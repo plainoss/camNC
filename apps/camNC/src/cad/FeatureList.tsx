@@ -73,9 +73,16 @@ function menuItems(
     rolledBack = false,
     last = false,
     sketchName = 'sketch',
-    shown = true,
+    shown,
     folders = false,
-  }: { rolledBack?: boolean; last?: boolean; sketchName?: string; shown?: boolean; folders?: boolean } = {}
+  }: {
+    rolledBack?: boolean;
+    last?: boolean;
+    sketchName?: string;
+    /** Whether a sketch row shows, when its eye can be switched from here. */
+    shown?: boolean;
+    folders?: boolean;
+  } = {}
 ): { action: FeatureAction; label: string; disabled?: boolean; title?: string }[] {
   if (entry.kind === 'variable' || entry.kind === 'plane')
     return [
@@ -86,10 +93,21 @@ function menuItems(
   const { kind } = entry.step;
   const sketch = kind === 'sketch' || kind === 'faceSketch';
   const rename = kind === 'sketch' || kind === 'extrude' ? [{ action: 'rename' as const, label: 'Rename' }] : [];
-  const folder = { action: 'addToFolder' as const, label: 'Add selection to folder…', disabled: !folders };
+  // A part is in one folder at most, so one already in a folder has nothing to add.
+  const folder = {
+    action: 'addToFolder' as const,
+    label: 'Add selection to folder…',
+    disabled: !folders,
+    title: 'Its part is already in a folder.',
+  };
   const suppress = sketch
     ? { action: 'unavailable' as const, label: 'Suppress', disabled: true, title: 'A sketch is suppressed with the extrude made from it.' }
-    : { action: 'suppress' as const, label: entry.step.suppressed ? 'Unsuppress' : 'Suppress', disabled: kind === 'move' };
+    : {
+        action: 'suppress' as const,
+        label: entry.step.suppressed ? 'Unsuppress' : 'Suppress',
+        disabled: kind === 'move',
+        title: 'A move is undone by deleting it.',
+      };
   const remove = { action: 'delete' as const, label: 'Delete', disabled: kind === 'faceSketch' || kind === 'copy' };
   // A step past the bar can only be named, grouped, switched off, rolled to or deleted until the design reaches it.
   if (rolledBack)
@@ -111,7 +129,7 @@ function menuItems(
     ...(sketch ? [unavailable('Copy sketch')] : []),
     unavailable('Show dimensions'),
     folder,
-    ...(kind === 'sketch' ? [{ action: 'toggleShown' as const, label: shown ? 'Hide' : 'Show' }] : []),
+    ...(kind === 'sketch' && shown !== undefined ? [{ action: 'toggleShown' as const, label: shown ? 'Hide' : 'Show' }] : []),
     ...(sketch ? [unavailable(`Create Drawing of ${entry.step.label}…`), { action: 'export' as const, label: 'Export as DXF/SVG…' }] : []),
     suppress,
     unavailable('Dynamic suppression'),
@@ -234,6 +252,8 @@ export function FeatureList({
     entry.kind === 'plane' ? entry.id : entry.kind === 'step' && entry.step.kind === 'sketch' ? entry.step.id : null;
   const key = (entry: ListedFeatureEntry) => (entry.kind === 'step' ? entry.step.id : entry.id);
   const rollbackAt = rollback ? entries.findIndex(entry => key(entry) === rollback) : -1;
+  const inFolder = (entry: FeatureEntry) =>
+    entry.kind === 'step' && !!document.folders?.some(folder => folder.partIds.includes(entry.step.partId));
   /** The name of the sketch an extrude row is made from, its own or the one it shares. */
   const sketchOf = (entry: FeatureEntry) => {
     if (entry.kind !== 'step') return undefined;
@@ -295,7 +315,11 @@ export function FeatureList({
           )}
         </h2>
         {onChange && (
-          <button type="button" aria-label="New folder" title="Group neighbouring parts and planes in a folder" onClick={folders.newFolder}>
+          <button
+            type="button"
+            aria-label="New folder"
+            title="Group neighbouring parts and planes in a folder"
+            onClick={() => folders.newFolder()}>
             ＋
           </button>
         )}
@@ -600,8 +624,8 @@ export function FeatureList({
             rolledBack: rollbackAt >= 0 && entries.findIndex(entry => key(entry) === key(menu.entry)) > rollbackAt,
             last: key(entries.at(-1)!) === key(menu.entry),
             sketchName: sketchOf(menu.entry),
-            shown: !visibilityId(menu.entry) || shown?.(visibilityId(menu.entry)!) !== false,
-            folders: !!onChange,
+            shown: onToggleShown && visibilityId(menu.entry) ? shown?.(visibilityId(menu.entry)!) !== false : undefined,
+            folders: !!onChange && !inFolder(menu.entry),
           }).map(item => (
             <button
               key={item.label}
@@ -614,8 +638,8 @@ export function FeatureList({
                 const { entry } = menu;
                 setMenu(null);
                 if (item.action === 'rename' && entry.kind === 'step') setRenaming(entry.step.id);
-                // A new folder takes the row's part, which right-clicking it selected.
-                else if (item.action === 'addToFolder') folders.newFolder();
+                // A new folder starts with the row's part.
+                else if (item.action === 'addToFolder') folders.newFolder(entry.kind === 'step' ? entry.step.partId : undefined);
                 else if (item.action === 'toggleShown') onToggleShown?.(visibilityId(entry)!);
                 else onAction(entry, item.action);
               }}>
