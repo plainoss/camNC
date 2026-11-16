@@ -28,6 +28,8 @@ export * from './datumPlanes';
 export * from './consumedTools';
 export * from './physicalJoinedCopies';
 export * from './edgeFillets';
+export * from './edgeRounds';
+export * from './filletProblems';
 export * from './suppression';
 export * from './extrudeSteps';
 export * from './faceExtrude';

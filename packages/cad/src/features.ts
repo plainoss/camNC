@@ -4,6 +4,7 @@ import { cadDocumentVersion } from './documentVersion';
 import { featuresForCopy } from './copyFeatures';
 import { faceRemovalDepth } from './faceRemovalDepth';
 import { newCadId, originId } from './document';
+import { withEdgeRounds } from './edgeRounds';
 import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
 import { relieveCorners } from './cornerRelief';
@@ -450,5 +451,15 @@ export function evaluateCadDocument(given: CadDocument, options: { through?: str
       ? evaluateCopyOperations(document, removed.parts, options.through)
       : applyPartCuts(document, removed.parts);
   diagnostics.push(...cut.diagnostics);
-  return { ...cut, parts: diagnostics.some(d => d.severity === 'error') ? [] : cut.parts, diagnostics };
+  // Fillet steps along a part's faces round over the edges of what all its cuts leave, joints and other parts' Removes
+  // included.
+  const byId = new Map(document.parts.map(part => [part.id, part]));
+  const finished = cut.parts.map(made => {
+    const source = byId.get(made.partId);
+    if (!source?.fillets?.some(fillet => fillet.rims?.length)) return made;
+    const rounded = withEdgeRounds(source, made);
+    diagnostics.push(...rounded.diagnostics);
+    return rounded.part;
+  });
+  return { ...cut, parts: diagnostics.some(d => d.severity === 'error') ? [] : finished, diagnostics };
 }

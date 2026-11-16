@@ -3,6 +3,7 @@ import {
   evaluateCadPart,
   evaluateCadPartFamily,
   evaluatedPartCopy,
+  withEdgeRounds,
   withPartCuts,
   type CadPart,
   type CadDocument,
@@ -72,7 +73,7 @@ export function partSolid(
     const machined = document ? withPartCuts(document, family) : family;
     // A face sketch uses the original local frame, including on mirrors. Select the copy's material without reflecting its axes.
     const shape = copyId ? evaluatedPartCopy(machined, { id: copyId }) : machined;
-    const { mesh, info } = nativePart(shape);
+    const { mesh, info } = nativePart(withEdgeRounds(part, shape).part);
     return { geometry: modelGeometry(mesh), origin: info.sourceOrigin, problem };
   } catch (cause) {
     return { problem: cause instanceof Error ? cause.message : String(cause) };

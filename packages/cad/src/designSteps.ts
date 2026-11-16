@@ -1,6 +1,6 @@
 import { mergedWithAll } from './unionParts';
 import { evaluateCadPart } from './geometry';
-import { edgeFilletProblems } from './edgeFillets';
+import { filletProblems } from './filletProblems';
 import { resolveExtrudeSteps } from './extrudeSteps';
 import { cadFaceSketches, faceIsUnderside } from './featureModel';
 import { cadCopyName } from './partPatterns';
@@ -162,7 +162,7 @@ export function designSteps(document: CadDocument): DesignStep[] {
     // switched off, itself or by its folder, isn't made, so neither is its fillet.
     const sharp =
       step.kind === 'fillet' && part && !step.suppressed && !part.suppressed && !masked.has(part.id)
-        ? edgeFilletProblems(part).some(problem => problem.filletId === step.id)
+        ? filletProblems(document, part).some(problem => problem.filletId === step.id)
           ? // As the reference says it; the Fillet dialog and the part say which corners and why.
             'Failed to fillet selections.'
           : undefined

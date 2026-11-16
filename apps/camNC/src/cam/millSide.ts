@@ -23,6 +23,9 @@ export function asMilled(part: EvaluatedCadPart): EvaluatedCadPart {
     ...mirrored,
     partId: part.partId,
     cuts: mirrored.cuts!.map(cut => ({ ...cut, side: cut.side === 'underside' ? 'top' : 'underside' })),
+    ...(mirrored.rounds && {
+      rounds: mirrored.rounds.map(round => ({ ...round, side: round.side === 'underside' ? 'top' : 'underside' })),
+    }),
   };
   // Copies that differ are separate parts by now, in the sketch's own frame.
   delete turned.copyCuts;

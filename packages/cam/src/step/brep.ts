@@ -4,6 +4,7 @@ import { difference, intersect, union, type Pt, type Vec3 } from '../geom';
 import { ON_CIRCLE, pathCircles, type Circle } from './arcs';
 import { pairEdgeUses } from './edgePairs';
 import { stackedWalls, withoutSeams, withUsedPoints } from './walls';
+import { roundMover, roundSlices, type MeshRound } from '../roundOver';
 
 /** A closed solid as faces bounded by shared edges, in the part's local frame (mm, z up). */
 export interface Brep {
@@ -29,6 +30,8 @@ export interface BrepFace {
 type Path = Pt[];
 /** Points this close are one vertex: twice Clipper's 1e-4 mm rounding. */
 const SAME_POINT = 2e-4;
+/** How near a rounded loop's points must lie to a circle found in the walls to be on it: the fit is from Clipper's rounded points. */
+const kOnRoundCircle = 0.02;
 const signedArea = (path: Path) =>
   path.reduce((sum, p, i) => sum + p.x * path[(i + 1) % path.length]!.y - path[(i + 1) % path.length]!.x * p.y, 0) / 2;
 function contains(path: Path, point: Pt) {
@@ -116,13 +119,13 @@ function shapes(region: PathsD) {
  * one cylindrical face with arc edges; everything else is planar, so curves other than arcs stay within the sketch's
  * chord tolerance.
  */
-export function partBrep(features: PartFeatures, underside?: PartFeatures | null): Brep {
-  const exact = buildBrep(features, underside, true);
+export function partBrep(features: PartFeatures, underside?: PartFeatures | null, rounds: readonly MeshRound[] = []): Brep {
+  const exact = buildBrep(features, underside, true, rounds);
   // Where arcs can't be matched up between faces, the part is still written, with flat facets for its curves.
-  return brepProblems(exact).length ? buildBrep(features, underside, false) : exact;
+  return brepProblems(exact).length ? buildBrep(features, underside, false, rounds) : exact;
 }
 
-function buildBrep(features: PartFeatures, underside: PartFeatures | null | undefined, arcs: boolean): Brep {
+function buildBrep(features: PartFeatures, underside: PartFeatures | null | undefined, arcs: boolean, rounds: readonly MeshRound[]): Brep {
   const points: Vec3[] = [],
     index = new Map<string, number[]>();
   /**
@@ -164,7 +167,9 @@ function buildBrep(features: PartFeatures, underside: PartFeatures | null | unde
     thickness = features.thickness;
 
   // Walls between heights, as the mesh has them: material present in both stacks over each interval.
-  const heights = [...new Set([0, ...levels.map(level => level.z), ...below.map(level => thickness - level.z)])].sort((a, b) => a - b);
+  const heights = [
+    ...new Set([0, ...levels.map(level => level.z), ...below.map(level => thickness - level.z), ...rounds.flatMap(roundSlices)]),
+  ].sort((a, b) => a - b);
   const slabs = heights.slice(0, -1).map((low, i) => {
     const high = heights[i + 1]!,
       middle = (low + high) / 2,
@@ -182,9 +187,15 @@ function buildBrep(features: PartFeatures, underside: PartFeatures | null | unde
     cap(difference(under, over), z, true);
     cap(difference(over, under), z, false);
   });
-  const circles = !arcs ? [] : pathCircles(slabs.flatMap(slab => slab.region));
+  // A rounded loop's walls are sloped facets over its round, each slice its own face: a circle it follows is no arc.
+  const move = roundMover(rounds);
+  const circles = (!arcs ? [] : pathCircles(slabs.flatMap(slab => slab.region))).filter(
+    circle =>
+      !rounds.some(round => round.points.every(p => Math.abs(Math.hypot(p.x - circle.x, p.y - circle.y) - circle.r) < kOnRoundCircle))
+  );
+  const sloped = (low: number, along: Pt[]) => !!move(along[0]!.x, along[0]!.y, low) && !!move(along.at(-1)!.x, along.at(-1)!.y, low);
   const seams = new Set<number>();
-  for (const { circle, ccw, along, low, high, bottom, top, first, last } of stackedWalls(slabs, circles, vertex)) {
+  for (const { circle, ccw, along, low, high, bottom, top, first, last } of stackedWalls(slabs, circles, vertex, sloped)) {
     for (const v of [...first, ...last]) seams.add(v);
     // Along the bottom, up the last side, back along the top and down the first side, past the heights in between.
     const loop = [...bottom, ...last, ...[...top].reverse(), ...[...first].reverse()];
@@ -213,7 +224,39 @@ function buildBrep(features: PartFeatures, underside: PartFeatures | null | unde
   for (let i = drafts.length - 1; i >= 0; i--) if (!drafts[i]!.loops.length) drafts.splice(i, 1);
   for (const chain of chains) chain.vertices = withoutSpikes(conform(chain.vertices, points, false, circles, level), false);
   withoutSeams(drafts, chains, points, seams);
-  return withUsedPoints(withEdges(drafts, chains, points));
+  return roundedOver(withUsedPoints(withEdges(drafts, chains, points)), move);
+}
+
+/**
+ * The sharp solid's points on rounded edges moved onto their rounds, as the mesh's are: each face they bound stays
+ * planar, a cap shrunk by the round or a wall's slice sloped over it, and is given its new plane.
+ */
+function roundedOver(brep: Brep, move: (x: number, y: number, z: number) => Pt | null): Brep {
+  let moved = false;
+  const points = brep.points.map((p): Vec3 => {
+    const to = move(p[0], p[1], p[2]);
+    if (!to || (Math.abs(to.x - p[0]) < 1e-12 && Math.abs(to.y - p[1]) < 1e-12)) return p;
+    moved = true;
+    return [to.x, to.y, p[2]];
+  });
+  if (!moved) return brep;
+  const faces = brep.faces.map(face => {
+    if (face.surface.kind !== 'plane') return face;
+    const loop = face.loops[0]!.map(({ edge, forward }) => points[forward ? brep.edges[edge]!.start : brep.edges[edge]!.end]!);
+    // Newell's normal of the outer loop, which runs counterclockwise seen from outside.
+    const normal: Vec3 = [0, 0, 0];
+    loop.forEach((a, i) => {
+      const b = loop[(i + 1) % loop.length]!;
+      normal[0] += (a[1] - b[1]) * (a[2] + b[2]);
+      normal[1] += (a[2] - b[2]) * (a[0] + b[0]);
+      normal[2] += (a[0] - b[0]) * (a[1] + b[1]);
+    });
+    const length = Math.hypot(...normal);
+    const before = face.surface.normal;
+    if (!length || normal[0] * before[0] + normal[1] * before[1] + normal[2] * before[2] <= 0) return face;
+    return { ...face, surface: { kind: 'plane' as const, origin: loop[0]!, normal: normal.map(v => v / length) as Vec3 } };
+  });
+  return { ...brep, points, faces };
 }
 
 /**
