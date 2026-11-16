@@ -49,6 +49,8 @@ export function nativePart(source: EvaluatedCadPart): {
     indices = geometry.index ? Uint32Array.from(geometry.index.array) : Uint32Array.from({ length: positions.length / 3 }, (_, i) => i);
     geometry.dispose();
   }
+  // CAM runs a roundover bit around each, where one of its radius is in the job.
+  if (rounds.length) features.rounds = rounds.map(({ points, ...round }) => ({ loop: points, ...round }));
   const part: FlatPart = {
     name: source.name,
     size,

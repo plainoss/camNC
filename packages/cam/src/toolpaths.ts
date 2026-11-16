@@ -32,6 +32,7 @@ import {
   finishRoles,
 } from './passPlanning';
 import { pocketOperation } from './pocketOperation';
+import { roundoverBitFor, roundoverOperation } from './roundoverOperation';
 import { loopNotches } from './outlineReach';
 import { roughAroundNotches } from './roughNotches';
 
@@ -662,16 +663,30 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
       // The outline's path bridges notches narrower than the bit, such as finger slots: they'd stay uncut.
       outlineNotches.push(...loopNotches(o, i, tools[0].diameter, offsetToleranceFor(s)));
     });
+  // Edges the design rounds over, once the walls below them are cut: a roundover bit of the round's radius for each.
+  (features.rounds ?? []).forEach((round, i) => {
+    const name = `Round over ${i + 1}`;
+    const bit = roundoverBitFor(round, s.roundoverBits);
+    if (!bit) return warnings.push(`edge round ${i + 1}: no ${round2(round.radius)} mm roundover bit, so the edge stays sharp`);
+    // An outline's wall is only there once it's cut through.
+    if (!s.cutThrough && round.material === 'inside')
+      return warnings.push(`edge round ${i + 1}: the outline isn't cut, so the edge stays sharp`);
+    const op = roundoverOperation(name, round, bit, s);
+    if ('problem' in op) return warnings.push(op.problem);
+    ops.push(op);
+  });
   if (features.bottomFaces.length && s.cutThrough)
     warnings.push(`bottom-side features at z=${features.bottomFaces.map(b => b.z).join(', ')}: need a second (flipped) setup`);
   if (features.slopedArea > 1) warnings.push(`${features.slopedArea.toFixed(0)}mm² of sloped faces ignored (not 2.5D)`);
 
   warnings.push(...ops.flatMap(op => op.warnings ?? []), ...fluteWarnings(ops, top));
 
-  // Stable sort: smallest tool first, keeps pockets -> holes -> outline within a tool.
+  // Stable sort: smallest tool first, keeps pockets -> holes -> outline within a tool. Roundovers come last, after
+  // every wall they need is cut.
+  const last = (op: Operation) => (op.tool.shape === 'roundover' ? 1 : 0);
   const operations = ops
     .map((op, i) => ({ op, i }))
-    .sort((a, b) => a.op.tool.diameter - b.op.tool.diameter || a.i - b.i)
+    .sort((a, b) => last(a.op) - last(b.op) || a.op.tool.diameter - b.op.tool.diameter || a.i - b.i)
     .map(x => x.op);
   return finalizePlan(
     {

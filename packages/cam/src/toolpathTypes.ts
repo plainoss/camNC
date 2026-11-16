@@ -16,11 +16,17 @@ export interface Tool {
   presetName?: string;
   /** Cutting diameter in mm: a flat end mill's, or a V-bit's widest (at the top of its cone). */
   diameter: number;
-  /** Default `flat`. A `v` bit has a cone of `angle` and cuts deeper where it should cut wider. */
-  shape?: 'flat' | 'v';
+  /**
+   * Default `flat`. A `v` bit has a cone of `angle` and cuts deeper where it should cut wider. A `roundover` bit's flank
+   * is a quarter circle of `radius`, rising from its tip (`tipDiameter`) to its full diameter: run along an edge with its
+   * tip by the wall, it rounds the edge over.
+   */
+  shape?: 'flat' | 'v' | 'roundover';
+  /** A roundover bit's radius, mm: the round it cuts. */
+  radius?: number;
   /** A V-bit's included angle, degrees (90 for a 90° bit). */
   angle?: number;
-  /** A V-bit's flat at the tip, mm (0: pointed). */
+  /** A V-bit's flat at the tip, mm (0: pointed), or a roundover bit's tip below its quarter circle. */
   tipDiameter?: number;
   name?: string;
   /** Depth per pass with this bit (its cutting data); default: the material's share of the diameter. */
@@ -47,6 +53,8 @@ export interface Tool {
 }
 
 export interface CamSettings {
+  /** Roundover bits for edges a design rounds over, each used where its radius matches; never for pockets or outlines. */
+  roundoverBits?: Tool[];
   /** Only for the G-code (`GcodeOptions.spindle`): the toolpaths are the same. */
   spindle?: SpindleSwitch;
   tools: Tool[];
