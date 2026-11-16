@@ -108,7 +108,7 @@ function unite(document: CadDocument, step: CadPartCut): { part: EvaluatedCadPar
   const joined = parts as CadPart[];
   for (const part of joined) {
     if (part.copies?.length || part.pattern) return { refused: `${part.name} has copies, which a union can't join yet.` };
-    if (document.parts.some(other => other.addTo === part.id && isJoinedBody(document, other)))
+    if (document.parts.some(other => other.addTo === part.id && isJoinedBody(document, other) && !step.tools.includes(other.id)))
       return { refused: `${part.name} has a body added to it, which a union can't join yet.` };
   }
   // Other steps' cuts in these parts would be lost, and parts other steps use or join can't be joined here too: the union
@@ -152,6 +152,7 @@ export function mergedWithAll(
   part: CadPart
 ): { hostId: string; joined: string[]; made: { part: EvaluatedCadPart } | { refused: string }; lost?: string[] } | null {
   if (part.intersect && !part.suppressed && part.extrude !== false) return intersectedWith(document, part);
+  if (!part.mergeAll && part.addTo && isJoinedBody(document, part)) return fusedAdd(document, part);
   if (!part.mergeAll || part.suppressed || part.extrude === false) return null;
   const touched = overlappedParts(document, part.id);
   if (!touched.length) return null;
@@ -201,4 +202,16 @@ function intersectedWith(
     made: 'refused' in made ? { refused: kNoIntersection } : made,
     lost,
   };
+}
+
+/**
+ * An Extrude › Add's body fused into the part it joins, as one solid: a stepped part where they differ in height. Only
+ * the one body joined to a part, drawn on its plane and extruded the same way, is fused; any other stays a solid of its
+ * own beside it, as before.
+ */
+function fusedAdd(document: CadDocument, part: CadPart): { hostId: string; joined: string[]; made: { part: EvaluatedCadPart } } | null {
+  const hostId = part.addTo!;
+  if (document.parts.some(other => other.id !== part.id && other.addTo === hostId && isJoinedBody(document, other))) return null;
+  const made = unionOf(document, { id: `${part.id}:add`, targets: [hostId], tools: [part.id], clearance: 0, operation: 'union' });
+  return 'part' in made ? { hostId, joined: [part.id], made } : null;
 }
