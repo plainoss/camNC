@@ -159,3 +159,39 @@ it('joins four boards apart with a disc sunk into their tops by Merge with all, 
   // Pocketed from below where only the disc is, 16.8 up.
   expect(joined!.part.cuts!.some(cut => Math.abs(cut.to - cut.from - 16.8) < 1e-6)).toBe(true);
 });
+
+it('joins only bodies that meet, by an area or a shared face, and refuses a part that would start above the first', async () => {
+  const unresolved = async (document: CadDocument) =>
+    (await solveCadDocument(document)).diagnostics.some(d => d.code === 'boolean-unresolved');
+  // On a plane 15 up and off to the side, the second board meets the first nowhere.
+  const floating = {
+    ...board('Part 2', 40, 40, 30, 15),
+    sketch: addRectangle(createCadPart().sketch, { x: 200, y: 0, width: 40, height: 40 }),
+  };
+  expect(await unresolved(union([board('Part 1', 100, 40, 10), floating]))).toBe(true);
+  // Side by side on one plane, they share a face and join.
+  const beside = { ...board('Part 2', 40, 40, 10), sketch: addRectangle(createCadPart().sketch, { x: 100, y: 0, width: 40, height: 40 }) };
+  expect(await unresolved(union([board('Part 1', 100, 40, 10), beside]))).toBe(false);
+  // On top but only along an edge of the first, it shares no face.
+  const edge = {
+    ...board('Part 2', 40, 40, 10, 10),
+    sketch: addRectangle(createCadPart().sketch, { x: 100, y: 0, width: 40, height: 40 }),
+  };
+  expect(await unresolved(union([board('Part 1', 100, 40, 10), edge]))).toBe(true);
+  // An Add standing off its part's top face stays a body of its own.
+  const host = board('Base', 100, 40, 10);
+  const off = {
+    ...board('Boss', 20, 20, 5, 10),
+    addTo: 'Base',
+    sketch: addRectangle(createCadPart().sketch, { x: 150, y: 0, width: 20, height: 20 }),
+  };
+  expect(mergedWithAll({ ...createCadDocument(), parts: [host, off] }, off)).toBeNull();
+  // A disc intersected into the top of a board keeps only 1.2 mm up there, which can't stand on the board's plane.
+  const sunk = {
+    ...board('Disc', 20, 20, 1.2, 10),
+    drawnOn: { on: { plane: 'top' as const }, offset: 10, inward: true as const },
+  };
+  const intersect: CadDocument = { ...union([board('Part 1', 100, 40, 10), sunk]) };
+  intersect.partCuts = [{ ...intersect.partCuts![0]!, operation: 'intersect' }];
+  expect(await unresolved(intersect)).toBe(true);
+});

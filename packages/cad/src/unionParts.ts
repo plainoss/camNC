@@ -102,6 +102,12 @@ export function unitedPart(
     kept.push(span);
   }
   if (!kept.length) return { refused: `${host.shape.name} can't be joined with its tools.` };
+  // A union joins bodies that meet: over an area where their slabs touch, or side by side where their slabs overlap.
+  if (operation === 'union' && !connected(outlines, spans, topRegions))
+    return { refused: 'The parts don’t all touch, so a union would leave them apart.' };
+  // Nor can a part start above the first part's sketch plane, as an intersection sunk into its top would.
+  if (Math.min(...kept.map(([low]) => low)) >= kMinStep)
+    return { refused: `What's kept starts above ${host.shape.name}'s sketch plane, which can't be made yet.` };
   const height = Math.max(...kept.map(([, high]) => high));
   regions.forEach((regionId, i) => {
     const step = height - kept[i]![1];
@@ -134,6 +140,51 @@ export function unitedPart(
   const problem = result?.diagnostics.find(d => d.severity === 'error');
   if (!result || problem) return { refused: problem?.message ?? `${host.shape.name} can't be joined with its tools.` };
   return { part: { ...result.part, partId: host.shape.partId, name: host.shape.name } };
+}
+
+/** Whether every body meets the first, directly or through others, by an area or a shared side. */
+function connected(outlines: CadPoint[][], spans: [number, number][], regions: { points: CadPoint[] }[]): boolean {
+  const n = outlines.length;
+  const meets = (i: number, j: number) => {
+    const [a, b] = [spans[i]!, spans[j]!];
+    const overlap = Math.min(a[1], b[1]) - Math.max(a[0], b[0]);
+    if (overlap < -kSame) return false;
+    // Over an area: some region both cover, their slabs touching or overlapping.
+    const over = regions.some(region => {
+      const inside = regionInteriorPoint(region.points);
+      return !!inside && pointInPolygon(inside, outlines[i]!) && pointInPolygon(inside, outlines[j]!);
+    });
+    // Side by side: their outlines share a side, and their slabs overlap in height, so they share a face.
+    return over || (overlap >= kMinStep && sharesSide(outlines[i]!, outlines[j]!));
+  };
+  const reached = new Set([0]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (let j = 0; j < n; j++)
+      if (!reached.has(j) && [...reached].some(i => meets(i, j))) {
+        reached.add(j);
+        grew = true;
+      }
+  }
+  return reached.size === n;
+}
+
+/** Whether two outlines have collinear sides that overlap along a length, as boards side by side do. */
+function sharesSide(a: CadPoint[], b: CadPoint[]): boolean {
+  const sides = (points: CadPoint[]) => points.map((p, i) => [p, points[(i + 1) % points.length]!] as const);
+  for (const [p, q] of sides(a))
+    for (const [r, t] of sides(b)) {
+      const dx = q.x - p.x,
+        dy = q.y - p.y,
+        length = Math.hypot(dx, dy);
+      if (length < kSame) continue;
+      const off = (point: CadPoint) => Math.abs((point.x - p.x) * dy - (point.y - p.y) * dx) / length;
+      if (off(r) > CAD_CHORD_TOLERANCE || off(t) > CAD_CHORD_TOLERANCE) continue;
+      const along = (point: CadPoint) => ((point.x - p.x) * dx + (point.y - p.y) * dy) / length;
+      const [lo, hi] = [Math.min(along(r), along(t)), Math.max(along(r), along(t))];
+      if (Math.min(hi, length) - Math.max(lo, 0) > kMinStep) return true;
+    }
+  return false;
 }
 
 const unions = new WeakMap<CadDocument, Map<string, { part: EvaluatedCadPart } | { refused: string }>>();
