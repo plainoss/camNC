@@ -183,7 +183,11 @@ export function ExtrudeDialog({
         delete made.remove;
         delete made.intersect;
         // Walls around a shape are a new part's: Add, Remove and Intersect take the shape whole.
-        if (next !== 'new') delete made.thinWall;
+        // Walls go with a new part, and a Remove of lines cuts them as slots; Add and Intersect take the shape whole.
+        if (next !== 'new' && !(next === 'remove' && made.thinWall && !sketchRegions(p.sketch, CAD_CHORD_TOLERANCE).length)) {
+          delete made.thinWall;
+          delete made.thinEdges;
+        }
         delete made.regions;
         const own = sketchRegions(p.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
         if (next === 'remove') {
@@ -265,11 +269,14 @@ export function ExtrudeDialog({
               ? `Faces of ${sketchName}`
               : null;
   // Faces picked apart are listed one by one, as the reference lists them.
+  // Lines picked for a thin extrude are listed one by one, as edges of their sketch.
   const listed =
-    selection ??
-    (alsoMade.length ? Array.from({ length: regionCount ?? 0 }, () => 1) : regionEntrySizes(document, part, part.regions ?? [])).map(
-      (size, i) => <span key={i}>{`${size > 1 ? 'Faces' : 'Face'} of ${sketchName}`}</span>
-    );
+    part.thinWall && part.thinEdges?.length
+      ? part.thinEdges.map(id => <span key={id}>{`Edge of ${sketchName}`}</span>)
+      : (selection ??
+        (alsoMade.length ? Array.from({ length: regionCount ?? 0 }, () => 1) : regionEntrySizes(document, part, part.regions ?? [])).map(
+          (size, i) => <span key={i}>{`${size > 1 ? 'Faces' : 'Face'} of ${sketchName}`}</span>
+        ));
   const board = operation === 'remove' ? removeSupport(document, part) : null;
   const spatialRemove = isSpatialRemoval(part);
   const solidControls = operation !== 'remove';
@@ -352,7 +359,15 @@ export function ExtrudeDialog({
       )}
       {operation !== 'new' && (
         <div className="cad-feature-selection" data-active={stepProblem ? '' : undefined}>
-          <small>{part.faceProfile ? 'Face to extrude' : operation === 'add' ? 'Regions to add' : 'Sketch to cut'}</small>
+          <small>
+            {part.faceProfile
+              ? 'Face to extrude'
+              : part.thinWall
+                ? 'Faces and sketch regions to extrude'
+                : operation === 'add'
+                  ? 'Regions to add'
+                  : 'Sketch to cut'}
+          </small>
           <span className="cad-feature-selection-entries">{listed}</span>
           <button type="button" aria-pressed={profilePicking} onClick={onPickProfile}>
             Select profile
@@ -488,7 +503,7 @@ export function ExtrudeDialog({
         </>
       ) : null}
       <>
-        {operation === 'new' && part.drawnOn && (
+        {(operation === 'new' || (operation === 'remove' && part.thinWall)) && part.drawnOn && (
           // Solid pushes the sketch's face out by the thickness; Thin stands a board on a line drawn edge-on.
           <div className="cad-feature-tabs" role="tablist" aria-label="Extrude type">
             <button type="button" role="tab" aria-selected={!part.thin && !part.thinWall} onClick={() => setThinWall(false)}>
@@ -513,7 +528,9 @@ export function ExtrudeDialog({
         )}
         {operation === 'new' && (
           <div className="cad-feature-selection" data-active={profileError && !part.regions?.length ? '' : undefined}>
-            <small>{part.faceProfile ? 'Face to extrude' : 'Sketch to extrude'}</small>
+            <small>
+              {part.faceProfile ? 'Face to extrude' : part.thinWall ? 'Faces and sketch regions to extrude' : 'Sketch to extrude'}
+            </small>
             <span className="cad-feature-selection-entries">{listed}</span>
             <button type="button" aria-pressed={profilePicking} onClick={onPickProfile}>
               Select profile
@@ -525,7 +542,7 @@ export function ExtrudeDialog({
             )}
           </div>
         )}
-        {operation === 'new' && part.thinWall && (
+        {(operation === 'new' || operation === 'remove') && part.thinWall && (
           <ThinWallFields
             wall={part.thinWall}
             variables={variables}
