@@ -9,6 +9,7 @@ import {
   type CadPart,
 } from '@wbcnc/cad';
 import type { ViewRegion } from '@/cam/model/ModelViewport';
+import { enclosedUsedRegions } from './enclosedRegions';
 
 /**
  * The regions an extrude can pick, as the 3D view shows them while it's open: a Remove's on the face it cuts, among
@@ -71,7 +72,10 @@ export function withRegionToggled(document: CadDocument, partId: string, regionI
       if (p.id !== partId) return p;
       const removing = p.remove && removalRegions(document, p);
       const current = p.regions ?? (removing && !('error' in removing) ? removing.cut : []);
-      const regions = current.includes(regionId) ? current.filter(id => id !== regionId) : [...current, regionId];
+      // A region picked in takes with it the rest of its circle that an earlier extrude of the sketch used.
+      const regions = current.includes(regionId)
+        ? current.filter(id => id !== regionId)
+        : [...new Set([...current, regionId, ...enclosedUsedRegions(document, p, regionId)])];
       // Its last region unpicked, it picks none rather than all of the sketch; one that made other parts too keeps
       // making them with none of its own, and OK hands its feature to the first.
       return { ...p, regions };
