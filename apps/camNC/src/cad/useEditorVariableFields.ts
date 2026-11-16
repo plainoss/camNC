@@ -3,15 +3,21 @@ import { cadFieldVariableExpression, cadVariableScope, formatCadValue, setCadVar
 import { useDesignUnits } from './designUnits';
 import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
 
+/** The step a dialog or an open sketch edits, as the feature list names it: an Extrude's, or the sketch's. */
+export function editedStep(dialog: { kind: string; partId?: string } | null, sketching?: string | false): string | null {
+  if (dialog?.kind === 'extrude' && dialog.partId) return `${dialog.partId}:extrude`;
+  return sketching ? `${sketching}:sketch` : null;
+}
+
 export function useEditorVariableFields(
   document: CadDocument,
   current: RefObject<CadDocument>,
   commit: (document: CadDocument) => void,
-  /** The part whose sketch is open: a variable made in one of its fields is listed before that sketch. */
-  sketching?: string | false
+  /** The step being edited: a variable made in one of its fields is listed before it. */
+  editingStep: string | null = null
 ) {
   const editing = useRef<string | null>(null);
-  editing.current = sketching ? `${sketching}:sketch` : null;
+  editing.current = editingStep;
   const scope = useMemo(() => cadVariableScope(document), [document]);
   const { lengthUnit, formatLength } = useDesignUnits(document.lengthUnit ?? 'mm');
   const fields = useMemo<CadVariableFields>(

@@ -240,7 +240,7 @@ import { dialogCommand, featureDialog, picksParts, previewOwner, sameDialogShown
 import { usePatternVariableCommit } from './studioPatternVariableSource';
 import { useStudioPreview } from './useStudioPreview';
 import { useEditorDocumentKeys } from './useEditorDocumentKeys';
-import { useEditorVariableFields } from './useEditorVariableFields';
+import { editedStep, useEditorVariableFields } from './useEditorVariableFields';
 import { useFeatureShown, withMadeSketchHidden } from './useFeatureShown';
 import './cad.css';
 
@@ -562,7 +562,7 @@ export function CadEditor({
   const { commit: variableCommit, normalized: normalizePatternVariableSource } = usePatternVariableCommit(dialog, documentRef, next =>
     commit(next)
   );
-  const variableScope = useEditorVariableFields(doc, documentRef, variableCommit, !showWorkspace && part?.id);
+  const variableScope = useEditorVariableFields(doc, documentRef, variableCommit, editedStep(dialog, !showWorkspace && part?.id));
   const blankDesign = studioSession && isBlankDesign(doc);
   const extrusionDepth = useExtrudeDepth(doc, dialog?.kind === 'extrude' ? dialog.partId : undefined, next => commit(next));
   const studioPreview = useStudioPreview(doc, previewOwner(dialog));
@@ -1467,7 +1467,7 @@ export function CadEditor({
   // Labels and points are turned back where they stand, to read and look the same from any side.
   const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
   const studioDisabled = disabledStudioCommands(part, partHasOutline, builtParts.length);
-  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback, unbuiltParts);
+  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback, unbuiltParts, featureProblems);
   shownNow.current = featureShown;
   const partsPanel = (
     <>

@@ -283,7 +283,12 @@ export function setCadVariable(
     ...document,
     revision: document.revision + 1,
     variables: existing
-      ? variables.map(variable => (variable.id === id ? { id, name, expression, ...(folderId && { folderId }) } : variable))
+      ? // Its place in the feature list stays as it was.
+        variables.map(variable =>
+          variable.id === id
+            ? { id, name, expression, ...(folderId && { folderId }), ...(variable.before && { before: variable.before }) }
+            : variable
+        )
       : [...variables, { id, name, expression, ...(folderId && { folderId }) }],
   };
   if (existing && existing.name !== name) next = mapExpressions(next, text => renameCadExpressionVariable(text, existing.name, name));
@@ -293,12 +298,29 @@ export function setCadVariable(
   return { document: applyCadVariables(next), id };
 }
 
-/** Removes a variable nothing uses. */
+/** The message a step gets that names a variable the design doesn't have, as the reference words it. */
+export const kVariableMissing = 'Variable not found, is suppressed, or has not been set.';
+
+/** The parts with a value naming a variable the design doesn't have, as after deleting one they used. */
+export function cadPartsMissingVariables(document: CadDocument): Set<string> {
+  const known = new Set((document.variables ?? []).map(variable => variable.name));
+  const missing = new Set<string>();
+  const check = (expression: string | undefined, partId?: string) => {
+    if (partId && expression && cadExpressionNames(expression).some(name => !known.has(name))) missing.add(partId);
+  };
+  visitTypedValues(document, {
+    value: (typed, _kind, owner) => check(typed.expression, owner.partId),
+    pattern: (pattern, owner) => Object.values(pattern.expressions).forEach(expression => check(expression, owner.partId)),
+  });
+  return missing;
+}
+
+/**
+ * Removes a variable, as the reference does even when it's used: what names it then fails, and Undo brings it back.
+ */
 export function removeCadVariable(document: CadDocument, id: string): { document: CadDocument } | { error: string } {
   const variable = document.variables?.find(candidate => candidate.id === id);
   if (!variable) return { document };
-  const uses = cadVariableUses(document, variable.name);
-  if (uses) return { error: `${variable.name} is used in ${uses === 1 ? 'one place' : `${uses} places`}. Change those first.` };
   const variables = document.variables!.filter(candidate => candidate.id !== id);
   const next: CadDocument = { ...document, revision: document.revision + 1, variables };
   if (!variables.length) delete next.variables;

@@ -1,4 +1,4 @@
-import { sketchOwnerId, type CadDocument } from '@wbcnc/cad';
+import { kVariableMissing, sketchOwnerId, type CadDocument } from '@wbcnc/cad';
 import { useCallback } from 'react';
 import { featureShownByDefault } from './sketchShown';
 
@@ -12,15 +12,19 @@ export function useFeatureShown(
   visibility: Readonly<Record<string, boolean>>,
   shownDocument: CadDocument,
   pastRollback: ReadonlySet<string>,
-  unbuilt?: readonly string[]
+  unbuilt?: readonly string[],
+  /** Why each part wasn't built: one failing only on a variable that's gone keeps its sketch hidden, as the reference does. */
+  problems?: Readonly<Record<string, string>>
 ): (id: string) => boolean {
   return useCallback(
     (id: string) => {
       if (pastRollback.has(id)) return false;
       if (id in visibility) return visibility[id]!;
-      return (id.endsWith(':sketch') && !!unbuilt?.includes(id.slice(0, -':sketch'.length))) || featureShownByDefault(shownDocument, id);
+      const partId = id.endsWith(':sketch') ? id.slice(0, -':sketch'.length) : null;
+      const reveals = !!partId && !!unbuilt?.includes(partId) && problems?.[partId] !== kVariableMissing;
+      return reveals || featureShownByDefault(shownDocument, id);
     },
-    [visibility, shownDocument, pastRollback, unbuilt]
+    [visibility, shownDocument, pastRollback, unbuilt, problems]
   );
 }
 

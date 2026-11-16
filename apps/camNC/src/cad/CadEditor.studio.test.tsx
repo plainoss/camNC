@@ -634,7 +634,7 @@ it('greys out the features after the one being edited, and shows them again once
   expect(rolledBack()).toEqual([]);
 });
 
-it('says why a variable in use can’t be deleted, and edits a variable from an open sketch in the studio', async () => {
+it('deletes a variable in use, brought back by one Undo, and edits a variable from an open sketch in the studio', async () => {
   const source: CadDocument = {
     ...createPlateDocument({ width: 200, height: 100 }),
     variables: [
@@ -652,7 +652,10 @@ it('says why a variable in use can’t be deleted, and edits a variable from an 
   const features = await screen.findByRole('region', { name: 'Features' });
   fireEvent.contextMenu(within(features).getByRole('button', { name: /#a = 10 mm/ }));
   await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Delete' }));
-  expect((await screen.findByRole('alert')).textContent).toMatch(/a is used in one place/);
+  // Gone without asking, as in the reference: what names it fails instead, and Undo brings it back.
+  await waitFor(() => expect(within(features).queryByRole('button', { name: /#a = 10 mm/ })).toBeNull());
+  await userEvent.click(screen.getByRole('button', { name: /^Undo/ }));
+  await waitFor(() => expect(within(features).getByRole('button', { name: /#a = 10 mm/ })).toBeDefined());
 
   await userEvent.dblClick(within(features).getByRole('button', { name: /Sketch · Plate/ }));
   await screen.findByRole('dialog', { name: 'Sketch · Plate' });

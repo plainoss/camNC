@@ -78,12 +78,10 @@ describe('design variables panel', () => {
     expect(screen.queryByRole('textbox', { name: 'Variable name' })).toBeNull();
   });
 
-  it('won’t delete a variable that’s in use, and saves when focus leaves the row', async () => {
+  it('saves when focus leaves the row', async () => {
     const ui = setup();
     await add('board', '18mm');
     await add('width', '600mm');
-    await userEvent.click(screen.getByRole('button', { name: 'Delete width' }));
-    expect(screen.getByRole('alert').textContent).toBe('width is used in one place. Change those first.');
     const name = screen.getAllByRole('textbox', { name: 'Variable name' })[0] as HTMLInputElement;
     await userEvent.click(name);
     name.select();

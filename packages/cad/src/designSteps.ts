@@ -1,3 +1,4 @@
+import { cadPartsMissingVariables, kVariableMissing } from './variables';
 import { cadCuts } from './featureModel';
 import { mergedWithAll } from './unionParts';
 import { evaluateCadPart } from './geometry';
@@ -153,17 +154,23 @@ export function designSteps(document: CadDocument): DesignStep[] {
           : step.kind === 'extrude'
             ? own
             : // A sketch is fine when only its extrude is missing the regions to extrude, as when it was emptied.
-              step.kind === 'sketch' && !(part && own === missingRegionProblem(part))
+              step.kind === 'sketch' && !(part && own === missingRegionProblem(part)) && own !== kVariableMissing
               ? own
               : null;
-    const reason = lost ?? regions ?? onFace;
+    // A Remove whose depth comes to nothing, as a variable can set it, fails as the reference says; its part is kept.
+    const nothing =
+      step.kind === 'extrude' && part?.remove && part.remove.depth === 0 && !step.suppressed
+        ? 'Failed to extrude selections, check input.'
+        : null;
+    const reason = lost ?? regions ?? nothing ?? onFace;
     // A Cut parts step whose typed values can't be followed keeps its last good ones, and says why on its row.
     const values = step.kind === 'partCut' ? partCutProblems.get(step.id) : undefined;
     // A Fillet step that can't round some of its corners leaves them sharp, and says so on its row. A part that's
     // switched off, itself or by its folder, isn't made, so neither is its fillet.
     const sharp =
       step.kind === 'fillet' && part && !step.suppressed && !part.suppressed && !masked.has(part.id)
-        ? filletProblems(document, part).some(problem => problem.filletId === step.id)
+        ? // A part that can't be built has nothing to round.
+          own || filletProblems(document, part).some(problem => problem.filletId === step.id)
           ? // As the reference says it; the Fillet dialog and the part say which corners and why.
             'Failed to fillet selections.'
           : undefined
@@ -190,7 +197,9 @@ export function designSteps(document: CadDocument): DesignStep[] {
 export function brokenParts(document: CadDocument): Map<string, string> {
   const byId = new Map(document.parts.map(part => [part.id, part]));
   const masked = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partIds));
-  const broken = new Map<string, string>();
+  // A part naming a variable that's gone can't be built, and what's built on it fails in turn.
+  const naming = cadPartsMissingVariables(document);
+  const broken = new Map<string, string>([...naming].map(id => [id, kVariableMissing]));
   const missing = (id: string): string | null => {
     const host = byId.get(id);
     if (!host) return 'a deleted part';
@@ -203,7 +212,8 @@ export function brokenParts(document: CadDocument): Map<string, string> {
   for (let changed = true; changed; ) {
     changed = false;
     for (const part of document.parts) {
-      if (broken.has(part.id)) continue;
+      // What it's built on being gone comes first, even for a part that names a missing variable itself.
+      if (broken.has(part.id) && !naming.has(part.id)) continue;
       const on = part.drawnOn?.on;
       const face =
         on && 'partId' in on
@@ -227,6 +237,7 @@ export function brokenParts(document: CadDocument): Map<string, string> {
       const reason = face ? `It’s drawn on a face of ${face}.` : adds ? `It adds to ${adds}.` : null;
       if (reason) {
         broken.set(part.id, reason);
+        naming.delete(part.id);
         changed = true;
       }
     }
@@ -447,8 +458,14 @@ function filletsAfterTheirCuts(document: CadDocument, steps: DesignStep[]): Desi
     const found = fillets.get(step.id);
     if (!found) continue;
     const cuts = new Map(cadCuts(found.part).map(cut => [cut.id, cut.removedBy]));
+    // A cut's id names the Remove that makes it, so the order holds while that Remove cuts nothing, as at no depth.
     const after = new Set(
-      (found.fillet.rims ?? []).flatMap(rim => rim.loops.flatMap(loop => (cuts.get(loop) ? [`${cuts.get(loop)}:extrude`] : [])))
+      (found.fillet.rims ?? []).flatMap(rim =>
+        rim.loops.flatMap(loop => {
+          const by = cuts.get(loop) ?? (loop.includes(':cut:') ? loop.split(':cut:')[0] : undefined);
+          return by ? [`${by}:extrude`] : [];
+        })
+      )
     );
     if (!after.size) continue;
     const last = Math.max(...ordered.flatMap((candidate, index) => (after.has(candidate.id) ? [index] : [])));

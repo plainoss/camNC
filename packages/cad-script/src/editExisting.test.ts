@@ -61,11 +61,11 @@ describe('editing existing design entities', () => {
     expect(result.document.parts[0]!.copies).toBeUndefined();
     expect(result.document.variables!.map(variable => variable.name)).toEqual(['width']);
   });
-  it('refuses removing an in-use variable', async () => {
+  it('removes an in-use variable, leaving what names it to fail', async () => {
     const start = await panel();
     const result = await editCad(start.document, d => d.removeVariable('width'));
-    expect(result.scriptError).toMatch(/used/);
-    expect(result.document).toEqual(start.document);
+    expect(result.scriptError).toBeUndefined();
+    expect(result.document.variables?.some(variable => variable.name === 'width')).toBeFalsy();
   });
   it('refuses settings that are not part of the selected step', async () => {
     const start = await panel();

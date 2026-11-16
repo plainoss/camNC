@@ -326,6 +326,8 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
     }
     const support = removeSupport(resolved, step);
     if ('error' in support) continue;
+    // At no depth, or below, as a variable can set it, a Remove cuts nothing: down to nothing, or up, away from the board.
+    if (typeof step.remove.depth === 'number' && step.remove.depth <= 0) continue;
     const extent = faceRemovalDepth(step, support.board.thickness);
     if ('error' in extent) continue;
     const face = removedSketch(step, support.face);
@@ -419,7 +421,9 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
     if ('error' in support) return support.error;
     const extent = faceRemovalDepth(part, support.board.thickness);
     if ('error' in extent) return extent.error;
-    if (part.remove.depth !== 'through' && !(part.remove.depth > 0)) return 'A cut needs some depth.';
+    // A depth of nothing fails as the reference's does; one below cuts away from the board, which takes nothing off it.
+    if (part.remove.depth === 0) return 'Failed to extrude selections, check input.';
+    if (part.remove.depth !== 'through' && part.remove.depth < 0) return null;
     // A thin Remove of lines cuts the slots they widen into, however its own sketch closes.
     const slots = thinSlotSketch(part);
     if (slots ? !part.thinEdges?.length : !removedRegionIds(document, part).length)

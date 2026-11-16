@@ -557,7 +557,7 @@ describe('half-lap and finger joints', () => {
     if ('error' in renamed) throw new Error(renamed.error);
     document = renamed.document;
     expect(document.partCuts![0]!.split).toEqual({ fingers: 5, fingersExpression: '#count' });
-    expect(removeCadVariable(document, id)).toEqual({ error: 'count is used in one place. Change those first.' });
+    expect('document' in removeCadVariable(document, id)).toBe(true);
     expect(parseCadDocument(JSON.parse(JSON.stringify(document)))).toEqual(document);
   });
 

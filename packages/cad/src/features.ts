@@ -2,6 +2,7 @@ import { withCadLengthUnit } from './lengthUnits';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { cadDocumentVersion } from './documentVersion';
 import { pieceProfile } from './partPieces';
+import { cadPartsMissingVariables, kVariableMissing } from './variables';
 import { featuresForCopy } from './copyFeatures';
 import { faceRemovalDepth } from './faceRemovalDepth';
 import { newCadId, originId } from './document';
@@ -426,7 +427,13 @@ export function evaluateCadDocument(given: CadDocument, options: { through?: str
   const diagnostics = validateCadDocument(given.operationOrder === undefined ? document : { ...document, partCuts: given.partCuts });
   if (diagnostics.some(d => d.severity === 'error')) return { parts: [], diagnostics };
   const parts: EvaluatedCadPart[] = [];
+  // A part whose values name a variable that's gone isn't built, and says why.
+  const missingVariables = cadPartsMissingVariables(document);
   for (const part of document.parts) {
+    if (missingVariables.has(part.id) && isCadBody(document, part)) {
+      diagnostics.push({ code: 'variable-missing', message: kVariableMissing, severity: 'error', partId: part.id });
+      continue;
+    }
     if (part.remove && !isSpatialRemoval(part) && part.extrude !== false && !part.suppressed) {
       const on = part.drawnOn?.on;
       const support = on && 'partId' in on && document.parts.find(candidate => candidate.id === on.partId);

@@ -127,12 +127,17 @@ describe('typed values', () => {
     const broken = { ...applied, variables: applied.variables!.map(v => (v.id === 'size' ? { ...v, expression: '-3 mm' } : v)) };
     const [part] = applyCadVariables(broken).parts;
     // Allowed to be negative.
-    expect(part).toMatchObject({ drawnOn: { offset: -3 }, placement: { position: [-3, 2, -3] }, moved: { by: [1, -3, 3] } });
+    // A Remove's depth too: below nothing, it cuts nothing.
+    expect(part).toMatchObject({
+      drawnOn: { offset: -3 },
+      placement: { position: [-3, 2, -3] },
+      moved: { by: [1, -3, 3] },
+      remove: { depth: -3 },
+    });
     expect(part).toMatchObject({
       thickness: 12,
       thin: { depth: 12 },
       cornerRelief: { diameter: 12 },
-      remove: { depth: 12 },
       hole: { diameter: 12 },
       fillets: [{ radius: 12 }],
       features: [{ depth: 12 }],
