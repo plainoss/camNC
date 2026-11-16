@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { addRectangle, createCadPart, evaluateCadPart, polygonArea, sketchRegions } from './index';
+import { missingRegionProblem } from './regionProfile';
 
 const tray = (wall: { thickness1: number; thickness2: number; midPlane?: true }) => {
   const part = { ...createCadPart('Part 1', 10), drawnOn: { on: { plane: 'top' as const }, offset: 0 } };
@@ -26,4 +27,9 @@ it('puts Thickness 2 inside, and centres Thickness 1 on the outline with Mid pla
   const centred = evaluateCadPart(tray({ thickness1: 4, thickness2: 0, midPlane: true })).part!;
   expect(box(centred.outline).map(v => Math.round(v * 1e6) / 1e6)).toEqual([-2, -2, 102, 52]);
   expect(box(centred.holes[0]!).map(v => Math.round(v * 1e6) / 1e6)).toEqual([2, 2, 98, 48]);
+});
+
+it('marks the extrude as missing its shape while a thin one waits for its pick', () => {
+  const part = { ...tray({ thickness1: 5, thickness2: 0 }), regions: [] };
+  expect(missingRegionProblem(part)).toBe('Select face or sketch region to extrude. 1 missing selection');
 });
