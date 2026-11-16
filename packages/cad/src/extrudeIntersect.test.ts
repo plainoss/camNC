@@ -2,8 +2,10 @@ import { expect, it } from 'vitest';
 import {
   addCircle,
   addRectangle,
+  cadDocumentVersion,
   cadPartsToCut,
   consumedTools,
+  createCadDesign,
   createCadDocument,
   createCadPart,
   designSteps,
@@ -64,4 +66,15 @@ it('reads only well-formed Intersect, Merge with all, taken-edge and pattern-gri
   expect(
     saved(part => (part.pattern = { id: 'p', axis: 'x', count: 200, spacing: 10, second: { vector: [0, 1, 0], count: 200, spacing: 10 } }))
   ).toThrow();
+});
+
+it('marks a new design with the current Extrude rules, needing reader version 8 once it has an Add', () => {
+  const fresh = createCadDesign();
+  expect(parseCadDocument(JSON.parse(JSON.stringify(fresh)))).toMatchObject({ version: 1, extrudeRules: 2 });
+  const { intersect: _, ...boss } = { ...disc(false), addTo: 'board' };
+  const added: CadDocument = JSON.parse(JSON.stringify({ ...fresh, parts: [board(), boss] }));
+  expect(cadDocumentVersion(added)).toBe(8);
+  expect(() => parseCadDocument(added)).toThrow();
+  expect(parseCadDocument({ ...added, version: 8 }).extrudeRules).toBe(2);
+  expect(() => parseCadDocument({ ...fresh, extrudeRules: 1 })).toThrow();
 });

@@ -1,4 +1,4 @@
-import { createCadDocument, type CadDocument } from '@wbcnc/cad';
+import { createCadDesign, type CadDocument } from '@wbcnc/cad';
 import { compactCadReport, inspectCadDocument } from '@wbcnc/cad-script';
 import { assessCadTask } from '../../../../../../packages/cad-script/src/tasks/assess';
 import type { CadSavedTask, CadTaskAssessment } from '../../../../../../packages/cad-script/src/tasks/types';
@@ -31,7 +31,7 @@ export async function runLiveTask(
   start: CadDocument | null,
   options: Pick<AssistantRunOptions, 'config' | 'key' | 'examples' | 'pricing' | 'limits' | 'request' | 'signal'> & { replies: number }
 ): Promise<LiveRun> {
-  const base = start ?? { ...createCadDocument(task.id), parts: [] };
+  const base = start ?? { ...createCadDesign(task.id), parts: [] };
   const initial = await inspectCadDocument(base);
   const report = compactCadReport(initial.document, initial.report);
   let messages: AssistantMessage[] = [

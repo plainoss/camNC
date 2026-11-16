@@ -275,7 +275,7 @@ export function ExtrudeDialog({
   const apart = operation === 'new' && splitApartRegions(document, part.id) !== document;
   // An Add folded into its part's profile is checked as that part, by its step problem.
   const mergeTarget = operation === 'add' ? document.parts.find(candidate => candidate.id === part.addTo) : undefined;
-  const folded = !!mergeTarget && addsRegionsTo(mergeTarget, part);
+  const folded = !!mergeTarget && addsRegionsTo(document, mergeTarget, part);
   const profileError =
     operation === 'remove' || folded || part.thin || apart || (part.regions?.length === 0 && alsoMade.length)
       ? undefined

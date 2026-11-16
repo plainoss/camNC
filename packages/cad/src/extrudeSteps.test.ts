@@ -45,7 +45,9 @@ function splitDesign() {
   const narrow = regions.find(region => Math.abs(area(region.points) - 1500) < 1)!.id;
   return { owner: { ...owner, regions: [wide] }, wide, narrow };
 }
-const design = (...parts: CadPart[]): CadDocument => ({ ...createCadDocument(), parts });
+// A new design, built with the current Extrude rules; `saved` is one saved before them.
+const design = (...parts: CadPart[]): CadDocument => ({ ...createCadDocument(), extrudeRules: 2, parts });
+const saved = (...parts: CadPart[]): CadDocument => ({ ...createCadDocument(), parts });
 const second = (owner: CadPart, regions: string[], extra: Partial<CadPart> = {}): CadPart => ({
   ...createCadPart('Part 2', 12),
   id: 'second',
@@ -135,6 +137,10 @@ describe('Extrude → Add', () => {
     const higher = resolveExtrudeSteps(design(owner, second(owner, [narrow], { addTo: owner.id, thickness: 25 })));
     expect(higher.parts[0]!.addedRegions).toBeUndefined();
     expect(isJoinedBody(higher, higher.parts[1]!)).toBe(true);
+    // A design saved before these rules rebuilds as it did: the Add takes the part's depth over its regions.
+    const before = resolveExtrudeSteps(saved(owner, second(owner, [narrow], { addTo: owner.id, thickness: 10 })));
+    expect([before.parts[0]!.addedRegions, cadCuts(before.parts[0]!), before.version]).toEqual([[narrow], [], 1]);
+    expect(lower.version).toBe(8);
   });
 
   it('leaves the part’s own regions, steps a region several Adds take to the highest, and folds a level or flipped Add', () => {
@@ -203,6 +209,8 @@ describe('Extrude → Remove', () => {
     expect(document.parts.map(part => part.copies?.length ?? 0)).toEqual([0, 0]);
     const off = resolveExtrudeSteps(design(document.parts[0]!, { ...document.parts[1]!, pattern: { ...pattern, suppressed: true } }));
     expect(cadCuts(off.parts[0]!)).toHaveLength(1);
+    // Saved before feature patterns of a Remove were cut, the Remove still cuts once.
+    expect(cadCuts(resolveExtrudeSteps(saved(board, { ...pocket, remove: { depth: 5 }, pattern })).parts[0]!)).toHaveLength(1);
   });
 
   it('repeats a dado running off the board, along +x on the underside too, and skips an instance off the board', () => {

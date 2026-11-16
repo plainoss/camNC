@@ -1,4 +1,4 @@
-import { createCadDocument, type CadDocument } from '@wbcnc/cad';
+import { createCadDesign, type CadDocument } from '@wbcnc/cad';
 import { compactCadReport, inspectCadDocument } from '@wbcnc/cad-script';
 import { assessCadTask } from '../../../../../packages/cad-script/src/tasks/assess';
 import type { CadSavedTask, CadTaskAssessment, CadTaskCandidate } from '../../../../../packages/cad-script/src/tasks/types';
@@ -32,7 +32,7 @@ export async function benchmarkAssistantTask(
 ): Promise<AssistantTaskBenchmark> {
   const { reuseTrustedCheckResults = false, ...runOptions } = options;
   const started = performance.now();
-  const base = start ?? { ...createCadDocument(task.id), parts: [] };
+  const base = start ?? { ...createCadDesign(task.id), parts: [] };
   const initial = await inspectCadDocument(base);
   const checkedCandidates = new Map<string, CadTaskCandidate>();
   const result = await runDesignAssistant({

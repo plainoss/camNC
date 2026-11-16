@@ -52,7 +52,7 @@ export function extrudeDepthView(document: CadDocument, partId: string): Extrude
   const inward = part.drawnOn?.inward ? -1 : 1;
   const target = part.addTo && placed.parts.find(candidate => candidate.id === part.addTo);
   // An Add level with its target has no end of its own; its target owns the extrusion depth.
-  if (target && addedRegionStep(target, part) === 0) return null;
+  if (target && addedRegionStep(placed, target, part) === 0) return null;
   return {
     partId,
     origin: frame.origin.map((value, axis) => value + frame.x[axis]! * x + frame.y[axis]! * y) as Vec,

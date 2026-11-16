@@ -31,6 +31,9 @@ export function createCadDocument(name = 'Untitled design'): CadDocument {
   return { version: 1, id: newCadId(), name, revision: 0, parts: [] };
 }
 
+/** A new design, built with the current Extrude rules; `createCadDocument` alone is the bare document they apply to. */
+export const createCadDesign = (name?: string): CadDocument => ({ ...createCadDocument(name), extrudeRules: 2 });
+
 export function createCadPart(name = 'Part 1', thickness = 18): CadPart {
   const sketch: CadSketch = { id: newCadId(), entities: [], constraints: [] };
   sketch.entities.push({ id: originId(sketch), type: 'point', x: 0, y: 0, fixed: true, construction: true });
