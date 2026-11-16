@@ -1,5 +1,5 @@
 import { dimensionValueError } from './dimensionValues';
-import type { CadConstraint, CadDimension, CadDocument, CadLinearPattern, CadPart, CadPlacement, CadSketch, CadTurn } from './types';
+import type { CadConstraint, CadDimension, CadDocument, CadLinearPattern, CadPlacement, CadSketch, CadTurn } from './types';
 import { cadExpressionNames, parseCadValue, type CadValueScope, type CadValueUnit } from './valueExpressions';
 
 export const CAD_MIN_THICKNESS = 0.1;
@@ -32,6 +32,8 @@ export interface TypedValueKind {
 export interface TypedValueOwner {
   partId?: string;
   constraintId?: string;
+  /** The ordered move or turn of a copy that holds it. */
+  operationId?: string;
 }
 
 export type LinearPatternWithExpressions = CadLinearPattern & { expressions: NonNullable<CadLinearPattern['expressions']> };
@@ -58,6 +60,10 @@ export function workOutTypedValue(
   const error = kind.check?.(value);
   return error ? { error, got: value } : { value };
 }
+
+/** How a typed value that can't be worked out says so. */
+export const typedValueProblem = (expression: string, kind: TypedValueKind, error: string) =>
+  `${kind.label ? `${kind.label} ` : ''}${expression}: ${error}`;
 
 const moreThanNothing = (message: string) => (value: number) => (value > 0 ? null : message);
 
@@ -103,6 +109,9 @@ type AxisKinds = readonly [TypedValueKind, TypedValueKind, TypedValueKind];
 const perAxis = (kind: (axis: (typeof kAxes)[number]) => TypedValueKind): AxisKinds => [kind('x'), kind('y'), kind('z')];
 const kPosition = perAxis(axis => ({ label: `Position ${axis}`, unit: 'mm' }));
 const kMoveBy = perAxis(() => ({ unit: 'mm', quiet: true }));
+export const kCopyTranslation: TypedValueKind = { label: 'Translation', unit: 'mm' };
+export const kCopyRotation: TypedValueKind = { label: 'Rotation', unit: 'deg' };
+const kCopyTranslations = perAxis(() => kCopyTranslation);
 export const kPartCutClearance: TypedValueKind = {
   label: 'Clearance',
   unit: 'mm',
@@ -201,11 +210,15 @@ export function mapTypedValues(document: CadDocument, edit: TypedValueEdit): Cad
     const [position, positionExpressions] = axes(placement.position, placement.positionExpressions, kPosition);
     return position === placement.position ? placement : { ...placement, position, positionExpressions };
   };
-  const turned = (turn: CadTurn) => typed(turn, 'degrees', kTurn);
-  const moved = (move: NonNullable<CadPart['moved']>): NonNullable<CadPart['moved']> => {
-    if (!('by' in move)) return move;
-    const [by, byExpressions] = axes(move.by, move.byExpressions, kMoveBy);
-    return within(by === move.by ? move : { ...move, by, byExpressions }, 'turn', turned);
+  const turned = (kind: TypedValueKind) => (turn: CadTurn) => typed(turn, 'degrees', kind);
+  /** A distance along each axis and a turn, as a moved part and an ordered move of a copy both keep them. */
+  const moved = <T extends { by: Triple<number>; byExpressions?: Triple<string | null>; turn?: CadTurn }>(
+    move: T,
+    byKinds: AxisKinds,
+    turnKind: TypedValueKind
+  ): T => {
+    const [by, byExpressions] = axes(move.by, move.byExpressions, byKinds);
+    return within(by === move.by ? move : { ...move, by, byExpressions }, 'turn', turned(turnKind));
   };
   const constrained = (constraint: CadConstraint): CadConstraint => {
     const at = owner;
@@ -237,13 +250,13 @@ export function mapTypedValues(document: CadDocument, edit: TypedValueEdit): Cad
     });
     next = within(next, 'drawnOn', drawnOn => typed(drawnOn, 'offset', kDrawnOnOffset));
     next = within(next, 'placement', placed);
-    next = within(next, 'moved', moved);
+    next = within(next, 'moved', move => ('by' in move ? moved(move, kMoveBy, kTurn) : move));
     next = within(next, 'copies', copies =>
       each(copies, copy => {
         let copied = within(copy, 'along', along => typed(along, 'distance', kCopyDistance));
         copied = within(copied, 'placement', placed);
         copied = within(copied, 'offset', placed);
-        return within(copied, 'turn', turned);
+        return within(copied, 'turn', turned(kTurn));
       })
     );
     next = within(next, 'remove', remove => typed(remove, 'depth', kRemoveDepth));
@@ -267,8 +280,20 @@ export function mapTypedValues(document: CadDocument, edit: TypedValueEdit): Cad
         relief => typed(relief, 'diameter', kPartCutCornerRelief)
       )
     );
-  if (parts === document.parts && planes === document.planes && partCuts === document.partCuts) return document;
-  return { ...document, parts, ...(planes && { planes }), ...(partCuts && { partCuts }) };
+  const copyTransforms =
+    document.copyTransforms &&
+    each(document.copyTransforms, move => {
+      owner = { partId: move.partId, operationId: move.id };
+      return moved(move, kCopyTranslations, kCopyRotation);
+    });
+  if (
+    parts === document.parts &&
+    planes === document.planes &&
+    partCuts === document.partCuts &&
+    copyTransforms === document.copyTransforms
+  )
+    return document;
+  return { ...document, parts, ...(planes && { planes }), ...(partCuts && { partCuts }), ...(copyTransforms && { copyTransforms }) };
 }
 
 /** Looks at every typed value without changing any. */
