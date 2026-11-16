@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addCircle, addRectangle, createCadDocument, createCadPart, parseCadDocument } from './document';
+import { addCircle, addLine, addRectangle, createCadDocument, createCadPart, parseCadDocument } from './document';
 import { designSteps } from './designSteps';
 import { faceRims, rimAt, rimLoops } from './edgeRounds';
 import { evaluateCadDocument } from './features';
@@ -112,5 +112,69 @@ describe('a Fillet step along a face', () => {
   it('leaves an edge that’s gone sharp, and says so', () => {
     const document = cup([{ id: 'f', corners: [], rims: [{ side: 'top', loops: ['gone'] }], radius: 1 }]);
     expect(filletProblems(document, document.parts[0]!)[0]?.message).toMatch(/is gone/);
+  });
+});
+
+describe('edges along faces with other cuts', () => {
+  const plate = (draw: (sketch: CadPart['sketch']) => CadPart['sketch'], depth: number | 'through', more?: CadPart) => {
+    const board: CadPart = { ...createCadPart('Plate', 18), id: 'board' };
+    board.sketch = addRectangle(board.sketch, { x: 0, y: 0, width: 100, height: 60 });
+    const cut: CadPart = { ...createCadPart('Cut', 18), id: 'cut', drawnOn: { on: { partId: 'board', face: 'top' }, offset: 0 } };
+    cut.sketch = draw(cut.sketch);
+    const document = { ...createCadDocument(), parts: [board, { ...cut, remove: { depth } }, ...(more ? [more] : [])] };
+    const evaluated = evaluateCadDocument(document);
+    expect(evaluated.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    return evaluated.parts.find(part => part.partId === 'board')!;
+  };
+  const summary = (part: EvaluatedCadPart) => rimLoops(part).map(({ id, side, at, wall }) => [id.split(':')[0], side, at, wall]);
+
+  it('leave out a rabbet running off the edge, and the outline’s edge it cuts away', () => {
+    const part = plate(sketch => addRectangle(sketch, { x: 90, y: -10, width: 20, height: 80 }), 6);
+    expect(summary(part)).toEqual([['outline', 'underside', 0, 18]]);
+    expect(faceRims(part, 'top', { x: 50, y: 30 })).toHaveProperty('error');
+  });
+
+  it('put a counterbore’s hole on the floor of its bore', () => {
+    const bore: CadPart = { ...createCadPart('Hole', 18), id: 'small', drawnOn: { on: { partId: 'board', face: 'top' }, offset: 0 } };
+    bore.sketch = addCircle(bore.sketch, { x: 50, y: 30, radius: 5 });
+    const part = plate(sketch => addCircle(sketch, { x: 50, y: 30, radius: 10 }), 5, { ...bore, remove: { depth: 15 } });
+    expect(summary(part)).toEqual([
+      ['outline', 'top', 0, 18],
+      ['outline', 'underside', 0, 18],
+      ['cut', 'top', 0, 5],
+      ['small', 'top', 5, 10],
+    ]);
+    expect(faceRims(part, 'top', { x: 5, y: 5 })).toMatchObject({ loops: ['outline', expect.stringMatching(/^cut:/)] });
+  });
+
+  it('give a through cut an opening on both faces', () => {
+    const part = plate(sketch => addRectangle(sketch, { x: 20, y: 20, width: 30, height: 20 }), 'through');
+    expect(summary(part)).toEqual([
+      ['outline', 'top', 0, 18],
+      ['outline', 'underside', 0, 18],
+      ['cut', 'top', 0, 18],
+      ['cut', 'underside', 0, 18],
+    ]);
+  });
+
+  it('round a sharp-cornered part, its rounds meeting in a miter at each corner', () => {
+    const tri: CadPart = { ...createCadPart('Triangle', 18), id: 'tri' };
+    let sketch = addLine(tri.sketch, { x1: 0, y1: 0, x2: 100, y2: 0 });
+    sketch = addLine(sketch, { x1: 100, y1: 0, x2: 50, y2: 86.6 });
+    tri.sketch = addLine(sketch, { x1: 50, y1: 86.6, x2: 0, y2: 0 });
+    const round = (radius: number) =>
+      evaluateCadDocument({
+        ...createCadDocument(),
+        parts: [{ ...tri, fillets: [{ id: 'f', corners: [], rims: [{ side: 'top', loops: ['outline'] }], radius }] }],
+      }).parts[0]!.rounds;
+    expect(round(1)).toHaveLength(1);
+    // Past the biggest circle inside it, 28.9, a round leaves no top face.
+    expect(round(15)).toHaveLength(1);
+    expect(
+      evaluateCadDocument({
+        ...createCadDocument(),
+        parts: [{ ...tri, thickness: 40, fillets: [{ id: 'f', corners: [], rims: [{ side: 'top', loops: ['outline'] }], radius: 30 }] }],
+      }).parts[0]!.rounds
+    ).toBeUndefined();
   });
 });

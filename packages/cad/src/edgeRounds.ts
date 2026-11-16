@@ -1,5 +1,5 @@
 import { pointInPolygon } from './geometry';
-import type { CadDiagnostic, CadFilletRim, CadPart, CadPoint, EvaluatedCadPart, EvaluatedCadRound } from './types';
+import type { CadDiagnostic, CadFilletRim, CadPart, CadPoint, EvaluatedCadCut, EvaluatedCadPart, EvaluatedCadRound } from './types';
 
 /**
  * An edge along a face of a part that a Fillet can round over: where its top or underside, or a pocket's floor, meets a
@@ -29,7 +29,7 @@ export interface CadEdgeRoundProblem {
 
 const kTolerance = 1e-3;
 /** Points a loop is measured at for how narrow it gets: enough for a few hundredths of a mm on parts up to a metre. */
-const kWidthSamples = 800;
+const kWidthSamples = 400;
 /** How close, in mm, a picked mesh edge must lie to a loop to be on it: the mesh and the loop are tessellated alike. */
 const kPickTolerance = 0.05;
 
@@ -37,32 +37,46 @@ const sides = ['top', 'underside'] as const;
 
 /**
  * The edges along a part's faces a Fillet can round: its outline and through holes, on both sides, and each cut's
- * opening. A cut that runs out past the part's outline, as a rabbet does, has no closed opening, and the outline's edge
- * on that side is cut away in places too, so neither is offered.
+ * opening, with a through cut's on both. An opening inside another cut's opening sits on that cut's floor, as a
+ * counterbore's hole does. A cut that runs out to the part's outline, as a rabbet does, has no closed opening, and the
+ * outline's edge on that side is cut away in places too, so neither is offered.
  */
 export function rimLoops(part: EvaluatedCadPart): CadRimLoop[] {
   const cuts = part.cuts ?? [];
+  const onOutline = (p: CadPoint) => distanceToLoop(p, part.outline) < kTolerance;
   const open = new Set(
-    cuts.filter(cut => cut.outline.some(p => !pointInPolygon(p, part.outline) && distanceToLoop(p, part.outline) > kTolerance))
+    cuts.filter(cut =>
+      cut.outline.some((p, i) => {
+        const q = cut.outline[(i + 1) % cut.outline.length]!;
+        return (!pointInPolygon(p, part.outline) && !onOutline(p)) || onOutline({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
+      })
+    )
   );
+  const closed = cuts.filter(cut => !open.has(cut));
   const loops: CadRimLoop[] = [];
+  /** A loop's edge on a side: on the face itself, or on the floor of the deepest cut whose opening holds it. */
+  const place = (id: string, points: CadPoint[], side: 'top' | 'underside', bottom: number, self?: EvaluatedCadCut) => {
+    const holding = closed.filter(
+      other => other !== self && other.side === side && !other.through && other.from === 0 && encloses(other.outline, points)
+    );
+    const at = Math.max(self && self.side === side ? self.from : 0, ...holding.map(other => other.to));
+    if (at < bottom - kTolerance) loops.push({ id, side, at, points, material: 'outside', wall: bottom - at });
+  };
   for (const side of sides) {
     if (![...open].some(cut => cut.side === side && cut.from === 0))
       loops.push({ id: 'outline', side, at: 0, points: part.outline, material: 'inside', wall: part.thickness });
-    for (const loop of part.loops)
-      if (loop.kind === 'hole') loops.push({ id: loop.id, side, at: 0, points: loop.points, material: 'outside', wall: part.thickness });
+    for (const loop of part.loops) if (loop.kind === 'hole') place(loop.id, loop.points, side, part.thickness);
   }
-  for (const cut of cuts)
-    if (!open.has(cut))
-      loops.push({
-        id: cut.id,
-        side: cut.side,
-        at: cut.from,
-        points: cut.outline,
-        material: 'outside',
-        wall: (cut.through ? part.thickness : cut.to) - cut.from,
-      });
+  for (const cut of closed) {
+    place(cut.id, cut.outline, cut.side, cut.through ? part.thickness : cut.to, cut);
+    if (cut.through) place(cut.id, cut.outline, cut.side === 'top' ? 'underside' : 'top', part.thickness, cut);
+  }
   return loops;
+}
+
+/** Whether every point of `inner` is inside `outer`, or on it. */
+function encloses(outer: CadPoint[], inner: CadPoint[]): boolean {
+  return inner.every(p => pointInPolygon(p, outer) || distanceToLoop(p, outer) < kTolerance);
 }
 
 /**
@@ -147,10 +161,16 @@ export function withEdgeRounds(
       else found.push(loop);
     }
     // Each edge is checked against the walls and faces around it, with this step's other rounds and earlier ones.
-    const others = (loop: CadRimLoop) => loops.filter(other => other !== loop && other.side === loop.side && other.at === loop.at);
-    const roundOn = (other: CadRimLoop) =>
-      found.includes(other) ? r : rounds.find(round => round.loopId === other.id && round.side === other.side)?.radius;
-    const kept = found.filter(loop => {
+    // On a pocket's floor, the pocket's own wall bounds the face too, as a counterbore's does around its hole.
+    const others = (loop: CadRimLoop) => [
+      ...loops.filter(other => other !== loop && other.side === loop.side && Math.abs(other.at - loop.at) < kTolerance),
+      ...(part.cuts ?? [])
+        .filter(cut => loop.at > 0 && cut.side === loop.side && !cut.through && Math.abs(cut.to - loop.at) < kTolerance)
+        .filter(cut => encloses(cut.outline, loop.points))
+        .map((cut): CadRimLoop => ({ ...loop, id: `${cut.id}:floor`, points: cut.outline })),
+    ];
+    // A round must fit its own wall and the part's width first; those that do are then checked against each other.
+    const fitting = found.filter(loop => {
       const edge = { loopId: loop.id, side: loop.side };
       if (r > loop.wall + kTolerance) {
         refuse(edge, `a ${fmt(r)} mm round is more than the ${fmt(loop.wall)} mm wall below an edge.`, loop.wall);
@@ -161,9 +181,15 @@ export function withEdgeRounds(
         refuse(edge, `two ${fmt(r)} mm rounds would overlap across the part’s ${fmtWidth(across)} mm width.`, across / 2);
         return false;
       }
+      return true;
+    });
+    const roundOn = (other: CadRimLoop) =>
+      fitting.includes(other) ? r : rounds.find(round => round.loopId === other.id && round.side === other.side)?.radius;
+    const kept = fitting.filter(loop => {
+      const edge = { loopId: loop.id, side: loop.side };
       for (const other of others(loop)) {
-        const width = loopDistance(loop.points, other.points);
         const beside = roundOn(other) ?? 0;
+        const width = loopDistance(loop.points, other.points, r + beside);
         if (r + beside > width + kTolerance) {
           refuse(
             edge,
@@ -215,52 +241,91 @@ function distanceToLoop(p: CadPoint, loop: CadPoint[]): number {
   return best;
 }
 
-/** The least distance between two loops that don't cross. */
-function loopDistance(a: CadPoint[], b: CadPoint[]): number {
+/** The least distance between two loops that don't cross, or anything at least `enough` when they're further apart. */
+function loopDistance(a: CadPoint[], b: CadPoint[], enough: number): number {
+  const box = (points: CadPoint[]) => ({
+    x0: Math.min(...points.map(p => p.x)),
+    y0: Math.min(...points.map(p => p.y)),
+    x1: Math.max(...points.map(p => p.x)),
+    y1: Math.max(...points.map(p => p.y)),
+  });
+  const p = box(a),
+    q = box(b);
+  const gap = Math.hypot(Math.max(0, q.x0 - p.x1, p.x0 - q.x1), Math.max(0, q.y0 - p.y1, p.y0 - q.y1));
+  if (gap > enough) return gap;
+  // Only the points near the other loop's box can be the closest.
+  const near = (points: CadPoint[], to: typeof p) =>
+    points.filter(point => Math.max(to.x0 - point.x, point.x - to.x1, to.y0 - point.y, point.y - to.y1) <= enough + kTolerance);
   let best = Infinity;
-  for (const p of a) best = Math.min(best, distanceToLoop(p, b));
-  for (const p of b) best = Math.min(best, distanceToLoop(p, a));
-  return best;
+  for (const point of near(a, q)) best = Math.min(best, distanceToLoop(point, b));
+  for (const point of near(b, p)) best = Math.min(best, distanceToLoop(point, a));
+  return Number.isFinite(best) ? best : gap;
 }
 
 /**
- * How narrow the part's material gets across the loop itself, as between the two long sides of a thin strip: the least
- * distance, through the material, between two points of the loop far enough apart along it not to be neighbours. Rounds
- * of radius r from both meet when they're 2r apart; two points that close along a smooth bend are further apart along
- * the loop than π·r, and around a corner they're less, so only those further along than that can meet. Material inside
- * a loop is never wider than its perimeter over π, a circle's diameter.
+ * How narrow the part's material gets across the loop itself: twice the radius of the biggest circle that fits inside
+ * an outline, as a round bigger than that leaves no face, and the narrowest neck, between two points that face each
+ * other square across the material, as the middle of a dumbbell does, where rounds from both sides meet. Around a sharp
+ * corner the two sides don't face each other square, and their rounds only meet in a miter.
  */
 function selfWidth(loop: CadRimLoop): number {
-  const samples: { p: CadPoint; s: number }[] = [];
-  const n = loop.points.length;
+  const { points } = loop;
+  const n = points.length;
+  const area = points.reduce((sum, p, i) => sum + p.x * points[(i + 1) % n]!.y - points[(i + 1) % n]!.x * p.y, 0);
+  const sign = area > 0 === (loop.material === 'inside') ? 1 : -1;
   let perimeter = 0;
-  for (let i = 0; i < n; i++) {
-    const a = loop.points[i]!,
-      b = loop.points[(i + 1) % n]!;
-    perimeter += Math.hypot(b.x - a.x, b.y - a.y);
-  }
+  for (let i = 0; i < n; i++) perimeter += Math.hypot(points[(i + 1) % n]!.x - points[i]!.x, points[(i + 1) % n]!.y - points[i]!.y);
   const step = Math.max(perimeter / kWidthSamples, 1e-6);
-  let s = 0;
+  // Points along the loop, each with the way into the material, square to its side.
+  const samples: { x: number; y: number; nx: number; ny: number }[] = [];
   for (let i = 0; i < n; i++) {
-    const a = loop.points[i]!,
-      b = loop.points[(i + 1) % n]!;
+    const a = points[i]!,
+      b = points[(i + 1) % n]!;
     const length = Math.hypot(b.x - a.x, b.y - a.y);
-    const count = Math.max(1, Math.ceil(length / step));
+    if (!length) continue;
+    const nx = (-(b.y - a.y) / length) * sign,
+      ny = ((b.x - a.x) / length) * sign;
+    const count = Math.ceil(length / step);
     for (let k = 0; k < count; k++)
-      samples.push({ p: { x: a.x + ((b.x - a.x) * k) / count, y: a.y + ((b.y - a.y) * k) / count }, s: s + (length * k) / count });
-    s += length;
+      samples.push({ x: a.x + ((b.x - a.x) * (k + 0.5)) / count, y: a.y + ((b.y - a.y) * (k + 0.5)) / count, nx, ny });
   }
-  let best = loop.material === 'inside' ? perimeter / Math.PI : Infinity;
-  for (let i = 0; i < samples.length; i++)
+  let best = loop.material === 'inside' ? 2 * inradius(points) : Infinity;
+  for (let i = 0; i < samples.length; i++) {
+    const p = samples[i]!;
     for (let j = i + 1; j < samples.length; j++) {
-      const p = samples[i]!.p,
-        q = samples[j]!.p;
-      const d = Math.hypot(q.x - p.x, q.y - p.y);
-      if (d >= best) continue;
-      const apart = samples[j]!.s - samples[i]!.s;
-      if (Math.min(apart, perimeter - apart) < ((Math.PI * d) / 2) * (1 - 1e-9)) continue;
-      // Only across the material: across an empty notch, the rounds on its two sides don't meet.
-      if (pointInPolygon({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 }, loop.points) === (loop.material === 'inside')) best = d;
+      const q = samples[j]!;
+      const dx = q.x - p.x,
+        dy = q.y - p.y;
+      const d = Math.hypot(dx, dy);
+      if (d >= best || d < 1e-9) continue;
+      if ((p.nx * dx + p.ny * dy) / d > kSquare && -(q.nx * dx + q.ny * dy) / d > kSquare) best = d;
     }
+  }
   return best;
+}
+
+/** How square, as a cosine, two sides must face each other across the material for their rounds to meet head on. */
+const kSquare = 0.995;
+
+/** The radius of the biggest circle inside a loop: searched on a grid, then around the best point found, finer. */
+function inradius(points: CadPoint[]): number {
+  const x0 = Math.min(...points.map(p => p.x)),
+    y0 = Math.min(...points.map(p => p.y)),
+    x1 = Math.max(...points.map(p => p.x)),
+    y1 = Math.max(...points.map(p => p.y));
+  let best = { x: (x0 + x1) / 2, y: (y0 + y1) / 2, r: 0 };
+  let span = { x: x1 - x0, y: y1 - y0 };
+  const grid = 16;
+  for (let round = 0; round < 6; round++) {
+    const centre = round ? best : { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+    for (let i = 0; i <= grid; i++)
+      for (let j = 0; j <= grid; j++) {
+        const p = { x: centre.x + span.x * (i / grid - 0.5), y: centre.y + span.y * (j / grid - 0.5) };
+        if (!pointInPolygon(p, points)) continue;
+        const r = distanceToLoop(p, points);
+        if (r > best.r) best = { ...p, r };
+      }
+    span = { x: (span.x * 4) / grid, y: (span.y * 4) / grid };
+  }
+  return best.r;
 }

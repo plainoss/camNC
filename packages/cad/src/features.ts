@@ -246,7 +246,7 @@ export function evaluateCadFeatures(
   copyId?: string
 ): { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
   const cut = cutFeatures({ ...part, features: featuresForCopy(part, copyId) }, profile);
-  if (!part.cornerRelief) return withRounds(part, cut);
+  if (!part.cornerRelief) return cut;
   const { part: next, skipped } = relieveCorners(cut.part, part.cornerRelief.diameter);
   const diagnostics = [...cut.diagnostics];
   if (skipped.length)
@@ -257,13 +257,7 @@ export function evaluateCadFeatures(
       message: `${skipped.length === 1 ? 'One corner is' : `${skipped.length} corners are`} too tight for a ${part.cornerRelief.diameter} mm bone and stay square.`,
       points: skipped,
     });
-  return withRounds(part, { part: next, diagnostics });
-}
-
-/** Fillet steps along the part's faces round over the edges of what its cuts leave. */
-function withRounds(part: CadPart, made: { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] }) {
-  const rounded = withEdgeRounds(part, made.part);
-  return { part: rounded.part, diagnostics: [...made.diagnostics, ...rounded.diagnostics] };
+  return { part: next, diagnostics };
 }
 
 /** Evaluate a source and only the copies with their own features; ordinary copies keep sharing its geometry. */
@@ -457,5 +451,15 @@ export function evaluateCadDocument(given: CadDocument, options: { through?: str
       ? evaluateCopyOperations(document, removed.parts, options.through)
       : applyPartCuts(document, removed.parts);
   diagnostics.push(...cut.diagnostics);
-  return { ...cut, parts: diagnostics.some(d => d.severity === 'error') ? [] : cut.parts, diagnostics };
+  // Fillet steps along a part's faces round over the edges of what all its cuts leave, joints and other parts' Removes
+  // included.
+  const byId = new Map(document.parts.map(part => [part.id, part]));
+  const finished = cut.parts.map(made => {
+    const source = byId.get(made.partId);
+    if (!source?.fillets?.some(fillet => fillet.rims?.length)) return made;
+    const rounded = withEdgeRounds(source, made);
+    diagnostics.push(...rounded.diagnostics);
+    return rounded.part;
+  });
+  return { ...cut, parts: diagnostics.some(d => d.severity === 'error') ? [] : finished, diagnostics };
 }

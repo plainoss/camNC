@@ -25,8 +25,11 @@ import type { CadConnectorPick } from './PartFeatureDialogs';
 type Picked = { partId: string; corner: string } | { partId: string; rim: CadFilletRim };
 
 const kUnsupported = 'Not available yet';
+/** The design has an error elsewhere, so the part isn't built: its edges along its faces can't be found. */
+const kUnbuilt = 'The design can’t be built as it is, so edges along its faces can’t be picked: fix its errors first.';
 
-const pickKey = (pick: Picked) => ('corner' in pick ? pick.corner : `${pick.rim.side}:${pick.rim.loops.join(',')}`);
+const pickKey = (pick: Picked) =>
+  'corner' in pick ? pick.corner : `${pick.rim.face ? 'face' : 'edge'}:${pick.rim.side}:${pick.rim.loops.join(',')}`;
 
 // A pick is read against the design the dialog opened on, built once.
 const builtParts = new WeakMap<CadDocument, Map<string, EvaluatedCadPart>>();
@@ -53,7 +56,8 @@ function pickedOf(document: CadDocument, pick: CadConnectorPick): Picked | { err
     const normal = rotateVector(back, pick.normal);
     const point = local(pick.surfacePoint ?? pick.point);
     const made = built();
-    if (!made || Math.abs(normal[2]) < 1 - 1e-6) return { error: 'Click an edge, or the top or underside of a part.' };
+    if (!made) return { error: kUnbuilt };
+    if (Math.abs(normal[2]) < 1 - 1e-6) return { error: 'Click an edge, or the top or underside of a part.' };
     const side = normal[2] > 0 ? 'top' : 'underside';
     if (Math.abs(point[2] - (side === 'top' ? made.thickness : 0)) > 1e-3)
       return { error: 'A pocket’s floor meets its walls at inside edges, which can’t be rounded over: pick the edges to round.' };
@@ -64,7 +68,7 @@ function pickedOf(document: CadDocument, pick: CadConnectorPick): Picked | { err
     b = local(pick.edge.b);
   if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 1e-3) {
     const made = built();
-    if (!made) return { error: 'Click an edge of a part.' };
+    if (!made) return { error: kUnbuilt };
     const found = rimAt(made, a, b);
     return 'error' in found ? found : { partId: part.id, rim: { side: found.side, loops: [found.loopId] } };
   }
