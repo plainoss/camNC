@@ -45,5 +45,9 @@ export function nextFilletLabel(document: CadDocument): string {
 export function pendingRow(document: CadDocument, dialog: StudioDialog | null, choosingPlane: boolean, rolledTo: string | null) {
   if (choosingPlane) return { kind: 'sketch' as const, label: nextSketchLabel(document, rolledTo) };
   if (dialog?.kind === 'fillet' && !dialog.filletId) return { kind: 'fillet' as const, label: nextFilletLabel(document) };
+  if (dialog?.kind === 'transform' && !dialog.copyId && !dialog.move) {
+    const made = designSteps(document).filter(step => step.label.startsWith('Transform')).length;
+    return { kind: 'copy' as const, label: `Transform ${made + 1}` };
+  }
   return undefined;
 }

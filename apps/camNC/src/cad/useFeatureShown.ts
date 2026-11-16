@@ -1,4 +1,4 @@
-import type { CadDocument } from '@wbcnc/cad';
+import { sketchOwnerId, type CadDocument } from '@wbcnc/cad';
 import { useCallback } from 'react';
 import { featureShownByDefault } from './sketchShown';
 
@@ -22,4 +22,15 @@ export function useFeatureShown(
     },
     [visibility, shownDocument, pastRollback, unbuilt]
   );
+}
+
+/**
+ * The eyes once an extrude is confirmed: the sketch it's made from goes back to hidden, as a sketch an extrude uses is,
+ * whether it was shown to pick from or is a new one.
+ */
+export function withMadeSketchHidden(visibility: Readonly<Record<string, boolean>>, document: CadDocument, partId: string) {
+  const made = document.parts.find(part => part.id === partId);
+  if (!made) return visibility;
+  const { [`${sketchOwnerId(made)}:sketch`]: _shown, ...rest } = visibility;
+  return rest;
 }

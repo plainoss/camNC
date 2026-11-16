@@ -82,24 +82,28 @@ function numberedSteps(document: CadDocument, steps: DesignStep[]): DesignStep[]
   // A name kept from before, as when an earlier step was deleted, isn't given again.
   const taken = new Set(steps.map(step => step.label));
   return steps.map(step => {
-    if (step.kind !== 'sketch' && step.kind !== 'extrude' && step.kind !== 'fillet' && step.kind !== 'mirror') return step;
+    // A transform of a part, or a copy of it moved, is numbered as Transform N.
+    const transform = (step.kind === 'copy' || step.kind === 'move') && step.label.startsWith('Transform · ');
+    if (step.kind !== 'sketch' && step.kind !== 'extrude' && step.kind !== 'fillet' && step.kind !== 'mirror' && !transform) return step;
     const part = byId.get(step.partId);
     const noun =
       step.kind === 'sketch'
         ? 'Sketch'
         : step.kind === 'fillet'
           ? 'Fillet'
-          : step.kind === 'mirror'
-            ? 'Mirror'
-            : part?.hole
-              ? 'Hole'
-              : 'Extrude';
+          : transform
+            ? 'Transform'
+            : step.kind === 'mirror'
+              ? 'Mirror'
+              : part?.hole
+                ? 'Hole'
+                : 'Extrude';
     const own = step.kind === 'sketch' ? part?.sketchName : step.kind === 'extrude' ? part?.extrudeName : undefined;
     let n = (counts.get(noun) ?? 0) + 1;
     if (!own) while (taken.has(`${noun} ${n}`)) n++;
     counts.set(noun, n);
     // A fillet has no name of its own, so it's always numbered.
-    return part && !own && (step.kind === 'fillet' || step.kind === 'mirror' || kDefaultPartName.test(part.name))
+    return part && !own && (step.kind === 'fillet' || step.kind === 'mirror' || transform || kDefaultPartName.test(part.name))
       ? { ...step, label: `${noun} ${n}` }
       : step;
   });

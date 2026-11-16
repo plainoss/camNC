@@ -68,7 +68,6 @@ import {
   resolveExtrudeSteps,
   setPartPattern,
   renamePartCopy,
-  sketchOwnerId,
 } from '@wbcnc/cad';
 import {
   useEffect,
@@ -239,7 +238,7 @@ import { usePatternVariableCommit } from './studioPatternVariableSource';
 import { useStudioPreview } from './useStudioPreview';
 import { useEditorDocumentKeys } from './useEditorDocumentKeys';
 import { useEditorVariableFields } from './useEditorVariableFields';
-import { useFeatureShown } from './useFeatureShown';
+import { useFeatureShown, withMadeSketchHidden } from './useFeatureShown';
 import './cad.css';
 
 const FaceSketchBackdrop = lazy(() => import('./FaceSketchBackdrop'));
@@ -1328,9 +1327,7 @@ export function CadEditor({
     initialPatternKind?: PatternOpening
   ) => openStudioFeature(studioNavigationInput(), kind, partId, before, initialPatternKind);
   const closeFeature = (keep: boolean) => {
-    // Confirming an extrude hides the sketch it's made from again, a sketch shown to pick from as much as a new one.
-    const made = keep && feature?.kind === 'extrude' && doc.parts.find(p => p.id === feature.partId);
-    if (made) setFeatureVisibility(({ [`${sketchOwnerId(made)}:sketch`]: _shown, ...rest }) => rest);
+    if (keep && feature?.kind === 'extrude') setFeatureVisibility(shown => withMadeSketchHidden(shown, doc, feature.partId));
     closeStudioFeature(studioNavigationInput(), keep);
   };
   const openSketch = (stepPartId: string, before?: CadHistoryMark) => openStudioSketch(studioNavigationInput(), stepPartId, before);
@@ -1452,7 +1449,9 @@ export function CadEditor({
   // A tool used up by its cut isn't a part of its own any more.
   // A part whose extrude wasn't built isn't a part yet.
   const builtParts = studioSession
-    ? listedStudioParts(doc, dialog, rolledBack).filter(p => !unbuiltParts?.includes(p.id))
+    ? listedStudioParts(dialog?.kind === 'transform' ? studioPreview.document : doc, dialog, rolledBack).filter(
+        p => !unbuiltParts?.includes(p.id)
+      )
     : builtStudioParts(doc);
   const isolatePart = usePartIsolation(builtParts, cutSelection.selectedKey, hiddenParts, setHiddenParts);
   const physicalPartCount = builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0);

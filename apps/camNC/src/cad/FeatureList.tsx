@@ -209,7 +209,7 @@ export function FeatureList({
   /** The design as the open dialog would make it: a row that couldn't be made so shows as broken while it's open. */
   preview?: CadDocument;
   /** A new feature's row while its dialog is open and it isn't made yet, as Sketch 2 before its plane is picked. */
-  pending?: { kind: 'sketch' | 'fillet'; label: string };
+  pending?: { kind: 'sketch' | 'fillet' | 'copy'; label: string };
 }) {
   const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);

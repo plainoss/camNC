@@ -49,7 +49,7 @@ async function retarget(command: RegExp, title: RegExp, field: string) {
 
 // Opening the cupboard in a full editor, and every pick after it, can take longer than the default under load.
 it.each([
-  ['Transform', /Transform/, /^Transform/, 'Part to move'],
+  ['Transform', /Transform/, /^Transform/, 'Entities to transform or copy'],
   ['Pattern', /Pattern/, /^Linear pattern/, 'Part to pattern'],
   ['Mirror', /^Mirror/, /^Mirror \d/, 'Entities to mirror'],
 ] as const)(
