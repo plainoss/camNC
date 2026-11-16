@@ -1,5 +1,6 @@
 import { intersectPaths, unionPaths, type PartFeatures } from '@wbcnc/cam';
 import { ShapeUtils, Vector2 } from 'three';
+import { roundOver, roundSlices, type MeshRound } from './roundOver';
 
 type Path = { x: number; y: number }[];
 const signedArea = (path: Path) =>
@@ -43,9 +44,14 @@ function conforming(corners: Vector2[], vertices: Vector2[]) {
 
 /**
  * A watertight solid for a part with cuts, without the hidden faces stacked slabs would leave: one cap per height, the
- * bottom, and walls between heights. Each horizontal face is exactly a level, so `extractFeatures` reads it back.
+ * bottom, and walls between heights. Each horizontal face is exactly a level, so `extractFeatures` reads it back. Edges
+ * rounded over curve from their face down the wall, in slices (see `roundOver`).
  */
-export function cutPartMesh(features: PartFeatures, underside?: PartFeatures): { positions: Float64Array; indices: Uint32Array } {
+export function cutPartMesh(
+  features: PartFeatures,
+  underside?: PartFeatures,
+  rounds: readonly MeshRound[] = []
+): { positions: Float64Array; indices: Uint32Array } {
   const positions: number[] = [];
   const triangle = (a: [number, number, number], b: [number, number, number], c: [number, number, number]) =>
     positions.push(...a, ...b, ...c);
@@ -84,7 +90,9 @@ export function cutPartMesh(features: PartFeatures, underside?: PartFeatures): {
   // Opposite-face pockets can overlap in depth without meeting in XY. Splicing the two stacks at the deepest
   // underside floor then creates inverted/overlapping walls. Partition at every floor and keep only material
   // present in both stacks, so each interval has one outward boundary even when their depths overlap.
-  const heights = [...new Set([0, ...levels.map(level => level.z), ...below.map(level => thickness - level.z)])].sort((a, b) => a - b);
+  const heights = [
+    ...new Set([0, ...levels.map(level => level.z), ...below.map(level => thickness - level.z), ...rounds.flatMap(roundSlices)]),
+  ].sort((a, b) => a - b);
   heights.slice(0, -1).forEach((low, i) => {
     const high = heights[i + 1]!,
       middle = (low + high) / 2,
@@ -100,5 +108,7 @@ export function cutPartMesh(features: PartFeatures, underside?: PartFeatures): {
         triangle([p.x, p.y, low], [q.x, q.y, high], [p.x, p.y, high]);
       });
   });
-  return { positions: Float64Array.from(positions), indices: Uint32Array.from({ length: positions.length / 3 }, (_, i) => i) };
+  const solid = Float64Array.from(positions);
+  roundOver(solid, rounds);
+  return { positions: solid, indices: Uint32Array.from({ length: positions.length / 3 }, (_, i) => i) };
 }

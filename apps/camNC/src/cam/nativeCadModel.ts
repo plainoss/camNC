@@ -28,7 +28,15 @@ export function nativePart(source: EvaluatedCadPart): {
   const outer = features.outlines[0]!;
   const holeLoops = source.loops.filter(loop => loop.kind === 'hole').map(loop => loop.id);
   let positions: Float64Array, indices: Uint32Array;
-  if (source.cuts?.length) ({ positions, indices } = cutPartMesh(features, below ?? undefined));
+  // Edges rounded over by Fillet steps, in the features' frame, which starts at the outline's corner.
+  const rounds = (source.rounds ?? []).map(round => ({
+    points: round.points.map(p => ({ x: p.x - offset.x, y: p.y - offset.y })),
+    z: round.side === 'top' ? source.thickness - round.at : round.at,
+    down: round.side === 'top',
+    radius: round.radius,
+    material: round.material,
+  }));
+  if (source.cuts?.length || rounds.length) ({ positions, indices } = cutPartMesh(features, below ?? undefined, rounds));
   else {
     const shape = new Shape(outer.map(p => new Vector2(p.x, p.y)));
     shape.holes.push(...features.throughHoles.map(h => new Path(h.map(p => new Vector2(p.x, p.y)))));

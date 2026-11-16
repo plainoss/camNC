@@ -18,10 +18,12 @@ export function designGeometryFingerprint(part: EvaluatedCadPart) {
     return [...values.slice(first), ...values.slice(0, first)].join(';');
   };
   const plain = [part.thickness, ring(part.outline), part.holes.map(ring).sort()];
-  // Parts without cuts keep the exact fingerprint they always had, so cut sheets stay valid.
-  if (!part.cuts?.length) return JSON.stringify(plain);
-  const cuts = part.cuts.map(cut => [cut.side, cut.from, cut.to, cut.through, ring(cut.outline), cut.islands.map(ring).sort()]);
-  return JSON.stringify([...plain, cuts]);
+  // Parts without cuts or rounded edges keep the exact fingerprint they always had, so cut sheets stay valid.
+  if (!part.cuts?.length && !part.rounds?.length) return JSON.stringify(plain);
+  const cuts = (part.cuts ?? []).map(cut => [cut.side, cut.from, cut.to, cut.through, ring(cut.outline), cut.islands.map(ring).sort()]);
+  if (!part.rounds?.length) return JSON.stringify([...plain, cuts]);
+  const rounds = part.rounds.map(round => [round.side, round.at, round.radius, round.material, ring(round.points)]);
+  return JSON.stringify([...plain, cuts, rounds]);
 }
 
 /** Content identity for physical stock; cache revisions remain monotonic even when this identity returns. */
