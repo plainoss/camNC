@@ -181,7 +181,7 @@ describe('reordering fillets', () => {
     const face = { type: 'sketch' as const, id: 'face', on: 'top' as const, sketch: { ...back.sketch, id: 'face-sketch' } };
     const document: CadDocument = { ...createCadDocument(), parts: [{ ...back, features: [face] }] };
     expect(reorderDrop(document, 'face', `${back.id}:extrude`)).toEqual({
-      error: 'Sketch on the top · Back is on Back’s faces, so it comes after Transform · Back.',
+      error: 'Sketch on the top · Back is on Back’s faces, so it comes after Transform 1.',
     });
     expect(reorderDrop(document, 'round', 'face')).toEqual({
       error: 'Fillet 1 rounds Back’s outline, so it moves only among its fillets.',
