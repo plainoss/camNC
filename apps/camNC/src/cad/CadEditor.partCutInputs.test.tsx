@@ -35,7 +35,11 @@ it('says on the Cut parts row and the joined parts that the tool whose Extrude w
   await settled();
   // The step still names Front as its tool, and now says it cuts without it rather than silently.
   const step = within(features).getByRole('button', { name: /^Cut Side with Front/ });
-  await waitFor(() => expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(message));
+  await waitFor(() =>
+    expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(
+      `Cut Side with Front did not regenerate properly: ${message}`
+    )
+  );
   expect(within(features).getByRole('status', { name: '1 with errors' })).toBeDefined();
   const parts = within(screen.getByRole('list', { name: 'Parts' }));
   expect(within(parts.getByRole('button', { name: /^▱?\s*Side/ })).getByRole('img', { name: message })).toBeDefined();

@@ -1,6 +1,7 @@
 import { useDesignUnits } from './designUnits';
 import {
   cadDrawnOnSupports,
+  designStepLabel,
   edgeFilletProblems,
   effectivePlacement,
   newCadId,
@@ -11,11 +12,14 @@ import {
 } from '@wbcnc/cad';
 import { useEffect, useMemo, useState } from 'react';
 import { CadValueInput } from './CadValueInput';
+import { nextFilletLabel } from './drawnOnName';
 import { FeatureDialog } from './FeatureDialog';
 import { useDialogPreview } from './useDialogPreview';
 import type { CadConnectorPick } from './PartFeatureDialogs';
 
 type Picked = { partId: string; corner: string };
+
+const kUnsupported = 'Not available yet';
 
 /**
  * The sketch corner a picked edge stands on: an edge through a part's thickness is where two of its sides meet. A top or
@@ -136,29 +140,50 @@ export function FilletDialog({
     if (!owner || !picked.length) return setError('Pick the edges to round.');
     if (candidate) onSave(candidate);
   };
-  const name = owner && document.parts.find(part => part.id === owner)?.name;
-  const edgeName = (pick: Picked, index: number) => {
+  // An edge is named for the feature that made it, as Edge of Extrude 1; where it stands tells picked edges apart.
+  const edgeName = (pick: Picked) => {
+    const made = document.parts.find(part => part.id === pick.partId)?.extrudedWith;
+    const label = designStepLabel(document, `${pick.partId}:extrude`) ?? (made && designStepLabel(document, `${made}:extrude`));
+    return `Edge of ${label || 'a part'}`;
+  };
+  const edgeAt = (pick: Picked, index: number) => {
     const part = document.parts.find(part => part.id === pick.partId);
     const point = part?.sketch.entities.find(entity => entity.type === 'point' && entity.id === pick.corner);
-    return point?.type === 'point'
-      ? `${part!.name} at ${formatLength(point.x)}, ${formatLength(point.y)} ${lengthUnit}`
-      : `${part?.name ?? 'Part'} edge ${index + 1}`;
+    return point?.type === 'point' ? `at ${formatLength(point.x)}, ${formatLength(point.y)} ${lengthUnit}` : `${index + 1}`;
   };
   return (
-    <FeatureDialog title="Fillet" okDisabled={!picked.length} onOk={save} onCancel={onCancel}>
+    <FeatureDialog
+      // Once an edge is picked the fillet has its place among its part's steps, and the number that goes with it.
+      title={designStepLabel(candidate ?? document, featureId) ?? nextFilletLabel(document)}
+      okDisabled={!picked.length}
+      className={refusal ? 'cad-feature-dialog-failed' : undefined}
+      onOk={save}
+      onCancel={onCancel}>
+      <div className="cad-feature-tabs" role="tablist" aria-label="Fillet type">
+        {['Edge', 'Full round'].map(choice => (
+          <button
+            key={choice}
+            type="button"
+            role="tab"
+            aria-selected={choice === 'Edge'}
+            disabled={choice !== 'Edge'}
+            title={choice === 'Edge' ? undefined : kUnsupported}>
+            {choice}
+          </button>
+        ))}
+      </div>
       <div className="cad-feature-selection" data-active="">
-        <small>Edges to round</small>
-        <span>{picked.length ? `${picked.length} ${picked.length === 1 ? 'edge' : 'edges'} of ${name}` : 'Click edges of a part'}</span>
+        <small>Entities to fillet</small>
         {/* Rounded previews replace the original edges, so each selection also needs an explicit removal control. */}
         {!!picked.length && (
           <ul aria-label="Selected edges" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {picked.map((pick, index) => {
-              const label = edgeName(pick, index);
+              const label = `${edgeName(pick)} ${edgeAt(pick, index)}`;
               return (
                 <li
                   key={`${pick.partId}:${pick.corner}`}
                   style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                  <span>{label}</span>
+                  <span title={label}>{edgeName(pick)}</span>
                   <button
                     type="button"
                     aria-label={`Remove selected edge: ${label}`}
@@ -174,12 +199,38 @@ export function FilletDialog({
           </ul>
         )}
       </div>
+      {/* An edge through the board meets its neighbours at a sharp corner, so there's no tangent chain to carry on along. */}
+      <label title={kUnsupported}>
+        <input type="checkbox" checked disabled readOnly />
+        Tangent propagation
+      </label>
+      <label className="cad-number-field">
+        Measurement
+        <select value="radius" disabled title={kUnsupported}>
+          <option value="radius">Radius</option>
+          <option value="distance">Control distance</option>
+        </select>
+      </label>
       <label className="cad-number-field">
         Radius
         <span>
           <CadValueInput bare aria-label="Radius" value={radiusText} onChange={event => setRadiusText(event.target.value)} />
         </span>
         {lengthUnit}
+      </label>
+      {['Asymmetric', 'Partial fillet', 'Variable fillet'].map(option => (
+        <label key={option} title={kUnsupported}>
+          <input type="checkbox" disabled />
+          {option}
+        </label>
+      ))}
+      <label title={kUnsupported}>
+        <input type="checkbox" checked disabled readOnly />
+        Allow edge overflow
+      </label>
+      <label title={kUnsupported}>
+        <input type="checkbox" disabled />
+        Smooth fillet corners
       </label>
       {(error ?? refusal) && (
         <p role="alert" className="cad-thickness-error">

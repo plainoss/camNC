@@ -36,6 +36,25 @@ describe('sketch constraint commands', () => {
     expect(buildConstraintForSelection(sketch, 'midpoint', [line.id, bridge.id]).constraint).toBeUndefined();
     expect(buildConstraintForSelection(sketch, 'coincident', [line.id, bridge.id]).alreadyApplied).toBe(true);
   });
+  it('makes a line normal to a circle through its center, and two lines normal as perpendicular', () => {
+    const { sketch, line, circle } = setup();
+    if (circle.type !== 'circle') throw Error();
+    expect(buildConstraintForSelection(sketch, 'normal', [line.id]).needsMore).toBe(true);
+    expect(buildConstraintForSelection(sketch, 'normal', [circle.id, line.id]).constraint).toEqual({
+      type: 'pointOnLine',
+      pointId: circle.centerId,
+      entityId: line.id,
+      label: 'Normal',
+    });
+    const crossed = addLine(sketch, { x1: 0, y1: 0, x2: 0, y2: 30 });
+    const other = crossed.entities.at(-1)!;
+    expect(buildConstraintForSelection(crossed, 'normal', [line.id, other.id]).constraint).toEqual({
+      type: 'perpendicular',
+      entityAId: line.id,
+      entityBId: other.id,
+    });
+    expect(buildConstraintForSelection(sketch, 'pierce', [line.endId, circle.id]).constraint).toBeUndefined();
+  });
   it('accepts a line or point pair for H/V and keeps tool-first point selection pending', () => {
     const { sketch, line } = setup();
     expect(buildConstraintForSelection(sketch, 'horizontal', []).needsMore).toBe(true);

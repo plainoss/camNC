@@ -60,6 +60,8 @@ it.each(['viewport', 'Parts list'])('refuses to widen a patterned tray divider p
   await userEvent.click(await studioCommand(/Transform/));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
   expect(screen.queryByRole('alert')).toBeNull();
+  // A new transform starts on Translate by line; this one moves by X, Y and Z.
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'xyz');
   const x = within(dialog).getByRole('textbox', { name: 'X' });
   await userEvent.clear(x);
   await userEvent.type(x, '50');

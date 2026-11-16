@@ -49,9 +49,9 @@ async function retarget(command: RegExp, title: RegExp, field: string) {
 
 // Opening the cupboard in a full editor, and every pick after it, can take longer than the default under load.
 it.each([
-  ['Transform', /Transform/, /^Transform/, 'Part to move'],
+  ['Transform', /Transform/, /^Transform/, 'Entities to transform or copy'],
   ['Pattern', /Pattern/, /^Linear pattern/, 'Part to pattern'],
-  ['Mirror', /^Mirror/, /^Mirror$/, 'Entities to mirror'],
+  ['Mirror', /^Mirror/, /^Mirror \d/, 'Entities to mirror'],
 ] as const)(
   'cancels %s with Escape after a part is picked in the Parts list',
   async (_, command, title, field) => {
@@ -76,15 +76,15 @@ it('cancels Transform with Escape after a click in the 3D view', async () => {
 }, 60_000);
 
 it('fills the Mirror plane with the plane clicked after its part is picked', async () => {
-  const { latest } = await retarget(/^Mirror/, /^Mirror$/, 'Entities to mirror');
-  const dialog = screen.getByRole('dialog', { name: 'Mirror' });
+  const { latest } = await retarget(/^Mirror/, /^Mirror \d/, 'Entities to mirror');
+  const dialog = screen.getByRole('dialog', { name: /^Mirror \d/ });
   const plane = within(dialog).getByRole('button', { name: 'Mirror plane' });
   // With the part taken, the mirror goes on to pick its plane.
   expect(plane).toHaveAttribute('data-active');
   expect(within(dialog).getByRole('button', { name: 'Entities to mirror' })).not.toHaveAttribute('data-active');
   const geometry = within(screen.getByRole('region', { name: 'Features' })).getByRole('list', { name: 'Default geometry' });
   await userEvent.click(within(geometry).getByRole('button', { name: /Top/ }));
-  await waitFor(() => expect(plane.textContent).toContain('top plane'));
+  await waitFor(() => expect(plane.textContent).toContain('Top plane'));
   const ok = within(dialog).getByRole('button', { name: 'OK' });
   expect(ok).not.toBeDisabled();
   await userEvent.click(ok);

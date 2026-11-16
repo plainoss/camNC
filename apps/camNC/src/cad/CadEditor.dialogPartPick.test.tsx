@@ -40,7 +40,7 @@ async function open() {
 it('mirrors the part clicked once its part field is active, and keeps the dialog and the selection together until then', async () => {
   const { source, latest } = await open();
   await userEvent.click(await studioCommand(/^Mirror/));
-  const dialog = await screen.findByRole('dialog', { name: 'Mirror' });
+  const dialog = await screen.findByRole('dialog', { name: /^Mirror \d/ });
   const field = within(dialog).getByRole('button', { name: 'Entities to mirror' });
   expect(field.textContent).toContain('Shelf');
   // While the plane is being picked, a part click doesn't take the selection away from the dialog's part.
@@ -67,9 +67,9 @@ it('mirrors the part clicked once its part field is active, and keeps the dialog
   await userEvent.click(within(dialog).getByRole('button', { name: 'Mirror plane' }));
   const geometry = within(screen.getByRole('region', { name: 'Features' })).getByRole('list', { name: 'Default geometry' });
   await userEvent.click(within(geometry).getByRole('button', { name: /Top/ }));
-  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).textContent).toContain('top plane'));
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).textContent).toContain('Top plane'));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Mirror' })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Mirror \d/ })).toBeNull());
   expect(named(latest(), 'Bottom').copies).toHaveLength(1);
   expect(named(latest(), 'Bottom').copies![0]).toMatchObject({ mirrored: true, mirror: { across: { plane: 'top' } } });
   expect(named(latest(), 'Shelf').copies ?? []).toHaveLength(0);
@@ -98,7 +98,7 @@ it('moves the part clicked while the dialog is open', async () => {
   const { source, latest } = await open();
   await userEvent.click(await studioCommand(/Transform/));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
-  const field = within(dialog).getByRole('button', { name: 'Part to move' });
+  const field = within(dialog).getByRole('button', { name: 'Entities to transform or copy' });
   expect(field.textContent).toContain('Shelf');
   await userEvent.click(row('Bottom'));
   await waitFor(() => expect(field.textContent).toContain('Bottom'));
@@ -107,16 +107,16 @@ it('moves the part clicked while the dialog is open', async () => {
   const active = () => [...dialog.querySelectorAll('.cad-feature-selection[data-active]')].map(field => field.getAttribute('aria-label'));
   const type = within(dialog).getByRole('combobox', { name: 'Transform type' });
   await userEvent.selectOptions(type, 'distance');
-  expect(active()).toEqual(['Part to move']);
+  expect(active()).toEqual(['Entities to transform or copy']);
   await userEvent.click(within(dialog).getByRole('button', { name: 'Direction' }));
   expect(active()).toEqual(['Direction']);
   await userEvent.click(field);
-  expect(active()).toEqual(['Part to move']);
+  expect(active()).toEqual(['Entities to transform or copy']);
   await userEvent.selectOptions(type, 'mate');
-  expect(active()).not.toContain('Part to move');
+  expect(active()).not.toContain('Entities to transform or copy');
   expect(active()).toContain('Mate connector');
   await userEvent.click(field);
-  expect(active()).toEqual(['Part to move']);
+  expect(active()).toEqual(['Entities to transform or copy']);
   await userEvent.selectOptions(type, 'xyz');
   const x = within(dialog).getByLabelText('X');
   await userEvent.clear(x);
@@ -130,7 +130,7 @@ it('refuses a copy for the part, as its family is not what was clicked', async (
   const { source } = await open();
   await userEvent.click(await studioCommand(/Transform/));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
-  const field = within(dialog).getByRole('button', { name: 'Part to move' });
+  const field = within(dialog).getByRole('button', { name: 'Entities to transform or copy' });
   // The cupboard's second side is a copy of the first.
   const side = named(source, 'Side');
   const view = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];

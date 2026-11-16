@@ -1,5 +1,7 @@
-import { activeDesign, consumedTools, isCadPart, type CadDocument, type CadPart } from '@wbcnc/cad';
+import { activeDesign, consumedTools, isCadPart, rolledBackTo, unionOf, type CadDocument, type CadPart } from '@wbcnc/cad';
 import { isBlank } from './editorHelpers';
+import type { StudioDialog } from './studioDialog';
+import { unpickedExtrudePreview } from './unpickedExtrude';
 
 /** Physical parts in the studio: suppressed copies and consumed tools retain source settings but have no visible row. */
 export function builtStudioParts(document: CadDocument): CadPart[] {
@@ -9,9 +11,22 @@ export function builtStudioParts(document: CadDocument): CadPart[] {
   return active.parts.filter(part => isCadPart(part) && !consumed.has(part.id));
 }
 
-/** The parts the studio's Parts list shows: a new design's untouched placeholder Part 1 is not one yet. */
-export function listedStudioParts(document: CadDocument): CadPart[] {
-  return isBlankDesign(document) ? [] : builtStudioParts(document);
+/**
+ * The parts the studio's Parts list shows: a new design's untouched placeholder Part 1 is not one yet, nor is the part
+ * of an open Extrude with no region picked, nor one made only after the step the design is rolled back to.
+ */
+export function listedStudioParts(document: CadDocument, dialog?: StudioDialog | null, rolledTo?: string | null): CadPart[] {
+  if (isBlankDesign(document)) return [];
+  if (rolledTo) document = rolledBackTo(document, rolledTo);
+  const built = builtStudioParts(unpickedExtrudePreview(document, dialog?.kind === 'extrude' ? dialog.partId : null));
+  // A Boolean › Union's or Intersect's part is as thick as the part it makes, once it can make it.
+  const joined = new Map<string, number>();
+  const active = activeDesign(document);
+  for (const step of active.partCuts ?? []) {
+    const made = step.operation === 'union' || step.operation === 'intersect' ? unionOf(active, step) : null;
+    if (made && 'part' in made) joined.set(made.part.partId, made.part.thickness);
+  }
+  return joined.size ? built.map(part => (joined.has(part.id) ? { ...part, thickness: joined.get(part.id)! } : part)) : built;
 }
 
 /** A new design, untouched: its only part is the placeholder sketch with nothing drawn yet. */
@@ -28,6 +43,8 @@ export function disabledStudioCommands(part: CadPart | undefined, partHasOutline
         ? { pattern: 'Select a part first', transform: 'Select a part first' }
         : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
     ...(partCount < 2 && { cutParts: 'Cutting parts needs two parts' }),
+    ...(partCount < 2 && { boolean: 'A Boolean needs two parts' }),
+    ...(partCount < 1 && { linearPattern: 'A pattern needs a part' }),
   };
   // A mirror image is of a part, as a pattern is.
   if (studioDisabled.pattern) studioDisabled.mirror = studioDisabled.pattern;

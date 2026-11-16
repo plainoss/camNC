@@ -11,6 +11,9 @@ import {
 } from '@wbcnc/cad';
 import { extrudedSketch, isSingleLine, replacePart, wholeSketch } from './editorHelpers';
 
+/** A new board's thickness when nothing else sets it, as a new sketch's part has. */
+export const kDefaultThickness = 18;
+
 type PickedFace = Extract<CadDrawnOn['on'], { partId: string }>;
 
 /** The design with a new Extrude in it, and the step its dialog edits, or why it can't start. */
@@ -19,7 +22,8 @@ export type StartedExtrude = { document: CadDocument; partId: string } | { refus
 /**
  * Starts the studio's Extrude: of a picked face, of a sketch not extruded yet (making a part of it), or as another
  * extrude of a part's sketch. `pickAll` starts it with every region of the sketch, as when it's picked from its row or
- * extruded straight from the open sketch. `pickedProfile` applies a region picked in the view.
+ * extruded straight from the open sketch; otherwise a sketch's first extrude starts with none picked. `pickedProfile`
+ * applies a region picked in the view.
  */
 export function startExtrude(
   before: CadDocument,
@@ -43,11 +47,18 @@ export function startExtrude(
       !sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).length &&
       evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
     if (problem) return { refusal: `Can’t extrude this sketch yet: ${problem.message}` };
-    return { document: replacePart(before, part.id, p => pickedProfile(extrudedSketch(before, p, pickAll))), partId: part.id };
+    // Unless all of it is asked for, nothing is picked yet: its regions are picked in the view, the selection active.
+    const started = (p: CadPart) => {
+      const made = extrudedSketch(before, p, pickAll);
+      return pickAll || made.thin || made.regions ? made : { ...made, regions: [] };
+    };
+    return { document: replacePart(before, part.id, p => pickedProfile(started(p))), partId: part.id };
   }
-  // Extrude always starts a new extrude, of the part's sketch here, as in the reference: it starts with the regions
-  // the sketch's extrudes leave, or none, or with them all when asked. An extrude already made is edited from its step.
+  // Extrude always starts a new extrude, of the part's sketch here: with all of it when asked, otherwise with none
+  // picked and the default thickness rather than the last one used, unless that follows a variable. An extrude already
+  // made is edited from its step.
   const next = newExtrudeOf(before, part, `Part ${before.parts.length + 1}`);
-  const made = pickedProfile(pickAll ? wholeSketch(next) : next);
+  const fresh = { ...next, regions: [], ...(!next.thicknessExpression && { thickness: kDefaultThickness }) };
+  const made = pickedProfile(pickAll ? wholeSketch(next) : fresh);
   return { document: { ...before, revision: before.revision + 1, parts: [...before.parts, made] }, partId: made.id };
 }

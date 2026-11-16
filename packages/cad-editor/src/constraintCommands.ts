@@ -22,7 +22,10 @@ export type ConstraintCommandTool =
   | 'parallel'
   | 'perpendicular'
   | 'equal'
-  | 'tangent';
+  | 'tangent'
+  | 'normal'
+  | 'pierce'
+  | 'curvature';
 export interface ConstraintSelectionResult {
   constraint?: NewCadConstraint;
   constraints?: NewCadConstraint[];
@@ -42,7 +45,13 @@ export const constraintPrompt = (tool: ConstraintCommandTool) =>
           ? 'Select two points, or a point and a curve, to make them coincident.'
           : tool === 'midpoint'
             ? 'Select a point and a line to place the point at its midpoint.'
-            : `Select two ${tool === 'parallel' || tool === 'perpendicular' ? 'lines' : 'curves'} to make them ${tool}.`;
+            : tool === 'normal'
+              ? 'Select a line and a circle or arc, or two lines, to make them normal.'
+              : tool === 'pierce'
+                ? 'Select a point, then an edge that crosses the sketch plane.'
+                : tool === 'curvature'
+                  ? 'Select two splines that share an endpoint to match their curvature there.'
+                  : `Select two ${tool === 'parallel' || tool === 'perpendicular' ? 'lines' : 'curves'} to make them ${tool}.`;
 
 function relationshipKey(c: CadConstraint | NewCadConstraint): string {
   if (c.type === 'symmetricCurves') return `${c.type}:${c.lineId}:${[c.entityAId, c.entityBId].sort().join(':')}`;
@@ -147,6 +156,21 @@ export function buildConstraintForSelection(
   if (selected.length !== 2) return invalid();
   const point = a!.type === 'point' ? a : b!.type === 'point' ? b : undefined;
   const curve = a!.type !== 'point' ? a : b!.type !== 'point' ? b : undefined;
+  if (tool === 'normal') {
+    const line = a!.type === 'line' ? a : b!.type === 'line' ? b : undefined;
+    const round = a!.type === 'circle' || a!.type === 'arc' ? a : b!.type === 'circle' || b!.type === 'arc' ? b : undefined;
+    // A line normal to a circle runs through its center; two lines normal to each other are perpendicular.
+    if (line?.type === 'line' && (round?.type === 'circle' || round?.type === 'arc')) {
+      if ([line.startId, line.endId].some(id => equivalent.equivalent(id, round.centerId)))
+        return { needsMore: false, alreadyApplied: true, message: 'This line already runs through the center.' };
+      return done({ type: 'pointOnLine', pointId: round.centerId, entityId: line.id, label: 'Normal' });
+    }
+    if (a!.type === 'line' && b!.type === 'line') return done({ type: 'perpendicular', entityAId: a!.id, entityBId: b!.id });
+    return invalid();
+  }
+  // Every edge of a sketch lies in its plane, so there is nothing for a point to pierce.
+  if (tool === 'pierce') return invalid('Pierce needs an edge that crosses the sketch plane, and sketch edges all lie in it.');
+  if (tool === 'curvature') return invalid('Matching curvature between splines isn’t available yet.');
   if (tool === 'coincident') {
     if (a!.type === 'point' && b!.type === 'point') return done({ type: 'coincident', pointAId: a!.id, pointBId: b!.id });
     if (!point || !curve) return invalid();

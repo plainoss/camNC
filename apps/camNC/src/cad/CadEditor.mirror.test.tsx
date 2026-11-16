@@ -33,12 +33,12 @@ it('mirrors the selected part across a picked plane, and changes the plane from 
   const features = screen.getByRole('region', { name: 'Features' });
   const geometry = within(features).getByRole('list', { name: 'Default geometry' });
   await userEvent.click(await studioCommand(/^Mirror/));
-  const dialog = await screen.findByRole('dialog', { name: 'Mirror' });
+  const dialog = await screen.findByRole('dialog', { name: /^Mirror \d/ });
   // The mirror plane is picked straight away.
   expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).hasAttribute('data-active')).toBe(true);
   await userEvent.click(within(geometry).getByRole('button', { name: /Right/ }));
   await settled();
-  expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).textContent).toContain('right plane');
+  expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).textContent).toContain('Right plane');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await settled();
   expect(latest().parts[0]!.copies).toHaveLength(1);
@@ -47,7 +47,7 @@ it('mirrors the selected part across a picked plane, and changes the plane from 
   expect(latest().parts[0]!.copies![0]!.placement!.position[0]).toBeCloseTo(-30, 6);
   // Its step opens it again, to mirror across another plane.
   await userEvent.dblClick(await within(features).findByRole('button', { name: /Plate 2|copy|Copy/ }));
-  const again = await screen.findByRole('dialog', { name: 'Mirror' });
+  const again = await screen.findByRole('dialog', { name: /^Mirror \d/ });
   await userEvent.click(within(again).getByRole('button', { name: 'Mirror plane' }));
   await userEvent.click(within(geometry).getByRole('button', { name: /Front/ }));
   await userEvent.click(within(again).getByRole('button', { name: 'OK' }));
@@ -79,7 +79,7 @@ it('uses another part face as the mirror plane', async () => {
       .mock.calls.findLast(([props]) => props.cameraState && props.meshes.some(mesh => mesh.partId === support.id))?.[0];
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(await studioCommand(/^Mirror/));
-  const dialog = await screen.findByRole('dialog', { name: 'Mirror' });
+  const dialog = await screen.findByRole('dialog', { name: /^Mirror \d/ });
   const frame = cadFaceFrame(source, { partId: support.id, face: 'top' });
   if ('error' in frame) throw new Error(frame.error);
   // The model canvas is loaded lazily, which the settled signal can't see before its module arrives: wait for the

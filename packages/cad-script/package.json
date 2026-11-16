@@ -15,6 +15,7 @@
     "mcp": "vite-node --config vite.config.ts src/mcpMain.ts",
     "iterate": "vite-node --config vite.config.ts src/iteration/cli.ts",
     "tasks": "vite-node --config vite.config.ts src/tasks/cli.ts",
+    "fingerprint": "vite-node --config vite.config.ts src/fingerprint/cli.ts",
     "test": "vitest",
     "check-types": "tsc --noEmit",
     "lint": "oxlint --max-warnings 0"

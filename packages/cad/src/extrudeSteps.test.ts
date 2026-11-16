@@ -121,6 +121,44 @@ describe('Extrude → Add', () => {
     expect(resolveExtrudeSteps(design(document.parts[0]!)).parts[0]!.addedRegions).toBeUndefined();
   });
 
+  it('steps the part down over regions it adds less far, and is a joined body when it ends beyond the part', () => {
+    const { owner, narrow } = splitDesign();
+    const lower = resolveExtrudeSteps(design(owner, second(owner, [narrow], { addTo: owner.id, thickness: 10 })));
+    expect(lower.parts[0]!.addedRegions).toEqual([narrow]);
+    expect(cadCuts(lower.parts[0]!)).toMatchObject([{ sketchId: owner.sketch.id, regionId: narrow, depth: 8, removedBy: 'second' }]);
+    const [shelf] = evaluateCadDocument(lower).parts;
+    expect([area(shelf!.outline), shelf!.thickness]).toEqual([5000, 18]);
+    expect(isJoinedBody(lower, lower.parts[1]!)).toBe(false);
+    // Just as far, its regions are the part's own; further, it can't be a step down.
+    const level = resolveExtrudeSteps(design(owner, second(owner, [narrow], { addTo: owner.id, thickness: 18 })));
+    expect(cadCuts(level.parts[0]!)).toEqual([]);
+    const higher = resolveExtrudeSteps(design(owner, second(owner, [narrow], { addTo: owner.id, thickness: 25 })));
+    expect(higher.parts[0]!.addedRegions).toBeUndefined();
+    expect(isJoinedBody(higher, higher.parts[1]!)).toBe(true);
+  });
+
+  it('leaves the part’s own regions, steps a region several Adds take to the highest, and folds a level or flipped Add', () => {
+    const { owner, wide, narrow } = splitDesign();
+    const add = (id: string, regions: string[], extra: Partial<CadPart>) => ({
+      ...second(owner, regions, { addTo: owner.id, ...extra }),
+      id,
+    });
+    const own = resolveExtrudeSteps(design(owner, add('a', [wide, narrow], { thickness: 10 })));
+    expect(cadCuts(own.parts[0]!)).toMatchObject([{ regionId: narrow, depth: 8 }]);
+    const two = resolveExtrudeSteps(design(owner, add('a', [narrow], { thickness: 10 }), add('b', [narrow], { thickness: 14 })));
+    expect(cadCuts(two.parts[0]!)).toMatchObject([{ regionId: narrow, depth: 4, removedBy: 'b' }]);
+    const level = resolveExtrudeSteps(design(owner, add('a', [narrow], { thickness: 10 }), add('b', [narrow], { thickness: 18 })));
+    expect(cadCuts(level.parts[0]!)).toEqual([]);
+    // Typed rather than following the variable, or a hair apart, the same depth folds.
+    const typed = { ...owner, thicknessExpression: 'board' };
+    const near = resolveExtrudeSteps(design(typed, add('a', [narrow], { thickness: 17.99 })));
+    expect([near.parts[0]!.addedRegions, cadCuts(near.parts[0]!)]).toEqual([[narrow], []]);
+    // Into the plane, a lower Add can't be cut from the part's top, so it's a body of its own.
+    const inward = { ...owner, drawnOn: { ...owner.drawnOn!, inward: true } };
+    const flipped = resolveExtrudeSteps(design(inward, add('a', [narrow], { thickness: 10, drawnOn: inward.drawnOn })));
+    expect(isJoinedBody(flipped, flipped.parts[1]!)).toBe(true);
+  });
+
   it('says why when it can’t add', () => {
     const { owner, narrow } = splitDesign();
     const other = { ...createCadPart('Other', 18), id: 'other' };
@@ -149,6 +187,84 @@ describe('Extrude → Remove', () => {
     pocket.sketch = draw(pocket.sketch);
     return { board, pocket };
   }
+
+  it('cuts again at each instance of its linear feature pattern, along the board, and not when suppressed', () => {
+    const { board, pocket } = onBoard(sketch => addCircle(sketch, { x: 20, y: 20, radius: 5 }));
+    const pattern = { id: 'p1', axis: 'x' as const, vector: [1, 0, 0] as [number, number, number], count: 3, spacing: 30 };
+    const document = resolveExtrudeSteps(design(board, { ...pocket, remove: { depth: 5 }, pattern }));
+    const evaluated = evaluateCadDocument(document);
+    expect(evaluated.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    const [cut] = cadPartsToCut(document, evaluated.parts);
+    const centres = cut!.part.cuts!.map(c => Math.round(c.outline.reduce((sum, p) => sum + p.x, 0) / c.outline.length));
+    expect([cut!.part.cuts!.map(c => c.to), centres]).toEqual([
+      [5, 5, 5],
+      [20, 50, 80],
+    ]);
+    expect(document.parts.map(part => part.copies?.length ?? 0)).toEqual([0, 0]);
+    const off = resolveExtrudeSteps(design(document.parts[0]!, { ...document.parts[1]!, pattern: { ...pattern, suppressed: true } }));
+    expect(cadCuts(off.parts[0]!)).toHaveLength(1);
+  });
+
+  it('repeats a dado running off the board, along +x on the underside too, and skips an instance off the board', () => {
+    const pattern = (count: number) => ({
+      id: 'p1',
+      axis: 'x' as const,
+      vector: [1, 0, 0] as [number, number, number],
+      count,
+      spacing: 30,
+    });
+    const centres = (document: CadDocument) => {
+      const evaluated = evaluateCadDocument(document);
+      expect(evaluated.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+      const [board] = cadPartsToCut(document, evaluated.parts);
+      return board!.part.cuts!.map(cut =>
+        Math.round((Math.min(...cut.outline.map(p => p.x)) + Math.max(...cut.outline.map(p => p.x))) / 2)
+      );
+    };
+    const dado = onBoard(sketch => addRectangle(sketch, { x: 20, y: -10, width: 10, height: 120 }));
+    const found = removalRegions(design(dado.board, { ...dado.pocket, remove: { depth: 5 } }), { ...dado.pocket, remove: { depth: 5 } });
+    if ('error' in found) throw new Error(found.error);
+    const groove = found.regions.find(
+      region => Math.min(...region.points.map(p => p.x)) > 19 && Math.max(...region.points.map(p => p.x)) < 31
+    )!;
+    const grooves = { ...dado.pocket, regions: [groove.id], remove: { depth: 5 }, pattern: pattern(3) };
+    expect(centres(resolveExtrudeSteps(design(dado.board, grooves)))).toEqual([25, 55, 85]);
+    // An underside sketch's x runs the other way, so x = -100 is 100 along the board.
+    const below = onBoard(sketch => addCircle(sketch, { x: -100, y: 50, radius: 5 }), 'underside');
+    const flipped = centres(resolveExtrudeSteps(design(below.board, { ...below.pocket, remove: { depth: 5 }, pattern: pattern(2) })));
+    expect(flipped.map(Math.abs).sort((a, b) => a - b)).toEqual([100, 130]);
+    const edge = onBoard(sketch => addCircle(sketch, { x: 150, y: 50, radius: 5 }));
+    expect(centres(resolveExtrudeSteps(design(edge.board, { ...edge.pocket, remove: { depth: 5 }, pattern: pattern(3) })))).toEqual([
+      150, 180,
+    ]);
+  });
+
+  it('lays a feature pattern out as a grid with a second direction, leaving out skipped instances', () => {
+    const { board, pocket } = onBoard(sketch => addCircle(sketch, { x: 20, y: 20, radius: 5 }));
+    const pattern = {
+      id: 'p1',
+      axis: 'x' as const,
+      vector: [1, 0, 0] as [number, number, number],
+      count: 3,
+      spacing: 30,
+      second: { vector: [0, 1, 0] as [number, number, number], count: 2, spacing: 12 },
+      skipped: [[2, 1]] as [number, number][],
+    };
+    const document = resolveExtrudeSteps(design(board, { ...pocket, remove: { depth: 5 }, pattern }));
+    const evaluated = evaluateCadDocument(document);
+    const [cut] = cadPartsToCut(document, evaluated.parts);
+    const centre = (outline: { x: number; y: number }[]) =>
+      [outline.reduce((sum, p) => sum + p.x, 0) / outline.length, outline.reduce((sum, p) => sum + p.y, 0) / outline.length].map(
+        Math.round
+      );
+    expect(cut!.part.cuts!.map(c => centre(c.outline)).sort((a, b) => a[1]! - b[1]! || a[0]! - b[0]!)).toEqual([
+      [20, 20],
+      [50, 20],
+      [80, 20],
+      [20, 32],
+      [50, 32],
+    ]);
+  });
 
   it('cuts a shape drawn on a board’s top into it, keeping the sketch as its own step', () => {
     const { board, pocket } = onBoard(sketch => addRectangle(sketch, { x: 50, y: 30, width: 40, height: 20 }));

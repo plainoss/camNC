@@ -33,6 +33,10 @@
   color: #fff;
   background: #2762a8;
 }
+/** A step whose preview can't be made: its name red, as its row is. */
+.cad-feature-dialog-failed .cad-feature-dialog-head h3 {
+  color: #c62828;
+}
 .cad-feature-dialog-head h3 {
   flex: 1;
   margin: 0;

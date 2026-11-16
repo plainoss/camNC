@@ -130,7 +130,7 @@ describe('reordering fillets', () => {
 
   it('keeps a fillet after the extrude whose edges it rounds, and says so', () => {
     const { back, document } = cupboard();
-    const why = 'Fillet · Back rounds the edges Extrude · Back makes, so it comes after it.';
+    const why = 'Fillet 1 rounds the edges Extrude · Back makes, so it comes after it.';
     expect(reorderDrop(document, 'round', `${back.id}:extrude`)).toEqual({ error: why });
     expect(reorderDrop(document, 'round', `${back.id}:sketch`)).toEqual({ error: why });
   });
@@ -181,10 +181,10 @@ describe('reordering fillets', () => {
     const face = { type: 'sketch' as const, id: 'face', on: 'top' as const, sketch: { ...back.sketch, id: 'face-sketch' } };
     const document: CadDocument = { ...createCadDocument(), parts: [{ ...back, features: [face] }] };
     expect(reorderDrop(document, 'face', `${back.id}:extrude`)).toEqual({
-      error: 'Sketch on the top · Back is on Back’s faces, so it comes after Transform · Back.',
+      error: 'Sketch on the top · Back is on Back’s faces, so it comes after Transform 1.',
     });
     expect(reorderDrop(document, 'round', 'face')).toEqual({
-      error: 'Fillet · Back rounds Back’s outline, so it moves only among its fillets.',
+      error: 'Fillet 1 rounds Back’s outline, so it moves only among its fillets.',
     });
   });
 

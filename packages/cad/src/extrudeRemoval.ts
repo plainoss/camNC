@@ -1,3 +1,4 @@
+import { missingRegionMessage } from './regionProfile';
 import { applyPartCuts } from './cutParts';
 import { cadSketchFrame } from './usedEdges';
 import { cadDrawnOnSupports, effectivePlacement, resolveDrawnPlacements } from './drawnOn';
@@ -90,7 +91,7 @@ export function applyExtrudeRemovals(
     const wanted = step.regions ?? found.cut;
     const regions = found.regions.filter(region => wanted.includes(region.id));
     if (new Set(wanted).size !== regions.length) {
-      error('A region picked to remove is no longer in its sketch. Pick its regions again.');
+      error(missingRegionMessage(new Set(wanted).size - regions.length));
       continue;
     }
     const groups = regionGroups(regions);
@@ -130,7 +131,8 @@ export function applyExtrudeRemovals(
         ...prepared,
         partCuts: [{ id: `remove-${step.id}`, tools: tools.map(tool => tool.id), targets: targets.map(target => target.id), clearance: 0 }],
       },
-      [...parts.filter(part => part.partId !== step.id), ...profiles]
+      [...parts.filter(part => part.partId !== step.id), ...profiles],
+      { merges: false }
     );
     for (const problem of cut.diagnostics) {
       // Skipped bones leave a valid square corner; only an unsupported intersection blocks the feature.

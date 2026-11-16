@@ -26,7 +26,7 @@ export function useFolderControls({
   selectedPartId: string | null;
 }) {
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [dialog, setDialog] = useState<{ kind: 'new' | 'rename' | 'settings'; id?: string } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: 'new' | 'rename' | 'settings'; id?: string; partId?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const apply = (result: { document: CadDocument } | { error: string }) => {
@@ -39,7 +39,8 @@ export function useFolderControls({
   const folder = document.folders?.find(folder => folder.id === menu?.id);
   const edited = document.folders?.find(folder => folder.id === dialog?.id);
   return {
-    newFolder: () => setDialog({ kind: 'new' }),
+    /** A new folder, starting with the given part (a feature row's) or else the selected one. */
+    newFolder: (partId?: string) => setDialog({ kind: 'new', partId }),
     openMenu: (id: string, x: number, y: number) => setMenu({ id, x, y }),
     settings: (id: string) => setDialog({ kind: 'settings', id }),
     toggle: (folder: CadFolder) => apply(setCadFolderCollapsed(document, folder.id, !folder.collapsed)),
@@ -84,7 +85,7 @@ export function useFolderControls({
             key={dialog.id ?? 'new'}
             document={document}
             folder={edited}
-            selectedPartId={selectedPartId}
+            selectedPartId={dialog.partId ?? selectedPartId}
             onChange={onChange}
             onClose={() => setDialog(null)}
           />

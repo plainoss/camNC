@@ -27,10 +27,10 @@ it('previews variable expressions while typing without saving and discards inval
 it('previews a plane offset before blur with the same identity across edits and save', async () => {
   const handlers = callbacks();
   render(<PlaneDialog document={createPlateDocument()} preselected={{ plane: 'top' }} {...handlers} />);
-  fireEvent.change(screen.getByRole('textbox', { name: 'Offset' }), { target: { value: '25' } });
+  fireEvent.change(screen.getByRole('textbox', { name: 'Offset distance' }), { target: { value: '25' } });
   await waitFor(() => expect(handlers.onPreview.mock.calls.at(-1)?.[0]?.planes?.[0]?.offset).toBe(25));
   const id = handlers.onPreview.mock.calls.at(-1)![0]!.planes![0]!.id;
-  fireEvent.change(screen.getByRole('textbox', { name: 'Offset' }), { target: { value: '40' } });
+  fireEvent.change(screen.getByRole('textbox', { name: 'Offset distance' }), { target: { value: '40' } });
   await waitFor(() => expect(handlers.onPreview.mock.calls.at(-1)?.[0]?.planes?.[0]).toMatchObject({ id, offset: 40 }));
   fireEvent.click(screen.getByRole('button', { name: 'OK' }));
   await waitFor(() =>
@@ -45,8 +45,9 @@ it('previews a mirror as soon as its plane is picked', async () => {
   render(<MirrorDialog document={document} partId={document.parts[0]!.id} pickPlane={pickPlane} {...handlers} />);
   pickPlane.mock.calls.at(-1)![0]({ plane: 'front' });
   await waitFor(() =>
-    expect(handlers.onPreview.mock.calls.at(-1)?.[0]?.parts[0]?.copies).toEqual([
-      expect.objectContaining({ mirror: { across: { plane: 'front' } } }),
+    // The plate stands on the Front plane, so its image joins it.
+    expect(handlers.onPreview.mock.calls.at(-1)?.[0]?.parts[0]?.mirrorJoins).toEqual([
+      expect.objectContaining({ across: { plane: 'front' } }),
     ])
   );
   expect(handlers.onSave).not.toHaveBeenCalled();
@@ -71,4 +72,14 @@ it('previews cut clearance without confirming the dialog', async () => {
   fireEvent.change(screen.getByRole('textbox', { name: 'Clearance' }), { target: { value: '0.5' } });
   await waitFor(() => expect(handlers.onPreview.mock.calls.at(-1)?.[0]?.partCuts?.[0]?.clearance).toBe(0.5));
   expect(handlers.onSave).not.toHaveBeenCalled();
+});
+
+it('starts a new plane 25 mm out, named Plane 1, and Flip normal moves it the other way', async () => {
+  const handlers = callbacks();
+  render(<PlaneDialog document={createPlateDocument()} preselected={{ plane: 'top' }} {...handlers} />);
+  expect(screen.getByRole('dialog', { name: 'Plane 1' })).toBeDefined();
+  expect(screen.getByRole('button', { name: 'Entities' }).textContent).toContain('Top plane');
+  expect((screen.getByRole('textbox', { name: 'Offset distance' }) as HTMLInputElement).value).toBe('25');
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Flip normal' }));
+  await waitFor(() => expect(handlers.onPreview.mock.calls.at(-1)?.[0]?.planes?.[0]).toMatchObject({ name: 'Plane 1', offset: -25 }));
 });

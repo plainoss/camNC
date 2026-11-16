@@ -3,11 +3,11 @@ import { cadDocumentVersion } from './documentVersion';
 import { cadMirrorFaceCopy, cadMirrorPlaneFrame } from './mirrorPlane';
 import { cadPartReference } from './partReferences';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
-import { mirroredPlacement, turnAbout } from './placement';
+import { CAD_IDENTITY_PLACEMENT, mirroredPlacement, rotateVector, turnAbout } from './placement';
 import { cadDirectionVector } from './directions';
 import { circularPartPatternStep } from './circularPartPattern';
 import { numberedCadCopy } from './copyNumbers';
-import type { CadDocument, CadPart, CadPartCopy, CadPartPattern, CadPlacement } from './types';
+import type { CadDocument, CadMirrorJoin, CadPart, CadPartCopy, CadPartPattern, CadPlacement } from './types';
 
 const kAxes = { x: 0, y: 1, z: 2 } as const;
 /** The most pieces a pattern makes, counting the part itself. */
@@ -57,7 +57,8 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
   let changed = false;
   const supports = cadDrawnOnSupports(document);
   const parts = document.parts.map(part => {
-    if (!part.pattern && !part.copies?.some(copy => copy.pattern || copy.offset || copy.along || copy.mirror)) return part;
+    // A Remove's pattern repeats its cuts in the board it cuts, rather than making copies.
+    if (part.remove || (!part.pattern && !part.copies?.some(copy => copy.pattern || copy.offset || copy.along || copy.mirror))) return part;
     const at = effectivePlacement(part, supports);
     // A transformed copy sits where its offset puts it from the part.
     const own = (part.copies ?? [])
@@ -127,7 +128,20 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
     changed = true;
     return { ...part, copies };
   });
-  return changed ? { ...document, parts: mirrored } : document;
+  // A Mirror › Add follows where its plane crosses the part, wherever either has moved.
+  const placed = { ...document, parts: mirrored };
+  const joined = mirrored.map(part => {
+    if (!part.mirrorJoins?.length) return part;
+    const at = effectivePlacement(part, supports) ?? CAD_IDENTITY_PLACEMENT;
+    const mirrorJoins = part.mirrorJoins.map(({ line: _line, ...join }) => {
+      const line = mirrorJoinLine(placed, at, join);
+      return line ? { ...join, line } : join;
+    });
+    if (JSON.stringify(mirrorJoins) === JSON.stringify(part.mirrorJoins)) return part;
+    changed = true;
+    return { ...part, mirrorJoins };
+  });
+  return changed ? { ...document, parts: joined } : document;
 }
 
 /** Sets a part's pattern, or removes it with `null`, and lays its copies out. */
@@ -192,4 +206,20 @@ export function addPartMirror(
     ),
   };
   return { document: resolvePartPatterns(next), id };
+}
+
+/**
+ * Where a Mirror › Add's plane crosses the sketch plane of a part placed `at`, in the sketch's coordinates, or none when
+ * the plane can't be found or doesn't stand across the sketch plane.
+ */
+function mirrorJoinLine(document: CadDocument, at: CadPlacement, join: CadMirrorJoin): CadMirrorJoin['line'] | undefined {
+  const frame = cadMirrorPlaneFrame(document, join.datum ? { across: join.across, datum: join.datum } : { across: join.across });
+  if (!frame || 'error' in frame) return undefined;
+  const back = [-at.rotation[0], -at.rotation[1], -at.rotation[2], at.rotation[3]];
+  const normal = rotateVector(back, frame.normal);
+  const across = Math.hypot(normal[0], normal[1]);
+  if (Math.abs(normal[2]) > 1e-6 || across < 1e-9) return undefined;
+  const origin = rotateVector(back, [0, 1, 2].map(axis => frame.origin[axis]! - at.position[axis]!) as [number, number, number]);
+  const tidy = (value: number) => Math.round(value * 1e9) / 1e9;
+  return { x: tidy(origin[0]), y: tidy(origin[1]), nx: tidy(normal[0] / across), ny: tidy(normal[1] / across) };
 }

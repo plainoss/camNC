@@ -1,5 +1,6 @@
 import { createCadPart, withFaceEdges, type CadDocument, type CadDrawnOn, type CadValueScope } from '@wbcnc/cad';
 import { isBlank } from './editorHelpers';
+import { kDefaultThickness } from './studioExtrude';
 
 /** Create the sketch's part on its support, respecting the material variable and the rollback insertion point. */
 export function newSketchPart(
@@ -15,7 +16,7 @@ export function newSketchPart(
 ) {
   const { variables, studio, thickness, datum, rolledTo } = options;
   const board = ['material', 'board', 'thickness'].find(name => Object.hasOwn(variables, name));
-  const added = createCadPart(`Part ${document.parts.length + 1}`, board ? variables[board]!.value : (thickness ?? 18));
+  const added = createCadPart(`Part ${document.parts.length + 1}`, board ? variables[board]!.value : (thickness ?? kDefaultThickness));
   // A blank first part is the one being sketched, rather than a second beside it.
   const blank = document.parts.length === 1 && isBlank(document.parts[0]!);
   const placed = {

@@ -1,5 +1,6 @@
 import { cadPartReference, type CadDocument } from '@wbcnc/cad';
 import type { FeatureEntry } from './FeatureList';
+import type { StudioDialog } from './studioDialog';
 
 type Step = Extract<FeatureEntry, { kind: 'step' }>['step'];
 
@@ -40,4 +41,9 @@ export function selectStudioFeature(
       selection.entities();
     }
   };
+}
+
+/** Whether a feature list row clicked goes to the dialog as its part, as the Linear pattern's feature does. */
+export function picksFeatureRows(dialog: StudioDialog | null): boolean {
+  return dialog?.kind === 'pattern' && dialog.initialPatternKind === 'linearPattern';
 }

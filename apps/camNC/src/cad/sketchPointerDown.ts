@@ -122,6 +122,20 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
   // Use is on: an edge clicked goes straight in, and a click anywhere else draws nothing.
   if (usingEdges) {
     if (edgeKey) takeEdges([edgeKey]);
+    else {
+      // An edge of the face the sketch is drawn on is taken into the drawing where it is, with its ends.
+      const hit = (event.target as Element).closest('[data-entity-id]')?.getAttribute('data-entity-id');
+      const edge = sketch.entities.find(entity => entity.id === hit && entity.faceEdge && entity.type === 'line');
+      if (edge?.type === 'line' && !edge.taken) {
+        const ends = new Set([edge.id, edge.startId, edge.endId]);
+        changeSketch({
+          ...sketch,
+          entities: sketch.entities.map(entity =>
+            ends.has(entity.id) ? { ...entity, construction: false, taken: true as const } : entity
+          ),
+        });
+      }
+    }
     return;
   }
   if (edgeKey && tool === 'select') {

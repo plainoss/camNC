@@ -32,7 +32,7 @@
   {
    "id": "186e952a-eb69-42d5-beb4-da923ded2b96:sketch",
    "kind": "sketch",
-   "label": "Sketch · Part 1",
+   "label": "Sketch 1",
    "part": "Part 1",
    "settings": {
     "on": "not placed"
@@ -47,7 +47,7 @@
   {
    "id": "186e952a-eb69-42d5-beb4-da923ded2b96:extrude",
    "kind": "extrude",
-   "label": "Extrude · Part 1",
+   "label": "Extrude 1",
    "part": "Part 1",
    "settings": {
     "thickness": {
@@ -86,7 +86,7 @@
   {
    "id": "fillet-r125",
    "kind": "fillet",
-   "label": "Fillet · Part 1",
+   "label": "Fillet 1",
    "part": "Part 1",
    "settings": {
     "corners": 3,
@@ -98,7 +98,7 @@
     "corners": 3,
     "rounded": 1,
     "sharp": 2,
-    "problem": "A fillet on Part 1 can’t be made at 2 of its 3 corners: This radius would consume an entire adjacent line. Choose a smaller radius."
+    "problem": "Failed to fillet selections."
    }
   }
  ],

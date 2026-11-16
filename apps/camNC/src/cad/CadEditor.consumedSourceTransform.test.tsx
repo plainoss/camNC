@@ -80,6 +80,8 @@ it.each([false, true])(
     await userEvent.click(transform);
     let dialog = await screen.findByRole('dialog', { name: /^Transform/ });
     expect(screen.queryByRole('alert')).toBeNull();
+    // A new transform starts on Translate by line; this one moves by X, Y and Z.
+    await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'xyz');
     await userEvent.clear(within(dialog).getByRole('textbox', { name: 'X' }));
     await userEvent.type(within(dialog).getByRole('textbox', { name: 'X' }), '5');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
@@ -88,6 +90,7 @@ it.each([false, true])(
 
     await userEvent.click(await studioCommand(/Transform/));
     dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+    await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'xyz');
     await userEvent.clear(within(dialog).getByRole('textbox', { name: 'X' }));
     await userEvent.type(within(dialog).getByRole('textbox', { name: 'X' }), '5');
     await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));

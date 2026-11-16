@@ -45,7 +45,7 @@ it('confirms a filleted sketch with existing region selections, and retains the 
       </div>
     );
   mount(source);
-  const dialog = await screen.findByRole('dialog', { name: /^Sketch · / });
+  const dialog = await screen.findByRole('dialog', { name: /^Sketch( · | \d)/ });
   await checked();
   const canvas = screen.getByTestId('cad-canvas');
   fireEvent.keyDown(canvas, { key: 'f', shiftKey: true });
@@ -67,7 +67,7 @@ it('confirms a filleted sketch with existing region selections, and retains the 
   cleanup();
   endCadSession(source.id);
   mount(saved);
-  const reopened = await screen.findByRole('dialog', { name: /^Sketch · / });
+  const reopened = await screen.findByRole('dialog', { name: /^Sketch( · | \d)/ });
   await checked();
   await waitFor(() => expect(within(reopened).getByRole('button', { name: /Finish sketch/ })).toBeEnabled());
   expect(saved.parts[0]!.sketch.entities.filter(entity => entity.type === 'arc')).toHaveLength(1);

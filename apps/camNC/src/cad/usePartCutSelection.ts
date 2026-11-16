@@ -6,7 +6,13 @@ type PartFeature = 'extrude' | 'pattern';
 
 /** Carry physical-copy identity into cut references and refuse unsupported family-only commands. */
 export function usePartCutSelection(document: CadDocument, part: CadPart | undefined, setPartId: (partId: string) => void) {
-  const [physicalSelection, setPhysicalSelection] = useState<{ partId: string; copyId?: string; references?: string[] } | null>(null);
+  const [physicalSelection, setPhysicalSelection] = useState<{
+    partId: string;
+    copyId?: string;
+    references?: string[];
+    /** Chosen by a click of its own, rather than with a feature opened on it. */
+    chosen?: boolean;
+  } | null>(null);
   const [cutPick, setCutPick] = useState<{ partId: string; seq: number } | null>(null);
   const [cutPicked, setCutPicked] = useState<string[]>([]);
   const showCutPicked = useCallback(
@@ -16,9 +22,9 @@ export function usePartCutSelection(document: CadDocument, part: CadPart | undef
   const pickForCut = (partId: string, copyId?: string) =>
     setCutPick(previous => ({ partId: cadPartReference(partId, copyId), seq: (previous?.seq ?? 0) + 1 }));
   // `references` are every part a feature row stands for, such as all targets of a Cut, highlighted with the selection.
-  const selectPart = (partId: string, copyId?: string, references?: string[]) => {
+  const selectPart = (partId: string, copyId?: string, references?: string[], chosen = true) => {
     setPartId(partId);
-    setPhysicalSelection({ partId, copyId, ...(references && references.length > 1 && { references }) });
+    setPhysicalSelection({ partId, copyId, ...(references && references.length > 1 && { references }), chosen });
   };
   const copyId = physicalSelection?.partId === part?.id ? physicalSelection?.copyId : undefined;
   // Suppression keeps raw source copy rows for restoration. Only built physical
@@ -50,7 +56,11 @@ export function usePartCutSelection(document: CadDocument, part: CadPart | undef
      * A Mirror, Transform or Pattern dialog takes its part from the same clicks, rather than the click moving the
      * selection away from its part, and the selection follows the part it takes.
      */
-    dialogPicks: { pick: cutPick, select: (partId: string) => selectPart(partId) },
+    dialogPicks: {
+      pick: cutPick,
+      select: (partId: string) => selectPart(partId),
+      selected: physicalSelection?.chosen ? physicalSelection.partId : null,
+    },
     cutPicked,
     showCutPicked,
     pickForCut,

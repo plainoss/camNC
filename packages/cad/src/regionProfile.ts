@@ -11,13 +11,18 @@ const regionIdsBySketch = new WeakMap<CadSketch, Set<string>>();
  */
 export function missingRegionProblem(part: CadPart): string | null {
   const wanted = [...(part.regions ?? []), ...(part.addedRegions ?? [])];
+  // A thin extrude whose shape was cleared to pick again is missing it, as the reference marks it, until one is picked.
+  if (part.thinWall && part.regions?.length === 0) return missingRegionMessage(1);
   if (!part.regions || !wanted.length || part.thin) return null;
   let ids = regionIdsBySketch.get(part.sketch);
   if (!ids) regionIdsBySketch.set(part.sketch, (ids = new Set(sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).map(region => region.id))));
-  return wanted.every(id => ids.has(id)) ? null : missingRegionMessage(part);
+  const missing = wanted.filter(id => !ids.has(id)).length;
+  return missing ? missingRegionMessage(missing) : null;
 }
 
-const missingRegionMessage = (part: CadPart) => `A region picked for ${part.name} is no longer in its sketch. Pick its regions again.`;
+/** As the reference says it: what to pick, and how many picks are gone. */
+export const missingRegionMessage = (missing: number) =>
+  `Select face or sketch region to extrude. ${missing} missing selection${missing === 1 ? '' : 's'}`;
 
 /**
  * A part extruded from the regions picked in its sketch, as the reference's Extrude takes them: the sketch can hold
@@ -31,7 +36,7 @@ export function regionProfile(part: CadPart & { regions: string[] }): { part?: E
   const wanted = [...new Set([...part.regions, ...(part.addedRegions ?? [])])];
   if (!wanted.length) return problem('region-count', 'Pick the regions of the sketch to extrude in the view.');
   const picked = regions.filter(region => wanted.includes(region.id));
-  if (picked.length < wanted.length) return problem('region-missing', missingRegionMessage(part));
+  if (picked.length < wanted.length) return problem('region-missing', missingRegionMessage(wanted.length - picked.length));
   const region = picked.length === 1 ? picked[0]! : joinedRegions(part.sketch, picked);
   if (!region) return problem('region-count', 'The picked regions don’t touch. Extrude each into a part of its own.');
   // Each island is another region's outline: its curves name the hole, as a whole sketch's loops do, so a pocket set on

@@ -10,6 +10,8 @@ export type SearchCommand = Omit<SketchToolDefinition, 'id'> & {
   description?: string;
   /** The command's own icon, for one that isn't a sketch tool. */
   glyph?: ReactNode;
+  /** Why it's listed but can't be chosen yet. */
+  unavailable?: string;
 };
 
 /** Nonmodal tool search keeps the drawing available and closes on outside click or Escape. */
@@ -69,7 +71,7 @@ export function CommandSearch({
             setIndex(next);
             if (event.target !== input.current) panel.current?.querySelectorAll<HTMLButtonElement>('[role="option"]')[next]?.focus();
           }
-        } else if (event.key === 'Enter' && event.target === input.current && active) {
+        } else if (event.key === 'Enter' && event.target === input.current && active && !active.unavailable) {
           event.preventDefault();
           onChoose(active.id);
         }
@@ -109,12 +111,14 @@ export function CommandSearch({
                 type="button"
                 role="option"
                 aria-selected={command.id === active?.id}
+                aria-disabled={command.unavailable ? true : undefined}
+                title={command.unavailable}
                 onFocus={() => setIndex(matches.indexOf(command))}
                 onPointerMove={event => {
                   setIndex(matches.indexOf(command));
                   if (event.currentTarget.parentElement?.contains(document.activeElement)) event.currentTarget.focus();
                 }}
-                onClick={() => onChoose(command.id)}>
+                onClick={() => !command.unavailable && onChoose(command.id)}>
                 {command.glyph ? (
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     {command.glyph}

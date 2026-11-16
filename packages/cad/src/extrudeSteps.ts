@@ -1,10 +1,13 @@
 import { faceRemovalDepth } from './faceRemovalDepth';
+import { resolveDrawnPlacements } from './drawnOn';
+import { cadDirectionVector } from './directions';
 import { cadDocumentVersion } from './documentVersion';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { entityPointIds, newCadId } from './document';
 import { faceExtrudeProblem, resolveFaceProfiles } from './faceExtrude';
 import { cadSketchRegions, evaluateCadFeatures, isCadPart } from './features';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea } from './geometry';
+import { patternedRemoval } from './featurePattern';
 import { regionGroups } from './regionProfile';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type { CadCut, CadDocument, CadEntity, CadFaceSketch, CadFeature, CadPart, CadSketch } from './types';
@@ -16,13 +19,40 @@ export const sketchOwnerId = (part: CadPart): string => part.sketchOf ?? part.id
 export const sharesSketch = (a: CadPart, b: CadPart): boolean => sketchOwnerId(a) === sketchOwnerId(b);
 
 /**
- * Whether a part is an Extrude → Add of another sketch: a body of its own, joined to the part it adds to. It's built and
+ * How far below a part's top an Extrude → Add of the part's own sketch ends: 0 when it extrudes its regions as far the
+ * same way, the step down when it is a plain extrude away from the sketch plane that ends lower, or null otherwise.
+ */
+export function addedRegionStep(target: CadPart, step: CadPart): number | null {
+  if (!sharesSketch(target, step) || !target.drawnOn?.inward !== !step.drawnOn?.inward) return null;
+  const same = (key: 'upTo' | 'upToDatum' | 'symmetric' | 'thin') => JSON.stringify(target[key]) === JSON.stringify(step[key]);
+  if (!(['upTo', 'upToDatum', 'symmetric', 'thin'] as const).every(same)) return null;
+  // Typed or following a variable, the same depth is the same: only a real step down is cut.
+  const below = target.thickness - step.thickness;
+  if (below < MIN_ADDED_STEP) return below > -MIN_ADDED_STEP ? 0 : null;
+  // A step down is cut from the part's top: one extruded into the plane, or up to something, isn't stepped.
+  const plain = !target.upTo && !target.upToDatum && !target.symmetric && !target.thin && !target.drawnOn?.inward;
+  return plain ? below : null;
+}
+
+/** The smallest step down an Add's regions can end at, as the shallowest cut. */
+const MIN_ADDED_STEP = 0.1;
+
+/**
+ * Whether an Extrude → Add of a part's own sketch makes its regions part of that part's profile: it extrudes them as far,
+ * or less far, the same way; less far, the part is stepped down over them. Otherwise, as when it ends beyond the part's
+ * top, it is a body joined to the part, as another sketch's Add is.
+ */
+export const addsRegionsTo = (target: CadPart, step: CadPart): boolean => addedRegionStep(target, step) !== null;
+
+/**
+ * Whether a part is an Extrude → Add of another sketch, or of the same one with a depth of its own: a body of its own,
+ * joined to the part it adds to. It's built and
  * made like a part, but listed as part of that one. How it's machined, as one piece or several, is decided later.
  */
 export function isJoinedBody(document: Pick<CadDocument, 'parts'>, part: CadPart): boolean {
   if (!part.addTo || part.extrude === false || part.suppressed || part.remove || copyFaceOperationProblem(part)) return false;
   const target = document.parts.find(candidate => candidate.id === part.addTo);
-  return !!target && isCadPart(target) && !sharesSketch(target, part);
+  return !!target && isCadPart(target) && !addsRegionsTo(target, part);
 }
 
 /** The parts and the bodies joined to them: everything built as a solid. */
@@ -118,7 +148,12 @@ export function removalRegions(document: CadDocument, part: CadPart): { regions:
       (largest, region) => (!largest || Math.abs(polygonArea(region.points)) > Math.abs(polygonArea(largest.points)) ? region : largest),
       null
     );
-  const cut = regions.filter(region => region !== rest && region.curveIds.some(id => id !== outlineId)).map(region => region.id);
+  // The face's whole outline taken into the sketch with Use makes the face itself a shape drawn on it, so it's cut too.
+  const faceLines = part.sketch.entities.filter(entity => entity.faceEdge && entity.type === 'line');
+  const wholeFace = faceLines.length > 0 && faceLines.every(entity => entity.taken);
+  const cut = regions
+    .filter(region => (region !== rest || wholeFace) && (wholeFace || region.curveIds.some(id => id !== outlineId)))
+    .map(region => region.id);
   return { regions, cut };
 }
 
@@ -223,13 +258,30 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
   });
 
   const added = new Map<string, string[]>();
+  // An Add that ends lower than its part steps the part down over its regions, as a cut from the top kept with the Add.
+  // A region the part makes itself isn't stepped, and one several Adds take ends at the highest of them.
+  const highest = new Map<string, Map<string, { below: number; by: string }>>();
   for (const step of parts) {
     const target = step.addTo && parts.find(part => part.id === step.addTo);
     // A suppressed Add adds nothing, as in the reference.
     // Nor does one not extruded, such as a sketch whose extrude was deleted.
-    if (step.suppressed || step.extrude === false || !target || !target.regions || !sharesSketch(target, step) || step.addTo === step.id)
-      continue;
+    const below = target ? addedRegionStep(target, step) : null;
+    if (step.suppressed || step.extrude === false || !target || !target.regions || below === null || step.addTo === step.id) continue;
     added.set(target.id, [...(added.get(target.id) ?? []), ...(step.regions ?? [])]);
+    const ends = highest.get(target.id) ?? highest.set(target.id, new Map()).get(target.id)!;
+    for (const regionId of step.regions ?? []) {
+      if (target.regions.includes(regionId)) continue;
+      const known = ends.get(regionId);
+      if (!known || below < known.below) ends.set(regionId, { below, by: step.id });
+    }
+  }
+  const removed = new Map<string, CadFeature[]>();
+  for (const [targetId, ends] of highest) {
+    const sketchId = parts.find(part => part.id === targetId)!.sketch.id;
+    const steps = [...ends].flatMap(([regionId, { below, by }]): CadCut[] =>
+      below ? [{ type: 'cut', id: `${by}:cut:${regionId}`, sketchId, regionId, depth: below, removedBy: by }] : []
+    );
+    if (steps.length) removed.set(targetId, steps);
   }
   parts = parts.map(part => {
     const regions = added.get(part.id);
@@ -240,8 +292,15 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
     return next;
   });
 
-  const removed = new Map<string, CadFeature[]>();
   const resolved = { ...document, parts };
+  let placements: CadDocument | null = null;
+  const placedDocument = () => (placements ??= resolveDrawnPlacements(resolved).document);
+  const placedBoard = (board: CadPart) => ({ ...board, placement: placedDocument().parts.find(part => part.id === board.id)?.placement });
+  // Along a picked plane or face, an edge, or an axis, as a part pattern is.
+  const patternAlong = (pattern: NonNullable<CadPart['pattern']>): [number, number, number] | null =>
+    pattern.direction
+      ? cadDirectionVector(placedDocument(), pattern.direction)
+      : (pattern.vector ?? (pattern.axis === 'x' ? [1, 0, 0] : pattern.axis === 'y' ? [0, 1, 0] : [0, 0, 1]));
   for (const step of parts) {
     // A suppressed Remove cuts nothing, and nor does a sketch not extruded.
     if (!step.remove || step.suppressed || step.extrude === false || isSpatialRemoval(step)) continue;
@@ -265,7 +324,9 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
         removedBy: step.id,
       })
     );
-    removed.set(support.board.id, [...(removed.get(support.board.id) ?? []), face, ...cuts]);
+    // A feature pattern of the Remove cuts it again at each of its instances.
+    const repeated = step.pattern ? patternedRemoval(step, placedBoard(support.board), face, cuts, patternAlong(step.pattern)) : [];
+    removed.set(support.board.id, [...(removed.get(support.board.id) ?? []), face, ...cuts, ...repeated]);
   }
   parts = parts.map(part => {
     const wanted = removed.get(part.id) ?? [];
@@ -286,7 +347,13 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
 
   const changed =
     parts.length !== document.parts.length || parts.some((part, index) => JSON.stringify(part) !== JSON.stringify(document.parts[index]));
-  if (!changed) return document;
+  if (!changed) {
+    // An edit that needs a newer reader, or no longer needs the exact one it named, as switching Merge with all does.
+    const required = cadDocumentVersion(document);
+    return required > document.version || (document.version >= 5 && required !== document.version)
+      ? { ...document, version: required }
+      : document;
+  }
   return { ...document, parts, version: cadDocumentVersion({ ...document, parts }) };
 }
 
@@ -304,12 +371,11 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
   if (part.addTo) {
     const target = document.parts.find(candidate => candidate.id === part.addTo);
     if (!target) return 'The part it adds to is gone. Pick another, or make a new part.';
-    // Another sketch's extrude is joined as a body of its own: it only needs a profile to extrude.
-    if (!sharesSketch(target, part)) {
+    // Another sketch's extrude, or one with a depth of its own, is joined as a body of its own: it only needs a profile.
+    if (!addsRegionsTo(target, part)) {
       const problem = evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
       return problem ? (part.regions ? problem.message : 'Pick a region of the sketch in the view.') : null;
     }
-    if (!sharesSketch(target, part)) return `Add joins regions of the sketch ${target.name} is made from.`;
     if (!target.regions) return `${target.name} is its whole sketch already.`;
     if (!part.regions?.length) return 'Pick the regions to add in the view.';
     const problem = evaluateCadPart({ ...target, addedRegions: [...(target.addedRegions ?? []), ...part.regions] }).diagnostics.find(
@@ -354,7 +420,7 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
  * so copies, face sketches and later cuts still work. A same-sketch Add or Remove has no body of its own.
  */
 export function partIsBuiltOn(document: CadDocument, part: CadPart, addTo?: CadPart): string | null {
-  const keepsBody = !!addTo && !sharesSketch(addTo, part);
+  const keepsBody = !!addTo && !addsRegionsTo(addTo, part);
   if (
     !keepsBody &&
     (part.copies?.length ||

@@ -41,6 +41,8 @@ function setup(pattern = false, count = 2) {
       }}
     />
   );
+  // A new transform starts on Translate by line; these work by X, Y and Z.
+  fireEvent.change(screen.getByRole('combobox', { name: 'Transform type' }), { target: { value: 'xyz' } });
   const latest = () => preview.mock.calls.at(-1)?.[0];
   return {
     document,

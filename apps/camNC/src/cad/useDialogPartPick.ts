@@ -6,6 +6,8 @@ export interface DialogPartPicks {
   /** The last part clicked, as a part or copy reference. `seq` tells two clicks apart. */
   pick: { partId: string; seq: number } | null;
   /** Selects the part the dialog took, so the list and the view show the part it works on. */
+  /** The part chosen in the Parts list or the view before the dialog opened, if any: it starts as the dialog's pick. */
+  selected?: string | null;
   select: (partId: string) => void;
 }
 
@@ -31,6 +33,8 @@ export function useDialogPartPick({
   const [target, setTarget] = useState(partId);
   const [active, setActive] = useState(pickable && startActive);
   const [problem, setProblem] = useState<string | null>(null);
+  /** Whether a part has been clicked for it since it opened, the one it opened on as much as another. With nothing to click, it's the given one. */
+  const [picked, setPicked] = useState(!picks || picks.selected === partId);
   const pick = picks?.pick;
   // The click that opened the dialog, or any before it, is not a pick for it.
   const seen = useRef(pick?.seq);
@@ -45,6 +49,7 @@ export function useDialogPartPick({
     if (!source) return;
     // A copy is its family's result: taking its family instead would change a part that wasn't clicked.
     if (source.id !== pick.partId) return setProblem(`Pick ${source.name} itself, not one of its copies.`);
+    setPicked(true);
     if (source.id === target) return setProblem(null);
     const refusal = take?.(source.id, target);
     setProblem(refusal || null);
@@ -54,6 +59,7 @@ export function useDialogPartPick({
   }, [pick]);
   return {
     partId: target,
+    picked,
     pickable,
     active,
     problem,

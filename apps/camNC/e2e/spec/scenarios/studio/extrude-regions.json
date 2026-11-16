@@ -1,0 +1,492 @@
+[
+  {
+    "id": "studio/extrude/first-dimension-then-region-pick",
+    "title": "A rectangle's first dimension scales it about the origin, and a first Extrude starts with no region picked until one is picked in the view",
+    "evidence": "design sketch-to-part workflow: first dimension scales the sketch; Extrude region selection starts empty and active",
+    "steps": [
+      "dialogcancel",
+      {
+        "spec": "1 view"
+      },
+      "view top",
+      {
+        "spec": "2 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "3 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "4 command"
+      },
+      "key g",
+      {
+        "spec": "5 draw"
+      },
+      "rect 0,0 20,10",
+      {
+        "expect": {
+          "entityCount": 4,
+          "regions": 1
+        }
+      },
+      {
+        "spec": "6 cancel"
+      },
+      "key Escape",
+      {
+        "spec": "7 command"
+      },
+      "key d",
+      {
+        "spec": "8 pick"
+      },
+      "viewpick 10,10,0",
+      {
+        "spec": "9 pick"
+      },
+      "viewpick 10,15,0",
+      {
+        "expect": {
+          "focus": "input",
+          "dimensions": [
+            {
+              "kind": "horizontal",
+              "value": 20
+            }
+          ]
+        }
+      },
+      {
+        "spec": "10 field"
+      },
+      "field Length 100",
+      {
+        "expect": {
+          "dimensions": [
+            {
+              "kind": "horizontal",
+              "value": 100
+            }
+          ],
+          "entitiesInclude": [
+            {
+              "type": "line",
+              "a": [100, 0],
+              "b": [100, 50]
+            }
+          ]
+        }
+      },
+      {
+        "spec": "11 view"
+      },
+      "key f",
+      {
+        "spec": "12 pick"
+      },
+      "viewpick 100,25,0",
+      {
+        "spec": "13 pick"
+      },
+      "viewpick 110,35,0",
+      {
+        "spec": "14 field"
+      },
+      "field Length 50",
+      {
+        "expect": {
+          "dimensions": [
+            {
+              "kind": "horizontal",
+              "value": 100
+            },
+            {
+              "kind": "vertical",
+              "value": 50
+            }
+          ],
+          "entitiesInclude": [
+            {
+              "type": "line",
+              "a": [100, 0],
+              "b": [100, 50]
+            }
+          ]
+        }
+      },
+      {
+        "spec": "15 cancel"
+      },
+      "key Escape",
+      {
+        "spec": "16 confirm"
+      },
+      "closesketch",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null
+          }
+        }
+      },
+      {
+        "spec": "17 command"
+      },
+      "key Shift+e",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 0,
+              "picking": true
+            }
+          }
+        }
+      },
+      {
+        "spec": "18 pick"
+      },
+      "viewpick 50,25,0",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 1
+            }
+          }
+        }
+      },
+      {
+        "spec": "19 field"
+      },
+      "dialogfill Thickness = 10",
+      "key Enter",
+      {
+        "expect": {
+          "focus": "input",
+          "studio": {
+            "dialog": "Extrude 1"
+          }
+        }
+      },
+      {
+        "spec": "20 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "listedParts": [
+              {
+                "name": "Part 1",
+                "thickness": 10
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "studio/extrude/regions-new-then-add-lower",
+    "title": "Overlapping rectangle and circle regions extrude separately: two as a new part 40 deep, then the rest as an Add 25 deep that steps the part down, as one part",
+    "evidence": "design region picks, an empty later Extrude at the default thickness, and Add with its own depth",
+    "steps": [
+      "dialogcancel",
+      {
+        "spec": "1 view"
+      },
+      "view top",
+      {
+        "spec": "2 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "3 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "4 command"
+      },
+      "key g",
+      {
+        "spec": "5 draw"
+      },
+      "rect 0,0 80,40",
+      {
+        "spec": "6 command"
+      },
+      "key c",
+      {
+        "spec": "7 draw"
+      },
+      "circle 80,20 20",
+      {
+        "expect": {
+          "regions": 3
+        }
+      },
+      {
+        "spec": "8 confirm"
+      },
+      "closesketch",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null
+          }
+        }
+      },
+      {
+        "spec": "9 command"
+      },
+      "key Shift+e",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 0,
+              "picking": true
+            }
+          }
+        }
+      },
+      {
+        "spec": "10 pick"
+      },
+      "viewpick 30,20,0",
+      {
+        "spec": "11 pick"
+      },
+      "viewpick 70,20,0",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 2
+            }
+          }
+        }
+      },
+      {
+        "spec": "12 field"
+      },
+      "dialogfill Thickness = 40",
+      "key Enter",
+      {
+        "spec": "13 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "listedParts": [
+              {
+                "name": "Part 1",
+                "thickness": 40
+              }
+            ]
+          }
+        }
+      },
+      {
+        "spec": "14 select"
+      },
+      "featureeye Sketch 1",
+      {
+        "spec": "15 command"
+      },
+      "key Shift+e",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 0,
+              "picking": true
+            }
+          }
+        }
+      },
+      {
+        "spec": "16 pick"
+      },
+      "viewpick 90,20,0",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 1
+            }
+          }
+        }
+      },
+      {
+        "spec": "17 field"
+      },
+      "dialogtab Add",
+      {
+        "spec": "18 field"
+      },
+      "dialogfill Thickness = 25",
+      "key Enter",
+      {
+        "spec": "19 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 1,
+            "thicknesses": {
+              "Part 1": 40,
+              "Part 2": 25
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "studio/extrude/add-merge-with-all",
+    "title": "A bar running into two blocks stays New when picked, and Add with Merge with all joins it and both blocks into one part",
+    "evidence": "design automatic Add only for one part run into; Merge with all joins every part an Add runs into",
+    "steps": [
+      "dialogcancel",
+      {
+        "spec": "1 view"
+      },
+      "view top",
+      {
+        "spec": "2 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "3 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "4 command"
+      },
+      "key g",
+      {
+        "spec": "5 draw"
+      },
+      "rect 0,0 30,30",
+      {
+        "spec": "6 draw"
+      },
+      "rect 70,0 100,30",
+      {
+        "spec": "7 confirm"
+      },
+      "closesketch",
+      {
+        "spec": "8 command"
+      },
+      "key Shift+e",
+      {
+        "spec": "9 pick"
+      },
+      "viewpick 15,15,0",
+      {
+        "spec": "10 pick"
+      },
+      "viewpick 85,15,0",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 2
+            }
+          }
+        }
+      },
+      {
+        "spec": "11 field"
+      },
+      "dialogfill Thickness = 10",
+      "key Enter",
+      {
+        "spec": "12 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 2
+          }
+        }
+      },
+      {
+        "spec": "13 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "14 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "15 command"
+      },
+      "key g",
+      {
+        "spec": "16 draw"
+      },
+      "rect 0,0 100,10",
+      {
+        "spec": "17 confirm"
+      },
+      "closesketch",
+      {
+        "spec": "18 command"
+      },
+      "key Shift+e",
+      {
+        "spec": "19 pick"
+      },
+      "viewpick 50,5,0",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "box": "Sketch to extrude",
+              "regions": 1
+            }
+          }
+        }
+      },
+      {
+        "spec": "20 field"
+      },
+      "dialogtab Add",
+      {
+        "spec": "21 field"
+      },
+      "dialogcheck Merge with all = true",
+      {
+        "spec": "22 field"
+      },
+      "dialogfill Thickness = 5",
+      "key Enter",
+      {
+        "spec": "23 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 1,
+            "partIssues": []
+          }
+        }
+      }
+    ]
+  }
+]

@@ -44,7 +44,8 @@ function setup(editing = false) {
   const latest = () => preview.mock.calls.at(-1)?.[0];
   const hasSharpCorner = (next: CadDocument, x: number) =>
     evaluateCadPart(next.parts[0]!).part!.outline.some(point => Math.hypot(point.x - x, point.y) < 1e-6);
-  const remove = (x: number) => fireEvent.click(screen.getByRole('button', { name: `Remove selected edge: Plate at ${x}, 0 mm` }));
+  const remove = (x: number) =>
+    fireEvent.click(screen.getByRole('button', { name: `Remove selected edge: Edge of Extrude · Plate at ${x}, 0 mm` }));
   return { document, part, corners, preview, save, pick, latest, hasSharpCorner, remove };
 }
 
@@ -52,7 +53,7 @@ it('removes rounded edges from the dialog after live preview has replaced their 
   const view = setup();
   view.pick(0);
   expect(view.hasSharpCorner(view.latest()!, 0)).toBe(false);
-  expect(screen.getByRole('button', { name: 'Remove selected edge: Plate at 0, 0 mm' })).toBeDefined();
+  expect(screen.getByRole('button', { name: 'Remove selected edge: Edge of Extrude · Plate at 0, 0 mm' })).toBeDefined();
   view.pick(1);
   expect(view.latest()?.parts[0]?.fillets?.[0]?.corners).toHaveLength(2);
   view.remove(0);

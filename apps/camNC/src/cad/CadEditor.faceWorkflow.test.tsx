@@ -9,7 +9,7 @@ import {
   type CadDocument,
   type CadDrawnOn,
 } from '@wbcnc/cad';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { page, userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
@@ -75,6 +75,12 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
     await userEvent.clear(field);
     await userEvent.type(field, value);
     await userEvent.keyboard('{Tab}');
+    await settled();
+  };
+  // A confirmed sketch's Extrude starts with nothing picked: its region is picked in the view.
+  const pickRegion = async () => {
+    const view = studioProps().regions!.find(region => !region.picked)!;
+    act(() => studioProps().onPickRegion!(view.id));
     await settled();
   };
   const ok = async () => {
@@ -153,6 +159,7 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   await drawRect([0, 0], [57, 63]);
   await unchanged(initial);
   await command('Extrude');
+  await pickRegion();
   await thickness('25');
   await ok();
   await unchanged(initial);
@@ -163,6 +170,7 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   await drawRect([0, 48], [57, 63]);
   await unchanged(initial);
   await command('Extrude');
+  await pickRegion();
   // Add has its own depth and end condition when it joins another sketch's body.
   expect(screen.getByRole('tab', { name: 'Add' }).getAttribute('aria-selected')).toBe('true');
   await thickness('65.7');
@@ -177,6 +185,7 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   await drawRect([0, 25], [63, 90.7]);
   await unchanged(secondView);
   await command('Extrude');
+  await pickRegion();
   expect((screen.getByRole('combobox', { name: 'Merge scope' }) as HTMLSelectElement).value).toBe(latest.parts[1]!.id);
   await thickness('3');
   await userEvent.click(screen.getByRole('button', { name: 'Flip direction' }));

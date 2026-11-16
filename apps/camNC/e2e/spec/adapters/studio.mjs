@@ -1,11 +1,18 @@
 import { createAdapter as sketchAdapter } from './sketch.mjs';
+import path from 'node:path';
+import process from 'node:process';
 import { settledSnapshot } from '../settle.mjs';
+import { readFeatures, readParts } from './studioLists.mjs';
+import { exportStep, extrudeRegions, parseSketchPick, saveDesign, studioCamera, studioPlanes, viewPick } from './studioPick.mjs';
 import { checkStudio, studioContent, studioState } from './studioModel.mjs';
 
 const escapePattern = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Part Studio steps use visible feature names and labelled controls; source reads never perform edits. */
-export async function createAdapter(page, url) {
+/**
+ * Part Studio steps use visible feature names and labelled controls; source reads never perform edits. Files a step
+ * writes (`exportstep`, `savedesign`) are relative to `baseDir`: the scenario file's folder, or where a session started.
+ */
+export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD ?? process.cwd() } = {}) {
   const base = await sketchAdapter(page, url), checkpoints = new Map();
   const readDocument = () => page.evaluate(async () => {
     const jobId = location.pathname.split('/')[2];
@@ -15,6 +22,8 @@ export async function createAdapter(page, url) {
     return (await getJob(jobId))?.design?.draft ?? null;
   });
   const read = async () => {
+    // A modal dialog playing its closing animation still hides the page from accessibility queries: let it finish.
+    await page.locator('[role="dialog"][data-state="closed"]').first().waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
     const document = await readDocument();
     const dialog = page.getByRole('dialog');
     const parts = page.getByRole('list', { name: 'Parts', exact: true });
@@ -48,14 +57,55 @@ export async function createAdapter(page, url) {
         flipped: await sectionDialog.getByRole('button', { name: 'Flip plane', exact: true }).getAttribute('aria-pressed') === 'true',
       } : {}),
     };
-    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, measurements, section, dialog: dialogName };
+    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, measurements, section, dialog: dialogName, extrudeRegions: await extrudeRegions(page), planes: await studioPlanes(page), camera: await studioCamera(page), features: await readFeatures(page), parts: await readParts(page) };
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
-    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter'].includes(verb)) return base.step(text);
+    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'featuremenu', 'menuitem', 'exportstep', 'savedesign'].includes(verb)) return base.step(text);
     if (!(await base.inDemo())) throw new Error('Studio workflow input requires demo mode');
     const since = await settledSnapshot(page);
-    if (verb === 'pickviewcenter') {
+    if (verb === 'viewpick') {
+      // With a sketch open the pick is on its drawing, as a person picks an edge or places a dimension there.
+      // An open sketch, not the Sketch dialog still waiting for its plane, which has the same name.
+      if (await page.locator('[role=dialog].cad-sketch-dialog').isVisible()) await base.step(`click ${parseSketchPick(rest).join(',')}`);
+      else await viewPick(page, rest);
+    }
+    else if (verb === 'featureeye') {
+      // A row's eye only shows while the row is hovered, so hover it first, as a person does, then click the eye.
+      // The origin's row has no button of its own, so default geometry is found by its row's name.
+      const features = page.getByRole('region', { name: 'Features', exact: true });
+      const geometry = features.getByRole('list', { name: 'Default geometry', exact: true }).getByRole('listitem').filter({ has: page.getByText(rest, { exact: true }) });
+      const row = await geometry.count() ? geometry : features.getByRole('button', { name: new RegExp(`^${escapePattern(rest)}(?:\\s|$)`) }).locator('xpath=ancestor::li[1]');
+      if (await row.count() !== 1) throw new Error(`Feature name must identify one row: ${rest}`);
+      await row.hover();
+      await row.getByRole('button', { name: /^(Show|Hide)$/ }).click();
+    } else if (verb === 'dialogtab') {
+      await page.getByRole('dialog').getByRole('tab', { name: rest, exact: true }).click();
+    } else if (verb === 'featuremenu') {
+      // Only the right-click: a separate `menuitem` step chooses from the menu, as a person's second click does.
+      const features = page.getByRole('region', { name: 'Features', exact: true });
+      const plane = features.getByRole('list', { name: 'Default geometry', exact: true }).getByRole('button', { name: rest, exact: true });
+      const row = await plane.count() ? plane : features.getByRole('button', { name: new RegExp(`^${escapePattern(rest)}(?:\\s|$)`) });
+      if (await row.count() !== 1) throw new Error(`Feature name must identify one row: ${rest}`);
+      await row.click({ button: 'right' });
+      await page.getByRole('menu').first().waitFor();
+    } else if (verb === 'menuitem') {
+      const item = page.getByRole('menu').getByRole('menuitem', { name: rest, exact: true });
+      if (await item.count() !== 1) throw new Error(`The open menu must have one item named ${rest}`);
+      await item.click();
+    } else if (verb === 'selectfeature') {
+      // One click on a named row of the feature list, a default plane included, as a person selects it there.
+      const features = page.getByRole('region', { name: 'Features', exact: true });
+      const plane = features.getByRole('list', { name: 'Default geometry', exact: true }).getByRole('button', { name: rest, exact: true });
+      const row = await plane.count() ? plane : features.getByRole('button', { name: new RegExp(`^${escapePattern(rest)}(?:\\s|$)`) });
+      if (await row.count() !== 1) throw new Error(`Feature name must identify one row: ${rest}`);
+      await row.click();
+    }
+    else if (verb === 'exportstep' || verb === 'savedesign') {
+      if (!rest) throw new Error(`${verb} takes a file path`);
+      const file = path.resolve(baseDir, rest);
+      await (verb === 'exportstep' ? exportStep(page, file) : saveDesign(page, file));
+    } else if (verb === 'pickviewcenter') {
       // A single stock board is centered by the named camera view. This is a real canvas click, never a model edit.
       const canvas = page.getByTestId('workspace-3d').locator('canvas').first();
       await canvas.waitFor();
@@ -94,7 +144,10 @@ export async function createAdapter(page, url) {
       else {
         const value = rest.slice(at + 3);
         if (!['true', 'false'].includes(value)) throw new Error('dialogcheck requires true or false');
-        await field.setChecked(value === 'true');
+        // A toggle button, as Flip direction, is pressed or not rather than checked.
+        const pressed = await field.getAttribute('aria-pressed');
+        if (pressed === null) await field.setChecked(value === 'true');
+        else if ((pressed === 'true') !== (value === 'true')) await field.click();
       }
     } else if (verb === 'featureaction') {
       const at = rest.indexOf(' = ');

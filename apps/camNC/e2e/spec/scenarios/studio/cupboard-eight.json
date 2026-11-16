@@ -285,7 +285,7 @@
         }
       },
       "feature Extrude \u00b7 Shelf",
-      "dialogfill Offset = board + margin + 4*pitch + pin/2",
+      "dialogfill Starting offset = board + margin + 4*pitch + pin/2",
       "dialogconfirm",
       "checkpoint move-shelf-stack",
       {

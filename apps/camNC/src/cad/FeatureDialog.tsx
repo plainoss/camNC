@@ -16,6 +16,7 @@ export function FeatureDialog({
   onOk,
   onCancel,
   autoFocus = true,
+  acceptFromPartsList,
   className,
   children,
 }: {
@@ -30,6 +31,8 @@ export function FeatureDialog({
   onCancel: () => void;
   /** Puts the keyboard in its first field on opening. A sketch's dialog leaves it on the drawing. */
   autoFocus?: boolean;
+  /** Enter on a Parts or Feature list row or in the 3D view accepts it, for a dialog whose picks are made there. */
+  acceptFromPartsList?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -45,6 +48,29 @@ export function FeatureDialog({
     void fieldsSettled().then(() => {
       if (!latest.current.okDisabled) latest.current.onOk();
     });
+  // A part just picked into it from the Parts list or the view keeps the keyboard there: Enter there accepts the dialog
+  // rather than picking the part again.
+  useEffect(() => {
+    if (!acceptFromPartsList) return;
+    const accept = (event: KeyboardEvent) => {
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      // A row of the Parts list, or of the Feature list's planes and features, just picked for the dialog.
+      const row =
+        target instanceof HTMLButtonElement &&
+        !!(target.closest('.cad-part-list') || target.closest('.cad-studio-features')) &&
+        target.hasAttribute('aria-pressed');
+      // The 3D view itself, not one of its buttons or fields.
+      const view = target?.matches('[data-testid="workspace-3d"], [data-testid="workspace-3d"] canvas');
+      if (event.key !== 'Enter' || event.isComposing || !(row || view)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      ok();
+    };
+    document.addEventListener('keydown', accept, true);
+    return () => document.removeEventListener('keydown', accept, true);
+    // `ok` reads the latest props itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acceptFromPartsList]);
   // Opening it puts the keyboard in its first field, as a dialog should.
   useEffect(() => {
     if (autoFocus) frame.current?.querySelector<HTMLElement>('input, select, button:not(.cad-feature-dialog-head button)')?.focus();
@@ -68,7 +94,17 @@ export function FeatureDialog({
         if (event.key === 'Escape') onCancel();
         // Enter applies a field's value and keeps the dialog open; Enter again, with nothing changed, accepts it, as in the
         // reference.
-        else if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type !== 'checkbox') {
+        // Enter on a box just ticked accepts the dialog, as its value is already taken.
+        // A sketch's own dialog leaves plain Enter to its drawing tools.
+        else if (
+          event.key === 'Enter' &&
+          event.target instanceof HTMLInputElement &&
+          event.target.type === 'checkbox' &&
+          !className?.includes('cad-sketch-dialog')
+        ) {
+          event.preventDefault();
+          requestAnimationFrame(ok);
+        } else if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type !== 'checkbox') {
           const input = event.target;
           if (lastEnter.current?.input === input && lastEnter.current.value === input.value) {
             lastEnter.current = null;

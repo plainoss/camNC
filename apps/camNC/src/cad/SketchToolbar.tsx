@@ -306,6 +306,26 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
     case 'perpendicular':
       shape = <path d="M4 18h16M12 18V4" />;
       break;
+    case 'normal':
+      // A line through a circle's center.
+      shape = (
+        <>
+          <circle cx="12" cy="12" r="5" />
+          <path d="M3 21 21 3" />
+        </>
+      );
+      break;
+    case 'pierce':
+      shape = (
+        <>
+          <path d="M3 16l6-4h12l-6 4z" />
+          <path d="M12 3v18" />
+        </>
+      );
+      break;
+    case 'curvature':
+      shape = <path d="M3 18c4 0 6-12 9-12s5 12 9 12" />;
+      break;
     case 'equal':
       shape = <path d="M5 8h14M5 16h14" />;
       break;

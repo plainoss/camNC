@@ -137,9 +137,18 @@ it('searches the studio’s own commands with Alt+C outside a sketch', async () 
   const search = await screen.findByRole('combobox', { name: 'Search tools' });
   await userEvent.type(search, 'pla');
   const options = within(screen.getByRole('listbox', { name: 'Tools' })).getAllByRole('option');
-  expect(options.map(option => option.textContent)).toEqual(['Plane']);
+  // The reference's other plane commands are listed too, greyed until they're available.
+  expect(options.map(option => option.textContent)).toEqual([
+    'Plane',
+    'Plane Normal To Edge',
+    'Plane Containing Edges',
+    'Offset Planes',
+    'Intermediate Planes',
+    'Surface Tangent Plane',
+  ]);
+  expect(options.slice(1).every(option => option.getAttribute('aria-disabled') === 'true')).toBe(true);
   await userEvent.keyboard('{Enter}');
-  expect(await screen.findByRole('dialog', { name: 'Plane' })).toBeDefined();
+  expect(await screen.findByRole('dialog', { name: /^Plane \d/ })).toBeDefined();
 });
 
 it('shows parts shaded with their edges, and offers shaded only or translucent', async () => {

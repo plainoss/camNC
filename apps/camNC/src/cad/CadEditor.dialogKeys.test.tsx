@@ -56,7 +56,7 @@ it('applies a value with Enter, accepts the dialog with Enter again, and leaves 
   await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('workspace-3d')));
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   await userEvent.keyboard('p');
-  await waitFor(() => expect(props().planes).toBeUndefined());
+  await waitFor(() => expect(props().planes ?? []).toHaveLength(0));
 });
 
 it('cancels the dialog with Escape, putting back the value applied in it', async () => {
@@ -90,7 +90,7 @@ it('returns the keyboard to the view after accepting a dialog while animation fr
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Extrude/ })).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('workspace-3d')));
     await userEvent.keyboard('p');
-    await waitFor(() => expect(vi.mocked(ModelViewport).mock.calls.at(-1)![0].planes).toBeUndefined());
+    await waitFor(() => expect(vi.mocked(ModelViewport).mock.calls.at(-1)![0].planes ?? []).toHaveLength(0));
   } finally {
     frame.mockRestore();
   }
@@ -119,7 +119,7 @@ it('keeps the keyboard request when Enter accepts a dialog before the lazy view 
     const view = await screen.findByTestId('workspace-3d');
     await waitFor(() => expect(document.activeElement).toBe(view));
     await userEvent.keyboard('p');
-    await waitFor(() => expect(vi.mocked(ModelViewport).mock.calls.at(-1)![0].planes).toBeUndefined());
+    await waitFor(() => expect(vi.mocked(ModelViewport).mock.calls.at(-1)![0].planes ?? []).toHaveLength(0));
   } finally {
     workspace.wait = null;
     ready();

@@ -2,7 +2,7 @@ import { useDesignUnits } from './designUnits';
 import { newCadId, nextDatumName, resolveDatumPlanes, type CadDocument, type CadDrawnOn, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useMemo, useState } from 'react';
 import { CadValueInput } from './CadValueInput';
-import { drawnOnName } from './drawnOnName';
+import { sketchPlaneName } from './drawnOnName';
 import { FeatureDialog } from './FeatureDialog';
 import { useDialogPreview } from './useDialogPreview';
 
@@ -35,7 +35,14 @@ export function PlaneDialog({
   const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const plane = document.planes?.find(candidate => candidate.id === planeId);
   const [on, setOn] = useState<CadDrawnOn['on'] | null>(plane?.on ?? preselected ?? null);
-  const [offsetText, setOffsetText] = useState(plane ? (plane.offsetExpression ?? lengthText(plane.offset)) : lengthText(100));
+  // A negative offset is the plane moved the other way, shown as its distance with the normal flipped, unless it was
+  // typed as a negative value of its own, which is kept as typed.
+  const typed = plane?.offsetExpression;
+  const flippedTyped = typed && /^-\((.*)\)$/.exec(typed)?.[1];
+  const [flipped, setFlipped] = useState(!!plane && plane.offset < 0 && (!typed || !!flippedTyped));
+  const [offsetText, setOffsetText] = useState(() =>
+    !plane ? lengthText(25) : flippedTyped || typed || lengthText(plane.offset < 0 && !typed ? -plane.offset : plane.offset)
+  );
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pick = () => {
@@ -53,22 +60,23 @@ export function PlaneDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [featureId] = useState(() => plane?.id ?? newCadId());
+  const [name] = useState(() => plane?.name ?? nextDatumName(document));
   const candidate = useMemo(() => {
     if (!on) return null;
     const offset = parseCadValue(offsetText, { unit: 'mm', variables });
     if ('error' in offset) return null;
     const next = {
       id: featureId,
-      name: plane?.name ?? nextDatumName(document),
+      name,
       on,
-      offset: offset.value,
-      ...(offset.expression && { offsetExpression: offset.expression }),
+      offset: flipped ? -offset.value : offset.value,
+      ...(offset.expression && { offsetExpression: flipped ? `-(${offset.expression})` : offset.expression }),
     };
     const planes = plane
       ? (document.planes ?? []).map(candidate => (candidate.id === plane.id ? next : candidate))
       : [...(document.planes ?? []), next];
     return resolveDatumPlanes({ ...document, revision: document.revision + 1, planes });
-  }, [document, plane, featureId, on, offsetText, variables, parseCadValue]);
+  }, [document, plane, featureId, on, offsetText, flipped, name, variables, parseCadValue]);
   useDialogPreview(candidate, onPreview);
   const save = () => {
     if (!on) return setError('Pick a plane or a face to offset from.');
@@ -77,29 +85,48 @@ export function PlaneDialog({
     if (candidate) onSave(candidate);
   };
   return (
-    <FeatureDialog title={plane ? plane.name : 'Plane'} onOk={save} onCancel={onCancel}>
+    <FeatureDialog title={name} onOk={save} onCancel={onCancel}>
+      <label className="cad-number-field">
+        Plane type
+        <select value="offset" disabled title="Not available yet">
+          {['Offset', 'Plane point', 'Line angle', 'Point normal', 'Three point', 'Mid plane', 'Curve point', 'Tangent'].map(type => (
+            <option key={type} value={type === 'Offset' ? 'offset' : type}>
+              {type}
+            </option>
+          ))}
+        </select>
+      </label>
       <button
         type="button"
         className="cad-feature-selection"
-        aria-label="Plane on"
+        aria-label="Entities"
         data-active={picking || !on ? '' : undefined}
         onClick={pick}>
-        <small>Offset from</small>
-        <span>{on ? drawnOnName(document, on) : 'Pick a plane or a face'}</span>
+        <small>Entities</small>
+        <span>{on ? sketchPlaneName(document, { on, offset: 0 }) : ''}</span>
       </button>
-      <label className="cad-number-field">
-        Offset
-        <span>
-          <CadValueInput
-            bare
-            aria-label="Offset"
-            value={offsetText}
-            spellCheck={false}
-            onChange={event => setOffsetText(event.target.value)}
-          />
-        </span>
-        {lengthUnit}
-      </label>
+      {/* The distance asks for something to measure it from first. */}
+      {on && (
+        <>
+          <label className="cad-number-field">
+            Offset distance
+            <span>
+              <CadValueInput
+                bare
+                aria-label="Offset distance"
+                value={offsetText}
+                spellCheck={false}
+                onChange={event => setOffsetText(event.target.value)}
+              />
+            </span>
+            {lengthUnit}
+          </label>
+          <label>
+            <input type="checkbox" checked={flipped} onChange={event => setFlipped(event.target.checked)} />
+            Flip normal
+          </label>
+        </>
+      )}
       {error && (
         <p role="alert" className="cad-thickness-error">
           {error}

@@ -33,7 +33,7 @@ function appendPoint(document: CadDocument, x: number, y: number, fixed = false)
 const widthDimension = (document: CadDocument) => document.parts[0]!.sketch.constraints.find(c => c.label === 'Width')!;
 
 describe('free sketch creation', () => {
-  it('creates a free rectangle with removable joined corners and horizontal, parallel, and perpendicular relationships', async () => {
+  it('creates a free rectangle with removable joined corners and horizontal and vertical sides', async () => {
     let sketch = createCadPart().sketch;
     sketch = addRectangle(sketch, { x: 20, y: 15, width: 40, height: 30 });
     expect(sketch.constraints.map(c => c.type)).toEqual([
@@ -42,9 +42,9 @@ describe('free sketch creation', () => {
       'coincident',
       'coincident',
       'horizontal',
-      'parallel',
-      'parallel',
-      'perpendicular',
+      'horizontal',
+      'vertical',
+      'vertical',
     ]);
     const result = await solveCadDocument(withSketch(sketch));
     expect(result.status).toBe('solved');

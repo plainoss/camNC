@@ -142,7 +142,8 @@ it('marks attached sketches and extrudes broken while their chosen copy is remov
   ]) {
     const steps = designSteps({ ...initial.document, parts: [source, initial.child] }).filter(step => step.partId === initial.child.id);
     expect(steps).toHaveLength(2);
-    expect(steps.every(step => step.broken?.includes('copy'))).toBe(true);
+    // Each says what it's missing, as the reference does.
+    expect(steps.every(step => step.broken?.includes('missing selection'))).toBe(true);
   }
   expect(
     designSteps(initial.document)

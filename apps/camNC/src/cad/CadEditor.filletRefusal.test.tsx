@@ -42,8 +42,8 @@ function open(source: CadDocument, change: (document: CadDocument) => void = () 
 it('says in the Fillet dialog, as it previews, that a radius uses up a side', async () => {
   await open(design(250, 30));
   const features = screen.getByRole('region', { name: 'Features' });
-  await userEvent.dblClick(within(features).getByRole('button', { name: /^Fillet · Part 1/ }));
-  const dialog = await screen.findByRole('dialog', { name: 'Fillet' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /^Fillet 1/ }));
+  const dialog = await screen.findByRole('dialog', { name: /^Fillet \d/ });
   expect(within(dialog).queryByRole('alert')).toBeNull();
   const radius = within(dialog).getByRole('textbox', { name: 'Radius' });
   await userEvent.clear(radius);
@@ -61,25 +61,29 @@ it('keeps a fillet whose radius uses up a side, and marks its row', async () => 
   const change = vi.fn<(document: CadDocument) => void>();
   await open(design(250, 30), change);
   const features = screen.getByRole('region', { name: 'Features' });
-  await userEvent.dblClick(within(features).getByRole('button', { name: /^Fillet · Part 1/ }));
-  const dialog = await screen.findByRole('dialog', { name: 'Fillet' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /^Fillet 1/ }));
+  const dialog = await screen.findByRole('dialog', { name: /^Fillet \d/ });
   const radius = within(dialog).getByRole('textbox', { name: 'Radius' });
   await userEvent.clear(radius);
   await userEvent.type(radius, '125');
   await waitFor(() => expect(within(dialog).getByRole('alert').textContent).toBe(message));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Fillet' })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Fillet \d/ })).toBeNull());
   await waitFor(() => expect(change.mock.calls.at(-1)?.[0].parts[0]!.fillets).toMatchObject([{ id: 'fillet', radius: 125 }]));
   await settled();
-  const step = within(features).getByRole('button', { name: /^Fillet · Part 1/ });
-  expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(message);
+  const step = within(features).getByRole('button', { name: /^Fillet 1/ });
+  expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(
+    'Fillet 1 did not regenerate properly: Failed to fillet selections.'
+  );
 }, 30_000);
 
 it('marks the Fillet row and the part when the sketch shrinks under its radius', async () => {
   await open(design(50, 30));
   const features = screen.getByRole('region', { name: 'Features' });
-  const step = within(features).getByRole('button', { name: /^Fillet · Part 1/ });
-  expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(message);
+  const step = within(features).getByRole('button', { name: /^Fillet 1/ });
+  expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(
+    'Fillet 1 did not regenerate properly: Failed to fillet selections.'
+  );
   expect(within(features).getByRole('status', { name: '1 with errors' })).toBeDefined();
   const parts = within(screen.getByRole('list', { name: 'Parts' }));
   expect(within(parts.getByRole('button', { name: /^▱?\s*Part 1/ })).getByRole('img', { name: message })).toBeDefined();

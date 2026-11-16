@@ -159,7 +159,7 @@
   {
    "id": "stool:leg:move",
    "kind": "move",
-   "label": "Transform · Leg",
+   "label": "Transform 1",
    "part": "Leg",
    "settings": {
     "by": [

@@ -131,6 +131,7 @@ export default function WorkspaceView({
   onPickPoint?: (pick: {
     partId: string;
     point: [number, number, number];
+    surfacePoint?: [number, number, number];
     normal: [number, number, number];
     copy: boolean;
     edge?: { a: [number, number, number]; b: [number, number, number] };
@@ -429,7 +430,8 @@ export default function WorkspaceView({
         measureWitness={measure.witness}
         onMissed={measure.clear}
         onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}
-        planes={onNewPart && showPlanes ? planes : undefined}
+        // While a dialog picks a point or an edge on a part, the planes don't take the click.
+        planes={onNewPart && showPlanes && !onPickPoint ? planes : undefined}
         sketchLines={sketchLines}
         onPickSketch={
           !sectionEditing && !measure.expanded && onPickSketch
@@ -473,6 +475,7 @@ export default function WorkspaceView({
             return onPickPoint({
               partId,
               point: pick.point as [number, number, number],
+              ...(pick.surfacePoint && { surfacePoint: pick.surfacePoint as [number, number, number] }),
               normal: pick.normal as [number, number, number],
               copy: !!model.instances[index]!.copyId,
               ...(pick.edge && { edge: pick.edge }),

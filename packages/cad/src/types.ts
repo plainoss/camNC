@@ -11,6 +11,8 @@ interface EntityBase {
   construction?: boolean;
   /** An edge of the face the part is drawn on, kept where that face is. It can't be edited, only drawn onto. */
   faceEdge?: boolean;
+  /** A face edge taken into the drawing with Use: part of its outline rather than construction, still kept on the face. */
+  taken?: true;
 }
 export interface CadPointEntity extends EntityBase, CadPoint {
   type: 'point';
@@ -324,6 +326,16 @@ export interface CadPart {
    */
   addTo?: string;
   /**
+   * Extrude → Add with Merge with all: a part of its own that joins, with them, every earlier part it runs into, as a
+   * Boolean › Union of them would. It has no `addTo`; running into none, it stays a part of its own.
+   */
+  mergeAll?: true;
+  /**
+   * Extrude › Intersect: of the parts before it, only what this extrude shares with them is kept, in the place of the one
+   * it runs into. One that runs into none leaves no part at all, and says so.
+   */
+  intersect?: true;
+  /**
    * Extrude → Remove: the picked regions, or every closed region but what's left of the face, are cut into the board
    * the sketch is drawn on, this deep. A plane-based extrusion removes its volume from earlier bodies, optionally
    * limited to `targets`. The step isn't a part itself.
@@ -339,6 +351,8 @@ export interface CadPart {
    * itself keeps its sharp corners; the part is rounded where it's made.
    */
   fillets?: CadEdgeFillet[];
+  /** Mirror › Add steps, after its fillets: the part joined with its own mirror image across a plane or a face. */
+  mirrorJoins?: CadMirrorJoin[];
   /** Regions Extrude → Add steps join to this part. The design writes it from those steps; it's never edited. */
   addedRegions?: string[];
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
@@ -351,6 +365,8 @@ export interface CadPart {
    * (to its right, walking the line from its start) or centred on it.
    */
   thin?: CadThinExtrude;
+  /** A thin extrude of a picked shape: walls around its outline, with no floor. Ignored when the part is a `thin` board. */
+  thinWall?: CadThinWall;
   /**
    * A bone in every inside corner, so a bit of this diameter cuts it fully and a part that fits into it goes all the
    * way in. The diameter is the design's bit: a bigger bit in the job can't reach into the bones.
@@ -367,6 +383,16 @@ export interface CadPart {
  * A part's sketch x and y, with its thickness as z, turned by `rotation` (a unit quaternion x, y, z, w) and then moved by
  * `position`, in mm.
  */
+export interface CadThinWall {
+  /** mm out from the shape's outline, or both ways around it when centred. */
+  thickness1: number;
+  thickness1Expression?: string;
+  /** mm in from the outline. */
+  thickness2: number;
+  thickness2Expression?: string;
+  /** Centred on the outline, Thickness 1 in all. */
+  midPlane?: true;
+}
 export interface CadThinExtrude {
   /** mm the board reaches from its plane or face. */
   depth: number;
@@ -402,6 +428,19 @@ export interface CadPlacement {
  * Another of the same part. A mirrored copy is its mirror image across the sketch's y axis, as a left side is of a right
  * one: it's cut as a part of its own, since turning the part over doesn't make it.
  */
+/**
+ * A Mirror › Add step: the part and its mirror image across a plane, a part's face or a plane made to sketch on (`datum`),
+ * made one part. The plane must stand across the part's sketch plane. `line` is where it crosses that sketch plane, in
+ * the sketch's own coordinates, worked out as the design is laid out: a point on it and its unit normal.
+ */
+export interface CadMirrorJoin {
+  id: string;
+  across: CadDrawnOn['on'];
+  datum?: string;
+  suppressed?: true;
+  line?: { x: number; y: number; nx: number; ny: number };
+}
+
 export interface CadPartCopy {
   id: string;
   /**
@@ -462,6 +501,22 @@ export interface CadPartPattern {
   excluded?: number[];
   /** Turns copies about a line in assembly space instead of spacing them in a row. */
   circular?: CadCircularPartPattern;
+  /** The row laid out to both sides of the original rather than after it. A Remove's feature pattern only, for now. */
+  centered?: true;
+  /** A second direction, making a grid: count × second count instances. A Remove's feature pattern only, for now. */
+  second?: {
+    vector: [number, number, number];
+    count: number;
+    spacing: number;
+    spacingExpression?: string;
+    countExpression?: string;
+    centered?: true;
+  };
+  /**
+   * Grid positions left out, as [along the first direction, along the second], counting from 0 at the first instance of
+   * each row: the original, or the first before it when centred.
+   */
+  skipped?: [number, number][];
 }
 export interface CadCircularPartPattern {
   /** A point on the picked axis, in assembly space. The picked line stays where it was picked. */
@@ -500,7 +555,7 @@ export interface CadCut {
   depthExpression?: string;
   /** Switched off: the part evaluates as if the cut weren't there, and it keeps its depth for when it's back on. */
   suppressed?: boolean;
-  /** The Extrude → Remove step that makes this cut, kept in step with it by the design. */
+  /** The Extrude → Remove step that makes this cut, or the Extrude → Add that steps its part down, kept in step with it. */
   removedBy?: string;
 }
 export type CadFeature = CadFaceSketch | CadCut;
@@ -510,7 +565,7 @@ export interface CadDocument {
   /** Display/input unit only. Geometry and persisted expressions remain in millimeters. */
   lengthUnit?: CadLengthUnit;
   /** Minimum supported reader: 2 features, 3 folders, 4 ordered operations, 5 step relief, 6 construction intent. */
-  version: 1 | 2 | 3 | 4 | 5 | 6;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   id: string;
   name: string;
   /** Increases on source edits; solving preserves the source revision. */
@@ -610,7 +665,13 @@ export interface CadPartCut {
   split?: 'half' | { fingers: number; fingersExpression?: string };
   /** The tools are used up by a cut-out. Split joints always keep both parts, even when this is saved as true. */
   consumeTools?: true;
+  /**
+   * Set when it's a Boolean step: `union` joins the tools into the first target, `subtract` cuts as "cut parts" does,
+   * and `intersect` keeps only what they share. Absent, it's a "cut parts" step.
+   */
+  operation?: CadBooleanOperation;
 }
+export type CadBooleanOperation = 'union' | 'subtract' | 'intersect';
 /** A named value. Its kind follows from the expression: a length or angle unit, or a plain number. */
 export interface CadVariable {
   id: string;

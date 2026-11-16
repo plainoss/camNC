@@ -10,6 +10,7 @@ import {
   extrudeStepProblem,
   isCadPart,
   isCadBody,
+  overlappedParts,
   partIsBuiltOn,
   removalRegions,
   removeSupport,
@@ -17,11 +18,14 @@ import {
   isSpatialRemoval,
   removalTargets,
   removalInward,
+  addsRegionsTo,
   sharesSketch,
   sketchOwnerId,
   sketchRegions,
   sketchStepLabel,
+  designStepLabel,
   splitApartRegions,
+  mergedWithAll,
   type CadDocument,
   type CadPart,
   type CadValueScope,
@@ -32,6 +36,8 @@ import { CadThicknessField } from './CadThicknessField';
 import { FeatureDialog } from './FeatureDialog';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
+import { ThinWallFields } from './ThinWallFields';
+import { regionEntries } from './enclosedRegions';
 
 interface PartDialogProps {
   document: CadDocument;
@@ -49,13 +55,15 @@ const changePart = (document: CadDocument, partId: string, change: (part: CadPar
   parts: document.parts.map(part => (part.id === partId ? change(part) : part)),
 });
 
-type ExtrudeOperation = 'new' | 'add' | 'remove';
+type ExtrudeOperation = 'new' | 'add' | 'remove' | 'intersect';
 
 /**
  * A sketch pushed out, as the reference's Extrude: New makes a part of it, how thick, where it starts from its plane or
  * face, and which way it grows. Add joins its regions to a part made from the same sketch, and Remove cuts them into
  * the board the sketch is drawn on, as a pocket or a hole.
  */
+
+const kUnsupported = 'Not available yet';
 export function ExtrudeDialog({
   document,
   part,
@@ -116,9 +124,13 @@ export function ExtrudeDialog({
       setUpTo(on, datum);
     });
   };
-  const operation: ExtrudeOperation = part.remove ? 'remove' : part.addTo !== undefined ? 'add' : 'new';
-  const mergeTarget = document.parts.find(candidate => candidate.id === part.addTo);
-  const ownExtrusion = operation !== 'add' || !mergeTarget || !sharesSketch(mergeTarget, part);
+  const operation: ExtrudeOperation = part.remove
+    ? 'remove'
+    : part.intersect
+      ? 'intersect'
+      : part.addTo !== undefined || part.mergeAll
+        ? 'add'
+        : 'new';
   const owner = document.parts.find(candidate => candidate.id === sketchOwnerId(part)) ?? part;
   // The parts an Add can join: those made from the same sketch, of regions picked from it, which it adds regions to, and
   // any other part, which it's joined to as a body of its own. The part its sketch is drawn on comes first.
@@ -141,6 +153,8 @@ export function ExtrudeDialog({
   const [removeError, setRemoveError] = useState<string | null>(null);
   /** Regions kept that the extrude can still take, given which of them it picks from. */
   const keptRegions = (p: CadPart, available: string[]) => p.regions?.filter(id => available.includes(id));
+  // Nothing picked yet stays so on another tab, rather than becoming the whole sketch.
+  const nonePicked = (p: CadPart) => p.regions?.length === 0;
   const switchTo = (next: ExtrudeOperation) => {
     setOperationError(null);
     if (next === operation) return;
@@ -150,6 +164,7 @@ export function ExtrudeDialog({
         (part.thin && 'A thin board can only be a new part.') ||
         (isCadBody(document, part) && partIsBuiltOn(document, part, next === 'add' ? mergeable[0] : undefined)) ||
         (next === 'add' && !mergeable.length && 'There’s no part yet to add to. Make one with New first.') ||
+        (next === 'intersect' && !mergeable.length && 'There’s no part yet to intersect with. Make one with New first.') ||
         (next === 'remove' &&
           (() => {
             if (part.drawnOn && ('plane' in part.drawnOn.on || typeof part.drawnOn.on.face === 'object'))
@@ -164,7 +179,11 @@ export function ExtrudeDialog({
       changePart(current, part.id, p => {
         const made: CadPart = { ...p };
         delete made.addTo;
+        delete made.mergeAll;
         delete made.remove;
+        delete made.intersect;
+        // Walls around a shape are a new part's: Add, Remove and Intersect take the shape whole.
+        if (next !== 'new') delete made.thinWall;
         delete made.regions;
         const own = sketchRegions(p.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
         if (next === 'remove') {
@@ -179,19 +198,28 @@ export function ExtrudeDialog({
                   p,
                   found.regions.map(region => region.id)
                 );
-          if (regions?.length) made.regions = regions;
+          if (regions?.length || nonePicked(p)) made.regions = regions ?? [];
+        } else if (next === 'intersect') {
+          made.intersect = true;
+          // Into what's below, as a cut goes: Opposite direction turns it the other way.
+          if (made.drawnOn) made.drawnOn = { ...made.drawnOn, inward: true };
+          const regions = keptRegions(p, own);
+          if (regions?.length || p.sketchOf || nonePicked(p)) made.regions = regions ?? [];
         } else if (next === 'add') {
           const into = mergeable[0]!;
-          // A solid face names the profile, not the body to join: that scope must be picked explicitly.
-          made.addTo = p.faceProfile ? '' : into.id;
+          // A solid face names the profile, not the body to join: that scope must be picked explicitly, as it must when
+          // the regions run into more than one part.
+          const touched = p.faceProfile ? [] : overlappedParts(current, p.id);
+          const only = touched.length === 1 ? mergeable.find(candidate => candidate.id === touched[0]) : undefined;
+          made.addTo = p.faceProfile || touched.length > 1 ? '' : (only?.id ?? into.id);
           if (sharesSketch(into, p)) made.regions = (keptRegions(p, own) ?? []).filter(id => !into.regions!.includes(id));
           else {
             const regions = keptRegions(p, own);
-            if (regions?.length || p.sketchOf) made.regions = regions ?? [];
+            if (regions?.length || p.sketchOf || nonePicked(p)) made.regions = regions ?? [];
           }
         } else {
           const regions = keptRegions(p, own);
-          if (regions?.length || p.sketchOf) made.regions = regions ?? [];
+          if (regions?.length || p.sketchOf || nonePicked(p)) made.regions = regions ?? [];
         }
         return made;
       })
@@ -215,17 +243,27 @@ export function ExtrudeDialog({
     return true;
   };
   const stepProblem = extrudeStepProblem(document, part);
+  const intersected = operation === 'intersect' ? mergedWithAll(document, part)?.made : undefined;
+  const intersectProblem = intersected && 'refused' in intersected ? intersected.refused : null;
   // The regions of the parts it made too are the feature's as well.
   const alsoMade = document.parts.flatMap(p => (p.extrudedWith === part.id ? (p.regions ?? []) : []));
   const regionCount = operation === 'remove' && !part.regions ? null : part.regions ? part.regions.length + alsoMade.length : null;
+  const sketchName = designStepLabel(document, `${owner.id}:sketch`) ?? sketchStepLabel(owner);
+  // The faces of a circle picked together are one entry, as one pick takes them.
+  const entries =
+    part.regions && regionCount && regionCount > 1 && !alsoMade.length ? regionEntries(document, part, part.regions) : regionCount;
   const selection =
     part.faceProfile && part.drawnOn
       ? drawnOnName(document, part.drawnOn.on)
       : regionCount === null
-        ? sketchStepLabel(owner)
-        : regionCount === 1
-          ? `A region of ${sketchStepLabel(owner)}`
-          : `${regionCount} regions of ${sketchStepLabel(owner)}`;
+        ? sketchName
+        : regionCount === 0
+          ? 'No region picked yet'
+          : regionCount === 1
+            ? `Face of ${sketchName}`
+            : entries === 1
+              ? `Faces of ${sketchName}`
+              : `${entries} faces of ${sketchName}`;
   const board = operation === 'remove' ? removeSupport(document, part) : null;
   const spatialRemove = isSpatialRemoval(part);
   const solidControls = operation !== 'remove';
@@ -235,8 +273,11 @@ export function ExtrudeDialog({
   // A sketch that isn't one outline extrudes the region picked from it in the view; until then there's nothing to make.
   // Regions picked apart are fine for New: each group becomes a part of its own on OK.
   const apart = operation === 'new' && splitApartRegions(document, part.id) !== document;
+  // An Add folded into its part's profile is checked as that part, by its step problem.
+  const mergeTarget = operation === 'add' ? document.parts.find(candidate => candidate.id === part.addTo) : undefined;
+  const folded = !!mergeTarget && addsRegionsTo(mergeTarget, part);
   const profileError =
-    operation === 'remove' || !ownExtrusion || part.thin || apart || (part.regions?.length === 0 && alsoMade.length)
+    operation === 'remove' || folded || part.thin || apart || (part.regions?.length === 0 && alsoMade.length)
       ? undefined
       : evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
   const [depthText, setDepthText] = useState(part.thin ? (part.thin.depthExpression ?? lengthText(part.thin.depth)) : lengthText(100));
@@ -255,6 +296,17 @@ export function ExtrudeDialog({
       })
     );
   };
+  /** Walls around the picked shape, picked again, or back to a solid. */
+  const setThinWall = (on: boolean) => {
+    if (!on) setThin(null);
+    if (on === !!part.thinWall) return;
+    onChange(document =>
+      changePart(document, part.id, p => {
+        const { thinWall: _wall, ...next } = p;
+        return on ? { ...next, regions: [], thinWall: { thickness1: 5, thickness2: 0 } } : next;
+      })
+    );
+  };
   /** Takes the typed depth, or says why not. Whether it was taken. */
   const applyDepth = (text = depthText, preview = false) => {
     const parsed = parseCadValue(text, { unit: 'mm', variables });
@@ -270,18 +322,23 @@ export function ExtrudeDialog({
   };
   return (
     <FeatureDialog
-      title={part.extrudeName ?? `Extrude · ${part.name}`}
+      title={designStepLabel(document, `${part.id}:extrude`) ?? part.extrudeName ?? `Extrude · ${part.name}`}
       okDisabled={!thicknessValid || !!depthError || !!profileError || !!stepProblem || !!removeError}
       onOk={onOk}
       onCancel={onCancel}>
       {/* New makes the sketch a part of its own; Add joins it to one; Remove cuts it out of the board it's drawn on. */}
       <div className="cad-feature-tabs" role="tablist" aria-label="Extrude operation">
-        {(['new', 'add', 'remove'] as const).map(choice => (
+        {(['new', 'add', 'remove', 'intersect'] as const).map(choice => (
           <button key={choice} type="button" role="tab" aria-selected={operation === choice} onClick={() => switchTo(choice)}>
-            {choice === 'new' ? 'New' : choice === 'add' ? 'Add' : 'Remove'}
+            {choice === 'new' ? 'New' : choice === 'add' ? 'Add' : choice === 'remove' ? 'Remove' : 'Intersect'}
           </button>
         ))}
       </div>
+      {intersectProblem && (
+        <p role="alert" className="cad-thickness-error">
+          {intersectProblem}
+        </p>
+      )}
       {operationError && (
         <p role="alert" className="cad-thickness-error">
           {operationError}
@@ -303,7 +360,23 @@ export function ExtrudeDialog({
       )}
       {operation === 'add' ? (
         <>
-          <label className="cad-number-field">
+          {/* On, it joins every part it runs into, with no scope to pick. */}
+          <label>
+            <input
+              type="checkbox"
+              checked={!!part.mergeAll}
+              onChange={event =>
+                onChange(current =>
+                  changePart(current, part.id, p => {
+                    const { addTo: _addTo, mergeAll: _mergeAll, ...rest } = p;
+                    return event.target.checked ? { ...rest, mergeAll: true } : { ...rest, addTo: '' };
+                  })
+                )
+              }
+            />
+            Merge with all
+          </label>
+          <label className="cad-number-field" hidden={!!part.mergeAll}>
             Merge scope
             <select
               value={part.addTo}
@@ -408,41 +481,56 @@ export function ExtrudeDialog({
           )}
         </>
       ) : null}
-      {ownExtrusion && (
-        <>
-          {operation === 'new' && part.drawnOn && (
-            // Solid pushes the sketch's face out by the thickness; Thin stands a board on a line drawn edge-on.
-            <div className="cad-feature-tabs" role="tablist" aria-label="Extrude type">
-              <button type="button" role="tab" aria-selected={!part.thin} onClick={() => setThin(null)}>
-                Solid
+      <>
+        {operation === 'new' && part.drawnOn && (
+          // Solid pushes the sketch's face out by the thickness; Thin stands a board on a line drawn edge-on.
+          <div className="cad-feature-tabs" role="tablist" aria-label="Extrude type">
+            <button type="button" role="tab" aria-selected={!part.thin && !part.thinWall} onClick={() => setThinWall(false)}>
+              Solid
+            </button>
+            <button type="button" role="tab" aria-selected={false} disabled title={kUnsupported}>
+              Surface
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!!part.thin || !!part.thinWall}
+              onClick={() => {
+                // A shape picked in the sketch gets walls around it; a sketch of one line, a board standing on it.
+                if (part.regions) return setThinWall(true);
+                const parsed = parseCadValue(depthText, { unit: 'mm', variables });
+                setThin({ depth: 'error' in parsed || parsed.value <= 0 ? 100 : parsed.value, midPlane: true });
+              }}>
+              Thin
+            </button>
+          </div>
+        )}
+        {operation === 'new' && (
+          <div className="cad-feature-selection" data-active={profileError && !part.regions?.length ? '' : undefined}>
+            <small>{part.faceProfile ? 'Face to extrude' : 'Sketch to extrude'}</small>
+            <span>{selection}</span>
+            <button type="button" aria-pressed={profilePicking} onClick={onPickProfile}>
+              Select profile
+            </button>
+            {!part.faceProfile && (
+              <button type="button" onClick={onEditSketch}>
+                Edit sketch
               </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={!!part.thin}
-                onClick={() => {
-                  const parsed = parseCadValue(depthText, { unit: 'mm', variables });
-                  setThin({ depth: 'error' in parsed || parsed.value <= 0 ? 100 : parsed.value, midPlane: true });
-                }}>
-                Thin
-              </button>
-            </div>
-          )}
-          {operation === 'new' && (
-            <div className="cad-feature-selection" data-active={profileError && !part.regions?.length ? '' : undefined}>
-              <small>{part.faceProfile ? 'Face to extrude' : 'Sketch to extrude'}</small>
-              <span>{selection}</span>
-              <button type="button" aria-pressed={profilePicking} onClick={onPickProfile}>
-                Select profile
-              </button>
-              {!part.faceProfile && (
-                <button type="button" onClick={onEditSketch}>
-                  Edit sketch
-                </button>
-              )}
-            </div>
-          )}
-          {profileError && (
+            )}
+          </div>
+        )}
+        {operation === 'new' && part.thinWall && (
+          <ThinWallFields
+            wall={part.thinWall}
+            variables={variables}
+            onChange={change => onChange(document => changePart(document, part.id, change))}
+          />
+        )}
+        {/* Nothing picked yet isn't a problem, only what to do next. */}
+        {profileError && !part.faceProfile && part.regions?.length === 0 ? (
+          <p>Pick a region of the sketch in the view.</p>
+        ) : (
+          profileError && (
             <p role="alert" className="cad-thickness-error">
               {part.faceProfile
                 ? (stepProblem ?? profileError.message)
@@ -450,172 +538,200 @@ export function ExtrudeDialog({
                   ? profileError.message
                   : 'Pick a region of the sketch in the view.'}
             </p>
-          )}
-          {solidControls && !part.thin && part.drawnOn && (
-            <label className="cad-number-field">
-              End type
-              <select
-                aria-label="End type"
-                value={part.upTo || pickingFace ? 'upTo' : 'blind'}
-                onChange={event => {
-                  if (event.target.value === 'upTo') return startPickingFace();
-                  stopPickingFace();
-                  setUpTo(null);
-                }}>
-                <option value="blind">Blind</option>
-                <option value="upTo">Up to face</option>
-              </select>
+          )
+        )}
+        {solidControls && !part.thin && part.drawnOn && (
+          <label className="cad-number-field">
+            End type
+            <select
+              aria-label="End type"
+              value={part.upTo || pickingFace ? 'upTo' : 'blind'}
+              onChange={event => {
+                if (event.target.value === 'upTo') return startPickingFace();
+                stopPickingFace();
+                setUpTo(null);
+              }}>
+              <option value="blind">Blind</option>
+              <option value="next" disabled>
+                Up to next
+              </option>
+              <option value="upTo">Up to face</option>
+              <option value="part" disabled>
+                Up to part
+              </option>
+              <option value="vertex" disabled>
+                Up to vertex
+              </option>
+              <option value="through" disabled>
+                Through all
+              </option>
+            </select>
+          </label>
+        )}
+        {(part.upTo || pickingFace) && (
+          <button
+            type="button"
+            className="cad-feature-selection"
+            aria-label="Up to"
+            data-active={pickingFace ? '' : undefined}
+            onClick={startPickingFace}>
+            <small>Up to</small>
+            <span>
+              {part.upTo
+                ? `${document.planes?.find(plane => plane.id === part.upToDatum)?.name ?? drawnOnName(document, part.upTo)}, ${formatLength(part.thickness)} ${lengthUnit} away`
+                : 'Pick a plane or a face'}
+            </span>
+          </button>
+        )}
+        {!part.upTo && !pickingFace && !part.thin && part.drawnOn && part.remove?.depth !== 'through' && (
+          <label>
+            <input
+              type="checkbox"
+              checked={!!part.symmetric}
+              onChange={event =>
+                onChange(document =>
+                  changePart(document, part.id, p => {
+                    const next = { ...p };
+                    if (event.target.checked) next.symmetric = true;
+                    else delete next.symmetric;
+                    return next;
+                  })
+                )
+              }
+            />
+            Symmetric
+          </label>
+        )}
+        {solidControls && !part.thin && part.drawnOn && (
+          <>
+            <label title={kUnsupported}>
+              <input type="checkbox" disabled />
+              Draft
             </label>
-          )}
-          {(part.upTo || pickingFace) && (
-            <button
-              type="button"
-              className="cad-feature-selection"
-              aria-label="Up to"
-              data-active={pickingFace ? '' : undefined}
-              onClick={startPickingFace}>
-              <small>Up to</small>
+            {/* A symmetric extrude has both its ends set by the one depth. */}
+            {!part.symmetric && (
+              <label title={kUnsupported}>
+                <input type="checkbox" disabled />
+                Second end position
+              </label>
+            )}
+          </>
+        )}
+        {!part.upTo && !part.symmetric && part.drawnOn && !part.thin?.midPlane && (
+          // The other way out of the sketch's plane, or into the face it's drawn on, for a thin board as for a solid one.
+          <button
+            type="button"
+            className="cad-flip-direction"
+            aria-label="Flip direction"
+            title="Extrude the other way"
+            // An Intersect goes into what's below by default, so pressed is the other way, as for a new part.
+            aria-pressed={part.remove ? removalInward(part) : part.intersect ? !part.drawnOn.inward : !!part.drawnOn.inward}
+            onClick={() =>
+              onChange(document =>
+                changePart(document, part.id, p => {
+                  const drawnOn = { ...p.drawnOn! };
+                  if (p.remove) drawnOn.inward = !removalInward(p);
+                  else if (drawnOn.inward) delete drawnOn.inward;
+                  else drawnOn.inward = true;
+                  return { ...p, drawnOn };
+                })
+              )
+            }>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 4v16M4 7l3-3 3 3M17 20V4M14 17l3 3 3-3" />
+            </svg>
+          </button>
+        )}
+        {solidControls && !part.upTo && (
+          <CadThicknessField
+            livePreview
+            key={`${part.id}:thickness:${depthDragging}`}
+            value={part.thickness}
+            expression={part.thicknessExpression}
+            variables={variables}
+            onValidityChange={setThicknessValid}
+            onCommit={(thickness, thicknessExpression) =>
+              onChange(document =>
+                changePart(document, part.id, p => {
+                  const next = { ...p, thickness, thicknessExpression };
+                  if (thicknessExpression === undefined) delete next.thicknessExpression;
+                  return next;
+                })
+              )
+            }
+          />
+        )}
+        {part.thin && (
+          <>
+            <label className="cad-number-field">
+              Depth
               <span>
-                {part.upTo
-                  ? `${document.planes?.find(plane => plane.id === part.upToDatum)?.name ?? drawnOnName(document, part.upTo)}, ${formatLength(part.thickness)} ${lengthUnit} away`
-                  : 'Pick a plane or a face'}
+                <CadValueInput
+                  bare
+                  aria-label="Depth"
+                  value={depthText}
+                  spellCheck={false}
+                  aria-invalid={depthError ? true : undefined}
+                  onChange={event => {
+                    setDepthText(event.target.value);
+                    applyDepth(event.target.value, true);
+                  }}
+                  onBlur={() => applyDepth()}
+                  onKeyDown={event => {
+                    // A depth that isn't taken keeps the dialog open to fix it, rather than Enter keeping the old one.
+                    if (event.key === 'Enter' && !applyDepth()) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }
+                  }}
+                />
               </span>
-            </button>
-          )}
-          {!part.upTo && !pickingFace && !part.thin && part.drawnOn && part.remove?.depth !== 'through' && (
+              {lengthUnit}
+            </label>
+            {depthError && (
+              <p role="alert" className="cad-thickness-error">
+                {depthError}
+              </p>
+            )}
             <label>
               <input
                 type="checkbox"
-                checked={!!part.symmetric}
-                onChange={event =>
-                  onChange(document =>
-                    changePart(document, part.id, p => {
-                      const next = { ...p };
-                      if (event.target.checked) next.symmetric = true;
-                      else delete next.symmetric;
-                      return next;
-                    })
-                  )
-                }
+                checked={!!part.thin.midPlane}
+                onChange={event => setThin({ ...part.thin!, midPlane: event.target.checked })}
               />
-              Symmetric
+              Mid plane
             </label>
-          )}
-          {!part.upTo && !part.symmetric && part.drawnOn && !part.thin?.midPlane && (
-            // The other way out of the sketch's plane, or into the face it's drawn on, for a thin board as for a solid one.
-            <button
-              type="button"
-              className="cad-flip-direction"
-              aria-label="Flip direction"
-              title="Extrude the other way"
-              aria-pressed={part.remove ? removalInward(part) : !!part.drawnOn.inward}
-              onClick={() =>
-                onChange(document =>
-                  changePart(document, part.id, p => {
-                    const drawnOn = { ...p.drawnOn! };
-                    if (p.remove) drawnOn.inward = !removalInward(p);
-                    else if (drawnOn.inward) delete drawnOn.inward;
-                    else drawnOn.inward = true;
-                    return { ...p, drawnOn };
-                  })
-                )
-              }>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M7 4v16M4 7l3-3 3 3M17 20V4M14 17l3 3 3-3" />
-              </svg>
-            </button>
-          )}
-          {solidControls && !part.upTo && (
-            <CadThicknessField
-              livePreview
-              key={`${part.id}:thickness:${depthDragging}`}
-              value={part.thickness}
-              expression={part.thicknessExpression}
-              variables={variables}
-              onValidityChange={setThicknessValid}
-              onCommit={(thickness, thicknessExpression) =>
-                onChange(document =>
-                  changePart(document, part.id, p => {
-                    const next = { ...p, thickness, thicknessExpression };
-                    if (thicknessExpression === undefined) delete next.thicknessExpression;
-                    return next;
-                  })
-                )
-              }
-            />
-          )}
-          {part.thin && (
-            <>
-              <label className="cad-number-field">
-                Depth
-                <span>
-                  <CadValueInput
-                    bare
-                    aria-label="Depth"
-                    value={depthText}
-                    spellCheck={false}
-                    aria-invalid={depthError ? true : undefined}
-                    onChange={event => {
-                      setDepthText(event.target.value);
-                      applyDepth(event.target.value, true);
-                    }}
-                    onBlur={() => applyDepth()}
-                    onKeyDown={event => {
-                      // A depth that isn't taken keeps the dialog open to fix it, rather than Enter keeping the old one.
-                      if (event.key === 'Enter' && !applyDepth()) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }
-                    }}
-                  />
-                </span>
-                {lengthUnit}
-              </label>
-              {depthError && (
-                <p role="alert" className="cad-thickness-error">
-                  {depthError}
-                </p>
-              )}
-              <label>
-                <input
-                  type="checkbox"
-                  checked={!!part.thin.midPlane}
-                  onChange={event => setThin({ ...part.thin!, midPlane: event.target.checked })}
-                />
-                Mid plane
-              </label>
-            </>
-          )}
-          {part.drawnOn && (
-            <CadDrawnOnField
-              livePreview
-              key={`${part.id}:drawn-on`}
-              inwardToggle={false}
-              document={document}
-              part={part as CadPart & { drawnOn: NonNullable<CadPart['drawnOn']> }}
-              variables={variables}
-              onChange={drawnOn => onChange(document => changePart(document, part.id, p => ({ ...p, drawnOn })))}
-            />
-          )}
-          {solidControls && (
-            <CadReliefField
-              livePreview
-              key={`${part.id}:relief`}
-              relief={part.cornerRelief}
-              variables={variables}
-              onChange={cornerRelief =>
-                onChange(document =>
-                  changePart(document, part.id, p => {
-                    const next = { ...p, cornerRelief };
-                    if (!cornerRelief) delete next.cornerRelief;
-                    return next;
-                  })
-                )
-              }
-            />
-          )}
-        </>
-      )}
+          </>
+        )}
+        {part.drawnOn && (
+          <CadDrawnOnField
+            livePreview
+            key={`${part.id}:drawn-on`}
+            inwardToggle={false}
+            document={document}
+            part={part as CadPart & { drawnOn: NonNullable<CadPart['drawnOn']> }}
+            variables={variables}
+            onChange={drawnOn => onChange(document => changePart(document, part.id, p => ({ ...p, drawnOn })))}
+          />
+        )}
+        {solidControls && (
+          <CadReliefField
+            livePreview
+            key={`${part.id}:relief`}
+            relief={part.cornerRelief}
+            variables={variables}
+            onChange={cornerRelief =>
+              onChange(document =>
+                changePart(document, part.id, p => {
+                  const next = { ...p, cornerRelief };
+                  if (!cornerRelief) delete next.cornerRelief;
+                  return next;
+                })
+              )
+            }
+          />
+        )}
+      </>
     </FeatureDialog>
   );
 }

@@ -5,6 +5,8 @@ export type StudioCommand =
   | 'sketch'
   | 'extrude'
   | 'cutParts'
+  | 'boolean'
+  | 'linearPattern'
   | 'transform'
   | 'pattern'
   | 'mirror'
@@ -73,5 +75,17 @@ export const kStudioCommands: { id: StudioCommand; label: string; hint: string; 
     label: 'Variable',
     hint: 'A named size, such as the board thickness, that any value can use',
     glyph: <path d="M8 5C5 8 5 16 8 19M16 5c3 3 3 11 0 14M10 9l4 6M14 9l-4 6" />,
+  },
+  {
+    id: 'linearPattern',
+    label: 'Linear pattern',
+    hint: 'Repeat a part, or an Extrude that removes, in a row along an edge',
+    glyph: <path d="M3 8h4v8H3zM10 8h4v8h-4zM17 8h4v8h-4zM3 20h18" />,
+  },
+  {
+    id: 'boolean',
+    label: 'Boolean',
+    hint: 'Join parts into one, subtract parts from others, or keep only what they share',
+    glyph: <path d="M3 4h11v11H3zM10 9h11v11H10z" />,
   },
 ];
