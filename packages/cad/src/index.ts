@@ -42,7 +42,7 @@ export * from './placement';
 export * from './drawnOn';
 export * from './faceEdges';
 export * from './cutParts';
-export { unionOf } from './unionParts';
+export { kNoIntersection, mergedWithAll, unionOf } from './unionParts';
 export { overlappedParts } from './partOverlap';
 export * from './partPatterns';
 export * from './mirrorPlane';

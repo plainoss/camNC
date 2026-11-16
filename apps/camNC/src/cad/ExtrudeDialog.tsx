@@ -25,6 +25,7 @@ import {
   sketchStepLabel,
   designStepLabel,
   splitApartRegions,
+  mergedWithAll,
   type CadDocument,
   type CadPart,
   type CadValueScope,
@@ -53,7 +54,7 @@ const changePart = (document: CadDocument, partId: string, change: (part: CadPar
   parts: document.parts.map(part => (part.id === partId ? change(part) : part)),
 });
 
-type ExtrudeOperation = 'new' | 'add' | 'remove';
+type ExtrudeOperation = 'new' | 'add' | 'remove' | 'intersect';
 
 /**
  * A sketch pushed out, as the reference's Extrude: New makes a part of it, how thick, where it starts from its plane or
@@ -122,7 +123,13 @@ export function ExtrudeDialog({
       setUpTo(on, datum);
     });
   };
-  const operation: ExtrudeOperation = part.remove ? 'remove' : part.addTo !== undefined || part.mergeAll ? 'add' : 'new';
+  const operation: ExtrudeOperation = part.remove
+    ? 'remove'
+    : part.intersect
+      ? 'intersect'
+      : part.addTo !== undefined || part.mergeAll
+        ? 'add'
+        : 'new';
   const owner = document.parts.find(candidate => candidate.id === sketchOwnerId(part)) ?? part;
   // The parts an Add can join: those made from the same sketch, of regions picked from it, which it adds regions to, and
   // any other part, which it's joined to as a body of its own. The part its sketch is drawn on comes first.
@@ -156,6 +163,7 @@ export function ExtrudeDialog({
         (part.thin && 'A thin board can only be a new part.') ||
         (isCadBody(document, part) && partIsBuiltOn(document, part, next === 'add' ? mergeable[0] : undefined)) ||
         (next === 'add' && !mergeable.length && 'There’s no part yet to add to. Make one with New first.') ||
+        (next === 'intersect' && !mergeable.length && 'There’s no part yet to intersect with. Make one with New first.') ||
         (next === 'remove' &&
           (() => {
             if (part.drawnOn && ('plane' in part.drawnOn.on || typeof part.drawnOn.on.face === 'object'))
@@ -172,6 +180,7 @@ export function ExtrudeDialog({
         delete made.addTo;
         delete made.mergeAll;
         delete made.remove;
+        delete made.intersect;
         delete made.regions;
         const own = sketchRegions(p.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
         if (next === 'remove') {
@@ -187,6 +196,12 @@ export function ExtrudeDialog({
                   found.regions.map(region => region.id)
                 );
           if (regions?.length || nonePicked(p)) made.regions = regions ?? [];
+        } else if (next === 'intersect') {
+          made.intersect = true;
+          // Into what's below, as a cut goes: Opposite direction turns it the other way.
+          if (made.drawnOn) made.drawnOn = { ...made.drawnOn, inward: true };
+          const regions = keptRegions(p, own);
+          if (regions?.length || p.sketchOf || nonePicked(p)) made.regions = regions ?? [];
         } else if (next === 'add') {
           const into = mergeable[0]!;
           // A solid face names the profile, not the body to join: that scope must be picked explicitly, as it must when
@@ -225,6 +240,8 @@ export function ExtrudeDialog({
     return true;
   };
   const stepProblem = extrudeStepProblem(document, part);
+  const intersected = operation === 'intersect' ? mergedWithAll(document, part)?.made : undefined;
+  const intersectProblem = intersected && 'refused' in intersected ? intersected.refused : null;
   // The regions of the parts it made too are the feature's as well.
   const alsoMade = document.parts.flatMap(p => (p.extrudedWith === part.id ? (p.regions ?? []) : []));
   const regionCount = operation === 'remove' && !part.regions ? null : part.regions ? part.regions.length + alsoMade.length : null;
@@ -303,12 +320,17 @@ export function ExtrudeDialog({
       onCancel={onCancel}>
       {/* New makes the sketch a part of its own; Add joins it to one; Remove cuts it out of the board it's drawn on. */}
       <div className="cad-feature-tabs" role="tablist" aria-label="Extrude operation">
-        {(['new', 'add', 'remove'] as const).map(choice => (
+        {(['new', 'add', 'remove', 'intersect'] as const).map(choice => (
           <button key={choice} type="button" role="tab" aria-selected={operation === choice} onClick={() => switchTo(choice)}>
-            {choice === 'new' ? 'New' : choice === 'add' ? 'Add' : 'Remove'}
+            {choice === 'new' ? 'New' : choice === 'add' ? 'Add' : choice === 'remove' ? 'Remove' : 'Intersect'}
           </button>
         ))}
       </div>
+      {intersectProblem && (
+        <p role="alert" className="cad-thickness-error">
+          {intersectProblem}
+        </p>
+      )}
       {operationError && (
         <p role="alert" className="cad-thickness-error">
           {operationError}
@@ -594,7 +616,8 @@ export function ExtrudeDialog({
             className="cad-flip-direction"
             aria-label="Flip direction"
             title="Extrude the other way"
-            aria-pressed={part.remove ? removalInward(part) : !!part.drawnOn.inward}
+            // An Intersect goes into what's below by default, so pressed is the other way, as for a new part.
+            aria-pressed={part.remove ? removalInward(part) : part.intersect ? !part.drawnOn.inward : !!part.drawnOn.inward}
             onClick={() =>
               onChange(document =>
                 changePart(document, part.id, p => {

@@ -144,7 +144,10 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
       else {
         const value = rest.slice(at + 3);
         if (!['true', 'false'].includes(value)) throw new Error('dialogcheck requires true or false');
-        await field.setChecked(value === 'true');
+        // A toggle button, as Flip direction, is pressed or not rather than checked.
+        const pressed = await field.getAttribute('aria-pressed');
+        if (pressed === null) await field.setChecked(value === 'true');
+        else if ((pressed === 'true') !== (value === 'true')) await field.click();
       }
     } else if (verb === 'featureaction') {
       const at = rest.indexOf(' = ');
