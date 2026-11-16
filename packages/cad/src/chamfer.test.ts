@@ -37,7 +37,8 @@ it('retains virtual corners and original plate dimensions with two independently
   const sketch = resized.document.parts[0]!.sketch;
   const point = (id: string) => sketch.entities.find(e => e.id === id) as CadPointEntity;
   const virtual = point(bottom.endId);
-  expect(virtual).toMatchObject({ x: 120, y: 0, construction: true });
+  expect(virtual).toMatchObject({ x: 120, construction: true });
+  expect(virtual.y).toBeCloseTo(0, 9);
   const edge = sketch.entities.find(e => e.id === result.lineIds[0]) as CadLineEntity;
   expect(Math.hypot(point(edge.startId).x - virtual.x, point(edge.startId).y - virtual.y)).toBeCloseTo(15, 7);
   expect(Math.hypot(point(edge.endId).x - virtual.x, point(edge.endId).y - virtual.y)).toBeCloseTo(20, 7);

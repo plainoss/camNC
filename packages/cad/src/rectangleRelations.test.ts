@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addConstraint, addRectangle, createCadDocument, createCadPart, originId, solveCadDocument, type CadPointEntity } from './index';
 describe('rectangle geometric relationships', () => {
-  it('retains one horizontal, opposite parallel, and adjacent perpendicular relations during native resizing', async () => {
+  it('keeps its sides horizontal and vertical during native resizing', async () => {
     const part = createCadPart();
     part.sketch = addRectangle(part.sketch, { x: 0, y: 0, width: 100, height: 60 });
     const lines = part.sketch.entities.filter(e => e.type === 'line'),
@@ -11,7 +11,7 @@ describe('rectangle geometric relationships', () => {
         .filter(c => c.type !== 'coincident')
         .map(c => c.type)
         .sort()
-    ).toEqual(['horizontal', 'parallel', 'parallel', 'perpendicular']);
+    ).toEqual(['horizontal', 'horizontal', 'vertical', 'vertical']);
     expect(part.sketch.constraints.filter(c => c.type === 'coincident')).toHaveLength(4);
     part.sketch = addConstraint(part.sketch, { type: 'coincident', pointAId: lines[0]!.startId, pointBId: originId(part.sketch) });
     const document = { ...createCadDocument(), parts: [part] };

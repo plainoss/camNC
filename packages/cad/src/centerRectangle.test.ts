@@ -37,9 +37,9 @@ describe('persistent center rectangles solved by PlaneGCS', () => {
       'coincident',
       'coincident',
       'horizontal',
-      'parallel',
-      'parallel',
-      'perpendicular',
+      'horizontal',
+      'vertical',
+      'vertical',
       'midpoint',
     ]);
     expect(sketch.constraints.at(-1)).toMatchObject({ pointId: center });

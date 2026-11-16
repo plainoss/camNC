@@ -431,10 +431,12 @@ export function addRectangle(
   const constraints: CadConstraint[] = [
     ...sketch.constraints,
     ...graph.coincidences,
+    // Each side horizontal or vertical, as the reference's corner rectangle draws it: a side dimensioned to zero leaves
+    // the others straight, as a line.
     { id: newCadId(), type: 'horizontal', entityId: bottom.id },
-    { id: newCadId(), type: 'parallel', entityAId: bottom.id, entityBId: top.id },
-    { id: newCadId(), type: 'parallel', entityAId: right.id, entityBId: left.id },
-    { id: newCadId(), type: 'perpendicular', entityAId: bottom.id, entityBId: right.id },
+    { id: newCadId(), type: 'horizontal', entityId: top.id },
+    { id: newCadId(), type: 'vertical', entityId: right.id },
+    { id: newCadId(), type: 'vertical', entityId: left.id },
   ];
   if (options.dimensioned)
     constraints.push(
