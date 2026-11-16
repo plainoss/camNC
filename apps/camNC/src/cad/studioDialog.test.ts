@@ -71,13 +71,14 @@ it('finds the step a dialog edits', () => {
   expect(editedStepId(document, { kind: 'mirror', partId, copyId: 'mirror-1' })).toBe('mirror-1');
 });
 
-it('has no edited step for a dialog adding one, nor for Fillet, Plane and Variable', () => {
+it('has no edited step for a dialog adding one, nor for Plane and Variable, and an edited Fillet is its own', () => {
   expect(editedStepId(document, null)).toBeNull();
   expect(editedStepId(document, { kind: 'pattern', partId, before })).toBeNull();
   expect(editedStepId(document, { kind: 'partCut' })).toBeNull();
   expect(editedStepId(document, { kind: 'transform', partId })).toBeNull();
   expect(editedStepId(document, { kind: 'mirror', partId })).toBeNull();
-  expect(editedStepId(document, { kind: 'fillet', partId, filletId: 'round' })).toBeNull();
+  expect(editedStepId(document, { kind: 'fillet', partId })).toBeNull();
+  expect(editedStepId(document, { kind: 'fillet', partId, filletId: 'round' })).toBe('round');
   expect(editedStepId(document, { kind: 'plane', id: 'plane-1' })).toBeNull();
   expect(editedStepId(document, { kind: 'variable', id: 'width' })).toBeNull();
 });
