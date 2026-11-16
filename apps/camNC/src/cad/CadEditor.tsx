@@ -1638,6 +1638,7 @@ export function CadEditor({
               onHover={entry => setHoveredStepParts(entry?.kind === 'step' ? featureRowParts(doc, entry.step) : null)}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane, onNewSketch: newSketchOn })}
               {...{ shown: featureShown, featureProblems, pending: pendingRow(doc, dialog, choosingFace, userRollback) }}
+              preview={dialog?.kind === 'fillet' ? studioPreview.document : undefined}
               onToggleShown={id => setFeatureVisibility(previous => ({ ...previous, [id]: !featureShown(id) }))}
             />
           )}

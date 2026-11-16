@@ -156,6 +156,7 @@ export function FilletDialog({
       // Once an edge is picked the fillet has its place among its part's steps, and the number that goes with it.
       title={designStepLabel(candidate ?? document, featureId) ?? nextFilletLabel(document)}
       okDisabled={!picked.length}
+      className={refusal ? 'cad-feature-dialog-failed' : undefined}
       onOk={save}
       onCancel={onCancel}>
       <div className="cad-feature-tabs" role="tablist" aria-label="Fillet type">

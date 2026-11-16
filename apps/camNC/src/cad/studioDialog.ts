@@ -102,6 +102,8 @@ export function editedStepId(document: CadDocument, dialog: StudioDialog | null)
       return dialog.copyId ?? (dialog.move ? `${dialog.partId}:move` : null);
     case 'mirror':
       return dialog.joinId ?? dialog.copyId ?? null;
+    case 'fillet':
+      return dialog.filletId ?? null;
     default:
       return null;
   }

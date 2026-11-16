@@ -1,6 +1,6 @@
 import { useDesignUnits } from './designUnits';
-import { cadFolderSteps, cadVariableValues, moveCadFolder, type CadDocument } from '@wbcnc/cad';
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
+import { cadFolderSteps, cadVariableValues, designSteps, moveCadFolder, type CadDocument } from '@wbcnc/cad';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { kBasePlanes } from './basePlanes';
 import type { DesignStep } from '@wbcnc/cad';
 import { PartRowMenu } from './PartRowMenu';
@@ -168,6 +168,7 @@ export function FeatureList({
   featureProblems,
   onNewSketch,
   onChange,
+  preview,
   pending,
 }: {
   document: CadDocument;
@@ -205,13 +206,18 @@ export function FeatureList({
   /** New sketch, from a base plane's right-click menu, as the reference's. */
   onNewSketch?: (plane: string) => void;
   onChange?: (document: CadDocument) => void;
+  /** The design as the open dialog would make it: a row that couldn't be made so shows as broken while it's open. */
+  preview?: CadDocument;
   /** A new feature's row while its dialog is open and it isn't made yet, as Sketch 2 before its plane is picked. */
   pending?: { kind: 'sketch' | 'fillet'; label: string };
 }) {
   const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);
+  const previewed = useMemo(() => (preview && preview !== document ? designSteps(preview) : null), [preview, document]);
   const entries = folderFeatureEntries(document).map(entry => {
     if (entry.kind !== 'step' || entry.step.broken || entry.step.suppressed) return entry;
+    const failing = previewed?.find(step => step.id === entry.step.id)?.broken;
+    if (failing) return { ...entry, step: { ...entry.step, broken: failing } };
     // An extrude that wasn't built says why, and its sketch says when it isn't fully defined.
     const problem =
       entry.step.kind === 'extrude'
