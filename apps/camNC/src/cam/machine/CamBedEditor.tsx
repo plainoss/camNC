@@ -21,7 +21,7 @@ import {
   type BedPart,
   type BedSelection,
 } from './bedEdit';
-import { entryHolds, entryRotation, entrySide, rotationKey, useCamMachine } from './camMachine';
+import { entryHolds, entryRotation, entrySide, useCamMachine } from './camMachine';
 import { useMachineLockReason, useMachineSetupLocked } from './useMachineBusy';
 import { useMachineQueue } from './useMachineQueue';
 
@@ -44,8 +44,6 @@ export function CamBedEditor() {
 
 function Editor() {
   const { current, updateBoard, queue, done, instances, nestBit } = useMachineQueue();
-  const rotation = useCamMachine(s => s.rotation);
-  const setRotation = useCamMachine(s => s.setRotation);
   const setBed = useBedEdit(s => s.setBed);
   const overlay = useCamMachine(s => s.overlay);
   const setOverlay = useCamMachine(s => s.setOverlay);
@@ -113,15 +111,7 @@ function Editor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragging]);
 
-  // The board's angle, turned here (the card's buttons, the corner handle): kept with the job, so it lies that way on
-  // the next visit too.
-  const deg = current ? entryRotation(current, rotation) : 0;
-  const turnedHere = current ? rotation[rotationKey(current)] : undefined;
-  useEffect(() => {
-    if (!current || !board || turnedHere === undefined || board.bed?.[side]?.deg === turnedHere) return;
-    save(turnBoard(board, side, turnedHere, useStore.getState().toolpathOffset), true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turnedHere, board?.id, side]);
+  const deg = current ? entryRotation(current) : 0;
 
   // What the overlay can do besides the holds: the parts to drag, the board to turn, the other boards to switch to.
   const cutHere = !!current && queue.some(e => e.board.board.id === current.board.board.id && done.includes(e.doneId));
@@ -165,17 +155,16 @@ function Editor() {
         saveRef.current(edit);
         return edit.exact ? 'exact' : 'moved';
       },
-      // Turned (the knob, the panel): about its middle, so its XY zero moves too. Saved first, so the program goes to
-      // the new spot when it's loaded at the new angle.
+      // Turned (the knob, the panel): about its middle, so its XY zero moves too. Kept with the job, so the board lies
+      // that way on the next visit too.
       rotate: (d, at) => {
-        const { current: c, board: b, side: sd, deg: from } = ctx.current;
+        const { board: b, side: sd, deg: from } = ctx.current;
         const o = useCamMachine.getState().overlay;
-        if (!c || !b) return;
+        if (!b) return;
         const s = useStore.getState();
         const to = at ?? (o ? turnAboutMiddle(s.toolpathOffset, o, from, d) : s.toolpathOffset);
         s.setToolpathOffset(new Vector3(to.x, to.y, s.toolpathOffset.z));
         saveRef.current(turnBoard(b, sd, d, to), true);
-        setRotation(rotationKey(c), d);
       },
       openInCam: where => {
         const id = ctx.current.board?.id;

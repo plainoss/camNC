@@ -68,8 +68,10 @@ describe('the machine queue with a real plan', () => {
     const straight = useStore.getState().toolpath?.gcode;
 
     // Turned, the plan fails no check of its own: the rectangle turned with it. It's loaded again by itself.
-    useCamMachine.getState().setRotation(boards.find(b => b.name === 'A')!.id, 0.1);
-    expect(useCamMachine.getState().rotation[boards.find(b => b.name === 'A')!.id]).toBe(0.1);
+    const boardA = boards.find(b => b.name === 'A')!.id;
+    await waitFor(() => expect(useBedEdit.getState().bed?.boardId).toBe(boardA));
+    useBedEdit.getState().bed!.rotate(0.1);
+    expect(client.getQueryData<CamJobV1>(camKeys.job(job.id))?.boards?.find(b => b.id === boardA)?.bed?.a?.deg).toBe(0.1);
     await waitFor(
       () => {
         expect(useStore.getState().toolpath?.gcode).toBeTruthy();

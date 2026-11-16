@@ -297,21 +297,21 @@ describe('the machine queue card', () => {
 
   it('side B turns on its own (camera): from the flip step, with side A’s rotation untouched and the holds mentioned', () => {
     const a = plan([3.175], 'a', { sideB: plan([3.175], 'b'), flip: { registration: 'camera' } });
-    useCamMachine.setState({ active: 'A:flip', rotation: { A: 1 } });
-    setQueue([board('A')], [a]);
+    const sideA = { x: 0, y: 0, deg: 1 };
+    const turned = board('A', { bed: { a: sideA, b: { x: 0, y: 0, deg: 1.1 } } });
+    useCamMachine.setState({ active: 'A:flip' });
+    setQueue([board('A', { bed: { a: sideA } })], [a]);
     const { rerender } = render(view());
     expect(card().getByText(/Refit the screws, clamps or tape/).parentElement!.textContent).toMatch(/clear of side B’s cuts/);
     // Until corrected it lies like side A; turned (the knob in the top view), on its own.
     expect(useCamMachine.getState().overlay?.rotationDeg).toBe(1);
-    useCamMachine.getState().setRotation('A:b', 1.1);
-    expect(useCamMachine.getState().rotation).toEqual({ A: 1, 'A:b': 1.1 });
-    setQueue([board('A')], [a]);
+    setQueue([turned], [a]);
     rerender(view());
     expect(useCamMachine.getState().overlay?.rotationDeg).toBe(1.1);
 
     // Where the outline can be dragged too: on side B's first step, its program loaded.
     useCamMachine.setState({ active: 'A:b:bit:0' });
-    setQueue([board('A')], [a]);
+    setQueue([turned], [a]);
     rerender(view());
     expect(useCamMachine.getState().overlay?.rotationDeg).toBe(1.1);
     expect(entryByKey('A:b:bit:0').sideB).toBe(true);

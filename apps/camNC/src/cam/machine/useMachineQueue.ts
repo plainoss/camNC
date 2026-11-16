@@ -15,13 +15,12 @@ import { useMachineSetupLocked } from './useMachineBusy';
  */
 export function useMachineQueue() {
   'use no memo';
-  const { jobId, rotation, active, done: doneHere, runSnapshot } = useCamMachine();
+  const { jobId, active, done: doneHere, runSnapshot } = useCamMachine();
   const { data: job } = useCamJob(jobId ?? '');
   const model = useCamModel(jobId ? job : null);
   const { boards: plain, instances } = useJobBoards(job, model.data);
   const boards = plain.map(b => {
-    // As turned here, else as saved with the job.
-    const [sideA, sideB] = [rotation[b.board.id] ?? b.board.bed?.a?.deg, rotation[`${b.board.id}:b`] ?? b.board.bed?.b?.deg];
+    const [sideA, sideB] = [b.board.bed?.a?.deg, b.board.bed?.b?.deg];
     // A board lying straight asks for what the Plan step asked for: the same plan.
     return {
       ...b,
