@@ -273,6 +273,14 @@ export function parseCadDocument(input: unknown): CadDocument {
         p.thinEdges.some(id => typeof id !== 'string' || !p.sketch.entities.some(entity => entity.id === id && entity.type === 'line')))
     )
       throw new Error('Invalid CAD thin edges');
+    if (
+      (p.piece !== undefined &&
+        (!p.piece ||
+          typeof p.piece !== 'object' ||
+          !['sketchId', 'regionId', 'by'].every(key => typeof (p.piece as unknown as Record<string, unknown>)[key] === 'string'))) ||
+      (p.pieceOf !== undefined && (!p.pieceOf || typeof p.pieceOf.partId !== 'string' || typeof p.pieceOf.by !== 'string'))
+    )
+      throw new Error('Invalid CAD part piece');
     if (p.mirrorJoins !== undefined) {
       if (!Array.isArray(p.mirrorJoins) || !p.mirrorJoins.length) throw new Error('Invalid CAD mirror');
       for (const join of p.mirrorJoins) {

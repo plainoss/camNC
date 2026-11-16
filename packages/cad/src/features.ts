@@ -1,6 +1,7 @@
 import { withCadLengthUnit } from './lengthUnits';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { cadDocumentVersion } from './documentVersion';
+import { pieceProfile } from './partPieces';
 import { featuresForCopy } from './copyFeatures';
 import { faceRemovalDepth } from './faceRemovalDepth';
 import { newCadId, originId } from './document';
@@ -245,7 +246,9 @@ export function evaluateCadFeatures(
   profile: EvaluatedCadPart,
   copyId?: string
 ): { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
-  const cut = cutFeatures({ ...part, features: featuresForCopy(part, copyId) }, profile);
+  // A part a through cut split is its own piece; the cuts that split it are its edges now.
+  const split = pieceProfile({ ...part, features: featuresForCopy(part, copyId) }, profile);
+  const cut = cutFeatures(split.part, split.profile);
   if (!part.cornerRelief) return cut;
   const { part: next, skipped } = relieveCorners(cut.part, part.cornerRelief.diameter);
   const diagnostics = [...cut.diagnostics];

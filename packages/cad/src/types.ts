@@ -375,6 +375,13 @@ export interface CadPart {
    */
   thinEdges?: string[];
   /**
+   * The piece of this part a through cut split it into that the part keeps, a region of one of its face sketches; the
+   * others are parts of their own, `pieceOf` it. The design writes both from its Remove steps; they're never edited.
+   */
+  piece?: CadPartPiece;
+  /** A piece of another part, split off it by a through cut: made by the design, which keeps it in step. */
+  pieceOf?: { partId: string; by: string };
+  /**
    * A bone in every inside corner, so a bit of this diameter cuts it fully and a part that fits into it goes all the
    * way in. The diameter is the design's bit: a bigger bit in the job can't reach into the bones.
    */
@@ -390,6 +397,12 @@ export interface CadPart {
  * A part's sketch x and y, with its thickness as z, turned by `rotation` (a unit quaternion x, y, z, w) and then moved by
  * `position`, in mm.
  */
+export interface CadPartPiece {
+  sketchId: string;
+  regionId: string;
+  /** The Remove step whose through cut split the part. */
+  by: string;
+}
 export interface CadThinWall {
   /** mm out from the shape's outline, or both ways around it when centred. */
   thickness1: number;

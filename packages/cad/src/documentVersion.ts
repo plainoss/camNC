@@ -11,6 +11,9 @@ export function cadDocumentVersion(document: CadDocument): CadDocument['version'
         part?.intersect ||
         part?.mirrorJoins?.length ||
         part?.thinWall ||
+        part?.thinEdges ||
+        part?.piece ||
+        part?.pieceOf ||
         part?.pattern?.second ||
         part?.pattern?.skipped ||
         part?.pattern?.centered

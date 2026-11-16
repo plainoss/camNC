@@ -9,6 +9,7 @@ import { cadSketchRegions, evaluateCadFeatures, isCadPart } from './features';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, pointInPolygon, polygonArea } from './geometry';
 import { patternedRemoval } from './featurePattern';
 import { thinSlotSketch } from './thinSlots';
+import { withoutPartPieces, withPartPieces } from './partPieces';
 import { regionGroups } from './regionProfile';
 import { regionInteriorPoint, sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type { CadCut, CadDocument, CadEntity, CadFaceSketch, CadFeature, CadPart, CadPoint, CadSketch } from './types';
@@ -176,7 +177,9 @@ function removedRegionIds(document: CadDocument, part: CadPart): string[] {
  * The design comes back unchanged when there's nothing to do.
  */
 export function resolveExtrudeSteps(document: CadDocument): CadDocument {
-  document = resolveFaceProfiles(document);
+  // Pieces a through cut split off are made again from the whole parts, once their cuts are in step.
+  const given = document;
+  document = resolveFaceProfiles(withoutPartPieces(document));
   const byId = new Map(document.parts.map(part => [part.id, part]));
   // A shared sketch's owner, following a chain left by an owner deleted in between.
   const owners = new Map<string, string>();
@@ -363,14 +366,14 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
     return next;
   });
 
+  // A board its through cuts run across is split into its pieces.
+  parts = withPartPieces({ ...document, parts }, given).parts;
   const changed =
-    parts.length !== document.parts.length || parts.some((part, index) => JSON.stringify(part) !== JSON.stringify(document.parts[index]));
+    parts.length !== given.parts.length || parts.some((part, index) => JSON.stringify(part) !== JSON.stringify(given.parts[index]));
   if (!changed) {
     // An edit that needs a newer reader, or no longer needs the exact one it named, as switching Merge with all does.
-    const required = cadDocumentVersion(document);
-    return required > document.version || (document.version >= 5 && required !== document.version)
-      ? { ...document, version: required }
-      : document;
+    const required = cadDocumentVersion(given);
+    return required > given.version || (given.version >= 5 && required !== given.version) ? { ...given, version: required } : given;
   }
   return { ...document, parts, version: cadDocumentVersion({ ...document, parts }) };
 }
@@ -417,7 +420,10 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
     const extent = faceRemovalDepth(part, support.board.thickness);
     if ('error' in extent) return extent.error;
     if (part.remove.depth !== 'through' && !(part.remove.depth > 0)) return 'A cut needs some depth.';
-    if (!removedRegionIds(document, part).length) return 'Draw a closed shape on the face to cut it out.';
+    // A thin Remove of lines cuts the slots they widen into, however its own sketch closes.
+    const slots = thinSlotSketch(part);
+    if (slots ? !part.thinEdges?.length : !removedRegionIds(document, part).length)
+      return slots || part.thinWall ? 'Pick the lines to cut along in the view.' : 'Draw a closed shape on the face to cut it out.';
     // The board has to take the cuts, as CAM machines it: a through cut can't reach its edge, nor a pocket go through.
     const errors = (board: CadPart) => {
       const profile = evaluateCadPart(board).part;

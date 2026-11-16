@@ -1,0 +1,264 @@
+[
+  {
+    "id": "studio/fillet/rim-face-of-cup",
+    "title": "A rim face between two circles is filleted on both its edges at once",
+    "evidence": "design workflow parity spec",
+    "steps": [
+      "dialogcancel",
+      {
+        "spec": "1 view"
+      },
+      "view top",
+      {
+        "spec": "2 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "3 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "4 command"
+      },
+      "key c",
+      {
+        "spec": "5 draw"
+      },
+      "circle 0,0 30",
+      {
+        "spec": "6 command"
+      },
+      "key d",
+      {
+        "spec": "7 pick"
+      },
+      "viewpick -21.213,21.213,0",
+      {
+        "spec": "8 pick"
+      },
+      "viewpick -40,40,0",
+      {
+        "spec": "9 field"
+      },
+      "field diameter 77.8",
+      {
+        "spec": "10 cancel"
+      },
+      "key Escape",
+      {
+        "spec": "11 confirm"
+      },
+      "closesketch",
+      {
+        "spec": "12 command"
+      },
+      "key Shift+e",
+      {
+        "spec": "13 pick"
+      },
+      "viewpick 10,-10,0",
+      {
+        "spec": "14 field"
+      },
+      "dialogfill Thickness = 20",
+      "key Enter",
+      {
+        "spec": "15 confirm"
+      },
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": [
+                  "hidden"
+                ]
+              },
+              "Extrude 1"
+            ],
+            "parts": [
+              "Part 1"
+            ]
+          }
+        }
+      },
+      {
+        "spec": "16 pick"
+      },
+      "viewpick 10,-10,20",
+      {
+        "spec": "17 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "18 command"
+      },
+      "key c",
+      {
+        "spec": "19 draw"
+      },
+      "circle 0,0 35",
+      {
+        "spec": "20 command"
+      },
+      "key d",
+      {
+        "spec": "21 pick"
+      },
+      "viewpick -24.749,24.749,0",
+      {
+        "spec": "22 pick"
+      },
+      "viewpick -45,45,0",
+      {
+        "spec": "23 field"
+      },
+      "field diameter 67.2",
+      {
+        "spec": "24 cancel"
+      },
+      "key Escape",
+      {
+        "spec": "25 confirm"
+      },
+      "closesketch",
+      {
+        "spec": "26 command"
+      },
+      "key Shift+e",
+      {
+        "spec": "27 pick"
+      },
+      "viewpick 0,0,20",
+      {
+        "spec": "28 field"
+      },
+      "dialogtab Remove",
+      {
+        "spec": "29 field"
+      },
+      "dialogfill Cut depth = 16",
+      "key Enter",
+      {
+        "spec": "30 confirm"
+      },
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": [
+                  "hidden"
+                ]
+              },
+              "Extrude 1",
+              {
+                "name": "Sketch 2",
+                "state": [
+                  "hidden"
+                ]
+              },
+              "Extrude 2"
+            ],
+            "parts": [
+              "Part 1"
+            ]
+          }
+        }
+      },
+      {
+        "spec": "31 view"
+      },
+      "key Shift+5",
+      {
+        "spec": "32 command"
+      },
+      "studiotool Fillet",
+      {
+        "expect": {
+          "pageText": "Full round"
+        }
+      },
+      {
+        "expect": {
+          "pageText": "Tangent propagation"
+        }
+      },
+      {
+        "expect": {
+          "pageText": "Asymmetric"
+        }
+      },
+      {
+        "expect": {
+          "pageText": "Partial fillet"
+        }
+      },
+      {
+        "expect": {
+          "pageText": "Variable fillet"
+        }
+      },
+      {
+        "expect": {
+          "pageText": "Allow edge overflow"
+        }
+      },
+      {
+        "expect": {
+          "pageText": "Smooth fillet corners"
+        }
+      },
+      {
+        "spec": "33 pick"
+      },
+      "viewpick -26,26,20",
+      {
+        "expect": {
+          "pageText": "Face of Extrude 1"
+        }
+      },
+      {
+        "spec": "34 field"
+      },
+      "dialogfill Radius = 1",
+      {
+        "spec": "35 confirm"
+      },
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": [
+                  "hidden"
+                ]
+              },
+              "Extrude 1",
+              {
+                "name": "Sketch 2",
+                "state": [
+                  "hidden"
+                ]
+              },
+              "Extrude 2",
+              "Fillet 1"
+            ],
+            "parts": [
+              "Part 1"
+            ]
+          }
+        }
+      }
+    ]
+  }
+]

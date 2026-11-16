@@ -31,7 +31,7 @@ Counted from the scenario files, without running them. PASS counts every scenari
 | Domain | Scenarios | PASS | XFAIL | FLAKY | Floor |
 | ------ | --------: | ---: | ----: | ----: | ----: |
 | sketch |       157 |  157 |     0 |     0 |   157 |
-| studio |        22 |   22 |     0 |     0 |    22 |
+| studio |        23 |   23 |     0 |     0 |    23 |
 
 | Group               | Scenarios | PASS | XFAIL | FLAKY |
 | ------------------- | --------: | ---: | ----: | ----: |
@@ -57,6 +57,7 @@ Counted from the scenario files, without running them. PASS counts every scenari
 | `studio/boolean`    |         2 |    2 |     0 |     0 |
 | `studio/cupboard`   |         5 |    5 |     0 |     0 |
 | `studio/extrude`    |         3 |    3 |     0 |     0 |
+| `studio/fillet`     |         1 |    1 |     0 |     0 |
 | `studio/joints`     |         1 |    1 |     0 |     0 |
 | `studio/measure`    |         1 |    1 |     0 |     0 |
 | `studio/pattern`    |         2 |    2 |     0 |     0 |

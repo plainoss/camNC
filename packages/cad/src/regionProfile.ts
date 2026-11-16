@@ -12,7 +12,7 @@ const regionIdsBySketch = new WeakMap<CadSketch, Set<string>>();
 export function missingRegionProblem(part: CadPart): string | null {
   const wanted = [...(part.regions ?? []), ...(part.addedRegions ?? [])];
   // A thin extrude whose shape was cleared to pick again is missing it, as the reference marks it, until one is picked.
-  if (part.thinWall && part.regions?.length === 0) return missingRegionMessage(1);
+  if (part.thinWall && part.regions?.length === 0 && !part.thinEdges?.length) return missingRegionMessage(1);
   if (!part.regions || !wanted.length || part.thin) return null;
   let ids = regionIdsBySketch.get(part.sketch);
   if (!ids) regionIdsBySketch.set(part.sketch, (ids = new Set(sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).map(region => region.id))));
