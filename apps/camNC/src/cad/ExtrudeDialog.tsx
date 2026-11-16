@@ -37,7 +37,7 @@ import { FeatureDialog } from './FeatureDialog';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
 import { ThinWallFields } from './ThinWallFields';
-import { regionEntries } from './enclosedRegions';
+import { regionEntries, regionEntrySizes } from './enclosedRegions';
 
 interface PartDialogProps {
   document: CadDocument;
@@ -265,7 +265,11 @@ export function ExtrudeDialog({
               ? `Faces of ${sketchName}`
               : null;
   // Faces picked apart are listed one by one, as the reference lists them.
-  const listed = selection ?? Array.from({ length: Number(entries) }, (_, i) => <span key={i}>{`Face of ${sketchName}`}</span>);
+  const listed =
+    selection ??
+    (alsoMade.length ? Array.from({ length: regionCount ?? 0 }, () => 1) : regionEntrySizes(document, part, part.regions ?? [])).map(
+      (size, i) => <span key={i}>{`${size > 1 ? 'Faces' : 'Face'} of ${sketchName}`}</span>
+    );
   const board = operation === 'remove' ? removeSupport(document, part) : null;
   const spatialRemove = isSpatialRemoval(part);
   const solidControls = operation !== 'remove';

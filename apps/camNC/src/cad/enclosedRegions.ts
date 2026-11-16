@@ -50,7 +50,13 @@ export function enclosedUsedRegions(document: CadDocument, part: CadPart, region
  * sketch used, taken along with a circle's free part, belong to that pick's entry.
  */
 export function regionEntries(document: CadDocument, part: CadPart, regionIds: readonly string[]): number {
+  return Math.max(1, regionEntrySizes(document, part, regionIds).length);
+}
+
+/** How many faces each entry of a selection of regions holds: one, or a circle's with the faces taken along. */
+export function regionEntrySizes(document: CadDocument, part: CadPart, regionIds: readonly string[]): number[] {
   const used = usedRegions(document, part);
-  const takenAlong = new Set(regionIds.filter(id => !used.has(id)).flatMap(id => enclosedUsedRegions(document, part, id)));
-  return Math.max(1, regionIds.filter(id => !takenAlong.has(id)).length);
+  const along = new Map(regionIds.filter(id => !used.has(id)).map(id => [id, enclosedUsedRegions(document, part, id)]));
+  const takenAlong = new Set([...along.values()].flat());
+  return regionIds.filter(id => !takenAlong.has(id)).map(id => 1 + (along.get(id)?.filter(other => regionIds.includes(other)).length ?? 0));
 }

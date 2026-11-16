@@ -433,11 +433,17 @@ export async function createAdapter(page, url) {
         return;
       }
       case 'check':
-        await page.getByLabel(rest, { exact: true }).check();
+      case 'uncheck': {
+        // A checkbox by its label, or a switch such as the drawing's Snap, pressed only when it isn't already so.
+        const toggle = page.getByRole('switch', { name: rest, exact: true });
+        if (await toggle.count()) {
+          if ((await toggle.getAttribute('aria-checked')) !== String(verb === 'check')) await toggle.click();
+          await settle();
+          return;
+        }
+        await page.getByLabel(rest, { exact: true })[verb]();
         return;
-      case 'uncheck':
-        await page.getByLabel(rest, { exact: true }).uncheck();
-        return;
+      }
       case 'hold':
         await page.keyboard.down(rest);
         return;

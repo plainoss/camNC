@@ -97,7 +97,8 @@ import {
   type CadCommandCheckpoint,
   type CadHistoryMark,
 } from '@wbcnc/cad-editor/session';
-import { DimensionGraphics, draftLabelAt } from './DimensionGraphics';
+import { DimensionGraphics } from './DimensionGraphics';
+import { draftLabelAt } from './draftLabelAt';
 import {
   idleDimensionWorkflow,
   transitionDimensionWorkflow,
