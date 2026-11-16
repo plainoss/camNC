@@ -109,8 +109,9 @@ import { idleDrawingGesture, type DrawingGesture } from '@wbcnc/cad-editor/drawi
 import { advanceCreationValue, creationValueAnchor, creationValueAt, type CreationValues } from './creationValues';
 import { CreationValueControls } from './CreationValueControls';
 import { SketchConicRhoForm, SketchDimensionEditor, SketchPolygonForm, SketchShapeSizeForm } from './SketchValueForms';
-import { SketchLinearPatternManipulator } from './SketchLinearPatternControls';
+import { SketchLinearPatternGuides, SketchLinearPatternManipulator } from './SketchLinearPatternControls';
 import { openPatternField } from './openPatternField';
+import { startCircularPatternDrag } from './circularPatternDrag';
 import {
   initialLinearPatternParameters,
   linearPatternParameters,
@@ -2239,22 +2240,20 @@ export function CadEditor({
                     circularFields.current[field]?.focus();
                     circularFields.current[field]?.select();
                   }}
-                  onStart={(kind, event) => {
-                    const start = sketchPointAtClient(event, drawingGroup.current ?? svg.current);
-                    if (!start) return;
-                    startHandleDrag(event, {
-                      tool: 'circularPattern',
+                  onStart={(kind, event) =>
+                    startCircularPatternDrag(
                       kind,
-                      start,
-                      parameters: circularParameters,
-                      last: Math.atan2(start.y - parsedCircular.center.y, start.x - parsedCircular.center.x),
-                      sweep:
-                        ((parsedCircular.angle * Math.PI) / 180) *
-                        (parsedCircular.closed ? (parsedCircular.count - 1) / parsedCircular.count : 1),
-                    });
-                    svg.current?.focus();
-                  }}
+                      event,
+                      drawingGroup.current ?? svg.current,
+                      parsedCircular,
+                      circularParameters,
+                      startHandleDrag
+                    )
+                  }
                 />
+              )}
+              {sketch && tool !== 'linearPattern' && (
+                <SketchLinearPatternGuides sketch={sketch} pixelScale={markerScale} onEdit={editPattern} />
               )}
               {tool === 'linearPattern' && selected.length > 0 && parsedLinear.ok && (
                 <SketchLinearPatternManipulator
