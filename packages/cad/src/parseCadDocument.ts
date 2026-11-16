@@ -528,7 +528,11 @@ export function parseCadDocument(input: unknown): CadDocument {
           c.radiusSide !== 'far'
         )
           throw new Error('Invalid circular witness side');
-        if (c.type === 'circleCircleDistance' && ![c.radiusASign, c.radiusBSign, c.direction].every(value => value === 1 || value === -1))
+        if (
+          c.type === 'circleCircleDistance' &&
+          (![c.radiusASign, c.radiusBSign, c.direction].every(value => value === 1 || value === -1) ||
+            (c.angle !== undefined && !Number.isFinite(c.angle)))
+        )
           throw new Error('Invalid circular dimension direction');
         if ('expression' in c && c.expression !== undefined && (!('value' in c) || typeof c.expression !== 'string'))
           throw new Error('Invalid dimension expression');

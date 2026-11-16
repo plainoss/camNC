@@ -82,7 +82,8 @@ export function unitedPart(
       return high - low >= kMinStep ? [low, high] : null;
     }
     const sorted = [...covering].sort((a, b) => a[0] - b[0]);
-    let [low, high] = sorted[0]!;
+    const low = sorted[0]![0];
+    let high = sorted[0]![1];
     for (const [l, h] of sorted.slice(1)) {
       if (l > high + kSame) return 'gap';
       high = Math.max(high, h);

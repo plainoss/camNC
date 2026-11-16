@@ -14,6 +14,7 @@ import {
   isJoinedBody,
   consumedTools,
   physicalJoinedCopies,
+  missingRegionProblem,
   type CadDocument,
   type CadPart,
   type CadPlacement,
@@ -68,7 +69,8 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
   // Bodies joined to a part by Extrude → Add are built as it is; a tool used up by a cut is only the cut it made.
   const consumed = consumedTools(document);
   const built = document.parts
-    .filter(part => isCadBody(document, part) && !consumed.has(part.id))
+    // An extrude with no regions picked, as when its sketch was emptied, is a failed feature that makes nothing.
+    .filter(part => isCadBody(document, part) && !consumed.has(part.id) && !missingRegionProblem(part))
     .map((part): Built => {
       try {
         const profile = geometry.parts ? undefined : evaluateCadPart(part).part;

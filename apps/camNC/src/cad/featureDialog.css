@@ -109,6 +109,10 @@
 .cad-feature-selection small {
   color: #50739b;
 }
+/** Faces picked apart, one entry a line. */
+.cad-feature-selection-entries > span {
+  display: block;
+}
 .cad-editor .cad-feature-selection button {
   min-height: 0;
   justify-self: start;

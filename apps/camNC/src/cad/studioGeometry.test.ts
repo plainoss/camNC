@@ -73,7 +73,8 @@ it.each(['suppressed', 'removed'] as const)('never resurrects an unavailable par
   const bytes = JSON.stringify(source),
     model = assemblyModel(source),
     geometry = studioGeometry(source);
-  expect(model.instances).toHaveLength(2);
+  // The parent alone: its Add is fused into it as one solid, and no copy of either comes back.
+  expect(model.instances).toHaveLength(1);
   expect(model.instances.every(instance => instance.copyId === undefined)).toBe(true);
   expect(geometry.document.parts.find(part => part.id === f.childId)!.copies ?? []).toEqual([]);
   expect(physicalFaceFrame(source, { partId: f.childId, copyId: f.copyId, face: 'top' })).toHaveProperty('error');

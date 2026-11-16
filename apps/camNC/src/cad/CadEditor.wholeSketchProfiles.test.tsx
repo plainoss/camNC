@@ -26,7 +26,7 @@ async function studio() {
   const features = screen.getByRole('region', { name: 'Features' });
   await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude 2/ }));
   const dialog = await screen.findByRole('dialog', { name: 'Extrude 2' });
-  expect(within(dialog).getByText('2 faces of Sketch 2')).toBeDefined();
+  expect(within(dialog).getAllByText('Face of Sketch 2')).toHaveLength(2);
   const pick = within(dialog).getByRole('button', { name: 'Select profile' });
   if (pick.getAttribute('aria-pressed') !== 'true') await userEvent.click(pick);
   return { source, features, dialog, latest: () => change.mock.calls.at(-1)?.[0] ?? source };

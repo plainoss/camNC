@@ -11,7 +11,11 @@ export async function modelPointOnScreen(page, point) {
   await canvas.waitFor({ timeout: 30_000 });
   return canvas.evaluate(async (element, [x, y, z]) => {
     // The page's own copy of the 3D library, so its root for this canvas is the one the view draws with.
-    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => /@react-three_fiber\.js|@react-three\/fiber/.test(name)).at(-1);
+    const moduleUrl = performance
+      .getEntriesByType('resource')
+      .map(entry => entry.name)
+      .filter(name => /@react-three_fiber\.js|@react-three\/fiber/.test(name))
+      .at(-1);
     if (!moduleUrl) throw new Error('Viewport picks require the development server');
     const { _roots } = await import(moduleUrl);
     const root = _roots.get(element);
@@ -28,7 +32,8 @@ export async function modelPointOnScreen(page, point) {
 /** `x,y,z` in model millimetres, as a scenario writes a viewport pick. */
 export function parseModelPoint(text) {
   const values = text.split(',').map(value => (value.trim() ? Number(value) : NaN));
-  if (values.length !== 3 || values.some(value => !Number.isFinite(value))) throw new Error(`viewpick takes a model point x,y,z in mm: ${text}`);
+  if (values.length !== 3 || values.some(value => !Number.isFinite(value)))
+    throw new Error(`viewpick takes a model point x,y,z in mm: ${text}`);
   return values;
 }
 
@@ -71,8 +76,13 @@ export async function extrudeRegions(page) {
   if (!(await select.count())) return { box: null, selection: null, regions: null, picking: null };
   const row = select.locator('..');
   const box = (await row.locator('small').first().textContent())?.trim() ?? null;
-  const selection = (await row.locator('span').first().textContent())?.trim() ?? null;
-  return { box, selection, regions: regionCount(selection), picking: (await select.getAttribute('aria-pressed')) === 'true' };
+  const shown = row.locator('span').first();
+  // Faces picked apart are listed an entry a line: the selection is their lines, and each counts.
+  const entries = await shown.locator(':scope > span').allTextContents();
+  const lines = entries.length ? entries.map(entry => entry.trim()) : [(await shown.textContent())?.trim() ?? ''];
+  const counts = lines.map(regionCount);
+  const regions = counts.every(count => count !== null) ? counts.reduce((sum, count) => sum + count, 0) : null;
+  return { box, selection: lines.join('\n') || null, regions, picking: (await select.getAttribute('aria-pressed')) === 'true' };
 }
 
 /** Saves the download a visible button starts to `file`, making its folder. */
@@ -128,7 +138,13 @@ export function angleBetween(a, b) {
 
 /** The named view a view direction matches within `degrees`, or null. */
 export function namedView(direction, degrees = 1) {
-  const match = Object.entries(NAMED_VIEW_FROM).find(([, from]) => angleBetween(from.map(value => -value), direction) <= degrees);
+  const match = Object.entries(NAMED_VIEW_FROM).find(
+    ([, from]) =>
+      angleBetween(
+        from.map(value => -value),
+        direction
+      ) <= degrees
+  );
   return match?.[0] ?? null;
 }
 
@@ -137,7 +153,11 @@ export async function studioCamera(page) {
   const canvas = page.getByTestId('workspace-3d').locator('canvas').first();
   if (!(await canvas.isVisible())) return null;
   const direction = await canvas.evaluate(async element => {
-    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => /@react-three_fiber\.js|@react-three\/fiber/.test(name)).at(-1);
+    const moduleUrl = performance
+      .getEntriesByType('resource')
+      .map(entry => entry.name)
+      .filter(name => /@react-three_fiber\.js|@react-three\/fiber/.test(name))
+      .at(-1);
     const root = moduleUrl && (await import(moduleUrl))._roots.get(element);
     if (!root) return null;
     const { camera } = root.store.getState();
@@ -166,13 +186,24 @@ export async function studioPlanes(page) {
         return [...names];
       })
     : [];
-  const rows = await page.getByRole('list', { name: 'Default geometry', exact: true }).getByRole('listitem').evaluateAll(items => items.map(item => ({
-    // The name is the row's own span without children, not the icon beside it.
-    name: [...item.querySelectorAll('span:not([aria-hidden])')].filter(span => !span.children.length).map(span => span.textContent?.trim()).find(Boolean) ?? null,
-    eye: item.querySelector('button[aria-label="Show"], button[aria-label="Hide"]')?.getAttribute('aria-label') ?? null,
-  })));
-  return Object.fromEntries(['Origin', 'Top', 'Front', 'Right'].map(name => {
-    const row = rows.find(candidate => candidate.name === name);
-    return [name, { view: drawn.includes(name), list: !row ? null : row.eye === 'Show' ? 'hidden' : 'shown' }];
-  }));
+  const rows = await page
+    .getByRole('list', { name: 'Default geometry', exact: true })
+    .getByRole('listitem')
+    .evaluateAll(items =>
+      items.map(item => ({
+        // The name is the row's own span without children, not the icon beside it.
+        name:
+          [...item.querySelectorAll('span:not([aria-hidden])')]
+            .filter(span => !span.children.length)
+            .map(span => span.textContent?.trim())
+            .find(Boolean) ?? null,
+        eye: item.querySelector('button[aria-label="Show"], button[aria-label="Hide"]')?.getAttribute('aria-label') ?? null,
+      }))
+    );
+  return Object.fromEntries(
+    ['Origin', 'Top', 'Front', 'Right'].map(name => {
+      const row = rows.find(candidate => candidate.name === name);
+      return [name, { view: drawn.includes(name), list: !row ? null : row.eye === 'Show' ? 'hidden' : 'shown' }];
+    })
+  );
 }

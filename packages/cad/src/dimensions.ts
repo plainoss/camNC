@@ -147,8 +147,9 @@ export function dimensionWitnessPoints(sketch: CadSketch, dimension: CadDimensio
       cb = points.get(b.centerId);
     if (!ca || !cb) return null;
     const distance = Math.hypot(cb.x - ca.x, cb.y - ca.y);
-    const ux = distance > CAD_GEOMETRY_TOLERANCE ? (cb.x - ca.x) / distance : 1,
-      uy = distance > CAD_GEOMETRY_TOLERANCE ? (cb.y - ca.y) / distance : 0;
+    const angle = dimension.angle ?? 0;
+    const ux = distance > CAD_GEOMETRY_TOLERANCE ? (cb.x - ca.x) / distance : Math.cos(angle),
+      uy = distance > CAD_GEOMETRY_TOLERANCE ? (cb.y - ca.y) / distance : Math.sin(angle);
     return [
       { x: ca.x - dimension.radiusASign * ux * a.radius, y: ca.y - dimension.radiusASign * uy * a.radius },
       { x: cb.x + dimension.radiusBSign * ux * b.radius, y: cb.y + dimension.radiusBSign * uy * b.radius },
@@ -347,11 +348,15 @@ export function dimensionForSelection(sketch: CadSketch, ids: readonly string[],
     const a = points.get(first.centerId),
       b = points.get(second.centerId);
     if (!a || !b) return { message: 'A selected circular curve has a missing center.' };
-    const distance = Math.hypot(b.x - a.x, b.y - a.y),
-      ux = distance > CAD_GEOMETRY_TOLERANCE ? (b.x - a.x) / distance : 1,
-      uy = distance > CAD_GEOMETRY_TOLERANCE ? (b.y - a.y) / distance : 0;
     const pickA = options.picks?.[first.id],
       pickB = options.picks?.[second.id];
+    const distance = Math.hypot(b.x - a.x, b.y - a.y);
+    // Circles with one centre are measured along the common radius toward the pointer, or where they were picked.
+    const toward = distance > CAD_GEOMETRY_TOLERANCE ? null : (options.placement ?? pickA ?? pickB);
+    const angle =
+      toward && Math.hypot(toward.x - a.x, toward.y - a.y) > CAD_GEOMETRY_TOLERANCE ? Math.atan2(toward.y - a.y, toward.x - a.x) : 0;
+    const ux = distance > CAD_GEOMETRY_TOLERANCE ? (b.x - a.x) / distance : Math.cos(angle),
+      uy = distance > CAD_GEOMETRY_TOLERANCE ? (b.y - a.y) / distance : Math.sin(angle);
     const radiusASign = pickA && (pickA.x - a.x) * ux + (pickA.y - a.y) * uy <= 0 ? 1 : -1;
     const radiusBSign = pickB && (pickB.x - b.x) * ux + (pickB.y - b.y) * uy > 0 ? 1 : -1;
     const projected = distance + radiusASign * first.radius + radiusBSign * second.radius;
@@ -364,6 +369,7 @@ export function dimensionForSelection(sketch: CadSketch, ids: readonly string[],
       direction: projected < 0 ? -1 : 1,
       value: Math.abs(projected),
       label: 'Distance',
+      ...(distance <= CAD_GEOMETRY_TOLERANCE && { angle }),
     });
   }
   if (circular && (mode === 'auto' || mode === 'distance')) {

@@ -235,6 +235,8 @@ export type CadConstraint =
       radiusASign: 1 | -1;
       radiusBSign: 1 | -1;
       direction: 1 | -1;
+      /** Between circles with one centre: the angle, in radians, of the common radius the dimension is drawn along. */
+      angle?: number;
     })
   | (DimensionBase & { type: 'pointLineDistance'; pointId: string; entityId: string; value: number })
   /** A normal distance between two infinite lines also requires their parallelism. */

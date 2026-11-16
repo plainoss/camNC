@@ -74,8 +74,11 @@ function brokenFeatures(result: CadSolveResult, issues: CadSolveResult['diagnost
   // A part's profile sketch comes first; its face sketches are its features' own.
   const profiles = result.sketches.filter((s, i, all) => all.findIndex(other => other.partId === s.partId) === i);
   const unbuilt = new Set(unbuiltParts(result, issues));
+  // A part unbuilt only for want of regions to extrude, as when its sketch was emptied, isn't its sketch's fault.
+  const unpicked = new Set(issues.flatMap(d => (d.partId && d.code === 'region-missing' ? [d.partId] : [])));
   for (const sketch of profiles)
-    if (unbuilt.has(sketch.partId) && sketch.dof > 0) broken[`${sketch.partId}:sketch`] = 'is not fully defined';
+    if (unbuilt.has(sketch.partId) && !unpicked.has(sketch.partId) && sketch.dof > 0)
+      broken[`${sketch.partId}:sketch`] = 'is not fully defined';
   return broken;
 }
 

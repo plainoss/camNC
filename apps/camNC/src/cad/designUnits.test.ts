@@ -13,6 +13,7 @@ describe('a length as a field shows it', () => {
     [304.8, 'ft', '1'],
     [18, 'mm', '18'],
     [17.123456789, 'mm', '17.123456789'],
+    [5.000000000000001, 'mm', '5'],
   ] as const)('shows %s mm in %s as %s', (value, unit, text) => {
     expect(shownLengthText(lengthText(value, unit), unit)).toBe(text);
   });

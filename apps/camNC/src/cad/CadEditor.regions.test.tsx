@@ -43,7 +43,7 @@ it('extrudes a sketch of overlapping shapes, all its regions picked, into one pa
   await userEvent.keyboard('{Shift>}E{/Shift}');
   const dialog = await screen.findByRole('dialog', { name: /^Extrude/ });
   expect(within(dialog).queryByRole('alert')).toBeNull();
-  expect(within(dialog).getByText(/3 faces/)).toBeDefined();
+  expect(within(dialog).getAllByText(/^Face of /)).toHaveLength(3);
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest().parts.filter(isCadPart)).toHaveLength(2));
   expect(screen.queryByText('Finish is blocked')).toBeNull();
