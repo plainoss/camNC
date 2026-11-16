@@ -123,7 +123,6 @@ export function CamQueueCard() {
   const midBoard = !!current && !current.firstOfBoard;
   useEffect(() => setMidBoard(midBoard), [midBoard, setMidBoard]);
   const gcode = current ? gcodeOf(current) : undefined;
-  const shownDeg = current ? entryRotation(current) : 0;
   const busy = useMachineBusy();
   const setupLocked = useMachineSetupLocked();
   const loadedGcode = useStore(s => s.toolpath?.gcode);
@@ -142,7 +141,7 @@ export function CamQueueCard() {
     if (current.key !== active && current.kind !== 'pending') setActive(current.key);
     show(current, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, active, current?.key, current?.plan, current?.blocked, gcode, shownDeg, loading, setupLocked, parts, setupKey]);
+  }, [jobId, active, current?.key, current?.plan, current?.blocked, gcode, loading, setupLocked, parts, setupKey]);
   if (!jobId) return null;
   const next = async () => {
     if (!current || busy || reviewing || recoveryPending.value || (runReview && runReview !== 'finished')) return;

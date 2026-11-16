@@ -40,7 +40,7 @@ export interface WorkerSettings {
   thresholdOffset?: number;
 }
 
-/** The steps of the depth pipeline. They hold GPU pipelines, so they live as long as the device. */
+/** The steps of the depth pipeline. They hold GPU pipelines, so they are built once with the device; an inflation step is built again when its margin changes. */
 interface DepthSteps {
   undistort: UndistortStep;
   camToMachine: CamToMachineStep;

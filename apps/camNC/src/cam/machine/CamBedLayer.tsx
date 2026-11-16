@@ -295,8 +295,8 @@ export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverla
       },
       end: () => {
         setTurning(null);
-        if (to !== from) bed.rotate(to, useStore.getState().toolpathOffset);
-        else show(from);
+        // Not turned after all, or the job refused the turn: back as it lay.
+        if (to === from || !bed.rotate(to, useStore.getState().toolpathOffset)) show(from);
       },
     });
   };

@@ -20,8 +20,9 @@ export interface TypedValueKind {
   /** Why a value that was worked out isn't allowed, if it isn't. */
   check?: (value: number) => string | null;
   /**
-   * Keeps its last good value without a problem of its own. A move, a turn, a removal, a hole, a fillet and a plane say
-   * nothing; a Cut parts step says it on the parts it joins (`partCutVariableErrors`).
+   * Keeps its last good value without a problem of its own. A part's own move and turn, a removal, a hole, a fillet and
+   * a plane say nothing; a Cut parts step says it on the parts it joins (`partCutVariableErrors`). A copy's ordered
+   * move and turn are not quiet: they say their own.
    */
   quiet?: true;
   /** A driven dimension shows what it measures, so its expression is kept and never worked out. */

@@ -79,11 +79,11 @@ export function useMachineQueue() {
   const save = useSaveCamJob(job);
   const done = doneEntries(queue, doneHere);
   const patchBoards = (patches: Record<string, Partial<BoardV1>>, expectedSheets?: Readonly<Record<string, string>>) => {
-    if (!job) return;
+    if (!job) return false;
     const expected =
       expectedSheets ??
       Object.fromEntries((model.data ? plain.map(b => b.board) : (job.boards ?? [])).map(board => [board.id, physicalSheetIdOf(board)]));
-    save.mutateCurrent(current => {
+    return save.mutateCurrent(current => {
       if (modelKey(current) !== modelKey(job)) return null;
       // A ready model can introduce stock without visiting Boards. Persist its layout
       // with the first machine action, rebased over any action since this render.
@@ -110,10 +110,11 @@ export function useMachineQueue() {
     stale: new Set(boards.filter((_, i) => plans[i].isPlaceholderData).map(b => b.board.id)),
     snapshot,
     designChanged: !!snapshot && !!job && snapshot.sourceKey !== modelKey(job),
-    /** A change to a board (holds, its spot on the bed): saved to the job; holds plan it again. */
-    updateBoard: (boardId: string, patch: Partial<BoardV1>) => {
-      if (!protectedRun) patchBoards({ [boardId]: patch });
-    },
+    /**
+     * A change to a board (holds, its spot on the bed): saved to the job; holds plan it again. False when the job
+     * didn't take it: a run is protected, or the model or the sheet changed since this render.
+     */
+    updateBoard: (boardId: string, patch: Partial<BoardV1>) => !protectedRun && patchBoards({ [boardId]: patch }),
     /** Several boards changed at once (what's cut). */
     patchBoards,
     /** The job's parts, as nested on the boards. */

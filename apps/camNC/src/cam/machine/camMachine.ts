@@ -62,7 +62,7 @@ const forgivingLocalStorage: StateStorage = {
   removeItem: name => demoStorage.removeItem(name),
 };
 
-/** The CAM job being cut at the machine: which program is loaded, what's done, how each board lies on the bed. */
+/** The CAM job being cut at the machine: which program is loaded and what's done. How each board lies on the bed is kept with the job (`board.bed`). */
 export const useCamMachine = create(
   persist(
     combine(

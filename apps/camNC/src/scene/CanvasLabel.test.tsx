@@ -21,7 +21,7 @@ describe('world-anchored canvas labels', () => {
         locked: null,
         check: () => 'free',
         drop: () => 'exact',
-        rotate: () => {},
+        rotate: () => true,
         openInCam,
       },
       selected: { kind: 'part', id: 'socket' },

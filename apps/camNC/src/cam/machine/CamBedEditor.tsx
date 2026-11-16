@@ -56,18 +56,20 @@ function Editor() {
   const navigate = useNavigate();
   const board = current?.board.board;
 
+  /** False when the job didn't take the edit. */
   const save = (edit: BedEdit, silent = false) => {
-    if (useCamMachine.getState().preparingRun || busy) return;
-    if (!current || current.board.board.id !== edit.boardId) return;
+    if (useCamMachine.getState().preparingRun || busy) return false;
+    if (!current || current.board.board.id !== edit.boardId) return false;
     const b = current.board.board;
     // A real sheet at the machine: a hold edited there leaves the board's size and the other parts as they are.
     if (edit.patch.fixtures) edit = { ...edit, patch: { ...freezeAtMachine(b, current.board.nest), ...edit.patch } };
     const before = Object.fromEntries(Object.keys(edit.patch).map(k => [k, b[k as keyof BoardV1]])) as Partial<BoardV1>;
-    updateBoard(edit.boardId, edit.patch);
-    if (silent) return;
+    if (!updateBoard(edit.boardId, edit.patch)) return false;
+    if (silent) return true;
     // Said next to what changed (`CamBedLayer`), not in a corner; Undo is beside the board and on ⌘Z.
     undo.current = [...undo.current.slice(-19), { boardId: edit.boardId, what: edit.what, before }];
     setUndoCount(undo.current.length);
+    return true;
   };
   const undoLast = () => {
     // A board cut since, or being cut: its parts and holds stay as they are.
@@ -156,15 +158,17 @@ function Editor() {
         return edit.exact ? 'exact' : 'moved';
       },
       // Turned (the knob, the panel): about its middle, so its XY zero moves too. Kept with the job, so the board lies
-      // that way on the next visit too.
+      // that way on the next visit too. The job plans the board by its angle, so a turn it refuses (the model or the
+      // sheet changed) doesn't move the zero either: the outline never shows an angle the program wasn't planned at.
       rotate: (d, at) => {
         const { board: b, side: sd, deg: from } = ctx.current;
         const o = useCamMachine.getState().overlay;
-        if (!b) return;
+        if (!b) return false;
         const s = useStore.getState();
         const to = at ?? (o ? turnAboutMiddle(s.toolpathOffset, o, from, d) : s.toolpathOffset);
+        if (!saveRef.current(turnBoard(b, sd, d, to), true)) return false;
         s.setToolpathOffset(new Vector3(to.x, to.y, s.toolpathOffset.z));
-        saveRef.current(turnBoard(b, sd, d, to), true);
+        return true;
       },
       openInCam: where => {
         const id = ctx.current.board?.id;
