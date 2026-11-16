@@ -46,19 +46,20 @@ function choose(canvas: SVGSVGElement) {
   fireEvent.keyDown(input, { key: 'Enter' });
 }
 const value = (name: string, text: string) => fireEvent.change(screen.getByLabelText(name), { target: { value: text } });
+// The pattern is edited in place and made by Enter in the drawing, as the sketch's status says.
+const apply = (canvas: SVGSVGElement) => fireEvent.keyDown(canvas, { key: 'Enter' });
 it('previews a two-direction pattern, validates counts and commits all instances as one undoable edit', async () => {
   const { canvas, latest } = await setup(true);
   choose(canvas);
-  expect(screen.getByRole('button', { name: /Finish sketch/ })).toBeDisabled();
-  value('Instances 1', '1');
-  expect(screen.getByRole('button', { name: 'Apply pattern' })).toBeDisabled();
+  // Confirming the sketch makes the pattern as it's set up, so it doesn't hold the sketch open.
+  expect(screen.getByRole('button', { name: /Finish sketch/ })).not.toBeDisabled();
   value('Instances 1', '3');
   value('Spacing 1', '25');
-  fireEvent.click(screen.getByLabelText('Second direction'));
+  // Two instances in the second direction turn it on.
   value('Instances 2', '2');
   value('Spacing 2', '25');
   expect(latest().entities.filter(e => e.type === 'circle')).toHaveLength(1);
-  fireEvent.click(screen.getByRole('button', { name: 'Apply pattern' }));
+  apply(canvas);
   await checked();
   await waitFor(() => expect(latest().entities.filter(e => e.type === 'circle')).toHaveLength(6));
   expect(latest().constraints.filter(c => c.type === 'linearPattern')).toHaveLength(1);
@@ -79,10 +80,17 @@ it('supports armed selection, cancellation, direction dragging and count-label e
   fireEvent.pointerDown(handle, { pointerId: 2, button: 0, clientX: b.x + b.width / 2, clientY: b.y + b.height / 2 });
   fireEvent.pointerMove(canvas, { pointerId: 2, clientX: b.x + b.width / 2, clientY: b.y + b.height / 2 - 40 * unit });
   fireEvent.pointerUp(canvas, { pointerId: 2 });
-  expect(Number((screen.getByLabelText('Direction angle 1') as HTMLInputElement).value)).toBeCloseTo(45, 4);
+  // The handle at the first instance, 25 along, is dragged 40 up.
+  expect(Number((screen.getByLabelText('Direction angle 1') as HTMLInputElement).value)).toBeCloseTo(
+    (Math.atan2(40, 25) * 180) / Math.PI,
+    4
+  );
   fireEvent.doubleClick(screen.getByRole('button', { name: 'Edit instance count 1' }));
   expect(screen.getByLabelText('Instances 1')).toHaveFocus();
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel pattern' }));
+  expect(screen.getByLabelText('Instances 1').closest('label')!.dataset.open).toBe('');
+  fireEvent.keyDown(screen.getByLabelText('Instances 1'), { key: 'Escape' });
+  expect(screen.getByLabelText('Instances 1').closest('label')!.dataset.open).toBeUndefined();
+  fireEvent.keyDown(canvas, { key: 'Escape' });
   expect(latest().entities.filter(e => e.type === 'circle')).toHaveLength(1);
   expect(screen.getByRole('button', { name: /^Undo/ })).toBeDisabled();
 });
@@ -91,9 +99,9 @@ it('caps the preview without capping the committed pattern', async () => {
   choose(canvas);
   value('Instances 1', '12');
   value('Spacing 1', '20');
-  expect(screen.getByText('Showing up to 10 instances. Apply creates the full pattern.')).toBeVisible();
+  expect(screen.getByText('Showing up to 10 instances. The sketch gets the full pattern.')).toBeVisible();
   expect(canvas.querySelectorAll('[data-entity-id] circle:not([data-nurbs-handle])').length).toBeGreaterThan(1);
-  fireEvent.click(screen.getByRole('button', { name: 'Apply pattern' }));
+  apply(canvas);
   await checked();
   await waitFor(() => expect(latest().entities.filter(e => e.type === 'circle')).toHaveLength(12));
 });
@@ -101,7 +109,7 @@ it('edits a persisted pattern from its icon without adding history for an unchan
   const { canvas, latest } = await setup(true);
   choose(canvas);
   value('Spacing 1', '25');
-  fireEvent.click(screen.getByRole('button', { name: 'Apply pattern' }));
+  apply(canvas);
   await checked();
   const group = latest().constraints.find(c => c.type === 'linearPattern')!;
   const icon = canvas.querySelector(`[data-constraint-id="${group.id}"]`)!;
@@ -137,12 +145,33 @@ it('persists an individually deleted instance through contextual edits, shrinkin
   fireEvent.pointerUp(fixture.canvas, { button: 2, pointerId: 4, clientX: 500, clientY: 300 });
   fireEvent.click(screen.getByRole('menuitem', { name: 'Edit pattern' }));
   value('Instances 1', '2');
-  fireEvent.click(screen.getByRole('button', { name: 'Apply pattern' }));
+  apply(fixture.canvas);
   await checked();
   fireEvent.doubleClick(glyph());
   value('Instances 1', '4');
-  fireEvent.click(screen.getByRole('button', { name: 'Apply pattern' }));
+  apply(fixture.canvas);
   await checked();
   expect(fixture.latest().entities.filter(e => e.type === 'circle')).toHaveLength(3);
   expect(fixture.latest().entities.some(e => e.id === deletedId)).toBe(false);
+});
+
+it('refuses to make, or finish with, a pattern whose values can’t be used, and Escape puts a value back', async () => {
+  const { canvas, latest } = await setup(true);
+  choose(canvas);
+  value('Instances 1', 'abc');
+  apply(canvas);
+  await checked();
+  expect(screen.getByRole('alert')).toBeDefined();
+  expect(latest().entities.filter(e => e.type === 'circle')).toHaveLength(1);
+  // Finishing doesn't drop it: the sketch stays open, saying why.
+  fireEvent.click(screen.getByRole('button', { name: /Finish sketch/ }));
+  await checked();
+  expect(screen.getByRole('form', { name: 'Linear pattern' })).toBeDefined();
+  expect(latest().constraints.filter(c => c.type === 'linearPattern')).toHaveLength(0);
+  // A value box's Escape puts back what it held when it opened.
+  value('Instances 1', '3');
+  fireEvent.doubleClick(screen.getByRole('button', { name: 'Edit instance count 1' }));
+  value('Instances 1', '5');
+  fireEvent.keyDown(screen.getByLabelText('Instances 1'), { key: 'Escape' });
+  expect(screen.getByLabelText('Instances 1')).toHaveValue('3');
 });

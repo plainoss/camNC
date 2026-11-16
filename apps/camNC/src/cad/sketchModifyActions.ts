@@ -22,7 +22,8 @@ import { replacePart } from './editorHelpers';
 import type { SketchEditorInput } from './sketchEditorInput';
 
 // Accepting sketch patterns, fillets, chamfers and offsets, constraining, and deleting, split out of CadEditor. They read the editor through SketchEditorInput.
-export function acceptSketchLinearPattern(editor: SketchEditorInput) {
+/** Makes the pattern being set up, or says why it can't be made: a finish waits on that reason. */
+export function acceptSketchLinearPattern(editor: SketchEditorInput): string | null {
   const {
     acceptCircularPattern,
     changeSketch,
@@ -38,8 +39,15 @@ export function acceptSketchLinearPattern(editor: SketchEditorInput) {
     sketch,
     tool,
   } = editor;
-  if (tool === 'circularPattern') return acceptCircularPattern();
-  if (!sketch || !parsedLinear.ok) return setMessage(parsedLinear.ok ? 'Select source geometry.' : parsedLinear.message);
+  if (tool === 'circularPattern') {
+    acceptCircularPattern();
+    return null;
+  }
+  const refused = (message: string) => {
+    setMessage(message);
+    return message;
+  };
+  if (!sketch || !parsedLinear.ok) return refused(parsedLinear.ok ? 'Select source geometry.' : parsedLinear.message);
   const existing = patternEditId && sketch.constraints.find(c => c.id === patternEditId);
   const same =
     existing &&
@@ -54,14 +62,14 @@ export function acceptSketchLinearPattern(editor: SketchEditorInput) {
     chooseTool('select');
     setSelected([]);
     setSelectedConstraints([id]);
-    return;
+    return null;
   }
   const result = linearPatternSketchEntities(sketch, {
     ...parsedLinear,
     entityIds: selected,
     patternId: patternEditId ?? patternCommandId.current,
   });
-  if (!result.ok) return setMessage(result.message);
+  if (!result.ok) return refused(result.message);
   changeSketch(result.sketch);
   chooseTool('select');
   setSelected([]);
@@ -69,6 +77,7 @@ export function acceptSketchLinearPattern(editor: SketchEditorInput) {
   if (result.releasedConstraintIds.length)
     setPatternNotice(`${result.releasedConstraintIds.length} relations on removed instances were released.`);
   setMessage('Linear pattern applied. Double-click its pattern icon or use Edit pattern to change it.');
+  return null;
 }
 
 export function acceptSketchCircularPattern(editor: SketchEditorInput) {

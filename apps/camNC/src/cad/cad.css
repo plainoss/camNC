@@ -970,6 +970,32 @@
 .cad-pattern-editor {
   max-width: calc(100% - 30px);
 }
+/** A sketch linear pattern's values open one at a time, in a small box under the chip or dimension double-clicked. */
+.cad-pattern-inline .cad-pattern-field {
+  display: none;
+}
+.cad-pattern-inline .cad-pattern-field[data-open] {
+  position: fixed;
+  z-index: 20;
+  display: block;
+  width: 7rem;
+  padding: 3px;
+  background: #fff;
+  border: 1px solid #9cc0e8;
+  border-radius: 3px;
+  box-shadow: 0 3px 12px #24324722;
+}
+.cad-pattern-inline > [role='alert'],
+.cad-pattern-inline > [role='status'] {
+  position: absolute;
+  z-index: 3;
+  left: 15px;
+  bottom: 43px;
+  padding: 4px 8px;
+  background: #fff;
+  border: 1px solid #c9d7e8;
+  border-radius: 5px;
+}
 .cad-pattern-editor fieldset {
   display: flex;
   flex-wrap: wrap;

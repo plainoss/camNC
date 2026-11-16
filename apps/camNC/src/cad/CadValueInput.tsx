@@ -59,6 +59,9 @@ export function CadValueInput({
     given.current = { exact: value, shown: shownLengthText(value, lengthUnit) };
   const shownValue = typeof value === 'string' && value === given.current?.exact ? given.current.shown : value;
   const [draft, setDraft] = useState(() => String(defaultValue ?? ''));
+  // The field's last plain value, before a `#name` was typed over it: a new variable starts with it, as in the reference.
+  const plain = useRef(String(value ?? defaultValue ?? ''));
+  if (typeof value === 'string' && !value.includes('#')) plain.current = value;
   const [menu, setMenu] = useState<{ start: number; typed: string; at: number } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   // Text this field puts in itself, such as a picked `#name`, doesn't open the list again.
@@ -104,10 +107,13 @@ export function CadValueInput({
     const text = input.value,
       end = menu.start + 1 + menu.typed.length;
     // A new variable is typed in place, `#name = value`, and made on Enter.
-    const insert = option.name ? `#${option.name}` : `#${menu.typed || 'name'} = `;
+    const start = option.name || plain.current.includes('#') ? '' : plain.current.trim();
+    const insert = option.name ? `#${option.name}` : `#${menu.typed || 'name'} = ${start}`;
     quiet.current = true;
     typeInto(input, text.slice(0, menu.start) + insert + text.slice(end), menu.start + insert.length);
     if (!option.name && !menu.typed) input.setSelectionRange(menu.start + 1, menu.start + 5);
+    // Its value, taken from the field, is selected to type over; Enter makes the variable with it.
+    else if (!option.name && start) input.setSelectionRange(menu.start + insert.length - start.length, menu.start + insert.length);
     setMenu(null);
   };
   /** Makes the variable a field's `#name = value` names, and leaves `#name` in the field. */
@@ -141,6 +147,7 @@ export function CadValueInput({
         aria-expanded={fields ? !!menu : undefined}
         onChange={event => {
           typed.current = event.currentTarget.value;
+          if (!event.currentTarget.value.includes('#')) plain.current = event.currentTarget.value;
           setDraft(event.currentTarget.value);
           setProblem(null);
           if (quiet.current) {

@@ -110,6 +110,7 @@ import { advanceCreationValue, creationValueAnchor, creationValueAt, type Creati
 import { CreationValueControls } from './CreationValueControls';
 import { SketchConicRhoForm, SketchDimensionEditor, SketchPolygonForm, SketchShapeSizeForm } from './SketchValueForms';
 import { SketchLinearPatternManipulator } from './SketchLinearPatternControls';
+import { openPatternField } from './openPatternField';
 import {
   initialLinearPatternParameters,
   linearPatternParameters,
@@ -1199,6 +1200,7 @@ export function CadEditor({
     acceptOffset() ||
     applyDimensionValue() ||
     applyConicRho() ||
+    (tool === 'linearPattern' && selected.length ? acceptLinearPattern() : null) ||
     (creationValues?.editing ? applyCreationValue({ advance: false }) : null);
   const prepareDocument = (): CadDocument | null => {
     const blocked = (reason: string) => {
@@ -2256,16 +2258,14 @@ export function CadEditor({
               {tool === 'linearPattern' && selected.length > 0 && parsedLinear.ok && (
                 <SketchLinearPatternManipulator
                   anchor={patternAnchor}
-                  steps={linearParameters.secondDirection ? [parsedLinear.stepX, parsedLinear.stepY] : [parsedLinear.stepX]}
-                  counts={[parsedLinear.countX, parsedLinear.countY]}
+                  steps={[parsedLinear.stepX, parsedLinear.stepY]}
+                  counts={[parsedLinear.countX, linearParameters.secondDirection ? parsedLinear.countY : 1]}
+                  bound={[!!parsedLinear.expressions?.countX, !!parsedLinear.expressions?.countY]}
                   pixelScale={markerScale}
                   onStart={(index, event) =>
                     startHandleDrag(event, { tool: 'linearPattern', index, anchor: patternAnchor, parameters: linearParameters })
                   }
-                  onEdit={field => {
-                    patternFields.current[field]?.focus();
-                    patternFields.current[field]?.select();
-                  }}
+                  onEdit={(field, chip) => openPatternField(patternFields.current[field], chip)}
                 />
               )}
               {tool === 'transform' && selected.length > 0 && parsedTransform.ok && (

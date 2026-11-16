@@ -16,19 +16,22 @@ export const ALLOWED = {
   // A context menu is two selects: `featuremenu` (the right-click) and `menuitem` (the choice).
   // Double-clicking a row (`feature`) or a dimension label (`editdim`) selects it, and so does a dialog's choice list.
   select: {
-    steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'partmenu', 'menuitem', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click'],
+    // `key Enter` takes the highlighted choice of a field's list, such as New variable.
+    steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'partmenu', 'menuitem', 'patterncount', 'patternspacing', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click', 'key Enter'],
   },
   command: { steps: ['studiotool', 'key', 'tool'] },
   draw: { steps: ['rect', 'circle', 'line', 'arc'] },
-  field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'field'], then: ['key Enter'] },
+  // A value typed into a box a chip or dimension opened: double-click it, type, and Enter.
+  field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'field', 'type', 'patterncount', 'patternspacing'], then: ['type', 'key Enter'] },
   confirm: { steps: ['dialogconfirm', 'closesketch', 'key Enter'] },
   cancel: { steps: ['dialogcancel', 'key Escape'] },
   // Zooming the drawing to show what's drawn next, and reopening the page, are what a person does to look.
-  view: { steps: ['view', 'fitview', 'reload', ...VIEW_KEYS.map(key => `key ${key}`)] },
+  view: { steps: ['view', 'reload', ...VIEW_KEYS.map(key => `key ${key}`)] },
 };
 
 /** Steps that look or record without being an input a person makes. */
-const FREE = new Set(['frame', 'shot', 'checkpoint', 'exportstep', 'savedesign', 'state', 'labelclear']);
+// Zooming the drawing to show what's drawn next is looking, not an input of the spec's.
+const FREE = new Set(['frame', 'shot', 'checkpoint', 'exportstep', 'savedesign', 'state', 'labelclear', 'fitview']);
 
 const verbOf = step => step.trim().split(/\s+/, 1)[0];
 const matches = (step, allowed) => allowed.some(entry => (entry.includes(' ') ? step.trim() === entry : verbOf(step) === entry));
@@ -61,7 +64,12 @@ export function lintScenario(scenario) {
   for (const { n, kind, inputs } of groups) {
     const { steps, then = [] } = ALLOWED[kind];
     const [first, ...rest] = inputs;
-    const extra = rest.filter((step, index) => !(index === 0 && matches(step, then)));
+    // What may follow comes in order, each at most once: a field's value typed, then Enter.
+    let next = 0;
+    const extra = rest.filter(step => {
+      while (next < then.length && !matches(step, [then[next]])) next++;
+      return next++ >= then.length;
+    });
     if (!first) findings.push({ spec: `${n} ${kind}`, problem: 'no input', allowed: steps });
     else if (!matches(first, steps) || extra.length)
       findings.push({ spec: `${n} ${kind}`, problem: !matches(first, steps) ? 'input not allowed for this kind' : `${extra.length} extra input${extra.length > 1 ? 's' : ''}`, allowed: steps, inputs });
