@@ -54,9 +54,17 @@ export function SketchLinearPatternControls({
       onKeyDown={e => {
         if (e.key === 'Escape') {
           e.preventDefault();
-          if (e.target instanceof HTMLInputElement && e.target.closest('label')?.dataset.open !== undefined) {
-            closeField(e.target);
-            e.target.blur();
+          const input = e.target instanceof HTMLInputElement ? e.target : null;
+          const box = input?.closest('label');
+          if (input && box?.dataset.open !== undefined) {
+            const key = fields.find(([, label]) => label === input.getAttribute('aria-label'))?.[0];
+            if (key && box.dataset.before !== undefined) {
+              const next = { ...parameters, [key]: box.dataset.before };
+              if (key === 'countY') next.secondDirection = Number(box.dataset.before) !== 1;
+              onChange(next);
+            }
+            closeField(input);
+            input.blur();
           } else onCancel();
         }
       }}>

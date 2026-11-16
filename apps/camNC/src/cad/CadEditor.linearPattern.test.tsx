@@ -154,3 +154,24 @@ it('persists an individually deleted instance through contextual edits, shrinkin
   expect(fixture.latest().entities.filter(e => e.type === 'circle')).toHaveLength(3);
   expect(fixture.latest().entities.some(e => e.id === deletedId)).toBe(false);
 });
+
+it('refuses to make, or finish with, a pattern whose values can’t be used, and Escape puts a value back', async () => {
+  const { canvas, latest } = await setup(true);
+  choose(canvas);
+  value('Instances 1', 'abc');
+  apply(canvas);
+  await checked();
+  expect(screen.getByRole('alert')).toBeDefined();
+  expect(latest().entities.filter(e => e.type === 'circle')).toHaveLength(1);
+  // Finishing doesn't drop it: the sketch stays open, saying why.
+  fireEvent.click(screen.getByRole('button', { name: /Finish sketch/ }));
+  await checked();
+  expect(screen.getByRole('form', { name: 'Linear pattern' })).toBeDefined();
+  expect(latest().constraints.filter(c => c.type === 'linearPattern')).toHaveLength(0);
+  // A value box's Escape puts back what it held when it opened.
+  value('Instances 1', '3');
+  fireEvent.doubleClick(screen.getByRole('button', { name: 'Edit instance count 1' }));
+  value('Instances 1', '5');
+  fireEvent.keyDown(screen.getByLabelText('Instances 1'), { key: 'Escape' });
+  expect(screen.getByLabelText('Instances 1')).toHaveValue('3');
+});

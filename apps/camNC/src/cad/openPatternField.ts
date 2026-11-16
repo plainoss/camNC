@@ -4,6 +4,8 @@ export function openPatternField(input: HTMLInputElement | undefined, chip: Elem
   if (!input || !(box instanceof HTMLElement)) return;
   const at = chip.getBoundingClientRect();
   box.dataset.open = '';
+  // Escape puts back what it held when it opened.
+  box.dataset.before = input.value;
   box.style.left = `${at.left}px`;
   box.style.top = `${at.bottom + 4}px`;
   input.focus();

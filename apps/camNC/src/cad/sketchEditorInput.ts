@@ -43,7 +43,7 @@ import type { ConstraintCommandTool } from '@wbcnc/cad-editor/constraintCommands
 /** The CadEditor state and callbacks that the sketch pointer and tool handlers read. CadEditor builds it fresh on every call. */
 export type SketchEditorInput = {
   acceptCircularPattern: () => void;
-  acceptLinearPattern: () => void;
+  acceptLinearPattern: () => string | null;
   acceptOffset: () => string | null;
   acceptSlot: () => void;
   acceptTransform: () => void;

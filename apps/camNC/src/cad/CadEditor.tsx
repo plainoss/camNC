@@ -1200,7 +1200,7 @@ export function CadEditor({
     acceptOffset() ||
     applyDimensionValue() ||
     applyConicRho() ||
-    (tool === 'linearPattern' && selected.length ? (acceptLinearPattern(), null) : null) ||
+    (tool === 'linearPattern' && selected.length ? acceptLinearPattern() : null) ||
     (creationValues?.editing ? applyCreationValue({ advance: false }) : null);
   const prepareDocument = (): CadDocument | null => {
     const blocked = (reason: string) => {
