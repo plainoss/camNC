@@ -55,6 +55,9 @@ describe('no extra inputs per spec step', () => {
   it('allows Enter only after a field, and refuses a missing input', () => {
     expect(lintScenario(scenario([{ spec: '1 confirm' }, 'key Enter', 'key Enter'])).ok).toBe(false);
     expect(lintScenario(scenario([{ spec: '1 field' }, 'dialogfill Depth = 10', 'key Enter', 'key Enter'])).findings[0].problem).toBe('1 extra input');
+    // A chip's box: double-click it, type the value, and Enter, in that order.
+    expect(lintScenario(scenario([{ spec: '1 field' }, 'patterncount 1', 'type 4', 'key Enter'])).ok).toBe(true);
+    expect(lintScenario(scenario([{ spec: '1 field' }, 'patterncount 1', 'key Enter', 'type 4'])).findings[0].problem).toBe('1 extra input');
     expect(lintScenario(scenario([{ spec: '1 view' }, { spec: '2 view' }, 'view top'])).findings).toEqual([expect.objectContaining({ spec: '1 view', problem: 'no input' })]);
     expect(lintScenario(scenario([{ spec: '1 cancel' }, 'key Enter'])).ok).toBe(false);
   });

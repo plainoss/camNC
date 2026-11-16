@@ -64,7 +64,12 @@ export function lintScenario(scenario) {
   for (const { n, kind, inputs } of groups) {
     const { steps, then = [] } = ALLOWED[kind];
     const [first, ...rest] = inputs;
-    const extra = rest.filter((step, index) => !(index < then.length && matches(step, then)));
+    // What may follow comes in order, each at most once: a field's value typed, then Enter.
+    let next = 0;
+    const extra = rest.filter(step => {
+      while (next < then.length && !matches(step, [then[next]])) next++;
+      return next++ >= then.length;
+    });
     if (!first) findings.push({ spec: `${n} ${kind}`, problem: 'no input', allowed: steps });
     else if (!matches(first, steps) || extra.length)
       findings.push({ spec: `${n} ${kind}`, problem: !matches(first, steps) ? 'input not allowed for this kind' : `${extra.length} extra input${extra.length > 1 ? 's' : ''}`, allowed: steps, inputs });
