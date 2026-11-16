@@ -204,26 +204,6 @@ describe('designs saved in another unit before plain numbers took it', () => {
     expect(document.parts[0]!.thicknessExpression).toBe('t + 2 mm');
     expect(applyCadVariables(document).parts[0]!.thickness).toBe(20);
   });
-});
-
-describe('the feature list reads lengths in the design’s unit', () => {
-  const plate = (lengthUnit?: CadLengthUnit, thicknessExpression?: string, thickness = 18) => {
-    const document = createPlateDocument();
-    if (lengthUnit) document.lengthUnit = lengthUnit;
-    Object.assign(document.parts[0]!, { thickness, ...(thicknessExpression && { thicknessExpression }) });
-    return designSteps(document).find(step => step.kind === 'extrude')!.detail;
-  };
-
-  it.each([
-    [undefined, undefined, 18, '18 mm'],
-    ['in', undefined, 18, '0.709 in'],
-    ['cm', undefined, 18, '1.8 cm'],
-    ['in', '(1) in', 25.4, '1 in'],
-    ['in', 't + 0.125 in', 22.225, 't + 0.125 in = 0.875 in'],
-    ['cm', 't + 2 cm', 40, 't + 2 cm = 4 cm'],
-  ] as const)('in a %s design, %s at %s mm reads %s', (lengthUnit, expression, value, detail) => {
-    expect(plate(lengthUnit, expression, value)).toBe(detail);
-  });
 
   it('writes the mm out in an ordered move’s distances and leaves its angle alone', () => {
     const plate = createPlateDocument({ width: 100, height: 60, thickness: 18 });
@@ -249,5 +229,25 @@ describe('the feature list reads lengths in the design’s unit', () => {
       null,
     ]);
     expect(migrateDesignUnitNumbers(moved)).toBe(moved);
+  });
+});
+
+describe('the feature list reads lengths in the design’s unit', () => {
+  const plate = (lengthUnit?: CadLengthUnit, thicknessExpression?: string, thickness = 18) => {
+    const document = createPlateDocument();
+    if (lengthUnit) document.lengthUnit = lengthUnit;
+    Object.assign(document.parts[0]!, { thickness, ...(thicknessExpression && { thicknessExpression }) });
+    return designSteps(document).find(step => step.kind === 'extrude')!.detail;
+  };
+
+  it.each([
+    [undefined, undefined, 18, '18 mm'],
+    ['in', undefined, 18, '0.709 in'],
+    ['cm', undefined, 18, '1.8 cm'],
+    ['in', '(1) in', 25.4, '1 in'],
+    ['in', 't + 0.125 in', 22.225, 't + 0.125 in = 0.875 in'],
+    ['cm', 't + 2 cm', 40, 't + 2 cm = 4 cm'],
+  ] as const)('in a %s design, %s at %s mm reads %s', (lengthUnit, expression, value, detail) => {
+    expect(plate(lengthUnit, expression, value)).toBe(detail);
   });
 });

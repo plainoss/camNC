@@ -43,6 +43,27 @@ it('moves a copy as its distance variable changes and renames it with the variab
   expect(renamed.document.copyTransforms![0]!.byExpressions).toEqual(['spacing', null, null]);
 });
 
+it('turns a copy as its angle variable changes and renames it with the variable', () => {
+  const withAngle = setCadVariable(moved(), { name: 'angle', expression: '30deg' });
+  if ('error' in withAngle) throw new Error(withAngle.error);
+  const document = applyCadVariables(
+    withMove(withAngle.document, {
+      byExpressions: [null, null, null],
+      turn: { about: [0, 0, 0], axis: [0, 0, 1], degrees: 30, degreesExpression: 'angle' },
+    })
+  );
+  expect(cadVariableUses(document, 'angle')).toBe(1);
+  expect(cadVariableUses(document, 'gap')).toBe(0);
+  expect(document.copyTransforms![0]!.turn).toMatchObject({ degrees: 30, degreesExpression: 'angle' });
+  const id = document.variables!.find(variable => variable.name === 'angle')!.id;
+  const further = setCadVariable(document, { id, name: 'angle', expression: '45deg' });
+  if ('error' in further) throw new Error(further.error);
+  expect(further.document.copyTransforms![0]!.turn).toMatchObject({ degrees: 45, degreesExpression: 'angle' });
+  const renamed = setCadVariable(further.document, { id, name: 'tilt', expression: '45deg' });
+  if ('error' in renamed) throw new Error(renamed.error);
+  expect(renamed.document.copyTransforms![0]!.turn).toMatchObject({ degrees: 45, degreesExpression: 'tilt' });
+});
+
 it('says which move cannot follow its expression and keeps its last good distance', () => {
   const document = moved();
   const broken = {
