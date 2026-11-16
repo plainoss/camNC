@@ -69,11 +69,19 @@ function overlaps(a: CadPoint[], b: { outline: CadPoint[]; holes: CadPoint[][] }
   return innerPoints(a).some(material) || innerPoints(b.outline).some(point => strictlyInside(point, a));
 }
 
+/** Whether two outlines meet along a stretch of edge, not only at a point: the middle of an edge of one lies on the other. */
+const sharesEdge = (a: CadPoint[], b: CadPoint[]) =>
+  a.some((p, i) => {
+    const q = a[(i + 1) % a.length]!;
+    return Math.hypot(q.x - p.x, q.y - p.y) > EPS && onEdge({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 }, b);
+  });
+
 /**
  * The earlier parts a part's material runs into: parts extruded along the same normal that share some volume with it,
- * in design order. Touching an edge or a face isn't running into a part, nor is lying in one of its holes.
+ * in design order. Touching an edge or a face isn't running into a part, nor is lying in one of its holes, unless
+ * `touching` asks for parts it stands against side by side too, sharing a stretch of their outlines.
  */
-export function overlappedParts(document: CadDocument, partId: string): string[] {
+export function overlappedParts(document: CadDocument, partId: string, touching = false): string[] {
   const placed = resolveDrawnPlacements(document).document;
   const part = placed.parts.find(p => p.id === partId);
   if (!part?.placement) return [];
@@ -85,6 +93,10 @@ export function overlappedParts(document: CadDocument, partId: string): string[]
   return placed.parts.slice(0, placed.parts.indexOf(part)).flatMap(other => {
     if (!isCadPart(other) || other.id === part.id) return [];
     const theirs = footprint(other, normal, x, y);
-    return theirs && Math.min(own.hi, theirs.hi) - Math.max(own.lo, theirs.lo) > EPS && overlaps(own.outline, theirs) ? [other.id] : [];
+    return theirs &&
+      Math.min(own.hi, theirs.hi) - Math.max(own.lo, theirs.lo) > EPS &&
+      (overlaps(own.outline, theirs) || (touching && sharesEdge(own.outline, theirs.outline)))
+      ? [other.id]
+      : [];
   });
 }
