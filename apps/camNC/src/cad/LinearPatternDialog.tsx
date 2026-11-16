@@ -186,6 +186,8 @@ export function LinearPatternDialog({
       };
     }
     if (count.value * (second?.count ?? 1) < 2) return { error: 'Use at least two instances.' };
+    // As many as a saved design can hold: each instance is its own copy to lay out.
+    if (count.value * (second?.count ?? 1) > 200) return { error: 'Use at most 200 instances in all.' };
     // Skipped positions the grid no longer has, or the original's, are left out.
     const seed = [centered ? Math.floor((count.value - 1) / 2) : 0, second?.centered ? Math.floor(((second?.count ?? 1) - 1) / 2) : 0];
     const kept = skipped.filter(([i, j]) => i < count.value && j < (second?.count ?? 1) && !(i === seed[0] && j === seed[1]));

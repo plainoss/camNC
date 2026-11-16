@@ -6,34 +6,57 @@ import type { CadDiagnostic, CadPart, CadPoint, EvaluatedCadPart } from './types
  * moved sides meet at sharp corners, as a wall drawn around a sketch's shape does.
  */
 export function offsetOutline(points: CadPoint[], distance: number): CadPoint[] | null {
-  const n = points.length;
   // Outward is to the right of a counterclockwise walk.
   const turn = polygonArea(points) >= 0 ? 1 : -1;
-  const sides = points.map((a, i) => {
-    const b = points[(i + 1) % n]!;
+  let sides = points.map((a, i) => {
+    const b = points[(i + 1) % points.length]!;
     const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
     const nx = (turn * (b.y - a.y)) / length,
       ny = (-turn * (b.x - a.x)) / length;
     return { a: { x: a.x + nx * distance, y: a.y + ny * distance }, b: { x: b.x + nx * distance, y: b.y + ny * distance } };
   });
-  const moved = sides.map((side, i) => {
-    const before = sides[(i + n - 1) % n]!;
+  // A side moved so far it turns round, as the short chords of an arc smaller than the wall do, is left out, and the
+  // sides either side of it meet at a sharp corner instead. Once too few sides are left, no such wall can be made.
+  for (;;) {
+    const moved = corners(sides);
+    if (!moved) return null;
+    const kept = sides.filter((side, i) => {
+      const p = moved[i]!,
+        q = moved[(i + 1) % sides.length]!;
+      return (q.x - p.x) * (side.b.x - side.a.x) + (q.y - p.y) * (side.b.y - side.a.y) >= -1e-9;
+    });
+    if (kept.length === sides.length)
+      return selfCrossing(moved) || Math.sign(polygonArea(moved)) !== Math.sign(polygonArea(points)) ? null : moved;
+    if (kept.length < 3) return null;
+    sides = kept;
+  }
+}
+
+type Side = { a: CadPoint; b: CadPoint };
+
+/** Where each moved side meets the one before it, or null where two that are parallel lie apart and never meet. */
+function corners(sides: Side[]): CadPoint[] | null {
+  const n = sides.length;
+  const moved: CadPoint[] = [];
+  for (let i = 0; i < n; i++) {
+    const side = sides[i]!,
+      before = sides[(i + n - 1) % n]!;
     const d1 = { x: before.b.x - before.a.x, y: before.b.y - before.a.y },
       d2 = { x: side.b.x - side.a.x, y: side.b.y - side.a.y };
+    const l1 = Math.hypot(d1.x, d1.y),
+      l2 = Math.hypot(d2.x, d2.y);
     const cross = d1.x * d2.y - d1.y * d2.x;
-    // Sides in line, as along an arc drawn as short chords, meet where they already touch.
-    if (Math.abs(cross) < 1e-9 * Math.hypot(d1.x, d1.y) * Math.hypot(d2.x, d2.y)) return side.a;
+    if (Math.abs(cross) < 1e-9 * l1 * l2) {
+      // Sides in line, as along an arc drawn as short chords, meet where they already touch.
+      const apart = Math.abs(((side.a.x - before.a.x) * d1.y - (side.a.y - before.a.y) * d1.x) / (l1 || 1));
+      if (apart > 1e-6 || d1.x * d2.x + d1.y * d2.y < 0) return null;
+      moved.push(side.a);
+      continue;
+    }
     const t = ((side.a.x - before.a.x) * d2.y - (side.a.y - before.a.y) * d2.x) / cross;
-    return { x: before.a.x + d1.x * t, y: before.a.y + d1.y * t };
-  });
-  // Moved too far, a side turns round or the outline crosses itself: no such wall can be made.
-  const turned = moved.some((p, i) => {
-    const q = moved[(i + 1) % n]!,
-      a = points[i]!,
-      b = points[(i + 1) % n]!;
-    return (q.x - p.x) * (b.x - a.x) + (q.y - p.y) * (b.y - a.y) < -1e-9;
-  });
-  return turned || selfCrossing(moved) || Math.sign(polygonArea(moved)) !== Math.sign(polygonArea(points)) ? null : moved;
+    moved.push({ x: before.a.x + d1.x * t, y: before.a.y + d1.y * t });
+  }
+  return moved;
 }
 
 /** Whether two sides of an outline that don't meet at a corner cross each other. */

@@ -264,6 +264,10 @@ describe('Extrude → Remove', () => {
       [20, 32],
       [50, 32],
     ]);
+    // Past 200 instances in all, as a variable can set it, only the rows that fit are laid out.
+    const big = { ...pattern, count: 100, spacing: 0.1, skipped: [], second: { ...pattern.second, count: 5, spacing: 0.1 } };
+    const many = resolveExtrudeSteps(design(board, { ...pocket, remove: { depth: 5 }, pattern: big }));
+    expect(cadCuts(many.parts[0]!)).toHaveLength(200);
   });
 
   it('cuts a shape drawn on a board’s top into it, keeping the sketch as its own step', () => {

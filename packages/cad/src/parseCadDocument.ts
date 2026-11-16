@@ -197,9 +197,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         count > 200 ||
         !Number.isFinite(spacing) ||
         (countExpression !== undefined && typeof countExpression !== 'string') ||
-        (spacingExpression !== undefined && typeof spacingExpression !== 'string') ||
-        // A grid's instances in all, as a row's: a few hundred at most, each one its own copy to lay out.
-        (p.pattern?.second !== undefined && count * p.pattern.second.count > 200)
+        (spacingExpression !== undefined && typeof spacingExpression !== 'string')
       )
         throw new Error('Invalid CAD part pattern');
     }

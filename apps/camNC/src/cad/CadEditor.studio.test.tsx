@@ -139,19 +139,16 @@ it('confirms a studio sketch from the empty-canvas context menu and keeps its li
   expect(latest().parts.find(part => part.id === kept.id)?.sketch).toEqual(kept.sketch);
 });
 
-it('disables Confirm sketch with the same reason as the empty sketch dialog', async () => {
+it('confirms an empty sketch, from its dialog and its menu alike, and lists it', async () => {
   const { dialog, canvas } = await newStudioSketch();
   const finish = within(dialog).getByRole('button', { name: '✓ Finish sketch' });
-  expect(finish).toHaveProperty('disabled', true);
+  expect(finish).toHaveProperty('disabled', false);
   const menu = await blankSketchMenu(canvas);
   const confirm = within(menu).getByRole('menuitem', { name: 'Confirm sketch' });
-  expect(confirm.getAttribute('aria-disabled')).toBe('true');
-  const reason = confirm.getAttribute('title');
-  expect(reason).toBeTruthy();
-  expect(confirm.getAttribute('aria-description')).toBe(reason);
-  expect(finish.getAttribute('title')).toBe(reason);
+  expect(confirm.getAttribute('aria-disabled')).not.toBe('true');
   fireEvent.click(confirm);
-  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(dialog);
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Sketch( · | \d)/ })).toBeNull());
+  expect(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch 2/ })).toBeTruthy();
 });
 
 it.each(['sketch', 'extrude', 'undo'])('dismisses Restore when another step starts: %s', async step => {

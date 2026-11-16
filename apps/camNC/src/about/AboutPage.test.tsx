@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AboutPage } from './AboutPage';
 import { applicationDistribution, dependencyLicenses, solverDistribution } from './licenses';
-import { stepReaderDistribution, stepReaderLicenses } from './stepReaderLicenses';
+import { stepReaderDistribution, stepReaderLicenses } from './stepReaderLicenseData';
 
 vi.mock('@/components/page-header', () => ({ PageHeader: () => <header>About</header> }));
 

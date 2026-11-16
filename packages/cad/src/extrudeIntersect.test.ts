@@ -61,7 +61,8 @@ it('reads only well-formed Intersect, Merge with all, taken-edge and pattern-gri
   expect(saved(part => (part.intersect = 'yes'))).toThrow();
   expect(saved(part => (part.mergeAll = false))).toThrow();
   expect(saved(part => ((part.sketch as { entities: Record<string, unknown>[] }).entities[0]!.taken = true))).toThrow();
+  // A grid a variable made larger than a pattern can lay out still opens; it lays out what fits.
   expect(
     saved(part => (part.pattern = { id: 'p', axis: 'x', count: 200, spacing: 10, second: { vector: [0, 1, 0], count: 200, spacing: 10 } }))
-  ).toThrow();
+  ).not.toThrow();
 });
