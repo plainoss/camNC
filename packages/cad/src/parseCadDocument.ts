@@ -197,7 +197,9 @@ export function parseCadDocument(input: unknown): CadDocument {
         count > 200 ||
         !Number.isFinite(spacing) ||
         (countExpression !== undefined && typeof countExpression !== 'string') ||
-        (spacingExpression !== undefined && typeof spacingExpression !== 'string')
+        (spacingExpression !== undefined && typeof spacingExpression !== 'string') ||
+        // A grid's instances in all, as a row's: a few hundred at most, each one its own copy to lay out.
+        (p.pattern?.second !== undefined && count * p.pattern.second.count > 200)
       )
         throw new Error('Invalid CAD part pattern');
     }
@@ -240,7 +242,6 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (fillet.suppressed !== undefined && typeof fillet.suppressed !== 'boolean') throw new Error('Invalid CAD fillet');
       }
     }
-    if (p.intersect !== undefined && p.intersect !== true) throw new Error('Invalid CAD extrude');
     if (p.thinWall !== undefined) {
       const wall = p.thinWall;
       if (!wall || typeof wall !== 'object') throw new Error('Invalid CAD thin wall');
@@ -320,6 +321,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (!['point', 'line', 'circle', 'ellipse', 'arc', 'conic', 'bezier', 'spline'].includes(e.type))
           throw new Error('Unknown CAD entity');
         if (e.construction !== undefined && typeof e.construction !== 'boolean') throw new Error('Invalid construction flag');
+        if (e.taken !== undefined && (e.taken !== true || !e.faceEdge)) throw new Error('Invalid taken face edge');
         if (e.type === 'point') {
           number(e.x);
           number(e.y);

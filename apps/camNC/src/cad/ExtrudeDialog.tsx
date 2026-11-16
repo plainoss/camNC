@@ -182,6 +182,8 @@ export function ExtrudeDialog({
         delete made.mergeAll;
         delete made.remove;
         delete made.intersect;
+        // Walls around a shape are a new part's: Add, Remove and Intersect take the shape whole.
+        if (next !== 'new') delete made.thinWall;
         delete made.regions;
         const own = sketchRegions(p.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
         if (next === 'remove') {

@@ -177,8 +177,8 @@ export const kNoIntersection = 'The parts either do not intersect or are totally
 
 /**
  * What an Extrude › Intersect makes: the part it runs into cut down to what the extrude shares with it, in its place.
- * The other parts before it share nothing, so they're used up too. Keeping nothing, it leaves no part, so all of them
- * are lost.
+ * The other parts before it share nothing, so they're used up too. One that can't be made changes nothing but its own
+ * body, which isn't made: the parts before it stay as they were.
  */
 function intersectedWith(
   document: CadDocument,
@@ -188,7 +188,7 @@ function intersectedWith(
     .slice(0, document.parts.indexOf(part))
     .filter(other => isCadPart(other) && !other.remove && !other.suppressed && !isJoinedBody(document, other))
     .map(other => other.id);
-  const lost = [part.id, ...scope];
+  const lost = [part.id];
   const touched = overlappedParts(document, part.id);
   if (touched.length !== 1) {
     const refused = touched.length ? 'Intersecting more than one part isn’t available yet.' : kNoIntersection;
@@ -198,7 +198,7 @@ function intersectedWith(
   const made = unionOf(document, step);
   return {
     hostId: touched[0]!,
-    joined: lost.filter(id => id !== touched[0]),
+    joined: [part.id, ...scope].filter(id => id !== touched[0]),
     made: 'refused' in made ? { refused: kNoIntersection } : made,
     lost,
   };

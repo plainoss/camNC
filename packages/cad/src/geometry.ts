@@ -482,7 +482,9 @@ export function evaluateCadPart(part: CadPart): { part?: EvaluatedCadPart; diagn
   }
   if (part.regions) {
     const made = regionProfile(part as CadPart & { regions: string[] });
-    return part.thinWall && made.part ? { ...made, part: thinWallShape(part, made.part) } : made;
+    if (!part.thinWall || !made.part) return made;
+    const walled = thinWallShape(part, made.part);
+    return { part: walled.part, diagnostics: [...made.diagnostics, ...walled.diagnostics] };
   }
   const diagnostics: CadDiagnostic[] = [];
   const error = (code: string, message: string, entityIds?: string[]) =>

@@ -21,7 +21,7 @@ export function consumedTools(document: CadDocument): Set<string> {
   for (const part of document.parts) {
     const merged = mergedWithAll(document, part);
     if (merged && 'part' in merged.made) for (const id of merged.joined) consumed.add(id);
-    // An Extrude › Intersect that keeps nothing leaves none of the parts it took in.
+    // An Extrude › Intersect that can't be made leaves only its own body unmade.
     else if (merged?.lost) for (const id of merged.lost) consumed.add(id);
   }
   // Consuming a host also uses up the active Add material that belongs to it.

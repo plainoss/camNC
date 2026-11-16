@@ -33,3 +33,9 @@ it('marks the extrude as missing its shape while a thin one waits for its pick',
   const part = { ...tray({ thickness1: 5, thickness2: 0 }), regions: [] };
   expect(missingRegionProblem(part)).toBe('Select face or sketch region to extrude. 1 missing selection');
 });
+
+it('refuses a wall too thick for the shape, rather than folding the hole inside out', () => {
+  const made = evaluateCadPart(tray({ thickness1: 0, thickness2: 30 }));
+  expect(made.part).toBeUndefined();
+  expect(made.diagnostics.map(d => d.code)).toContain('thin-wall');
+});
