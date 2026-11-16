@@ -1402,7 +1402,9 @@ export function CadEditor({
   const grid = Math.max(1, 10 ** Math.floor(Math.log10(view.w / 20)));
   const chainPreview = sketch && chainGeometry(sketch, chain);
   const acceptanceNotice = notice ?? useNotice ?? finishError;
-  const profiles = useProfileSelection(doc, feature, commit, setStudioRefusal);
+  // Read when a region is picked, after this render has worked out which features show.
+  const shownNow = useRef<(id: string) => boolean>(() => true);
+  const profiles = useProfileSelection(doc, feature, commit, setStudioRefusal, id => shownNow.current(id));
   const faceBackdrop = useFaceSketchCamera(faceSketch?.scene, view, sketchTurn, sketchCameraShift, canvasBox);
   const studioBackdrop = useMemo(() => {
     if (!studioSession || showWorkspace || show3D || !part || !canvasBox?.width || !canvasBox.height) return null;
@@ -1458,6 +1460,7 @@ export function CadEditor({
   const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
   const studioDisabled = disabledStudioCommands(part, partHasOutline, builtParts.length);
   const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback, unbuiltParts);
+  shownNow.current = featureShown;
   const partsPanel = (
     <>
       <div className="cad-panel-heading" hidden={!!faceSketch}>

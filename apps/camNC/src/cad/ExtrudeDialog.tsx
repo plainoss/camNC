@@ -37,6 +37,7 @@ import { FeatureDialog } from './FeatureDialog';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
 import { ThinWallFields } from './ThinWallFields';
+import { regionEntries } from './enclosedRegions';
 
 interface PartDialogProps {
   document: CadDocument;
@@ -246,6 +247,8 @@ export function ExtrudeDialog({
   const alsoMade = document.parts.flatMap(p => (p.extrudedWith === part.id ? (p.regions ?? []) : []));
   const regionCount = operation === 'remove' && !part.regions ? null : part.regions ? part.regions.length + alsoMade.length : null;
   const sketchName = designStepLabel(document, `${owner.id}:sketch`) ?? sketchStepLabel(owner);
+  // The faces of a circle picked together are one entry, as one pick takes them.
+  const entries = part.regions && regionCount && regionCount > 1 && !alsoMade.length ? regionEntries(part, part.regions) : regionCount;
   const selection =
     part.faceProfile && part.drawnOn
       ? drawnOnName(document, part.drawnOn.on)
@@ -255,7 +258,9 @@ export function ExtrudeDialog({
           ? 'No region picked yet'
           : regionCount === 1
             ? `Face of ${sketchName}`
-            : `${regionCount} faces of ${sketchName}`;
+            : entries === 1
+              ? `Faces of ${sketchName}`
+              : `${entries} faces of ${sketchName}`;
   const board = operation === 'remove' ? removeSupport(document, part) : null;
   const spatialRemove = isSpatialRemoval(part);
   const solidControls = operation !== 'remove';
