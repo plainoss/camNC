@@ -1,4 +1,13 @@
-import { parseCadDocument, solveCadDocument, type CadDocument } from '@wbcnc/cad';
+import {
+  addCircle,
+  createCadDocument,
+  createCadPart,
+  evaluateCadDocument,
+  parseCadDocument,
+  solveCadDocument,
+  type CadDocument,
+  type CadPart,
+} from '@wbcnc/cad';
 import { loadStep } from '@wbcnc/cam';
 import occtWasmUrl from 'occt-import-js/dist/occt-import-js.wasm?url';
 import { describe, expect, it } from 'vitest';
@@ -73,6 +82,32 @@ describe('studio STEP export', () => {
       expect(file[axis]![0]).toBeCloseTo(lo!, 1);
       expect(file[axis]![1]).toBeCloseTo(hi!, 1);
     });
+  });
+
+  it('writes a cup with both edges of its rim rounded over, taking away what the rounds do', async () => {
+    const body: CadPart = { ...createCadPart('Part 1', 20), id: 'body' };
+    body.sketch = addCircle(body.sketch, { x: 0, y: 0, radius: 38.9 });
+    const pocket: CadPart = { ...createCadPart('Pocket', 20), id: 'pocket', drawnOn: { on: { partId: 'body', face: 'top' }, offset: 0 } };
+    pocket.sketch = addCircle(pocket.sketch, { x: 0, y: 0, radius: 33.6 });
+    const cup: CadDocument = { ...createCadDocument(), parts: [body, { ...pocket, remove: { depth: 16 } }] };
+    const rim = evaluateCadDocument(cup).parts[0]!.cuts![0]!.id;
+    const document = {
+      ...cup,
+      parts: [
+        {
+          ...body,
+          fillets: [{ id: 'f', corners: [], rims: [{ side: 'top' as const, loops: ['outline', rim], face: true as const }], radius: 1 }],
+        },
+        cup.parts[1]!,
+      ],
+    };
+    const solved = (await solveCadDocument(document)).document;
+    const result = studioStep(solved);
+    expect(result.problems).toEqual([]);
+    const { bodies } = await loadStep(new TextEncoder().encode(result.text), { locateFile: () => occtWasmUrl });
+    expect(bodies).toHaveLength(1);
+    // π(38.9² · 20 − 33.6² · 16) less the two 1 mm rounds' 98 mm³, within 0.1 %.
+    expect(volume(bodies[0]!.mesh.positions, bodies[0]!.mesh.indices) / 38233).toBeCloseTo(1, 3);
   });
 
   it('leaves out hidden parts, and exports one part or copy on its own', async () => {

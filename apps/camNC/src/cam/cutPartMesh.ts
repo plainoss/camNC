@@ -1,6 +1,5 @@
-import { intersectPaths, unionPaths, type PartFeatures } from '@wbcnc/cam';
+import { intersectPaths, roundOver, roundSlices, unionPaths, type MeshRound, type PartFeatures } from '@wbcnc/cam';
 import { ShapeUtils, Vector2 } from 'three';
-import { roundOver, roundSlices, type MeshRound } from './roundOver';
 
 type Path = { x: number; y: number }[];
 const signedArea = (path: Path) =>

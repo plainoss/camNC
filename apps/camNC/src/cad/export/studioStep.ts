@@ -50,7 +50,7 @@ export function studioStep(
       key = instanceKey(belongs);
     if (options.only && key !== instanceKey(options.only)) return;
     const { entry, below } = model.solids[i]!;
-    const brep = partBrep(entry.features, below);
+    const brep = partBrep(entry.features, below, entry.rounds);
     const open = brepProblems(brep);
     if (open.length)
       return void problems.push({ name: instance.name, message: 'Its solid doesn’t close, so it can’t be written exactly.' });

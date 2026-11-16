@@ -36,24 +36,35 @@ export function roundSlices(round: MeshRound): number[] {
  */
 export function roundOver(positions: Float64Array, rounds: readonly MeshRound[]): void {
   if (!rounds.length) return;
-  const moves = rounds.map(loopMoves);
+  const move = roundMover(rounds);
   for (let i = 0; i < positions.length; i += 3) {
-    const x = positions[i]!,
-      y = positions[i + 1]!,
-      z = positions[i + 2]!;
-    rounds.some((round, r) => {
+    const moved = move(positions[i]!, positions[i + 1]!, positions[i + 2]!);
+    if (!moved) continue;
+    positions[i] = moved.x;
+    positions[i + 1] = moved.y;
+  }
+}
+
+/**
+ * Where a point of the sharp solid goes on the rounds, as {@link roundOver} moves it, or null for one on no round: off
+ * their loops, or above or below where they curve.
+ */
+export function roundMover(rounds: readonly MeshRound[]): (x: number, y: number, z: number) => Point | null {
+  const moves = rounds.map(loopMoves);
+  return (x, y, z) => {
+    for (let r = 0; r < rounds.length; r++) {
+      const round = rounds[r]!;
       // How far below the edge, into the wall, for one on the top: 0 at the edge, the radius where the round ends.
       const depth = round.down ? round.z - z : z - round.z;
-      if (depth < -1e-9 || depth > round.radius + 1e-9) return false;
+      if (depth < -1e-9 || depth > round.radius + 1e-9) continue;
       const move = moves[r]!(x, y);
-      if (!move) return false;
+      if (!move) continue;
       const rise = round.radius - Math.min(round.radius, depth);
       const inset = round.radius - Math.sqrt(Math.max(0, round.radius * round.radius - rise * rise));
-      positions[i] = x + move.x * inset;
-      positions[i + 1] = y + move.y * inset;
-      return true;
-    });
-  }
+      return { x: x + move.x * inset, y: y + move.y * inset };
+    }
+    return null;
+  };
 }
 
 /** For a point on the round's loop, the way into the material that moves it one unit off each side it's on. */
