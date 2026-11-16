@@ -686,6 +686,8 @@ export interface CadVariable {
   expression: string;
   /** Association only: variable names remain unique across the entire document. */
   folderId?: string;
+  /** The design step it's listed before, as made while that step was edited: the feature list shows it there. */
+  before?: string;
 }
 
 export interface CadDiagnostic {

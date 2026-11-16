@@ -561,7 +561,7 @@ export function CadEditor({
   const { commit: variableCommit, normalized: normalizePatternVariableSource } = usePatternVariableCommit(dialog, documentRef, next =>
     commit(next)
   );
-  const variableScope = useEditorVariableFields(doc, documentRef, variableCommit);
+  const variableScope = useEditorVariableFields(doc, documentRef, variableCommit, !showWorkspace && part?.id);
   const blankDesign = studioSession && isBlankDesign(doc);
   const extrusionDepth = useExtrudeDepth(doc, dialog?.kind === 'extrude' ? dialog.partId : undefined, next => commit(next));
   const studioPreview = useStudioPreview(doc, previewOwner(dialog));

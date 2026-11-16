@@ -1,9 +1,17 @@
-import { useMemo, type RefObject } from 'react';
+import { useMemo, useRef, type RefObject } from 'react';
 import { cadFieldVariableExpression, cadVariableScope, formatCadValue, setCadVariable, type CadDocument } from '@wbcnc/cad';
 import { useDesignUnits } from './designUnits';
 import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
 
-export function useEditorVariableFields(document: CadDocument, current: RefObject<CadDocument>, commit: (document: CadDocument) => void) {
+export function useEditorVariableFields(
+  document: CadDocument,
+  current: RefObject<CadDocument>,
+  commit: (document: CadDocument) => void,
+  /** The part whose sketch is open: a variable made in one of its fields is listed before that sketch. */
+  sketching?: string | false
+) {
+  const editing = useRef<string | null>(null);
+  editing.current = sketching ? `${sketching}:sketch` : null;
   const scope = useMemo(() => cadVariableScope(document), [document]);
   const { lengthUnit, formatLength } = useDesignUnits(document.lengthUnit ?? 'mm');
   const fields = useMemo<CadVariableFields>(
@@ -23,7 +31,12 @@ export function useEditorVariableFields(document: CadDocument, current: RefObjec
         const typed = cadFieldVariableExpression(expression, unit, variables, source.lengthUnit, existing && variables[name]?.kind);
         const result = setCadVariable(source, { ...(existing && { id: existing.id }), name, expression: typed });
         if ('error' in result) return result.error;
-        commit(result.document);
+        const before = !existing && editing.current;
+        commit(
+          before
+            ? { ...result.document, variables: result.document.variables?.map(v => (v.name === name ? { ...v, before } : v)) }
+            : result.document
+        );
         return null;
       },
     }),
