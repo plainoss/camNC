@@ -157,7 +157,7 @@ function Editor() {
         saveRef.current(edit);
         return edit.exact ? 'exact' : 'moved';
       },
-      // Turned (the knob, the panel): about its middle, so its XY zero moves too. Kept with the job, so the board lies
+      // Turned (the knob): about its middle, so its XY zero moves too. Kept with the job, so the board lies
       // that way on the next visit too. The job plans the board by its angle, so a turn it refuses (the model or the
       // sheet changed) doesn't move the zero either: the outline never shows an angle the program wasn't planned at.
       rotate: (d, at) => {

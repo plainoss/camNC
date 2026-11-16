@@ -1,4 +1,5 @@
 import { useStore } from '@/store/store';
+import { settled } from '@/test/settled';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@wbcnc/ui/components/tooltip';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -9,7 +10,6 @@ import { instancesOf, reconcileBoards } from '../boards';
 import { camKeys, camWorker, modelKey } from '../camQueries';
 import { createJob, saveJob, type CamJobV1 } from '../jobDb';
 import { getJob } from '../jobDb';
-import { settled } from '@/test/settled';
 import { moveHold, useBedEdit } from './bedEdit';
 import { BedToolbar } from './BedToolbar';
 import { CamBedEditor } from './CamBedEditor';
@@ -121,7 +121,7 @@ describe('the machine queue with a real plan', () => {
       boards: rendered.boards!.map(b => (b.id === boardA ? { ...b, physicalSheetId: 'another-sheet' } : b)),
     });
     const bed = useBedEdit.getState().bed!;
-    // The panel's turn (about the middle) and the knob's (with where its zero ends up).
+    // About the middle, and as the knob turns it (with where its zero ends up).
     expect(bed.rotate(0.1)).toBe(false);
     expect(bed.rotate(0.1, { x: offset.x + 5, y: offset.y + 5 })).toBe(false);
     expect(cachedA()?.physicalSheetId).toBe('another-sheet');
