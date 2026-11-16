@@ -16,11 +16,11 @@ export const ALLOWED = {
   // A context menu is two selects: `featuremenu` (the right-click) and `menuitem` (the choice).
   // Double-clicking a row (`feature`) or a dimension label (`editdim`) selects it, and so does a dialog's choice list.
   select: {
-    steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'partmenu', 'menuitem', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click'],
+    steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'partmenu', 'menuitem', 'patterncount', 'patternspacing', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click'],
   },
   command: { steps: ['studiotool', 'key', 'tool'] },
   draw: { steps: ['rect', 'circle', 'line', 'arc'] },
-  field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'field'], then: ['key Enter'] },
+  field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'field', 'type'], then: ['key Enter'] },
   confirm: { steps: ['dialogconfirm', 'closesketch', 'key Enter'] },
   cancel: { steps: ['dialogcancel', 'key Escape'] },
   // Zooming the drawing to show what's drawn next, and reopening the page, are what a person does to look.

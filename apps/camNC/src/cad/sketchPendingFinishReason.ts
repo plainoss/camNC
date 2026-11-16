@@ -23,8 +23,8 @@ export function sketchPendingFinishReason({
   cornerReady?: boolean;
 }): string | null {
   if (tool === 'slot' && selected) return 'Create the slot or press Escape before finishing the sketch.';
-  if ((tool === 'linearPattern' || tool === 'circularPattern') && selected)
-    return 'Apply the pattern or press Escape before finishing the sketch.';
+  // A linear pattern being set up is applied as the sketch is confirmed, as it's edited in place.
+  if (tool === 'circularPattern' && selected) return 'Apply the pattern or press Escape before finishing the sketch.';
   if (tool === 'transform' && selected) return 'Apply the transform or press Escape before finishing the sketch.';
   if (splitting) return 'Choose the second split point or press Escape before finishing the sketch.';
   if ((tool === 'fillet' || tool === 'chamfer') && selected && !cornerReady)

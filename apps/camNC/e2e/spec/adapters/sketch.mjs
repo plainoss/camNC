@@ -547,6 +547,14 @@ export async function createAdapter(page, url) {
         await page.keyboard.press('Enter');
         return;
       }
+      case 'patterncount':
+      case 'patternspacing': {
+        // A sketch linear pattern's count chip or spacing dimension, double-clicked to type its value, as a person does.
+        const label = `Edit ${verb === 'patterncount' ? 'instance count' : 'spacing'} ${rest || '1'}`;
+        await page.getByRole('button', { name: label, exact: true }).dblclick();
+        await settle();
+        return;
+      }
       case 'fitview': {
         // Zooms the drawing out, by the wheel as a person does, until the box from one corner to the other is in view:
         // an empty sketch has nothing for Fit to frame, and a shape drawn off the screen can't be clicked.
