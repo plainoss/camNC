@@ -143,6 +143,21 @@ describe('comparing fingerprints', () => {
     ]);
   });
 
+  it('pairs parts of the same volume by where they are', () => {
+    const slabs = [0, 20, 40].map(x => box(x, 0, 0, x + 10, 1, 1));
+    const result = compareParts(
+      slabs.map((mesh, i) => part(`E${i}`, mesh)),
+      [2, 0, 1].map(i => part(`A${i}`, slabs[i]!)),
+      { volumePercent: 0.1, bbox: 0.01, distance: 0.05, samples: 500 }
+    );
+    expect(result.failures).toEqual([]);
+    expect(result.parts.map(p => [p.expected, p.actual]).sort()).toEqual([
+      ['E0', 'A0'],
+      ['E1', 'A1'],
+      ['E2', 'A2'],
+    ]);
+  });
+
   it('fails a different part count and names the part left over', () => {
     const cube = box(0, 0, 0, 1, 1, 1);
     const result = compareParts([part('A', cube), part('B', box(0, 0, 0, 2, 1, 1))], [part('A', cube)]);

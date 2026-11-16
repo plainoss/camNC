@@ -1118,6 +1118,61 @@
   font-size: 11px;
 }
 /** The variables a value field offers after `#`. */
+/** The Create variable popup, under the field it was opened from. */
+.cad-create-variable {
+  position: fixed;
+  z-index: 45;
+  display: grid;
+  gap: 6px;
+  width: 15rem;
+  padding: 8px 10px;
+  border: 1px solid #c3cedb;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 4px 16px #24324722;
+  font-size: 13px;
+}
+.cad-create-variable [role='tablist'] {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid #d7e1ec;
+}
+.cad-create-variable [role='tab'] {
+  padding: 2px 6px;
+  border: 0;
+  background: none;
+}
+.cad-create-variable [role='tab'][aria-selected='true'] {
+  color: #1f6fc5;
+  border-bottom: 2px solid #1f6fc5;
+}
+.cad-create-variable [role='tab']:disabled {
+  color: #a0aec0;
+}
+.cad-create-variable input {
+  padding: 2px 4px;
+  border: 1px solid #c3cedb;
+  border-radius: 3px;
+}
+.cad-create-variable header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cad-create-variable label {
+  display: grid;
+  gap: 2px;
+}
+.cad-create-variable .cad-create-variable-ok {
+  color: #fff;
+  background: #2f9e44;
+  border-radius: 3px;
+  padding: 0 6px;
+}
+.cad-create-variable .cad-create-variable-cancel {
+  color: #c73535;
+  padding: 0 6px;
+}
 .cad-variable-menu {
   position: fixed;
   z-index: 40;
