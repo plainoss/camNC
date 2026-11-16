@@ -11,6 +11,8 @@ interface EntityBase {
   construction?: boolean;
   /** An edge of the face the part is drawn on, kept where that face is. It can't be edited, only drawn onto. */
   faceEdge?: boolean;
+  /** A face edge taken into the drawing with Use: part of its outline rather than construction, still kept on the face. */
+  taken?: true;
 }
 export interface CadPointEntity extends EntityBase, CadPoint {
   type: 'point';

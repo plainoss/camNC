@@ -148,7 +148,12 @@ export function removalRegions(document: CadDocument, part: CadPart): { regions:
       (largest, region) => (!largest || Math.abs(polygonArea(region.points)) > Math.abs(polygonArea(largest.points)) ? region : largest),
       null
     );
-  const cut = regions.filter(region => region !== rest && region.curveIds.some(id => id !== outlineId)).map(region => region.id);
+  // The face's whole outline taken into the sketch with Use makes the face itself a shape drawn on it, so it's cut too.
+  const faceLines = part.sketch.entities.filter(entity => entity.faceEdge && entity.type === 'line');
+  const wholeFace = faceLines.length > 0 && faceLines.every(entity => entity.taken);
+  const cut = regions
+    .filter(region => (region !== rest || wholeFace) && (wholeFace || region.curveIds.some(id => id !== outlineId)))
+    .map(region => region.id);
   return { regions, cut };
 }
 

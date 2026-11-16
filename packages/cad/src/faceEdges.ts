@@ -101,8 +101,10 @@ export function withFaceEdges(document: CadDocument, part: CadPart): CadSketch {
     const next = wanted.get(e.id);
     wanted.delete(e.id);
     if (next) {
-      if (JSON.stringify(next) !== JSON.stringify(e)) changed = true;
-      entities.push(next);
+      // An edge taken in with Use stays in the drawing as the face moves.
+      const kept = e.taken ? { ...next, construction: false, taken: true as const } : next;
+      if (JSON.stringify(kept) !== JSON.stringify(e)) changed = true;
+      entities.push(kept);
     } else {
       changed = true;
       if (!used.has(e.id)) continue;
