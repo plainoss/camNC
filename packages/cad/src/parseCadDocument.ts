@@ -22,8 +22,7 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (!input || typeof input !== 'object' || nestedDeeperThan(input, 64)) throw new Error('Invalid CAD document');
   const d = input as CadDocument;
   if (
-    ![1, 2, 3, 4, 5, 6, 7, 8].includes(d.version) ||
-    (d.extrudeRules !== undefined && d.extrudeRules !== 2) ||
+    ![1, 2, 3, 4, 5, 6, 7].includes(d.version) ||
     typeof d.id !== 'string' ||
     typeof d.name !== 'string' ||
     (d.lengthUnit !== undefined && !['mm', 'cm', 'm', 'in', 'ft'].includes(d.lengthUnit)) ||
@@ -198,9 +197,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         count > 200 ||
         !Number.isFinite(spacing) ||
         (countExpression !== undefined && typeof countExpression !== 'string') ||
-        (spacingExpression !== undefined && typeof spacingExpression !== 'string') ||
-        // A grid's instances in all, as a row's: a few hundred at most, each one its own copy to lay out.
-        (p.pattern?.second !== undefined && count * p.pattern.second.count > 200)
+        (spacingExpression !== undefined && typeof spacingExpression !== 'string')
       )
         throw new Error('Invalid CAD part pattern');
     }

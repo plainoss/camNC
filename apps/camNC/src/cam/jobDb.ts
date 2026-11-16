@@ -7,7 +7,7 @@ import type { BoardV1, StockBoardV1 } from './boards';
 import type { NestObjective } from './autoNest';
 import type { PartPrint } from './partMatch';
 import type { PlanSettingsV1 } from './planSettings';
-import { createCadDesign, createCadPart, type CadDocument } from '@wbcnc/cad';
+import { createCadDocument, createCadPart, type CadDocument } from '@wbcnc/cad';
 
 /**
  * CAM jobs live in IndexedDB, not in the persisted zustand store: model files are megabytes, and jobs are documents
@@ -273,7 +273,7 @@ export async function createJob(file: File, defaults: NewJobDefaults = {}): Prom
 /** Start a native flat-part design without an intermediate model file. */
 export async function createDesignJob(name = 'Untitled design'): Promise<CamJobV1> {
   return newJob(currentStore(), name, title => {
-    const draft = { ...createCadDesign(title), lengthUnit: 'cm' as const };
+    const draft = { ...createCadDocument(title), lengthUnit: 'cm' as const };
     draft.parts.push(createCadPart('Part 1'));
     return { fileName: title, design: { draft, acceptedRevision: 0, partRevisions: {} } };
   });

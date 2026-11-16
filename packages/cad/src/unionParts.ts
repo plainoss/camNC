@@ -1,6 +1,6 @@
 import { addLine, createCadPart } from './document';
 import { cadDrawnOnSupports, effectivePlacement, resolveDrawnPlacements } from './drawnOn';
-import { hasCurrentExtrudeRules, isJoinedBody } from './extrudeSteps';
+import { isJoinedBody } from './extrudeSteps';
 import { overlappedParts } from './partOverlap';
 import { evaluateCadFeatures, isCadPart } from './features';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, pointInPolygon } from './geometry';
@@ -152,8 +152,7 @@ export function mergedWithAll(
   part: CadPart
 ): { hostId: string; joined: string[]; made: { part: EvaluatedCadPart } | { refused: string }; lost?: string[] } | null {
   if (part.intersect && !part.suppressed && part.extrude !== false) return intersectedWith(document, part);
-  // A design saved before the current Extrude rules keeps another sketch's Add as a body joined to its part.
-  if (!part.mergeAll && part.addTo && hasCurrentExtrudeRules(document) && isJoinedBody(document, part)) return fusedAdd(document, part);
+  if (!part.mergeAll && part.addTo && isJoinedBody(document, part)) return fusedAdd(document, part);
   if (!part.mergeAll || part.suppressed || part.extrude === false) return null;
   const touched = overlappedParts(document, part.id);
   if (!touched.length) return null;

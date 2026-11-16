@@ -23,7 +23,7 @@ import {
   cadFaceSketches,
   cadVariableScope,
   cadSketchRegions,
-  createCadDesign,
+  createCadDocument,
   createCadPart,
   filletLineCorners,
   linearPatternSketchEntities,
@@ -870,7 +870,7 @@ export async function editCad(
   script: CadScript,
   options: { name?: string; toolpaths?: boolean } = {}
 ): Promise<CadEditResult> {
-  const base = start ?? createCadDesign(options.name);
+  const base = start ?? createCadDocument(options.name);
   await initializeCadSolver();
   const expectations = new Map<string, CadExpectation[]>();
   const session = createDesignEdit(base, expectations);

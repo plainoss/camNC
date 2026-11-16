@@ -2,8 +2,6 @@ import type { CadDocument } from './types';
 
 /** Saved source features determine the minimum reader version. */
 export function cadDocumentVersion(document: CadDocument): CadDocument['version'] {
-  // An older reader would rebuild the design's Adds and patterned Removes the old way.
-  if (document.extrudeRules === 2 && document.parts.some(part => part?.addTo || (part?.remove && part.pattern))) return 8;
   // An older reader would cut where a Boolean joins.
   if (
     document.partCuts?.some(step => step?.operation !== undefined) ||

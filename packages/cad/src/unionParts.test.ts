@@ -3,8 +3,6 @@ import {
   addRectangle,
   cadPartsToCut,
   consumedTools,
-  mergedWithAll,
-  createCadDesign,
   createCadDocument,
   createCadPart,
   solveCadDocument,
@@ -130,11 +128,4 @@ it('leaves chained merges, and merges into a part another step uses, apart rathe
   ).toEqual(['Bar', 'Part 1', 'Part 2', 'Stub']);
   const ordered: CadDocument = { ...createCadDocument(), version: 7, operationOrder: [], parts: [left, right, bar] };
   expect(consumedTools(ordered)).toEqual(new Set());
-});
-
-it('fuses an Add of another sketch into its part in a new design, and keeps it a joined body in one saved before', () => {
-  const boss = { ...board('Boss', 20, 20, 30), addTo: 'Base' };
-  const parts = [board('Base', 100, 40, 10), boss];
-  expect(mergedWithAll({ ...createCadDesign(), parts }, boss)).toMatchObject({ hostId: 'Base', joined: ['Boss'] });
-  expect(mergedWithAll({ ...createCadDocument(), parts }, boss)).toBeNull();
 });

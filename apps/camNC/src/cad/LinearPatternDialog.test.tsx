@@ -16,7 +16,7 @@ function design(): CadDocument {
     drawnOn: { on: { partId: board.id, face: 'top' as const }, offset: 0 },
   };
   pocket.sketch = addCircle(pocket.sketch, { x: 20, y: 20, radius: 5 });
-  return { ...document, extrudeRules: 2, parts: [board, pocket] };
+  return { ...document, parts: [board, pocket] };
 }
 
 it('patterns a picked Remove along a picked edge, positive along it, Distance apart, Instance count times', async () => {

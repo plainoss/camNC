@@ -564,17 +564,8 @@ export type CadLengthUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 export interface CadDocument {
   /** Display/input unit only. Geometry and persisted expressions remain in millimeters. */
   lengthUnit?: CadLengthUnit;
-  /**
-   * Minimum supported reader: 2 features, 3 folders, 4 ordered operations, 5 step relief, 6 construction intent,
-   * 7 Booleans and Extrude merges, 8 the current Extrude rules.
-   */
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
-  /**
-   * Version 8: the Extrude rules new designs are made with. An Add of a part's own sketch that ends lower steps the part
-   * down, an Add of another sketch fuses into its part, and a Remove's feature pattern cuts at each instance. A design
-   * saved without it rebuilds as it did: the Add takes the part's depth, stays a joined body, and the Remove cuts once.
-   */
-  extrudeRules?: 2;
+  /** Minimum supported reader: 2 features, 3 folders, 4 ordered operations, 5 step relief, 6 construction intent. */
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   id: string;
   name: string;
   /** Increases on source edits; solving preserves the source revision. */

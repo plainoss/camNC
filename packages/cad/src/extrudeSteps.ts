@@ -22,9 +22,7 @@ export const sharesSketch = (a: CadPart, b: CadPart): boolean => sketchOwnerId(a
  * How far below a part's top an Extrude → Add of the part's own sketch ends: 0 when it extrudes its regions as far the
  * same way, the step down when it is a plain extrude away from the sketch plane that ends lower, or null otherwise.
  */
-export function addedRegionStep(document: CadRules, target: CadPart, step: CadPart): number | null {
-  // A design saved before the current rules adds its own sketch's regions at the part's depth, however the Add is set.
-  if (!hasCurrentExtrudeRules(document)) return sharesSketch(target, step) ? 0 : null;
+export function addedRegionStep(target: CadPart, step: CadPart): number | null {
   if (!sharesSketch(target, step) || !target.drawnOn?.inward !== !step.drawnOn?.inward) return null;
   const same = (key: 'upTo' | 'upToDatum' | 'symmetric' | 'thin') => JSON.stringify(target[key]) === JSON.stringify(step[key]);
   if (!(['upTo', 'upToDatum', 'symmetric', 'thin'] as const).every(same)) return null;
@@ -36,12 +34,6 @@ export function addedRegionStep(document: CadRules, target: CadPart, step: CadPa
   return plain ? below : null;
 }
 
-/** What a design's rebuild rules depend on. */
-type CadRules = Pick<CadDocument, 'extrudeRules'>;
-
-/** Whether a design is built with the current Extrude rules, as new designs are; see `CadDocument.extrudeRules`. */
-export const hasCurrentExtrudeRules = (document: CadRules): boolean => document.extrudeRules === 2;
-
 /** The smallest step down an Add's regions can end at, as the shallowest cut. */
 const MIN_ADDED_STEP = 0.1;
 
@@ -50,18 +42,17 @@ const MIN_ADDED_STEP = 0.1;
  * or less far, the same way; less far, the part is stepped down over them. Otherwise, as when it ends beyond the part's
  * top, it is a body joined to the part, as another sketch's Add is.
  */
-export const addsRegionsTo = (document: CadRules, target: CadPart, step: CadPart): boolean =>
-  addedRegionStep(document, target, step) !== null;
+export const addsRegionsTo = (target: CadPart, step: CadPart): boolean => addedRegionStep(target, step) !== null;
 
 /**
  * Whether a part is an Extrude → Add of another sketch, or of the same one with a depth of its own: a body of its own,
  * joined to the part it adds to. It's built and
  * made like a part, but listed as part of that one. How it's machined, as one piece or several, is decided later.
  */
-export function isJoinedBody(document: Pick<CadDocument, 'parts' | 'extrudeRules'>, part: CadPart): boolean {
+export function isJoinedBody(document: Pick<CadDocument, 'parts'>, part: CadPart): boolean {
   if (!part.addTo || part.extrude === false || part.suppressed || part.remove || copyFaceOperationProblem(part)) return false;
   const target = document.parts.find(candidate => candidate.id === part.addTo);
-  return !!target && isCadPart(target) && !addsRegionsTo(document, target, part);
+  return !!target && isCadPart(target) && !addsRegionsTo(target, part);
 }
 
 /** The parts and the bodies joined to them: everything built as a solid. */
@@ -274,7 +265,7 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
     const target = step.addTo && parts.find(part => part.id === step.addTo);
     // A suppressed Add adds nothing, as in the reference.
     // Nor does one not extruded, such as a sketch whose extrude was deleted.
-    const below = target ? addedRegionStep(document, target, step) : null;
+    const below = target ? addedRegionStep(target, step) : null;
     if (step.suppressed || step.extrude === false || !target || !target.regions || below === null || step.addTo === step.id) continue;
     added.set(target.id, [...(added.get(target.id) ?? []), ...(step.regions ?? [])]);
     const ends = highest.get(target.id) ?? highest.set(target.id, new Map()).get(target.id)!;
@@ -333,11 +324,8 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
         removedBy: step.id,
       })
     );
-    // A feature pattern of the Remove cuts it again at each of its instances; a design saved before cuts it once.
-    const repeated =
-      step.pattern && hasCurrentExtrudeRules(document)
-        ? patternedRemoval(step, placedBoard(support.board), face, cuts, patternAlong(step.pattern))
-        : [];
+    // A feature pattern of the Remove cuts it again at each of its instances.
+    const repeated = step.pattern ? patternedRemoval(step, placedBoard(support.board), face, cuts, patternAlong(step.pattern)) : [];
     removed.set(support.board.id, [...(removed.get(support.board.id) ?? []), face, ...cuts, ...repeated]);
   }
   parts = parts.map(part => {
@@ -384,7 +372,7 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
     const target = document.parts.find(candidate => candidate.id === part.addTo);
     if (!target) return 'The part it adds to is gone. Pick another, or make a new part.';
     // Another sketch's extrude, or one with a depth of its own, is joined as a body of its own: it only needs a profile.
-    if (!addsRegionsTo(document, target, part)) {
+    if (!addsRegionsTo(target, part)) {
       const problem = evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
       return problem ? (part.regions ? problem.message : 'Pick a region of the sketch in the view.') : null;
     }
@@ -432,7 +420,7 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
  * so copies, face sketches and later cuts still work. A same-sketch Add or Remove has no body of its own.
  */
 export function partIsBuiltOn(document: CadDocument, part: CadPart, addTo?: CadPart): string | null {
-  const keepsBody = !!addTo && !addsRegionsTo(document, addTo, part);
+  const keepsBody = !!addTo && !addsRegionsTo(addTo, part);
   if (
     !keepsBody &&
     (part.copies?.length ||

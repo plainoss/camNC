@@ -24,6 +24,9 @@ function movedEntity(entity: CadEntity, ids: ReadonlySet<string>, suffix: string
  * board's outline closing them, as the board's own cuts are, so a dado running off an edge repeats too. An instance
  * whose region isn't wholly on the board, a direction out of the face's plane, or a circular pattern, isn't cut.
  */
+/** The most instances a pattern makes, the original among them. */
+export const MAX_PATTERN_INSTANCES = 200;
+
 export function patternedRemoval(
   step: CadPart,
   board: CadPart,
@@ -48,7 +51,8 @@ export function patternedRemoval(
   const second = pattern.second;
   const secondLocal = second && (board.placement ? rotateVector(conjugate(board.placement.rotation), second.vector) : second.vector);
   if (secondLocal && Math.abs(secondLocal[2]) > 1e-6) return [];
-  const rows = second && second.count > 1 ? second.count : 1;
+  // A grid makes 200 instances at most, as a row does: a count a variable sets higher lays out only the rows that fit.
+  const rows = second && second.count > 1 ? Math.max(1, Math.min(second.count, Math.floor(MAX_PATTERN_INSTANCES / pattern.count))) : 1;
   // Centred, the original is the middle instance, or the one before the middle of an even count.
   const from = (count: number, centered?: true) => (centered ? Math.floor((count - 1) / 2) : 0);
   for (let row = 0; row < rows; row++)
