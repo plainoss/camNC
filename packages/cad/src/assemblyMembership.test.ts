@@ -63,10 +63,11 @@ it('excludes suppressed copies and restores their original names', () => {
   expect(report(document)?.collisions).toEqual([]);
 });
 
-it('retains an active joined Add body in assembly diagnostics', () => {
+it('fuses an active joined Add body into its part in assembly diagnostics', () => {
   const base = panel('Base');
   const boss: CadPart = { ...panel('Boss'), addTo: base.id, drawnOn: { on: { partId: base.id, face: 'top' }, offset: 0 } };
   const document = resolveDrawnPlacements({ ...createCadDocument(), parts: [base, boss] }).document;
-  expect(report(document)?.parts.map(p => p.name)).toEqual(['Base', 'Boss']);
+  // Fused into its part as one solid, it collides with nothing.
+  expect(report(document)?.parts.map(p => p.name)).toEqual(['Base']);
   expect(report(document)?.collisions).toEqual([]);
 });

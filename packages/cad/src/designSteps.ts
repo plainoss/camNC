@@ -149,9 +149,12 @@ export function designSteps(document: CadDocument): DesignStep[] {
         ? 'Select a sketch plane. 1 missing selection'
         : step.kind === 'extrude' && missing
           ? missingRegionMessage(missing)
-          : step.kind === 'sketch' || step.kind === 'extrude'
+          : step.kind === 'extrude'
             ? own
-            : null;
+            : // A sketch is fine when only its extrude is missing the regions to extrude, as when it was emptied.
+              step.kind === 'sketch' && !(part && own === missingRegionProblem(part))
+              ? own
+              : null;
     const reason = lost ?? regions ?? onFace;
     // A Cut parts step whose typed values can't be followed keeps its last good ones, and says why on its row.
     const values = step.kind === 'partCut' ? partCutProblems.get(step.id) : undefined;

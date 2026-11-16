@@ -1,8 +1,10 @@
 import { expect, it } from 'vitest';
 import {
+  addCircle,
   addRectangle,
   cadPartsToCut,
   consumedTools,
+  mergedWithAll,
   createCadDocument,
   createCadPart,
   solveCadDocument,
@@ -51,13 +53,13 @@ it('joins two boards drawn on one plane into the first, as high as the higher an
   expect(() => parseCadDocument(JSON.parse(JSON.stringify({ ...document, version: 6 })))).toThrow();
 });
 
-it('keeps the tools as parts when asked, and refuses boards on different planes', async () => {
+it('keeps the tools as parts when asked, and refuses boards on planes apart, with a gap between them', async () => {
   const kept = await solveCadDocument(union([board('Part 1', 100, 40, 10), board('Part 2', 40, 80, 30)], true));
   expect(cadPartsToCut(kept.document, kept.parts).map(entry => [entry.part.name, entry.part.thickness])).toEqual([
     ['Part 1', 30],
     ['Part 2', 30],
   ]);
-  const apart = await solveCadDocument(union([board('Part 1', 100, 40, 10), board('Part 2', 40, 80, 30, 5)]));
+  const apart = await solveCadDocument(union([board('Part 1', 100, 40, 10), board('Part 2', 40, 80, 30, 15)]));
   expect(apart.diagnostics.some(d => d.code === 'boolean-unresolved')).toBe(true);
 });
 
@@ -81,7 +83,7 @@ it('changes nothing and uses up no tools when it can’t join them: copies, cuts
   expect(await refused(cut)).toContainEqual(['Part 1', 10]);
   const apart = union([
     board('Part 1', 100, 40, 10),
-    { ...board('Part 2', 40, 80, 30), drawnOn: { on: { plane: 'top' as const }, offset: 5 } },
+    { ...board('Part 2', 40, 80, 30), drawnOn: { on: { plane: 'top' as const }, offset: 15 } },
   ]);
   expect(await refused(apart)).toEqual([
     ['Part 1', 10],
@@ -128,4 +130,32 @@ it('leaves chained merges, and merges into a part another step uses, apart rathe
   ).toEqual(['Bar', 'Part 1', 'Part 2', 'Stub']);
   const ordered: CadDocument = { ...createCadDocument(), version: 7, operationOrder: [], parts: [left, right, bar] };
   expect(consumedTools(ordered)).toEqual(new Set());
+});
+
+it('joins four boards apart with a disc sunk into their tops by Merge with all, as one part', async () => {
+  const at = (name: string, draw: (sketch: CadPart['sketch']) => CadPart['sketch']) => {
+    const part = { ...createCadPart(name, 18), id: name, drawnOn: { on: { plane: 'top' as const }, offset: 0 } };
+    return { ...part, sketch: draw(part.sketch) };
+  };
+  const parts = [
+    at('A', sketch => addRectangle(sketch, { x: -47, y: -27, width: 14, height: 18 })),
+    at('B', sketch => addCircle(sketch, { x: -37, y: 32, radius: 9.9 })),
+    at('C', sketch => addCircle(sketch, { x: 18, y: 32, radius: 8.54 })),
+    at('D', sketch => addCircle(sketch, { x: 18, y: -27, radius: 27.59 })),
+  ];
+  const disc = {
+    ...at('Disc', sketch => addCircle(sketch, { x: 0, y: 0, radius: 41.68 })),
+    thickness: 1.2,
+    drawnOn: { on: { plane: 'top' as const }, offset: 18, inward: true as const },
+    mergeAll: true as const,
+  };
+  const document = await solveCadDocument({ ...createCadDocument(), version: 7, parts: [...parts, disc] });
+  const made = cadPartsToCut(document.document, document.parts);
+  expect(made.map(({ part }) => part.name)).toEqual(['A']);
+  const [joined] = made;
+  expect(joined!.part.thickness).toBeCloseTo(18, 6);
+  // The four prisms, and the disc's 1.2 around and between them, its top level with theirs: about 61 600 mm³.
+  expect(Math.abs(volume(joined!.part) / 61_617 - 1)).toBeLessThan(0.005);
+  // Pocketed from below where only the disc is, 16.8 up.
+  expect(joined!.part.cuts!.some(cut => Math.abs(cut.to - cut.from - 16.8) < 1e-6)).toBe(true);
 });
