@@ -51,5 +51,6 @@ export function enclosedUsedRegions(document: CadDocument, part: CadPart, region
  */
 export function regionEntries(document: CadDocument, part: CadPart, regionIds: readonly string[]): number {
   const used = usedRegions(document, part);
-  return Math.max(1, regionIds.filter(id => !used.has(id)).length);
+  const takenAlong = new Set(regionIds.filter(id => !used.has(id)).flatMap(id => enclosedUsedRegions(document, part, id)));
+  return Math.max(1, regionIds.filter(id => !takenAlong.has(id)).length);
 }
