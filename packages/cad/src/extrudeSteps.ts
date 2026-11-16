@@ -6,11 +6,12 @@ import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { entityPointIds, newCadId } from './document';
 import { faceExtrudeProblem, resolveFaceProfiles } from './faceExtrude';
 import { cadSketchRegions, evaluateCadFeatures, isCadPart } from './features';
-import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea } from './geometry';
+import { CAD_CHORD_TOLERANCE, evaluateCadPart, pointInPolygon, polygonArea } from './geometry';
 import { patternedRemoval } from './featurePattern';
+import { thinSlotSketch } from './thinSlots';
 import { regionGroups } from './regionProfile';
-import { sketchRegions, type CadSketchRegion } from './sketchRegions';
-import type { CadCut, CadDocument, CadEntity, CadFaceSketch, CadFeature, CadPart, CadSketch } from './types';
+import { regionInteriorPoint, sketchRegions, type CadSketchRegion } from './sketchRegions';
+import type { CadCut, CadDocument, CadEntity, CadFaceSketch, CadFeature, CadPart, CadPoint, CadSketch } from './types';
 
 /** The part or sketch feature whose sketch a part extrudes: its own, or the one it shares. */
 export const sketchOwnerId = (part: CadPart): string => part.sketchOf ?? part.id;
@@ -301,9 +302,25 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
     pattern.direction
       ? cadDirectionVector(placedDocument(), pattern.direction)
       : (pattern.vector ?? (pattern.axis === 'x' ? [1, 0, 0] : pattern.axis === 'y' ? [0, 1, 0] : [0, 0, 1]));
-  for (const step of parts) {
+  for (const drawn of parts) {
     // A suppressed Remove cuts nothing, and nor does a sketch not extruded.
-    if (!step.remove || step.suppressed || step.extrude === false || isSpatialRemoval(step)) continue;
+    if (!drawn.remove || drawn.suppressed || drawn.extrude === false || isSpatialRemoval(drawn)) continue;
+    // A thin Remove of open lines cuts the slots its lines widen into, every one of them.
+    const slots = thinSlotSketch(drawn);
+    const remove = drawn.remove;
+    let step: CadPart & { remove: typeof remove } = slots
+      ? (({ regions: _regions, ...rest }) => ({ ...rest, remove, sketch: { ...slots.sketch, id: drawn.sketch.id } }))(drawn)
+      : { ...drawn, remove };
+    if (slots) {
+      // Only the strips are cut: the face between them stays.
+      const found = removalRegions(resolved, step);
+      if ('error' in found) continue;
+      const inStrip = (points: CadPoint[]) => {
+        const inside = regionInteriorPoint(points);
+        return !!inside && slots.strips.some(strip => pointInPolygon(inside, strip));
+      };
+      step = { ...step, regions: found.regions.filter(region => inStrip(region.points)).map(region => region.id) };
+    }
     const support = removeSupport(resolved, step);
     if ('error' in support) continue;
     const extent = faceRemovalDepth(step, support.board.thickness);
@@ -319,7 +336,8 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
         id: `${step.id}:cut:${regionId}`,
         sketchId: step.sketch.id,
         regionId,
-        depth: extent.depth,
+        // Slots of a thin Remove run as deep as asked, through the board when that's deeper than it.
+        depth: slots && typeof extent.depth === 'number' && extent.depth >= support.board.thickness ? 'through' : extent.depth,
         ...typed,
         removedBy: step.id,
       })

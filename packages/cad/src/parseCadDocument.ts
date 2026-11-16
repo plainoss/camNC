@@ -250,6 +250,14 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (wall[key] !== undefined && typeof wall[key] !== 'string') throw new Error('Invalid CAD thin wall');
       if (wall.midPlane !== undefined && wall.midPlane !== true) throw new Error('Invalid CAD thin wall');
     }
+    if (
+      p.thinEdges !== undefined &&
+      (!p.thinWall ||
+        !Array.isArray(p.thinEdges) ||
+        !p.thinEdges.length ||
+        p.thinEdges.some(id => typeof id !== 'string' || !p.sketch.entities.some(entity => entity.id === id && entity.type === 'line')))
+    )
+      throw new Error('Invalid CAD thin edges');
     if (p.mirrorJoins !== undefined) {
       if (!Array.isArray(p.mirrorJoins) || !p.mirrorJoins.length) throw new Error('Invalid CAD mirror');
       for (const join of p.mirrorJoins) {

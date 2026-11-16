@@ -186,7 +186,8 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   await unchanged(secondView);
   await command('Extrude');
   await pickRegion();
-  expect((screen.getByRole('combobox', { name: 'Merge scope' }) as HTMLSelectElement).value).toBe(latest.parts[1]!.id);
+  // Drawn on one part's side and standing against another, it stays a new part: which to add to is picked by hand.
+  expect(screen.getByRole('tab', { name: 'New' }).getAttribute('aria-selected')).toBe('true');
   await thickness('3');
   await userEvent.click(screen.getByRole('button', { name: 'Flip direction' }));
   await userEvent.click(screen.getByRole('button', { name: 'Flip direction' }));

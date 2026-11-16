@@ -370,6 +370,11 @@ export interface CadPart {
   /** A thin extrude of a picked shape: walls around its outline, with no floor. Ignored when the part is a `thin` board. */
   thinWall?: CadThinWall;
   /**
+   * The open lines of the sketch a thin extrude walls instead of a shape: each becomes a strip, Thickness 1 to its right
+   * walking it from its start and Thickness 2 to its left, or centred on it with Mid plane. A Remove cuts them as slots.
+   */
+  thinEdges?: string[];
+  /**
    * A bone in every inside corner, so a bit of this diameter cuts it fully and a part that fits into it goes all the
    * way in. The diameter is the design's bit: a bigger bit in the job can't reach into the bones.
    */
