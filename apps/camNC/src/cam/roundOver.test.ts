@@ -56,8 +56,9 @@ describe('a part with edges rounded over', () => {
     expect(Math.max(...zs)).toBeCloseTo(20, 6);
     for (let i = 0; i < rounded.positions.length; i += 3) {
       const reach = Math.hypot(rounded.positions[i]! - 38.9, rounded.positions[i + 1]! - 38.9);
-      if (Math.abs(rounded.positions[i + 2]! - 20) < 1e-9)
-        expect(reach).toBeGreaterThan(33.6 + 1 - 0.02), expect(reach).toBeLessThan(38.9 - 1 + 0.02);
+      if (Math.abs(rounded.positions[i + 2]! - 20) > 1e-9) continue;
+      expect(reach).toBeGreaterThan(33.6 + 1 - 0.02);
+      expect(reach).toBeLessThan(38.9 - 1 + 0.02);
     }
   });
 
