@@ -111,13 +111,10 @@ export function useDepthBlendWorker(vidSource: VideoSourceSrc) {
     } satisfies RemapStepParams;
   }, [camRes, bounds, calibration, R, t]);
 
+  // The worker reads only the fields of depthSettings it knows (not minMaskVal, which the shader uses).
   useEffect(() => {
-    depthBlendManager.setVideoSource(vidSource).catch(console.error);
-  }, [depthBlendManager, vidSource]);
-
-  useEffect(() => {
-    depthBlendManager.setParams(params).catch(console.error);
-  }, [depthBlendManager, params]);
+    depthBlendManager.configure({ source: vidSource, params, settings: depthSettings });
+  }, [depthBlendManager, vidSource, params, depthSettings]);
 
   useEffect(() => {
     const unsubscribe = depthBlendManager.onTextures(textures => {
@@ -155,14 +152,4 @@ export function useDepthBlendWorker(vidSource: VideoSourceSrc) {
       cancelled = true;
     };
   }, [depthBlendManager, enabled, setInitializing, setEnabled]);
-
-  // Push runtime settings to worker whenever they change.
-  useEffect(() => {
-    depthBlendManager.setProcessingSettings({
-      frameRateLimit: depthSettings.frameRateLimit,
-      bgMargin: depthSettings.bgMargin,
-      renderMargin: depthSettings.renderMargin,
-      thresholdOffset: depthSettings.thresholdOffset,
-    });
-  }, [depthBlendManager, depthSettings]);
 }

@@ -6,6 +6,13 @@ const mocks = vi.hoisted(() => ({
   connected: Promise.resolve({ src: 'video' }) as Promise<{ src: string }>,
   camSource: { url: 'video' } as object | null,
   toast: { error: vi.fn(), dismiss: vi.fn() },
+  depthSettings: { frameRateLimit: 0.5 },
+  manager: {
+    configure: vi.fn(),
+    onTextures: vi.fn(() => () => {}),
+    start: vi.fn(async () => {}),
+    stop: vi.fn(async () => {}),
+  },
 }));
 
 vi.mock('@wbcnc/ui/components/sonner', () => ({ toast: mocks.toast }));
@@ -13,17 +20,7 @@ vi.mock('@wbcnc/go2webrtc/use-video-source', async () => {
   const { use } = await import('react');
   return { useVideoSource: () => use(mocks.connected) };
 });
-vi.mock('@/depth/depthBlendManager', () => {
-  const manager = {
-    setVideoSource: vi.fn(async () => {}),
-    setParams: vi.fn(async () => {}),
-    onTextures: vi.fn(() => () => {}),
-    start: vi.fn(async () => {}),
-    stop: vi.fn(async () => {}),
-    setProcessingSettings: vi.fn(),
-  };
-  return { DepthBlendManager: { getInstance: () => manager } };
-});
+vi.mock('@/depth/depthBlendManager', () => ({ DepthBlendManager: { getInstance: () => mocks.manager } }));
 vi.mock('@/store/store', () => ({
   useVideoUrl: () => 'video',
   useCamSource: () => mocks.camSource,
@@ -36,13 +33,14 @@ vi.mock('@/store/store', () => ({
   useSetDepthBlendInitializing: () => vi.fn(),
   useSetMaskTexture: () => vi.fn(),
   useSetBgTexture: () => vi.fn(),
-  useDepthSettings: () => ({}),
+  useDepthSettings: () => mocks.depthSettings,
 }));
 
 describe('DepthBlendWorker error reporting', () => {
   beforeEach(() => {
     mocks.toast.error.mockReset();
     mocks.toast.dismiss.mockReset();
+    mocks.manager.configure.mockClear();
     mocks.camSource = { url: 'video' };
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -69,5 +67,17 @@ describe('DepthBlendWorker error reporting', () => {
     });
     await vi.waitFor(() => expect(mocks.toast.error).toHaveBeenCalledTimes(1));
     expect(mocks.toast.error.mock.calls[0][0]).toBe('Error loading depth blend worker: No camera source found');
+  });
+
+  it('hands the source, parameters and settings to the manager in one call', async () => {
+    mocks.connected = Promise.resolve({ src: 'video' });
+    await act(async () => {
+      render(<DepthBlendWorker />);
+    });
+    await vi.waitFor(() => expect(mocks.manager.configure).toHaveBeenCalledTimes(1));
+    const config = mocks.manager.configure.mock.calls[0][0];
+    expect(config.source).toBe('video');
+    expect(config.params).toMatchObject({ outputSize: [1, 1], machineBounds: [-20, -20, 21, 21] });
+    expect(config.settings).toBe(mocks.depthSettings);
   });
 });

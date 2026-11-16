@@ -7,7 +7,7 @@ import { GridHeatmapTracker } from '../components/CoverageHeatmap';
 import { CalibrateInWorker } from '../lib/calibrateInWorker';
 import { CalibrationResult, CapturedFrame, Corner, PatternSize } from '../lib/calibrationTypes';
 import { createImageBlob } from '../lib/imageUtils';
-import type { FrameEvent, StreamCornerFinderWorkerAPI } from '../workers/streamCornerFinder.worker';
+import type { FrameEvent, FrameRejectedEvent, StreamCornerFinderWorkerAPI } from '../workers/streamCornerFinder.worker';
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -36,14 +36,11 @@ export interface CalibrationSettings {
 // -----------------------------------------------------------------------------
 
 interface CameraSlice {
-  stream: MediaStream | null;
   videoElement: HTMLVideoElement | null;
   frameWidth: number;
   frameHeight: number;
   isStreaming: boolean;
   cornerWorker: Comlink.Remote<StreamCornerFinderWorkerAPI> | null;
-  // Optional, externally provided max resolution of the stream.
-  maxResolution: Resolution | null;
   workerCleanup: (() => void) | null;
   // Promise for an in-flight startCamera call
   startPromise: Promise<void> | null;
@@ -56,11 +53,10 @@ interface CameraSlice {
   stopCamera: () => void;
   pauseProcessing: () => Promise<void>;
   resumeProcessing: () => Promise<void>;
-  setFrameDimensions: (width: number, height: number) => void;
   onLoadedMetadata: (el: HTMLVideoElement, maxResolution?: Resolution) => void;
 }
 
-type RejectedReason = 'blurry' | 'not_unique';
+type RejectedReason = FrameRejectedEvent['result'];
 
 interface ProcessingSlice {
   currentCorners: Corner[] | null;
@@ -75,12 +71,10 @@ interface ProcessingSlice {
 
 interface CaptureSlice {
   capturedFrames: CapturedFrame[];
-  selectedFrameId: string | null;
   showGallery: boolean;
   captureFrame: () => Promise<string | undefined>;
   deleteFrame: (id: string) => void;
   setShowGallery: (show: boolean) => void;
-  setSelectedFrame: (id: string | null) => void;
 }
 
 interface SettingsSlice {
@@ -119,14 +113,12 @@ function getAspectRatio({ width, height }: Resolution) {
 // -----------------------------------------------------------------------------
 
 const createCameraSlice: StateCreator<CalibrationState, [], [], CameraSlice> = (set, get) => ({
-  stream: null,
   videoElement: null,
   frameWidth: 0,
   frameHeight: 0,
   isStreaming: false,
   cornerWorker: null,
   workerCleanup: null,
-  maxResolution: null,
   startPromise: null,
   stopRequested: false,
   startingElement: null,
@@ -233,12 +225,9 @@ const createCameraSlice: StateCreator<CalibrationState, [], [], CameraSlice> = (
 
       if (!get().stopRequested) {
         set({
-          stream: source instanceof MediaStream ? source : null,
           videoElement: el,
-          maxResolution: resolution,
           isStreaming: true,
           capturedFrames: [],
-          selectedFrameId: null,
           currentCorners: null,
           currentFrameImageData: null,
           rejectedReason: null,
@@ -283,7 +272,6 @@ const createCameraSlice: StateCreator<CalibrationState, [], [], CameraSlice> = (
     }
 
     set({
-      stream: null,
       videoElement: null,
       isStreaming: false,
       frameWidth: 0,
@@ -291,7 +279,6 @@ const createCameraSlice: StateCreator<CalibrationState, [], [], CameraSlice> = (
       rejectedReason: null,
       currentCorners: null,
       currentFrameImageData: null,
-      selectedFrameId: null,
       detectionFps: 0,
       cornerWorker: null,
       workerCleanup: null,
@@ -321,8 +308,6 @@ const createCameraSlice: StateCreator<CalibrationState, [], [], CameraSlice> = (
       }
     }
   },
-
-  setFrameDimensions: (w, h) => set({ frameWidth: w, frameHeight: h }),
 });
 
 // Processing slice
@@ -361,7 +346,6 @@ const createProcessingSlice: StateCreator<CalibrationState, [], [], ProcessingSl
 
 const createCaptureSlice: StateCreator<CalibrationState, [], [], CaptureSlice> = (set, get) => ({
   capturedFrames: [],
-  selectedFrameId: null,
   showGallery: false,
 
   captureFrame: async () => {
@@ -399,14 +383,9 @@ const createCaptureSlice: StateCreator<CalibrationState, [], [], CaptureSlice> =
     }
   },
 
-  deleteFrame: id =>
-    set(state => ({
-      capturedFrames: state.capturedFrames.filter(f => f.id !== id),
-      selectedFrameId: state.selectedFrameId === id ? null : state.selectedFrameId,
-    })),
+  deleteFrame: id => set(state => ({ capturedFrames: state.capturedFrames.filter(f => f.id !== id) })),
 
   setShowGallery: show => set({ showGallery: show }),
-  setSelectedFrame: id => set({ selectedFrameId: id }),
 });
 
 // Settings slice
@@ -458,7 +437,7 @@ const createCalibrationResultSlice: StateCreator<CalibrationState, [], [], Calib
     // The worker only accepts poses that differ from all previously accepted ones; forget them as well.
     cornerWorker?.resetPoses().catch(console.error);
     heatmapTracker?.clear();
-    set(state => ({ capturedFrames: [], selectedFrameId: null, calibrationResult: null, heatmapTick: state.heatmapTick + 1 }));
+    set(state => ({ capturedFrames: [], calibrationResult: null, heatmapTick: state.heatmapTick + 1 }));
   },
 });
 

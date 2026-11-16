@@ -1,6 +1,5 @@
 import { useCamResolution, useMachineSize } from '@/store/store';
 import { useThree } from '@react-three/fiber';
-import { useMemo } from 'react';
 
 // Returns the scale factor from video pixels to world units.
 // Used as minimum for the camera, so the video is fully contained in the viewport.
@@ -23,23 +22,4 @@ export function useViewPortToMachineScale() {
   const containerAspect = size.width / size.height;
   const videoAspect = mw / mh;
   return containerAspect < videoAspect ? size.width / mw : size.height / mh;
-}
-
-export function useContain(videoWidth: number, videoHeight: number) {
-  const videoToWorldScale = useViewportToVideoScale();
-  console.log(
-    'videoToWorldScale',
-    videoToWorldScale,
-    videoWidth,
-    videoHeight,
-    videoToWorldScale * videoWidth,
-    videoToWorldScale * videoHeight
-  );
-  return useMemo(
-    () => ({
-      planeWidth: videoWidth * videoToWorldScale,
-      planeHeight: videoHeight * videoToWorldScale,
-    }),
-    [videoWidth, videoHeight, videoToWorldScale]
-  );
 }

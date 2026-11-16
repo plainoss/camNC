@@ -1,0 +1,30 @@
+{
+  "package": "occt-import-js",
+  "version": "0.0.23",
+  "gitTag": "0.0.23",
+  "gitCommit": "c2148e54b456b571238d35cac037d304053d64b2",
+  "occtVersion": "7.6.1",
+  "occtCommit": "d2abb6d844231cb8f29be6894440874a4700e4a5",
+  "npmTarball": "https://registry.npmjs.org/occt-import-js/-/occt-import-js-0.0.23.tgz",
+  "upstreamSource": "https://github.com/kovacsv/occt-import-js/tree/c2148e54b456b571238d35cac037d304053d64b2",
+  "occtSource": "https://github.com/Open-Cascade-SAS/OCCT/tree/d2abb6d844231cb8f29be6894440874a4700e4a5",
+  "sourceArchive": "occt-import-js-0.0.23-source.tgz",
+  "sourceArchiveSha256": "239f618fd2a0a562396bb432ce0e2943ad0e3d7503ac3c554bf96d01406dc409",
+  "wasmSha256": "33391fc9d94ea5c869a6718488bf0a9a464222bac9bdc764dfe1690cef281952",
+  "files": {
+    "Emscripten-3.1.69-LICENSE.txt": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86",
+    "OCCT-LGPL-2.1.txt": "090f8eb6ba63e72887c1f89b009fb1656cfda02d83b6e9805b20468520a5d77f",
+    "OCCT-LGPL-Exception-1.0.txt": "04580a884ea6cea294402649ff7b5cbb167d47462d1340a4ed33e550db10a81b",
+    "occt-import-js-0.0.23-source.tgz": "239f618fd2a0a562396bb432ce0e2943ad0e3d7503ac3c554bf96d01406dc409",
+    "occt-import-js-LGPL-2.1.txt": "7ffe1954587c77dfba1cf8eb9b2ea743671fa6e63f9e7a2f258119d42e14eefe"
+  },
+  "buildDependencies": {
+    "emscripten": "3.1.69 (tools/setup_emscripten_win.bat at the tag)"
+  },
+  "licenseSources": {
+    "occt-import-js-LGPL-2.1.txt": "Installed occt-import-js@0.0.23/LICENSE.md (byte-identical)",
+    "OCCT-LGPL-2.1.txt": "Installed occt-import-js@0.0.23/dist/license.occt.txt, identical to OCCT LICENSE_LGPL_21.txt at d2abb6d",
+    "OCCT-LGPL-Exception-1.0.txt": "OCCT_LGPL_EXCEPTION.txt at d2abb6d",
+    "Emscripten-3.1.69-LICENSE.txt": "https://raw.githubusercontent.com/emscripten-core/emscripten/3.1.69/LICENSE"
+  }
+}

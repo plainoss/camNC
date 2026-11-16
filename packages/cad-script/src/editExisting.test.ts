@@ -3,6 +3,7 @@ import { parseCadDocument } from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
 import { designSteps } from '@wbcnc/cad';
 import { editCad } from './edit';
+import { resolveHandle, resolveNamed } from './editExisting';
 import { compactCadReport } from './compactReport';
 
 const panel = () =>
@@ -172,5 +173,55 @@ describe('compact model reports', () => {
     expect(report.parts[0]!.cuts[0]).toMatchObject({ count: 10 });
     expect(report.parts[0]!.sketches[1]!.entities.filter(entity => entity.type === 'circle')).toHaveLength(1);
     expect(designSteps(result.document).filter(step => step.kind === 'cut')).toHaveLength(1);
+  });
+});
+
+describe('resolving a name or handle', () => {
+  const items = [
+    { id: 'abc-1', name: 'Side', alt: 'x1' },
+    { id: 'abd-2', name: 'Shelf', alt: 'x2' },
+    { id: 'Side-3', name: 'Shelf', alt: 'y3' },
+    { id: 'abc', name: 'Top', alt: 'y4' },
+  ];
+  const find = (query: string) =>
+    resolveNamed(
+      items,
+      query,
+      'board',
+      item => item.name,
+      item => item.alt
+    ).id;
+
+  it('prefers the only item with the name over an ID that starts with it', () => {
+    expect(find('Side')).toBe('abc-1');
+  });
+  it('refuses a name several items share', () => {
+    expect(() => find('Shelf')).toThrow('More than one board is named Shelf. Use its handle.');
+  });
+  it('takes a whole ID over the longer IDs it begins, and a whole second ID', () => {
+    expect(find('abc')).toBe('abc');
+    expect(find('x2')).toBe('abd-2');
+  });
+  it('takes an ID or second ID by its unambiguous start', () => {
+    expect(find('abd')).toBe('abd-2');
+    expect(find('y3')).toBe('Side-3');
+  });
+  it('refuses a start that fits several IDs, and one that fits none', () => {
+    expect(() => find('ab')).toThrow('The handle ab fits more than one board. Use more of it.');
+    expect(() => find('x')).toThrow('The handle x fits more than one board. Use more of it.');
+    expect(() => find('zz')).toThrow('There is no board with the handle zz.');
+  });
+  it('resolves a bare list of IDs the same way', () => {
+    expect(resolveHandle(['abc-1', 'abd-2'], 'abd', 'cut')).toBe('abd-2');
+    expect(() => resolveHandle(['abc-1', 'abd-2'], 'ab', 'cut')).toThrow('fits more than one cut');
+  });
+});
+
+describe('finding by a shared name', () => {
+  it('refuses a variable handle that fits none instead of removing another', async () => {
+    const start = await panel();
+    const result = await editCad(start.document, d => d.removeVariable('missing'));
+    expect(result.scriptError).toBe('There is no variable with the handle missing.');
+    expect(result.document).toEqual(start.document);
   });
 });

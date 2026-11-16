@@ -1,22 +1,22 @@
 import {
-  cadCopyName,
   cadFolderIssue,
   createCadFolder,
   createCadPart,
   designSteps,
   newCadId,
   renameCadExpressionVariables,
-  trimCadFolders,
   type CadDocument,
   type CadFolder,
 } from '@wbcnc/cad';
-import { fail, resolveHandle } from './editExisting';
-import type { CadScript, DesignEdit, PartCopy, ScriptStepEdit } from './editTypes';
+import { fail, resolveNamed, type ExistingEdit, type ExistingScope } from './editExisting';
+import type { CadScript, DesignEdit } from './editTypes';
 import { scopedConstruction } from './constructionApi';
 
 interface ScopeContext {
   get(): CadDocument;
   set(document: CadDocument): void;
+  /** The design's find and remove calls, limited to what the scope owns. */
+  existing(scope: ExistingScope): ExistingEdit;
 }
 export interface ScriptFolderRef {
   id: string;
@@ -44,17 +44,7 @@ export function runFolderScope(ctx: ScopeContext, root: DesignEdit, name: string
   if (typeof script !== 'function') return fail('A folder needs a script callback.');
   let folder: CadFolder;
   if (existing) {
-    const folders = ctx.get().folders ?? [];
-    const named = folders.filter(folder => folder.name === name);
-    if (named.length > 1) return fail(`Several folders are named ${name}; use its handle.`);
-    const id =
-      named[0]?.id ??
-      resolveHandle(
-        folders.map(folder => folder.id),
-        name,
-        'folder'
-      );
-    folder = folders.find(folder => folder.id === id)!;
+    folder = resolveNamed(ctx.get().folders ?? [], name, 'folder', folder => folder.name);
   } else {
     let unique = name.trim(),
       suffix = 2;
@@ -97,56 +87,31 @@ export function runFolderScope(ctx: ScopeContext, root: DesignEdit, name: string
         };
       },
     });
-  const findPart = (name: string) => {
-    const parts = ownedParts(),
-      matches = parts.filter(part => part.name === name);
-    if (matches.length > 1) return fail(`Several parts in ${current().name} are named ${name}; use a handle.`);
-    const id =
-      matches[0]?.id ??
-      resolveHandle(
-        parts.map(part => part.id),
-        name,
-        `part in ${current().name}`
-      );
-    return parts.find(part => part.id === id)!;
-  };
+  const {
+    findPart,
+    cut: _cut,
+    removeVariable: _removeVariable,
+    ...found
+  } = ctx.existing({
+    parts: ownedParts,
+    ownsStep: step => (step.kind === 'partCut' ? !!current().partCutIds?.includes(step.id) : current().partIds.includes(step.partId)),
+    label: folder.name,
+  });
+  // Only what these return goes through `wrap`: wrapping the calls themselves would rename a part, copy or step name that
+  // happens to equal a local variable.
+  const existingApi = Object.fromEntries(
+    Object.entries(found).map(([key, method]) => [
+      key,
+      (...args: never[]) => {
+        const result = (method as (...args: never[]) => unknown)(...args);
+        return result && typeof result === 'object' ? wrap(result) : result;
+      },
+    ])
+  ) as typeof found;
   const part = (name: string, options?: Parameters<DesignEdit['part']>[1]) =>
     wrap(root.part(findPart(name).id, translated(options, names) as typeof options));
-  const findCopy = (name: string): PartCopy => {
-    const copies = ownedParts().flatMap(part =>
-      (part.copies ?? []).map((copy, index) => ({ id: `${part.id}:${copy.id}`, copyId: copy.id, name: cadCopyName(part, index) }))
-    );
-    const matches = copies.filter(copy => copy.name === name);
-    if (matches.length > 1) return fail(`Several copies in ${current().name} are named ${name}; use a handle.`);
-    return wrap(
-      root.existingCopy(
-        matches[0]?.id ??
-          resolveHandle(
-            copies.flatMap(copy => [copy.id, copy.copyId]),
-            name,
-            `copy in ${current().name}`
-          )
-      )
-    );
-  };
-  const step = (name: string): ScriptStepEdit => {
-    const all = designSteps(ctx.get()).filter(step =>
-      step.kind === 'partCut' ? current().partCutIds?.includes(step.id) : current().partIds.includes(step.partId)
-    );
-    const matches = all.filter(step => step.label === name);
-    if (matches.length > 1) return fail(`Several steps in ${current().name} are named ${name}; use a handle.`);
-    return wrap(
-      root.step(
-        matches[0]?.id ??
-          resolveHandle(
-            all.map(step => step.id),
-            name,
-            `step in ${current().name}`
-          )
-      )
-    );
-  };
   const scoped: DesignEdit = {
+    ...existingApi,
     construction: options => root.construction(scopedConstruction(options, folderId, names, ownedParts(), ctx.get().constructions ?? [])),
     part,
     newPart(name, options) {
@@ -162,25 +127,6 @@ export function runFolderScope(ctx: ScopeContext, root: DesignEdit, name: string
       ctx.set({ ...document, parts });
       update({ partIds: [...members, made.id] });
       return part(made.id, options);
-    },
-    existingCopy: findCopy,
-    detachCopy(input, name) {
-      return wrap(root.detachCopy(findCopy(typeof input === 'string' ? input : input.id), name));
-    },
-    step,
-    removePart(input) {
-      root.removePart(findPart(typeof input === 'string' ? input : input.id).id);
-      ctx.set(trimCadFolders(ctx.get()));
-    },
-    removeCopy(input) {
-      root.removeCopy(findCopy(typeof input === 'string' ? input : input.id));
-    },
-    removePattern(input) {
-      root.removePattern(findPart(typeof input === 'string' ? input : input.id).id);
-    },
-    removeStep(input) {
-      root.removeStep(step(typeof input === 'string' ? input : input.id));
-      ctx.set(trimCadFolders(ctx.get()));
     },
     removeVariable(input) {
       const actual = names.get(input) ?? input;

@@ -15,13 +15,33 @@ async function fixture(t) {
   const require = createRequire(new URL('../../../../packages/cad/package.json', import.meta.url));
   const wasm = path.join(path.dirname(require.resolve('@salusoft89/planegcs')), 'planegcs_dist/planegcs.wasm');
   await copyFile(wasm, path.join(dir, 'assets/planegcs-fixture.wasm'));
+  const camRequire = createRequire(new URL('../../../../packages/cam/package.json', import.meta.url));
+  await copyFile(camRequire.resolve('occt-import-js/dist/occt-import-js.wasm'), path.join(dir, 'assets/occt-import-js-fixture.wasm'));
   return dir;
 }
 
 test('the shipped solver assets include exact notices, full licenses, native source and matching WASM', async t => {
   const result = await verifyDistribution(await fixture(t));
-  assert.equal(result.version, '1.3.0');
-  assert(result.sourceFiles > 50);
+  assert.equal(result.planegcs.version, '1.3.0');
+  assert(result.planegcs.sourceFiles > 50);
+});
+
+test('the shipped STEP reader assets include its notice, OCCT licenses and exception, source and matching WASM', async t => {
+  const result = await verifyDistribution(await fixture(t));
+  assert.equal(result['occt-import-js'].version, '0.0.23');
+  assert(result['occt-import-js'].sourceFiles > 20);
+});
+
+test('a deployable build cannot silently omit the STEP reader notice, OCCT exception or WASM', async t => {
+  let dir = await fixture(t);
+  await rm(path.join(dir, 'licenses/occt-import-js/THIRD_PARTY_NOTICES.md'));
+  await assert.rejects(verifyDistribution(dir), /ENOENT/);
+  dir = await fixture(t);
+  await rm(path.join(dir, 'licenses/occt-import-js/OCCT-LGPL-Exception-1.0.txt'));
+  await assert.rejects(verifyDistribution(dir), /ENOENT/);
+  dir = await fixture(t);
+  await writeFile(path.join(dir, 'assets/occt-import-js-fixture.wasm'), 'unrecorded replacement');
+  await assert.rejects(verifyDistribution(dir), /missing the licensed occt-import-js WASM/);
 });
 
 test('a deployable build cannot silently omit the LGPL notice', async t => {
