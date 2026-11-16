@@ -10,16 +10,19 @@ export const lengthText = (value: number, unit: CadLengthUnit) => String(value /
 const plainNumber = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
 /**
  * A field's plain number as it's shown, in a design measured in `unit`: with the fewest decimals that keep it within
- * 0.0001 mm, so 18 mm reads `0.70866` in inches rather than `0.7086614173228347`. Anything else is shown as it is.
+ * 0.0001 mm, so 18 mm reads `0.70866` in inches rather than `0.7086614173228347`, and a solved 5.000000000000001 mm
+ * reads `5`. Anything else is shown as it is.
  */
 export function shownLengthText(text: string, unit: CadLengthUnit): string {
-  if (unit === 'mm' || !plainNumber.test(text)) return text;
+  if (!plainNumber.test(text)) return text;
   const scale = lengthUnitScale(unit),
     value = Number(text) * scale;
   if (!Number.isFinite(value)) return text;
-  for (let decimals = 0; decimals < 8; decimals++) {
+  // In millimetres a typed length keeps every digit: only a solver's rounding noise is dropped.
+  const within = unit === 'mm' ? 4 * Number.EPSILON * Math.max(1, Math.abs(value)) : 1e-4;
+  for (let decimals = 0; decimals < 16; decimals++) {
     const shown = String(+(value / scale).toFixed(decimals));
-    if (Math.abs(Number(shown) * scale - value) < 1e-4) return shown.length < text.length ? shown : text;
+    if (Math.abs(Number(shown) * scale - value) < within) return shown.length < text.length ? shown : text;
   }
   return text;
 }

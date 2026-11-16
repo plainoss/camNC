@@ -10,7 +10,7 @@ import {
   extrudeStepProblem,
   isCadPart,
   isCadBody,
-  overlappedParts,
+  meetingParts,
   partIsBuiltOn,
   removalRegions,
   removeSupport,
@@ -37,7 +37,7 @@ import { FeatureDialog } from './FeatureDialog';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
 import { ThinWallFields } from './ThinWallFields';
-import { regionEntries } from './enclosedRegions';
+import { regionEntries, regionEntrySizes } from './enclosedRegions';
 
 interface PartDialogProps {
   document: CadDocument;
@@ -208,8 +208,8 @@ export function ExtrudeDialog({
         } else if (next === 'add') {
           const into = mergeable[0]!;
           // A solid face names the profile, not the body to join: that scope must be picked explicitly, as it must when
-          // the regions run into more than one part.
-          const touched = p.faceProfile ? [] : overlappedParts(current, p.id);
+          // the regions run into, or lie on, more than one part.
+          const touched = p.faceProfile ? [] : meetingParts(current, p.id);
           const only = touched.length === 1 ? mergeable.find(candidate => candidate.id === touched[0]) : undefined;
           made.addTo = p.faceProfile || touched.length > 1 ? '' : (only?.id ?? into.id);
           if (sharesSketch(into, p)) made.regions = (keptRegions(p, own) ?? []).filter(id => !into.regions!.includes(id));
@@ -263,7 +263,13 @@ export function ExtrudeDialog({
             ? `Face of ${sketchName}`
             : entries === 1
               ? `Faces of ${sketchName}`
-              : `${entries} faces of ${sketchName}`;
+              : null;
+  // Faces picked apart are listed one by one, as the reference lists them.
+  const listed =
+    selection ??
+    (alsoMade.length ? Array.from({ length: regionCount ?? 0 }, () => 1) : regionEntrySizes(document, part, part.regions ?? [])).map(
+      (size, i) => <span key={i}>{`${size > 1 ? 'Faces' : 'Face'} of ${sketchName}`}</span>
+    );
   const board = operation === 'remove' ? removeSupport(document, part) : null;
   const spatialRemove = isSpatialRemoval(part);
   const solidControls = operation !== 'remove';
@@ -347,7 +353,7 @@ export function ExtrudeDialog({
       {operation !== 'new' && (
         <div className="cad-feature-selection" data-active={stepProblem ? '' : undefined}>
           <small>{part.faceProfile ? 'Face to extrude' : operation === 'add' ? 'Regions to add' : 'Sketch to cut'}</small>
-          <span>{selection}</span>
+          <span className="cad-feature-selection-entries">{listed}</span>
           <button type="button" aria-pressed={profilePicking} onClick={onPickProfile}>
             Select profile
           </button>
@@ -508,7 +514,7 @@ export function ExtrudeDialog({
         {operation === 'new' && (
           <div className="cad-feature-selection" data-active={profileError && !part.regions?.length ? '' : undefined}>
             <small>{part.faceProfile ? 'Face to extrude' : 'Sketch to extrude'}</small>
-            <span>{selection}</span>
+            <span className="cad-feature-selection-entries">{listed}</span>
             <button type="button" aria-pressed={profilePicking} onClick={onPickProfile}>
               Select profile
             </button>

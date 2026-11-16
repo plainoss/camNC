@@ -269,6 +269,9 @@ export async function createAdapter(page, url) {
     await page.mouse.up();
   };
   const chooseTool = async name => {
+    // A tool with its own toolbar button, such as Linear pattern, is pressed there; others are in their family's menu.
+    const own = page.getByRole('toolbar', { name: 'Sketch toolbar' }).getByRole('button', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: \\(|$)`) });
+    if ((await own.count()) === 1) return own.click();
     const family = /arc|conic/i.test(name) ? 'Arc tools' : /rectangle/i.test(name) ? 'Rectangle tools' : 'Spline tools';
     await page.getByRole('button', { name: family, exact: true }).click();
     await page.locator('[role=menu][data-state=open]').getByRole('menuitem', { name, exact: true }).click();
@@ -430,11 +433,17 @@ export async function createAdapter(page, url) {
         return;
       }
       case 'check':
-        await page.getByLabel(rest, { exact: true }).check();
+      case 'uncheck': {
+        // A checkbox by its label, or a switch such as the drawing's Snap, pressed only when it isn't already so.
+        const toggle = page.getByRole('switch', { name: rest, exact: true });
+        if (await toggle.count()) {
+          if ((await toggle.getAttribute('aria-checked')) !== String(verb === 'check')) await toggle.click();
+          await settle();
+          return;
+        }
+        await page.getByLabel(rest, { exact: true })[verb]();
         return;
-      case 'uncheck':
-        await page.getByLabel(rest, { exact: true }).uncheck();
-        return;
+      }
       case 'hold':
         await page.keyboard.down(rest);
         return;
@@ -536,6 +545,37 @@ export async function createAdapter(page, url) {
         const value = args.pop();
         await page.getByLabel(new RegExp(`^${args.join(' ')}`)).fill(value);
         await page.keyboard.press('Enter');
+        return;
+      }
+      case 'fitview': {
+        // Zooms the drawing out, by the wheel as a person does, until the box from one corner to the other is in view:
+        // an empty sketch has nothing for Fit to frame, and a shape drawn off the screen can't be clicked.
+        const corners = args.map(point);
+        const box = await canvas.boundingBox();
+        if (!box) throw new Error('The drawing has no visible bounds');
+        const middle = [box.x + box.width / 2, box.y + box.height / 2];
+        const margin = 40;
+        for (let attempt = 0; ; attempt++) {
+          const seen = await Promise.all(corners.map(screen));
+          if (seen.every(([x, y]) => x > box.x + margin && x < box.x + box.width - margin && y > box.y + margin && y < box.y + box.height - margin)) return;
+          if (attempt >= 30) throw new Error(`The drawing would not zoom out to show ${rest}`);
+          await page.mouse.move(middle[0], middle[1]);
+          cursor = middle;
+          await page.mouse.wheel(0, 240);
+          await settle();
+        }
+      }
+      case 'labelclear': {
+        // A check: the label of the dimension being placed covers none of these drawing points, such as a second
+        // curve's edge the pointer is about to pick.
+        const labels = await page.locator('[data-dimension]').evaluateAll(nodes => nodes.map(node => {
+          const r = node.getBoundingClientRect();
+          return [r.left, r.top, r.right, r.bottom];
+        }));
+        for (const at of args.map(point)) {
+          const [x, y] = await screen(at);
+          if (labels.some(([l, t, r, b]) => x >= l && x <= r && y >= t && y <= b)) throw new Error(`A dimension label covers ${at.join(',')}`);
+        }
         return;
       }
       case 'reload':

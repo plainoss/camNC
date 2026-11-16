@@ -61,7 +61,7 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
-    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'featuremenu', 'menuitem', 'exportstep', 'savedesign'].includes(verb)) return base.step(text);
+    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'featuremenu', 'partmenu', 'menuitem', 'exportstep', 'savedesign'].includes(verb)) return base.step(text);
     if (!(await base.inDemo())) throw new Error('Studio workflow input requires demo mode');
     const since = await settledSnapshot(page);
     if (verb === 'viewpick') {
@@ -121,6 +121,12 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
         await features.getByRole('button', { name: 'More', exact: true }).click();
         await page.getByRole('menu').getByRole('menuitem', { name: rest, exact: true }).click();
       }
+    } else if (verb === 'partmenu') {
+      // A Parts list row's context menu, as `featuremenu` opens a Feature list row's; `menuitem` then picks from it.
+      const rows = page.getByRole('list', { name: 'Parts', exact: true }).getByRole('listitem').filter({ has: page.getByText(rest, { exact: true }) });
+      if (await rows.count() !== 1) throw new Error(`Part name must identify one rendered row: ${rest}`);
+      await rows.getByRole('button').first().click({ button: 'right' });
+      await page.getByRole('menu').waitFor();
     } else if (verb === 'selectpart') {
       const rows = page.getByRole('list', { name: 'Parts', exact: true }).getByRole('listitem').filter({ has: page.getByText(rest, { exact: true }) });
       if (await rows.count() !== 1) throw new Error(`Part name must identify one rendered row: ${rest}`);

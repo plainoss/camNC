@@ -82,6 +82,18 @@ const sharesEdge = (a: CadPoint[], b: CadPoint[]) =>
  * `touching` asks for parts it stands against side by side too, sharing a stretch of their outlines.
  */
 export function overlappedParts(document: CadDocument, partId: string, touching = false): string[] {
+  return partsMet(document, partId, touching ? 'sides' : 'volume');
+}
+
+/**
+ * The earlier parts a part meets: sharing volume with it, standing against it side by side, or, with `faces`, also
+ * lying on or under it face to face, as a sketch drawn on a part's top does with every part level with that top.
+ */
+export function meetingParts(document: CadDocument, partId: string): string[] {
+  return partsMet(document, partId, 'faces');
+}
+
+function partsMet(document: CadDocument, partId: string, how: 'volume' | 'sides' | 'faces'): string[] {
   const placed = resolveDrawnPlacements(document).document;
   const part = placed.parts.find(p => p.id === partId);
   if (!part?.placement) return [];
@@ -93,9 +105,11 @@ export function overlappedParts(document: CadDocument, partId: string, touching 
   return placed.parts.slice(0, placed.parts.indexOf(part)).flatMap(other => {
     if (!isCadPart(other) || other.id === part.id) return [];
     const theirs = footprint(other, normal, x, y);
-    return theirs &&
-      Math.min(own.hi, theirs.hi) - Math.max(own.lo, theirs.lo) > EPS &&
-      (overlaps(own.outline, theirs) || (touching && sharesEdge(own.outline, theirs.outline)))
+    if (!theirs) return [];
+    const shared = Math.min(own.hi, theirs.hi) - Math.max(own.lo, theirs.lo);
+    const over = overlaps(own.outline, theirs);
+    return (shared > EPS && (over || (how !== 'volume' && sharesEdge(own.outline, theirs.outline)))) ||
+      (how === 'faces' && shared > -EPS && over)
       ? [other.id]
       : [];
   });

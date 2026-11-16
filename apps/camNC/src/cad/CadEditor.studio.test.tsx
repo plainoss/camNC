@@ -916,7 +916,7 @@ it('picks a further region of the shared sketch in the view into the same extrud
   await waitFor(() => expect(latest().parts[1]!.regions).toEqual([narrow]));
   pickSketchRegion(wide);
   await waitFor(() => expect(latest().parts[1]!.regions).toEqual([narrow, wide]));
-  expect(within(dialog).getByText('2 faces of Sketch · Shelf')).toBeDefined();
+  expect(within(dialog).getAllByText('Face of Sketch · Shelf')).toHaveLength(2);
   expect(latest().parts).toHaveLength(2);
   pickSketchRegion(wide);
   await waitFor(() => expect(latest().parts[1]!.regions).toEqual([narrow]));

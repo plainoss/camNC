@@ -31,7 +31,7 @@ it('names the sketch to extrude as the feature list does, and picks all of its s
   const pick = within(dialog).getByRole('button', { name: 'Select profile' });
   if (pick.getAttribute('aria-pressed') !== 'true') await userEvent.click(pick);
   await userEvent.click(within(features).getByRole('button', { name: /^selectme/ }));
-  await waitFor(() => expect(chooser.textContent).toBe('3 faces of selectme'));
+  await waitFor(() => expect(chooser.textContent).toBe('Face of selectme'.repeat(3)));
   const target = latest().parts.find(part => part.name === 'Part 1')!;
   expect(target.regions).toHaveLength(3);
   expect(within(dialog).queryByRole('alert')).toBeNull();
@@ -49,7 +49,7 @@ it('names the sketch to extrude as the feature list does, and picks all of its s
   // Edited again, the feature's parts all follow, and keep their ids.
   await userEvent.dblClick(extrudes()[0]!);
   const again = await screen.findByRole('dialog', { name: 'Extrude 1' });
-  await waitFor(() => expect(again.querySelector('.cad-feature-selection span')!.textContent).toBe('3 faces of selectme'));
+  await waitFor(() => expect(again.querySelector('.cad-feature-selection span')!.textContent).toBe('Face of selectme'.repeat(3)));
   const thickness = within(again).getByRole('textbox', { name: /Thickness/ });
   await userEvent.clear(thickness);
   await userEvent.type(thickness, '30 mm{Enter}');
@@ -68,7 +68,7 @@ it('names the sketch to extrude as the feature list does, and picks all of its s
   expect(made()[0]!.regions).toHaveLength(3);
   expect(extrudes()).toHaveLength(1);
   await userEvent.click(within(operation).getByRole('tab', { name: 'New' }));
-  await waitFor(() => expect(third.querySelector('.cad-feature-selection span')!.textContent).toBe('3 faces of selectme'));
+  await waitFor(() => expect(third.querySelector('.cad-feature-selection span')!.textContent).toBe('Face of selectme'.repeat(3)));
   await userEvent.click(within(third).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(made()).toHaveLength(3));
   expect(extrudes()).toHaveLength(1);

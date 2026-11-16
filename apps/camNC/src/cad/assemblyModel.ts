@@ -14,6 +14,9 @@ import {
   isJoinedBody,
   consumedTools,
   physicalJoinedCopies,
+  missingRegionProblem,
+  sketchRegions,
+  CAD_CHORD_TOLERANCE,
   type CadDocument,
   type CadPart,
   type CadPlacement,
@@ -54,6 +57,9 @@ export interface AssemblyModel {
  * Every part and copy as a mesh where it sits in the assembly. Pieces without a placement lie flat in a row beside the
  * placed ones, so a new design shows something sensible before anything is placed.
  */
+/** Whether a part's sketch has nothing left to extrude. */
+const emptySketch = (part: CadPart) => !sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).length;
+
 export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = new Set()): AssemblyModel {
   // Where each part drawn on a plane or face is, from that face as it is now: a step changed without solving, such as a
   // thickness in the Extrude dialog, would otherwise leave the parts on it where it used to be.
@@ -68,7 +74,9 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
   // Bodies joined to a part by Extrude → Add are built as it is; a tool used up by a cut is only the cut it made.
   const consumed = consumedTools(document);
   const built = document.parts
-    .filter(part => isCadBody(document, part) && !consumed.has(part.id))
+    // An extrude of an emptied sketch is a failed feature that makes nothing; one that lost only some regions is still
+    // a part that can't be built, and is reported as one.
+    .filter(part => isCadBody(document, part) && !consumed.has(part.id) && !(missingRegionProblem(part) && emptySketch(part)))
     .map((part): Built => {
       try {
         const profile = geometry.parts ? undefined : evaluateCadPart(part).part;

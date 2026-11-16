@@ -447,6 +447,8 @@ describe('Extrude → Add of another sketch', () => {
     expect(isCadPart(boss)).toBe(false);
     const evaluated = evaluateCadDocument(document);
     expect(evaluated.parts.map(part => part.partId)).toEqual([block.id, boss.id]);
-    expect(cadPartsToCut(document, evaluated.parts).map(entry => entry.part.name)).toEqual(['Block', 'Boss']);
+    // Made, it's fused into the block as one solid: the block stepped up 10 where the boss stands.
+    const made = cadPartsToCut(document, evaluated.parts);
+    expect(made.map(entry => [entry.part.name, entry.part.thickness])).toEqual([['Block', 28]]);
   });
 });

@@ -98,6 +98,7 @@ import {
   type CadHistoryMark,
 } from '@wbcnc/cad-editor/session';
 import { DimensionGraphics } from './DimensionGraphics';
+import { draftLabelAt } from './draftLabelAt';
 import {
   idleDimensionWorkflow,
   transitionDimensionWorkflow,
@@ -1448,10 +1449,9 @@ export function CadEditor({
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   // A tool used up by its cut isn't a part of its own any more.
   // A part whose extrude wasn't built isn't a part yet.
+  const listed = dialog?.kind === 'transform' ? studioPreview.document : dialog?.kind === 'extrude' ? shownDocument : doc;
   const builtParts = studioSession
-    ? listedStudioParts(dialog?.kind === 'transform' ? studioPreview.document : doc, dialog, rolledBack).filter(
-        p => !unbuiltParts?.includes(p.id)
-      )
+    ? listedStudioParts(listed, dialog, rolledBack).filter(p => !unbuiltParts?.includes(p.id))
     : builtStudioParts(doc);
   const isolatePart = usePartIsolation(builtParts, cutSelection.selectedKey, hiddenParts, setHiddenParts);
   const physicalPartCount = builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0);
@@ -2391,7 +2391,7 @@ export function CadEditor({
                   constraint={dimensionDraft}
                   sketch={sketch}
                   pixelScale={markerScale}
-                  position={cursor}
+                  position={draftLabelAt(dimensionDraft, cursor, markerScale)}
                   selected
                   interactive={false}
                 />

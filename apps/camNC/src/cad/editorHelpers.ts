@@ -4,6 +4,7 @@ import {
   evaluateCadPart,
   extrudeLeadId,
   isCadPart,
+  meetingParts,
   solidSketchRegionIds,
   type CadDocument,
   type CadEntity,
@@ -80,7 +81,13 @@ export function extrudedSketch(document: CadDocument, sketch: CadPart, pickAll: 
   const on = made.drawnOn?.on;
   const face = on && 'partId' in on ? on.partId : null;
   const onto = face && document.parts.find(candidate => candidate.id === face);
-  if (onto && isCadPart(onto) && !(on && 'partId' in on && on.copyId)) made.addTo = extrudeMergeTarget(document, made, onto.id);
+  // Drawn on a part's face, it adds to that part, unless it also meets other parts, as level with that face: then it's
+  // a new part, and Merge with all or a merge scope is chosen by hand.
+  const alone = () => {
+    const placed = { ...document, parts: document.parts.map(p => (p.id === made.id ? made : p)) };
+    return meetingParts(placed, made.id).every(id => id === face);
+  };
+  if (onto && isCadPart(onto) && !(on && 'partId' in on && on.copyId) && alone()) made.addTo = extrudeMergeTarget(document, made, onto.id);
   if (pickAll && !made.regions && evaluateCadPart(made).diagnostics.some(d => d.severity === 'error')) {
     const solid = solidSketchRegionIds(made.sketch);
     if (solid.length > 1) made.regions = solid;

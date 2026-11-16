@@ -16,18 +16,19 @@ export const ALLOWED = {
   // A context menu is two selects: `featuremenu` (the right-click) and `menuitem` (the choice).
   // Double-clicking a row (`feature`) or a dimension label (`editdim`) selects it, and so does a dialog's choice list.
   select: {
-    steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'menuitem', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click'],
+    steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'partmenu', 'menuitem', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click'],
   },
   command: { steps: ['studiotool', 'key', 'tool'] },
   draw: { steps: ['rect', 'circle', 'line', 'arc'] },
   field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'field'], then: ['key Enter'] },
   confirm: { steps: ['dialogconfirm', 'closesketch', 'key Enter'] },
   cancel: { steps: ['dialogcancel', 'key Escape'] },
-  view: { steps: ['view', ...VIEW_KEYS.map(key => `key ${key}`)] },
+  // Zooming the drawing to show what's drawn next, and reopening the page, are what a person does to look.
+  view: { steps: ['view', 'fitview', 'reload', ...VIEW_KEYS.map(key => `key ${key}`)] },
 };
 
 /** Steps that look or record without being an input a person makes. */
-const FREE = new Set(['frame', 'shot', 'checkpoint', 'exportstep', 'savedesign', 'state']);
+const FREE = new Set(['frame', 'shot', 'checkpoint', 'exportstep', 'savedesign', 'state', 'labelclear']);
 
 const verbOf = step => step.trim().split(/\s+/, 1)[0];
 const matches = (step, allowed) => allowed.some(entry => (entry.includes(' ') ? step.trim() === entry : verbOf(step) === entry));

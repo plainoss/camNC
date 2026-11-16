@@ -2,11 +2,12 @@ import { addLine, createCadPart } from './document';
 import { cadDrawnOnSupports, effectivePlacement, resolveDrawnPlacements } from './drawnOn';
 import { isJoinedBody } from './extrudeSteps';
 import { overlappedParts } from './partOverlap';
-import { evaluateCadFeatures, isCadPart } from './features';
+import { cadSketchRegions, evaluateCadFeatures, isCadPart } from './features';
+import { flipUnderside } from './featureModel';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, pointInPolygon } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
 import { regionInteriorPoint, sketchRegions } from './sketchRegions';
-import type { CadCut, CadDocument, CadPart, CadPartCut, CadPlacement, CadPoint, EvaluatedCadPart } from './types';
+import type { CadCut, CadDocument, CadFaceSketch, CadPart, CadPartCut, CadPlacement, CadPoint, EvaluatedCadPart } from './types';
 
 const kSame = 1e-6;
 /** The smallest step a union leaves between parts of different heights; less is the same height. */
@@ -32,8 +33,9 @@ export interface UnionInput {
 
 /**
  * One part of the parts a Boolean › Union joins, in the first one's place and name: their outlines joined, as high as
- * the highest, and stepped down from the top where only lower ones were. It joins plain boards drawn on one plane and
- * extruded the same way from it; anything else is refused with the reason, as joining it needs a solid of another kind.
+ * the highest, stepped down from the top where only lower ones were and pocketed from below where every one starts
+ * higher. It joins plain boards drawn on planes parallel to the first one's, from that plane up, each extruded one way
+ * along its normal; anything else is refused with the reason, as joining it needs a solid of another kind.
  */
 export function unitedPart(
   host: UnionInput,
@@ -44,43 +46,146 @@ export function unitedPart(
   for (const { shape, source } of all) {
     if (shape.holes.length || shape.cuts?.length)
       return { refused: `${shape.name} has holes or cuts, which a union or intersection can't keep yet.` };
-    if (source.drawnOn?.inward || source.symmetric || source.thin) return { refused: `${shape.name} isn't extruded up from its sketch.` };
+    if (source.symmetric || source.thin) return { refused: `${shape.name} isn't extruded one way from its sketch.` };
   }
-  // Every outline in the first part's sketch coordinates, on its sketch plane.
+  // Every outline in the first part's sketch coordinates, and how high each body runs above its sketch plane: a body
+  // drawn on a plane parallel to it, extruded either way along its normal, is a slab between two heights.
   const outlines: CadPoint[][] = [];
+  const spans: [number, number][] = [];
   for (const { shape, at } of all) {
     const points = shape.outline.map(p => toLocal(host.at, toWorld(at, [p.x, p.y, 0])));
     const up = toLocal(host.at, toWorld(at, [shape.outline[0]!.x, shape.outline[0]!.y, 1]));
-    const tilt = [up[0] - points[0]![0], up[1] - points[0]![1], up[2] - points[0]![2] - 1];
-    if (points.some(p => Math.abs(p[2]) > kSame) || tilt.some(v => Math.abs(v) > kSame))
-      return { refused: `${shape.name} isn't drawn on the same plane, extruded the same way, as ${host.shape.name}.` };
+    const along = up[2] - points[0]![2];
+    const tilt = [up[0] - points[0]![0], up[1] - points[0]![1], Math.abs(along) - 1];
+    const level = points[0]![2];
+    if (points.some(p => Math.abs(p[2] - level) > kSame) || tilt.some(v => Math.abs(v) > kSame))
+      return { refused: `${shape.name} isn't drawn on a plane parallel to ${host.shape.name}'s, extruded along its normal.` };
     outlines.push(points.map(([x, y]) => ({ x, y })));
+    spans.push(along > 0 ? [level, level + shape.thickness] : [level - shape.thickness, level]);
   }
+  // The joined part stands on the first part's sketch plane; one reaching below it would have to move it.
+  if (spans.some(([low]) => low < -kSame))
+    return { refused: `A part reaches below ${host.shape.name}'s sketch plane, which a union can't join yet.` };
   let sketch = createCadPart('Union').sketch;
   for (const outline of outlines)
     outline.forEach((a, i) => {
       const b = outline[(i + 1) % outline.length]!;
       sketch = addLine(sketch, { x1: a.x, y1: a.y, x2: b.x, y2: b.y });
     });
-  // An intersection keeps only what every board shares, as high as the lowest of them.
-  const height = (operation === 'union' ? Math.max : Math.min)(...all.map(({ shape }) => shape.thickness));
+  // What a region of the joined outline is filled between: the covering slabs joined, or for an intersection shared.
+  const filled = (inside: CadPoint): [number, number] | null | 'gap' => {
+    const covering = spans.filter((_, i) => pointInPolygon(inside, outlines[i]!));
+    if (!covering.length || (operation === 'intersect' && covering.length < all.length)) return null;
+    if (operation === 'intersect') {
+      const low = Math.max(...covering.map(([l]) => l)),
+        high = Math.min(...covering.map(([, h]) => h));
+      return high - low >= kMinStep ? [low, high] : null;
+    }
+    const sorted = [...covering].sort((a, b) => a[0] - b[0]);
+    const low = sorted[0]![0];
+    let high = sorted[0]![1];
+    for (const [l, h] of sorted.slice(1)) {
+      if (l > high + kSame) return 'gap';
+      high = Math.max(high, h);
+    }
+    return [low, high];
+  };
   const regions: string[] = [];
   const cuts: CadCut[] = [];
-  for (const region of sketchRegions(sketch, CAD_CHORD_TOLERANCE)) {
+  const kept: [number, number][] = [];
+  const topRegions = sketchRegions(sketch, CAD_CHORD_TOLERANCE);
+  for (const region of topRegions) {
     const inside = regionInteriorPoint(region.points);
-    if (!inside) continue;
-    const covering = all.filter((_, i) => pointInPolygon(inside, outlines[i]!));
-    if (!covering.length || (operation === 'intersect' && covering.length < all.length)) continue;
+    const span = inside && filled(inside);
+    if (span === 'gap') return { refused: 'The parts would leave a gap between them, which a union can’t join yet.' };
+    if (!span) continue;
     regions.push(region.id);
-    const step = height - Math.max(...covering.map(({ shape }) => shape.thickness));
-    if (step >= kMinStep) cuts.push({ type: 'cut', id: `union:${region.id}`, sketchId: sketch.id, regionId: region.id, depth: step });
+    kept.push(span);
   }
-  const joined: CadPart = { ...createCadPart(host.shape.name, height), id: host.shape.partId, sketch, regions, features: cuts };
+  if (!kept.length) return { refused: `${host.shape.name} can't be joined with its tools.` };
+  // A union joins bodies that meet: over an area where their slabs touch, or side by side where their slabs overlap.
+  if (operation === 'union' && !connected(outlines, spans, topRegions))
+    return { refused: 'The parts don’t all touch, so a union would leave them apart.' };
+  // Nor can a part start above the first part's sketch plane, as an intersection sunk into its top would.
+  if (Math.min(...kept.map(([low]) => low)) >= kMinStep)
+    return { refused: `What's kept starts above ${host.shape.name}'s sketch plane, which can't be made yet.` };
+  const height = Math.max(...kept.map(([, high]) => high));
+  regions.forEach((regionId, i) => {
+    const step = height - kept[i]![1];
+    if (step >= kMinStep) cuts.push({ type: 'cut', id: `union:${regionId}`, sketchId: sketch.id, regionId, depth: step });
+  });
+  // Where every slab starts above the sketch plane, the part is pocketed from its underside up to the lowest of them.
+  let joined: CadPart = { ...createCadPart(host.shape.name, height), id: host.shape.partId, sketch, regions, features: cuts };
+  if (kept.some(([low]) => low >= kMinStep)) {
+    let under = createCadPart('Union underside').sketch;
+    for (const outline of outlines) {
+      const flipped = flipUnderside(outline);
+      flipped.forEach((a, i) => {
+        const b = flipped[(i + 1) % flipped.length]!;
+        under = addLine(under, { x1: a.x, y1: a.y, x2: b.x, y2: b.y });
+      });
+    }
+    const face: CadFaceSketch = { type: 'sketch', id: `${host.shape.partId}:union-underside`, on: 'underside', sketch: under };
+    const withFace = { ...joined, features: [...cuts, face] };
+    const lifted: CadCut[] = [];
+    for (const region of cadSketchRegions(withFace, under.id)) {
+      const inside = regionInteriorPoint(region.points);
+      const span = inside && filled({ x: -inside.x, y: inside.y });
+      if (span && span !== 'gap' && span[0] >= kMinStep)
+        lifted.push({ type: 'cut', id: `union:under:${region.id}`, sketchId: under.id, regionId: region.id, depth: span[0] });
+    }
+    if (lifted.length) joined = { ...withFace, features: [...withFace.features, ...lifted] };
+  }
   const profile = evaluateCadPart(joined).part;
   const result = profile && evaluateCadFeatures(joined, profile);
   const problem = result?.diagnostics.find(d => d.severity === 'error');
   if (!result || problem) return { refused: problem?.message ?? `${host.shape.name} can't be joined with its tools.` };
   return { part: { ...result.part, partId: host.shape.partId, name: host.shape.name } };
+}
+
+/** Whether every body meets the first, directly or through others, by an area or a shared side. */
+function connected(outlines: CadPoint[][], spans: [number, number][], regions: { points: CadPoint[] }[]): boolean {
+  const n = outlines.length;
+  const meets = (i: number, j: number) => {
+    const [a, b] = [spans[i]!, spans[j]!];
+    const overlap = Math.min(a[1], b[1]) - Math.max(a[0], b[0]);
+    if (overlap < -kSame) return false;
+    // Over an area: some region both cover, their slabs touching or overlapping.
+    const over = regions.some(region => {
+      const inside = regionInteriorPoint(region.points);
+      return !!inside && pointInPolygon(inside, outlines[i]!) && pointInPolygon(inside, outlines[j]!);
+    });
+    // Side by side: their outlines share a side, and their slabs overlap in height, so they share a face.
+    return over || (overlap >= kMinStep && sharesSide(outlines[i]!, outlines[j]!));
+  };
+  const reached = new Set([0]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (let j = 0; j < n; j++)
+      if (!reached.has(j) && [...reached].some(i => meets(i, j))) {
+        reached.add(j);
+        grew = true;
+      }
+  }
+  return reached.size === n;
+}
+
+/** Whether two outlines have collinear sides that overlap along a length, as boards side by side do. */
+function sharesSide(a: CadPoint[], b: CadPoint[]): boolean {
+  const sides = (points: CadPoint[]) => points.map((p, i) => [p, points[(i + 1) % points.length]!] as const);
+  for (const [p, q] of sides(a))
+    for (const [r, t] of sides(b)) {
+      const dx = q.x - p.x,
+        dy = q.y - p.y,
+        length = Math.hypot(dx, dy);
+      if (length < kSame) continue;
+      const off = (point: CadPoint) => Math.abs((point.x - p.x) * dy - (point.y - p.y) * dx) / length;
+      if (off(r) > CAD_CHORD_TOLERANCE || off(t) > CAD_CHORD_TOLERANCE) continue;
+      const along = (point: CadPoint) => ((point.x - p.x) * dx + (point.y - p.y) * dy) / length;
+      const [lo, hi] = [Math.min(along(r), along(t)), Math.max(along(r), along(t))];
+      if (Math.min(hi, length) - Math.max(lo, 0) > kMinStep) return true;
+    }
+  return false;
 }
 
 const unions = new WeakMap<CadDocument, Map<string, { part: EvaluatedCadPart } | { refused: string }>>();
