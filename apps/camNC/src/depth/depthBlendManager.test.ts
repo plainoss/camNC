@@ -25,9 +25,8 @@ function setup() {
   // Likewise for a settings update.
   const settingsUpdate = { result: (): Promise<void> => Promise.resolve() };
   const proxy: VideoPipelineWorkerAPI = {
-    init: async (stream, cfg) => {
-      const width = cfg.mode === 'none' ? 0 : cfg.params.outputSize[0];
-      calls.push(`init:${streams.get(stream)}:${width}`);
+    init: async (stream, params) => {
+      calls.push(`init:${streams.get(stream)}:${params.outputSize[0]}`);
       await init.result();
     },
     start: async cb => {

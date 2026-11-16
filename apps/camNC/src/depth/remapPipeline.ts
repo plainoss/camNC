@@ -5,21 +5,6 @@ import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { REMAP_PARAMS_STRUCT, UNDISTORT_WGSL } from './sharedShaders';
 import { createRemapUniform, generateMachineToCamMatrix, padMat3 } from './webgpu-helpers';
 
-export interface WebGPUPipelineStep<TParams> {
-  /**
-   * Run the GPU step.
-   * @param srcTex Source texture to read from (must have TEXTURE_BINDING usage).
-   * @param params Parameters for this processing step (not cached in the step instance).
-   * @param dstTex Optional destination texture. If omitted the step will lazily allocate its own
-   *               output texture that matches the expected descriptor. When provided the caller is
-   *               responsible for keeping / re-using the texture across frames which avoids
-   *               per-frame allocations.
-   * @returns The texture that now contains the processed result – i.e. `dstTex` if it was
-   *          supplied, otherwise the internally allocated texture.
-   */
-  process(srcTex: GPUTexture, params: TParams, dstTex?: GPUTexture): Promise<GPUTexture>;
-}
-
 export interface RemapStepParams {
   outputSize: [number, number];
   machineBounds: [number, number, number, number];
@@ -34,7 +19,7 @@ export interface RemapStepParams {
   combinedProjectionMatrix?: Matrix3;
 }
 
-export class CamToMachineStep implements WebGPUPipelineStep<RemapStepParams> {
+export class CamToMachineStep {
   private device: GPUDevice;
   private pipeline: GPUComputePipeline;
   private sampler: GPUSampler;
@@ -137,7 +122,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   }
 }
 
-export class MachineToCamStep implements WebGPUPipelineStep<{ params: RemapStepParams; scale: [number, number] }> {
+export class MachineToCamStep {
   private device: GPUDevice;
   private pipeline: GPUComputePipeline;
   private sampler: GPUSampler;
@@ -264,7 +249,7 @@ export interface UndistortParams {
 
 // Undistort is now just a special case of CamToMachineStep with identity
 // transform and bounds equal to output pixel extents.
-export class UndistortStep implements WebGPUPipelineStep<UndistortParams> {
+export class UndistortStep {
   private inner: CamToMachineStep;
 
   constructor(device: GPUDevice) {
