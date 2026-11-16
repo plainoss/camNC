@@ -504,7 +504,12 @@ it('renames a part from its row in the Parts list, leaving its features named as
   const parts = screen.getByRole('region', { name: 'Parts panel' });
   fireEvent.contextMenu(within(parts).getByRole('button', { name: new RegExp(`^${before}$`) }));
   const menu = screen.getByRole('menu', { name: `${before} actions` });
-  expect([...menu.querySelectorAll('[role=menuitem]')].map(item => item.textContent)).toEqual(['Rename', 'Hide', 'Export…']);
+  expect([...menu.querySelectorAll('[role=menuitem]')].map(item => item.textContent)).toEqual([
+    'Rename',
+    'Hide',
+    'Make transparent…',
+    'Export…',
+  ]);
   await userEvent.click(within(menu).getByRole('menuitem', { name: 'Rename' }));
   const name = within(parts).getByRole('textbox', { name: `New name for ${before}` });
   await userEvent.clear(name);

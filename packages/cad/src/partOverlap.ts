@@ -94,6 +94,8 @@ export function meetingParts(document: CadDocument, partId: string): string[] {
 }
 
 function partsMet(document: CadDocument, partId: string, how: 'volume' | 'sides' | 'faces'): string[] {
+  const drawn = document.parts.find(p => p.id === partId)?.drawnOn?.on;
+  const onFace = !!drawn && 'partId' in drawn;
   const placed = resolveDrawnPlacements(document).document;
   const part = placed.parts.find(p => p.id === partId);
   if (!part?.placement) return [];
@@ -109,7 +111,9 @@ function partsMet(document: CadDocument, partId: string, how: 'volume' | 'sides'
     const shared = Math.min(own.hi, theirs.hi) - Math.max(own.lo, theirs.lo);
     const over = overlaps(own.outline, theirs);
     return (shared > EPS && (over || (how !== 'volume' && sharesEdge(own.outline, theirs.outline)))) ||
-      (how === 'faces' && shared > -EPS && over)
+      // Face to face where it's sketched on a part's face and so stands on every part level with that face; one drawn on a
+      // plane that only touches a part isn't standing on it.
+      (how === 'faces' && onFace && shared > -EPS && Math.abs(own.lo - theirs.hi) <= EPS && over)
       ? [other.id]
       : [];
   });
