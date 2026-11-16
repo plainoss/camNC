@@ -1508,6 +1508,7 @@ export function CadEditor({
         ])}
         selectedKey={cutSelection.selectedKey}
         hiddenParts={hiddenParts}
+        transparent={studioSession ? [transparentParts, setTransparentParts] : undefined}
         onToggleHidden={key => setHiddenParts(previous => toggledKey(previous, key))}
         trouble={partTrouble}
         onPick={(partId, copyId) => {

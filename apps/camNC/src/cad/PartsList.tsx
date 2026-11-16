@@ -2,6 +2,7 @@ import { useDesignUnits } from './designUnits';
 import { edgeFilletProblems, type CadDocument, type CadFolder, type CadPart } from '@wbcnc/cad';
 import { useCallback, useState } from 'react';
 import { PartRowMenu } from './PartRowMenu';
+import { MakeTransparentPanel } from './MakeTransparentPanel';
 import { ExportDialog, type ExportTarget } from './export/ExportDialog';
 import { shownPartsTarget } from './export/shownPartsTarget';
 
@@ -31,7 +32,10 @@ export function PartsList({
   folders = document?.folders,
   onSketchCopy,
   onDetachCopy,
+  transparent,
 }: {
+  /** The parts made see-through in the view, and how to change them, as the Part menu's Make transparent does. */
+  transparent?: [ReadonlySet<string>, (keys: ReadonlySet<string>) => void];
   rows: PartsListRow[];
   folders?: CadFolder[];
   onSketchCopy?: (partId: string, copyId: string, face: 'top' | 'underside') => void;
@@ -55,6 +59,7 @@ export function PartsList({
   const [menu, setMenu] = useState<{ key: string; name: string; x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [exporting, setExporting] = useState<ExportTarget | null>(null);
+  const [seeThrough, setSeeThrough] = useState(false);
   const closeMenu = useCallback(() => setMenu(null), []);
   // A Fillet step that leaves corners sharp is a problem with the part too, as the check reports it.
   const problemOf = (part: CadPart) => trouble(part.id) || edgeFilletProblems(part)[0]?.message;
@@ -148,6 +153,29 @@ export function PartsList({
           items={[
             { label: 'Rename', onSelect: () => setRenaming(menu.key) },
             { label: hiddenParts.has(menu.key) ? 'Show' : 'Hide', onSelect: () => onToggleHidden(menu.key) },
+            ...(transparent
+              ? [
+                  {
+                    label: 'Make transparent…',
+                    onSelect: () => {
+                      transparent[1](new Set([...transparent[0], menu.key]));
+                      setSeeThrough(true);
+                    },
+                  },
+                  // While parts are see-through, any part's menu can end it.
+                  ...(transparent[0].size || seeThrough
+                    ? [
+                        {
+                          label: 'Exit make transparent',
+                          onSelect: () => {
+                            transparent[1](new Set());
+                            setSeeThrough(false);
+                          },
+                        },
+                      ]
+                    : []),
+                ]
+              : []),
             ...(() => {
               const row = rows.find(row => row.key === menu.key);
               const exportDocument = studio ? document : undefined;
@@ -179,6 +207,14 @@ export function PartsList({
         />
       )}
       <ExportDialog target={exporting} unit={lengthUnit} onClose={() => setExporting(null)} />
+      {transparent && seeThrough && (
+        <MakeTransparentPanel
+          onClose={() => {
+            transparent[1](new Set());
+            setSeeThrough(false);
+          }}
+        />
+      )}
     </>
   );
 }
