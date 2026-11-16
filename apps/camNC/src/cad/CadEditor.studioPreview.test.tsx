@@ -44,7 +44,11 @@ async function studio(document = plate()) {
 }
 async function transform() {
   await userEvent.click(await studioCommand(/Transform/));
-  return screen.findByRole('dialog', { name: /^Transform/ });
+  const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  // A new Transform starts with nothing picked, on Translate by line: pick the part, and move by X, Y and Z.
+  await userEvent.click(screen.getByRole('list', { name: 'Parts' }).querySelector<HTMLButtonElement>('li > button')!);
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'xyz');
+  return dialog;
 }
 async function typeX(dialog: HTMLElement, value: string) {
   const field = within(dialog).getByRole('textbox', { name: 'X' });
@@ -91,7 +95,7 @@ it('previews edits to one existing transformed copy without accumulating copies 
   const { change } = await studio(resolvePartPatterns(source));
   expect(viewport().meshes).toHaveLength(2);
   const features = screen.getByRole('region', { name: 'Features' });
-  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · / }));
+  await userEvent.dblClick(within(features).getByRole('button', { name: /^Transform \d/ }));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
   change.mockClear();
   const copyIndex = () => viewport().instanceIds!.findIndex(id => id.endsWith('/shifted'));

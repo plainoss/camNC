@@ -111,7 +111,8 @@ export function openStudioFeature(
   const { chooseTool, cutSelection, documentRef, openDialog, setSelected, setSelectedFace, setShowWorkspace } = editor;
   partId = featureLeadId(documentRef.current, kind, partId);
   setSelectedFace(null);
-  cutSelection.selectPart(partId);
+  // Opened on, not chosen: a dialog opened next starts with nothing picked.
+  cutSelection.selectPart(partId, undefined, undefined, false);
   setSelected([]);
   chooseTool('select');
   setShowWorkspace(true);
@@ -172,7 +173,8 @@ export function openStudioSketch(editor: StudioNavigationInput, stepPartId: stri
   // An Extrude dialog the sketch was opened from is dropped, not cancelled: its extrude stays.
   closeDialog();
   setChoosingFace(false);
-  cutSelection.selectPart(partId);
+  // Opened on, not chosen: a dialog opened next starts with nothing picked.
+  cutSelection.selectPart(partId, undefined, undefined, false);
   setSelected([]);
   setShowWorkspace(false);
   setShow3D(false);

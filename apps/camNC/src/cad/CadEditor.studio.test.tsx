@@ -115,6 +115,16 @@ it.each(['Cancel', 'Escape'])('restores a cancelled studio sketch and its drawn 
   await waitFor(() => expect(latest().parts.some(part => part.id === kept.id)).toBe(false));
 });
 
+/**
+ * A new Transform starts with nothing picked, on Translate by line: the part is picked from the Parts list, as a person
+ * does, and the type set to X, Y and Z, which these tests start from.
+ */
+async function pickFirstPart() {
+  const row = screen.getByRole('list', { name: 'Parts' }).querySelector<HTMLButtonElement>('li > button')!;
+  await userEvent.click(row);
+  await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Transform type' }), 'xyz');
+}
+
 it('confirms a studio sketch from the empty-canvas context menu and keeps its line', async () => {
   const { latest, canvas } = await newStudioSketch();
   await drawStudioLine(canvas);
@@ -701,7 +711,8 @@ it('moves a part with a transform when Copy part is off, as the reference does b
   const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(await studioCommand(/Transform/));
-  const dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  const dialog = await screen.findByRole('dialog', { name: /^Transform \d/ });
+  await pickFirstPart();
   expect(within(dialog).getByRole('checkbox', { name: 'Copy part' })).toHaveProperty('checked', false);
   const z = within(dialog).getAllByRole('textbox')[2]!;
   await userEvent.clear(z);
@@ -712,14 +723,15 @@ it('moves a part with a transform when Copy part is off, as the reference does b
   expect(latest().parts[0]!.copies).toBeUndefined();
   // It's a step of its own, opened again to change.
   const features = screen.getByRole('region', { name: 'Features' });
-  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Plate/ }));
-  const again = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /^Transform 1/ }));
+  const again = await screen.findByRole('dialog', { name: /^Transform \d/ });
   expect(within(again).queryByRole('checkbox', { name: 'Copy part' })).toBeNull();
   expect(within(again).getAllByRole('textbox')[2]).toHaveProperty('value', '40');
   await userEvent.click(within(again).getByRole('button', { name: 'Cancel' }));
   // Another transform from the toolbar moves it on from there, keeping the first move.
   await userEvent.click(await studioCommand(/Transform/));
-  const more = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  const more = await screen.findByRole('dialog', { name: /^Transform \d/ });
+  await pickFirstPart();
   const z2 = within(more).getAllByRole('textbox')[2]!;
   await userEvent.clear(z2);
   await userEvent.type(z2, '10');
@@ -732,7 +744,8 @@ it('copies a part with a transform, and edits the copy from its feature', async 
   const { latest } = await studio();
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(await studioCommand(/Transform/));
-  let dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  let dialog = await screen.findByRole('dialog', { name: /^Transform \d/ });
+  await pickFirstPart();
   // A transform moves the part unless Copy part is on, as in the reference.
   await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
   const x = within(dialog).getAllByRole('textbox')[0]!;
@@ -742,8 +755,8 @@ it('copies a part with a transform, and edits the copy from its feature', async 
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest().parts[0]!.copies?.[0]).toMatchObject({ mirrored: true, offset: { position: [250, 0, 0] } }));
   const features = screen.getByRole('region', { name: 'Features' });
-  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Plate 2/ }));
-  dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /^Transform 1/ }));
+  dialog = await screen.findByRole('dialog', { name: /^Transform \d/ });
   expect(within(dialog).getAllByRole('textbox')[0]).toHaveProperty('value', '250');
   // The copy is a part of its own in the parts list, with its own eye.
   const panel = screen.getByRole('region', { name: 'Parts panel' });
@@ -1075,6 +1088,7 @@ it('copies a part by a distance along a plane picked for the direction, as the r
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(await studioCommand(/Transform/));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  await pickFirstPart();
   await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'distance');
   // The Direction box waits for a plane or face; one from the feature list fills it.
@@ -1090,7 +1104,7 @@ it('copies a part by a distance along a plane picked for the direction, as the r
   // The front plane faces -Y, so the copy sits 30 mm that way.
   expect(latest().parts[0]!.copies![0]!.offset!.position).toEqual([0, -30, 0]);
   // Switched to X, Y and Z, it no longer follows the plane.
-  fireEvent.contextMenu(within(features).getByRole('button', { name: /Transform · / }));
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /^Transform \d/ }));
   await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Edit…' }));
   const again = await screen.findByRole('dialog', { name: /^Transform/ });
   await userEvent.selectOptions(within(again).getByRole('combobox', { name: 'Transform type' }), 'xyz');
@@ -1120,7 +1134,7 @@ it('moves a part so a corner of it lands on a corner of another, by mate connect
   await userEvent.click(within(panel).getByRole('button', { name: /^▱?\s*Boss/ }));
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(await studioCommand(/Transform/));
-  const dialog = await screen.findByRole('dialog', { name: 'Transform · Boss' });
+  const dialog = await screen.findByRole('dialog', { name: /^Transform \d/ });
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'mate');
   // The first connector has to be on the part itself.
   await userEvent.click(within(dialog).getByRole('button', { name: 'Mate connector' }));
@@ -1136,8 +1150,8 @@ it('moves a part so a corner of it lands on a corner of another, by mate connect
   await waitFor(() => expect(latest().parts[1]!.moved).toEqual({ by: [160, 60, 0] }));
   // Its top onto the base's top turns it over first, about the point picked.
   const features = screen.getByRole('region', { name: 'Features' });
-  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Boss/ }));
-  const again = await screen.findByRole('dialog', { name: 'Transform · Boss' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /^Transform 1/ }));
+  const again = await screen.findByRole('dialog', { name: /^Transform \d/ });
   await userEvent.selectOptions(within(again).getByRole('combobox', { name: 'Transform type' }), 'mate');
   await userEvent.click(within(again).getByRole('button', { name: 'Mate connector' }));
   // Picked where the move put it, at the base's corner.
@@ -1167,8 +1181,8 @@ it('mates a part moved by a distance from where it’s drawn, not from where the
     act(() => onSelect!(partId, index, { partId, index, point, normal }));
   };
   const features = await screen.findByRole('region', { name: 'Features' });
-  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Boss/ }));
-  const dialog = await screen.findByRole('dialog', { name: 'Transform · Boss' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /^Transform 1/ }));
+  const dialog = await screen.findByRole('dialog', { name: /^Transform \d/ });
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'mate');
   await userEvent.click(within(dialog).getByRole('button', { name: 'Mate connector' }));
   // Its underside, lifted 10 mm off the base.
@@ -1194,6 +1208,7 @@ it('copies a part along a line from one picked point to another, as Translate by
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(await studioCommand(/Transform/));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  await pickFirstPart();
   await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'line');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
@@ -1238,6 +1253,7 @@ it('moves a part along an edge picked for the line, and turns it about an edge p
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(await studioCommand(/Transform/));
   let dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  await pickFirstPart();
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'line');
   await userEvent.click(within(dialog).getByRole('button', { name: 'Line start' }));
   clickEdge();
@@ -1246,7 +1262,7 @@ it('moves a part along an edge picked for the line, and turns it about an edge p
   await waitFor(() => expect(latest().parts[0]!.moved).toEqual({ by: [200, 0, 0] }));
   // Rotate about the same edge, changing that Transform step.
   const features = screen.getByRole('region', { name: 'Features' });
-  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Plate/ }));
+  await userEvent.dblClick(within(features).getByRole('button', { name: /^Transform 1/ }));
   dialog = await screen.findByRole('dialog', { name: /^Transform/ });
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'rotate');
   await userEvent.click(within(dialog).getByRole('button', { name: 'Axis' }));
@@ -1271,6 +1287,7 @@ it('rotates a part about the line out of a face picked for the axis', async () =
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(await studioCommand(/Transform/));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  await pickFirstPart();
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'rotate');
   // Without an axis it says what to pick.
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
@@ -1340,6 +1357,7 @@ it('saves a picked-direction distance expression and removes it when replaced by
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(await studioCommand(/Transform/));
   let dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  await pickFirstPart();
   await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'distance');
   await userEvent.click(within(dialog).getByRole('button', { name: 'Direction' }));
@@ -1350,7 +1368,7 @@ it('saves a picked-direction distance expression and removes it when replaced by
   await userEvent.type(distance, '#gap');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest().parts[0]!.copies?.[0]?.along).toMatchObject({ distance: 30, distanceExpression: '#gap' }));
-  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Plate 2/ }));
+  await userEvent.dblClick(within(features).getByRole('button', { name: /^Transform 1/ }));
   dialog = await screen.findByRole('dialog', { name: /^Transform/ });
   expect(within(dialog).getByRole('textbox', { name: 'Distance' })).toHaveValue('#gap');
   await userEvent.clear(within(dialog).getByRole('textbox', { name: 'Distance' }));

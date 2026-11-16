@@ -15,6 +15,7 @@ import {
   type CadValueScope,
 } from '@wbcnc/cad';
 import { FeatureDialog } from './FeatureDialog';
+import { setPendingProblem } from './pendingProblem';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
 import { DialogPartField } from './DialogPartField';
@@ -367,6 +368,12 @@ export function TransformDialog({
     if ('error' in candidate) return setError(candidate.error);
     onSave(candidate);
   };
+  // Nothing picked yet, its row in the feature list shows red, as a dialog missing its selection does.
+  const missing = !editing && !partPick.picked;
+  useEffect(() => {
+    setPendingProblem(missing ? 'Select entities to transform or copy. 1 missing selection' : null);
+    return () => setPendingProblem(null);
+  }, [missing]);
   return (
     <FeatureDialog
       title={transformTitle(document, part.id, copyId, move)}

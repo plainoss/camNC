@@ -1,6 +1,7 @@
 import { useDesignUnits } from './designUnits';
 import { cadFolderSteps, cadVariableValues, designSteps, moveCadFolder, type CadDocument } from '@wbcnc/cad';
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
+import { pendingProblemNow, subscribePendingProblem } from './pendingProblem';
 import { kBasePlanes } from './basePlanes';
 import type { DesignStep } from '@wbcnc/cad';
 import { PartRowMenu } from './PartRowMenu';
@@ -213,6 +214,7 @@ export function FeatureList({
 }) {
   const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);
+  const pendingProblem = useSyncExternalStore(subscribePendingProblem, pendingProblemNow);
   const previewed = useMemo(() => (preview && preview !== document ? designSteps(preview) : null), [preview, document]);
   const entries = folderFeatureEntries(document).map(entry => {
     if (entry.kind !== 'step' || entry.step.broken || entry.step.suppressed) return entry;
@@ -586,10 +588,21 @@ export function FeatureList({
           );
         })}
         {pending && (
-          <li className="cad-feature-pending">
-            <button type="button">
+          <li className={pendingProblem ? 'cad-feature-pending cad-feature-broken' : 'cad-feature-pending'}>
+            <button
+              type="button"
+              aria-description={pendingProblem ? `${pending.label} did not regenerate properly: ${pendingProblem}` : undefined}>
               <span aria-hidden="true">{kIcons[pending.kind]}</span>
               <span>{pending.label}</span>
+              {pendingProblem && (
+                <span
+                  className="cad-feature-warning"
+                  role="img"
+                  aria-label="Error"
+                  title={`${pending.label} did not regenerate properly: ${pendingProblem}`}>
+                  ⚠
+                </span>
+              )}
             </button>
           </li>
         )}
