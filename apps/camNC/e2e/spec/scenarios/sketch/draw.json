@@ -109,9 +109,8 @@
           ],
           "dimensions": [],
           "constraintsAtLeast": {
-            "horizontal": 1,
-            "parallel": 2,
-            "perpendicular": 1
+            "horizontal": 2,
+            "vertical": 2
           }
         }
       }
