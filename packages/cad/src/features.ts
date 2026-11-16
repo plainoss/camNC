@@ -4,6 +4,7 @@ import { cadDocumentVersion } from './documentVersion';
 import { featuresForCopy } from './copyFeatures';
 import { faceRemovalDepth } from './faceRemovalDepth';
 import { newCadId, originId } from './document';
+import { withEdgeRounds } from './edgeRounds';
 import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
 import { relieveCorners } from './cornerRelief';
@@ -245,7 +246,7 @@ export function evaluateCadFeatures(
   copyId?: string
 ): { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
   const cut = cutFeatures({ ...part, features: featuresForCopy(part, copyId) }, profile);
-  if (!part.cornerRelief) return cut;
+  if (!part.cornerRelief) return withRounds(part, cut);
   const { part: next, skipped } = relieveCorners(cut.part, part.cornerRelief.diameter);
   const diagnostics = [...cut.diagnostics];
   if (skipped.length)
@@ -256,7 +257,13 @@ export function evaluateCadFeatures(
       message: `${skipped.length === 1 ? 'One corner is' : `${skipped.length} corners are`} too tight for a ${part.cornerRelief.diameter} mm bone and stay square.`,
       points: skipped,
     });
-  return { part: next, diagnostics };
+  return withRounds(part, { part: next, diagnostics });
+}
+
+/** Fillet steps along the part's faces round over the edges of what its cuts leave. */
+function withRounds(part: CadPart, made: { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] }) {
+  const rounded = withEdgeRounds(part, made.part);
+  return { part: rounded.part, diagnostics: [...made.diagnostics, ...rounded.diagnostics] };
 }
 
 /** Evaluate a source and only the copies with their own features; ordinary copies keep sharing its geometry. */

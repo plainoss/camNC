@@ -707,6 +707,8 @@ export interface EvaluatedCadPart {
   loops: EvaluatedCadLoop[];
   /** Cuts beyond the through-holes above, in feature order. Absent on plain profiles. */
   cuts?: EvaluatedCadCut[];
+  /** Edges along its faces that Fillet steps round over, in step order. Absent when there are none. */
+  rounds?: EvaluatedCadRound[];
   /** Complete cut sets for copies that differ, in the original's sketch frame before mirroring. Missing copies use `cuts`. */
   copyCuts?: Record<string, EvaluatedCadCut[]>;
   /** A copy can fill a profile hole with No cut, or turn it into a pocket. Evaluated material only, never saved source. */
@@ -731,6 +733,20 @@ export interface EvaluatedCadCut {
   /** For a cut another part makes: the bit diameter its opening's corners are relieved for, when they are. */
   relief?: number;
 }
+/** An edge along a face of the part, rounded over with a quarter circle: the face and the wall below it meet on the curve. */
+export interface EvaluatedCadRound {
+  filletId: string;
+  /** The rounded loop: `outline`, a through hole's loop ID, or a cut's ID. */
+  loopId: string;
+  side: 'top' | 'underside';
+  /** mm in from that side's surface where the edge sits: 0 on the surface itself, a cut's floor depth for one on it. */
+  at: number;
+  radius: number;
+  /** The edge, in the part's sketch coordinates. */
+  points: CadPoint[];
+  /** Where the part's material is: inside the loop for its outline, outside it for a hole or a cut's opening. */
+  material: 'inside' | 'outside';
+}
 export type CadEntityFreedom = 'fully-constrained' | 'underconstrained' | 'unknown';
 export interface CadSketchSolveStatus {
   partId: string;
@@ -752,11 +768,28 @@ export interface CadSolveResult extends CadEvaluation {
   featuresEvaluated?: true;
 }
 
-/** One Fillet step: corners of a part's sketch, rounded to a radius, as the edges through the part there. */
+/**
+ * Edges of a Fillet step along a face of the part: where its top or underside, or a pocket's floor, meets a wall going
+ * into the part. The round runs all the way along each loop.
+ */
+export interface CadFilletRim {
+  side: 'top' | 'underside';
+  /** The loops whose edge on that side is rounded: `outline`, a through hole's loop ID, or a cut's ID for its opening. */
+  loops: string[];
+  /** Picked as the face these loops bound, rather than edge by edge: it's listed as that one face. */
+  face?: true;
+}
+
+/**
+ * One Fillet step: corners of a part's sketch, rounded to a radius, as the edges through the part there, and edges along
+ * its faces, rounded over.
+ */
 export interface CadEdgeFillet {
   id: string;
   /** Corner points of the part's sketch, each where two straight sides meet. */
   corners: string[];
+  /** Edges along the part's faces, such as both edges of a cup's rim. */
+  rims?: CadFilletRim[];
   radius: number;
   radiusExpression?: string;
   suppressed?: true;

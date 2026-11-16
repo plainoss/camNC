@@ -238,6 +238,20 @@ export function parseCadDocument(input: unknown): CadDocument {
         number(fillet.radius);
         if (fillet.radiusExpression !== undefined && typeof fillet.radiusExpression !== 'string') throw new Error('Invalid CAD fillet');
         if (fillet.suppressed !== undefined && typeof fillet.suppressed !== 'boolean') throw new Error('Invalid CAD fillet');
+        if (fillet.rims !== undefined) {
+          if (!Array.isArray(fillet.rims)) throw new Error('Invalid CAD fillet');
+          for (const rim of fillet.rims)
+            if (
+              !rim ||
+              typeof rim !== 'object' ||
+              (rim.side !== 'top' && rim.side !== 'underside') ||
+              !Array.isArray(rim.loops) ||
+              !rim.loops.length ||
+              rim.loops.some((loop: unknown) => typeof loop !== 'string' || !loop) ||
+              (rim.face !== undefined && rim.face !== true)
+            )
+              throw new Error('Invalid CAD fillet');
+        }
       }
     }
     if (p.thinWall !== undefined) {
