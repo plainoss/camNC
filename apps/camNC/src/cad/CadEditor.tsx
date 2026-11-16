@@ -68,6 +68,7 @@ import {
   resolveExtrudeSteps,
   setPartPattern,
   renamePartCopy,
+  sketchOwnerId,
 } from '@wbcnc/cad';
 import {
   useEffect,
@@ -1326,7 +1327,12 @@ export function CadEditor({
     before?: CadHistoryMark,
     initialPatternKind?: PatternOpening
   ) => openStudioFeature(studioNavigationInput(), kind, partId, before, initialPatternKind);
-  const closeFeature = (keep: boolean) => closeStudioFeature(studioNavigationInput(), keep);
+  const closeFeature = (keep: boolean) => {
+    // Confirming an extrude hides the sketch it's made from again, a sketch shown to pick from as much as a new one.
+    const made = keep && feature?.kind === 'extrude' && doc.parts.find(p => p.id === feature.partId);
+    if (made) setFeatureVisibility(({ [`${sketchOwnerId(made)}:sketch`]: _shown, ...rest }) => rest);
+    closeStudioFeature(studioNavigationInput(), keep);
+  };
   const openSketch = (stepPartId: string, before?: CadHistoryMark) => openStudioSketch(studioNavigationInput(), stepPartId, before);
   const closeSketch = (keep: boolean) => closeStudioSketch(studioNavigationInput(), keep);
   const openStep = (step: DesignStep) => openDesignStep(studioNavigationInput(), step);
