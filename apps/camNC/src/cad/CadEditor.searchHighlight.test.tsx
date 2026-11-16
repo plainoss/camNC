@@ -6,6 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 import { CadEditor } from './CadEditor';
 import { solveCadDocument } from './solveCad';
+import { settled } from '@/test/settled';
 
 vi.mock('@/cam/model/ModelViewport', () => ({ ModelViewport: vi.fn(() => null) }));
 const sessions: string[] = [];
@@ -112,7 +113,8 @@ it('moves the toolbar highlight with keyboard and pointer results, clearing it f
   expect(highlighted()).toHaveLength(0);
   await search('circular pattern');
   await userEvent.keyboard('{Enter}');
-  expect(await screen.findByRole('dialog', { name: 'Circular pattern · Plate' })).toBeVisible();
+  await settled();
+  expect(screen.getByRole('dialog', { name: 'Circular pattern · Plate' })).toBeVisible();
   expect(highlighted()).toHaveLength(0);
   expect(studioToolbar().getByRole('button', { name: 'Pattern' })).toHaveAttribute('aria-pressed', 'true');
   unchanged();
