@@ -8,6 +8,7 @@ export function cadDocumentVersion(document: CadDocument): CadDocument['version'
     document.parts.some(
       part =>
         part?.mergeAll ||
+        part?.intersect ||
         part?.mirrorJoins?.length ||
         part?.thinWall ||
         part?.pattern?.second ||

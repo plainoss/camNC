@@ -240,6 +240,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (fillet.suppressed !== undefined && typeof fillet.suppressed !== 'boolean') throw new Error('Invalid CAD fillet');
       }
     }
+    if (p.intersect !== undefined && p.intersect !== true) throw new Error('Invalid CAD extrude');
     if (p.thinWall !== undefined) {
       const wall = p.thinWall;
       if (!wall || typeof wall !== 'object') throw new Error('Invalid CAD thin wall');

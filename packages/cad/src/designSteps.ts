@@ -1,3 +1,4 @@
+import { mergedWithAll } from './unionParts';
 import { evaluateCadPart } from './geometry';
 import { edgeFilletProblems } from './edgeFillets';
 import { resolveExtrudeSteps } from './extrudeSteps';
@@ -159,6 +160,11 @@ export function designSteps(document: CadDocument): DesignStep[] {
             'Failed to fillet selections.'
           : undefined
         : undefined;
+    // An Extrude › Intersect that keeps nothing says so on its row.
+    if (step.kind === 'extrude' && part?.intersect && !step.suppressed) {
+      const made = mergedWithAll(document, part)?.made;
+      if (made && 'refused' in made) return { ...step, broken: made.refused };
+    }
     // A Mirror › Add that can't join the part with its mirror image leaves the part as it was.
     const unmirrored =
       step.kind === 'mirror' && part && !step.suppressed

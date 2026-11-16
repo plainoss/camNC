@@ -1,0 +1,49 @@
+import { expect, it } from 'vitest';
+import {
+  addCircle,
+  addRectangle,
+  cadPartsToCut,
+  consumedTools,
+  createCadDocument,
+  createCadPart,
+  designSteps,
+  polygonArea,
+  sketchRegions,
+  solveCadDocument,
+  type CadDocument,
+  type CadPart,
+} from './index';
+
+const board = (): CadPart => {
+  const part = { ...createCadPart('Part 1', 10), id: 'board', drawnOn: { on: { plane: 'top' as const }, offset: 0 } };
+  part.sketch = addRectangle(part.sketch, { x: 0, y: 0, width: 100, height: 40 });
+  return { ...part, regions: sketchRegions(part.sketch).map(region => region.id) };
+};
+const disc = (inward: boolean): CadPart => {
+  const part = {
+    ...createCadPart('Part 2', 10),
+    id: 'disc',
+    drawnOn: { on: { plane: 'top' as const }, offset: 0, ...(inward && { inward: true }) },
+  };
+  part.sketch = addCircle(part.sketch, { x: 0, y: 0, radius: 30 });
+  return { ...part, regions: sketchRegions(part.sketch).map(region => region.id), intersect: true };
+};
+const design = (inward: boolean): CadDocument => ({ ...createCadDocument(), version: 7, parts: [board(), disc(inward)] });
+
+it('keeps only what the extrude shares with the part it runs into: a quarter disc over the board', async () => {
+  const solved = await solveCadDocument(design(false));
+  const parts = cadPartsToCut(solved.document, solved.parts);
+  expect(parts.map(entry => entry.part.name)).toEqual(['Part 1']);
+  expect(Math.abs(polygonArea(parts[0]!.part.outline))).toBeCloseTo((Math.PI * 900) / 4, -1);
+  expect(designSteps(solved.document).every(step => !step.broken)).toBe(true);
+});
+
+it('leaves no part when the extrude goes the other way and only touches the board, and says so on its row', async () => {
+  const document = design(true);
+  expect(consumedTools(document)).toEqual(new Set(['disc', 'board']));
+  const solved = await solveCadDocument(document);
+  expect(cadPartsToCut(solved.document, solved.parts)).toEqual([]);
+  expect(designSteps(document).find(step => step.id === 'disc:extrude')?.broken).toBe(
+    'The parts either do not intersect or are totally contained.'
+  );
+});

@@ -329,6 +329,11 @@ export interface CadPart {
    */
   mergeAll?: true;
   /**
+   * Extrude › Intersect: of the parts before it, only what this extrude shares with them is kept, in the place of the one
+   * it runs into. One that runs into none leaves no part at all, and says so.
+   */
+  intersect?: true;
+  /**
    * Extrude → Remove: the picked regions, or every closed region but what's left of the face, are cut into the board
    * the sketch is drawn on, this deep. A plane-based extrusion removes its volume from earlier bodies, optionally
    * limited to `targets`. The step isn't a part itself.

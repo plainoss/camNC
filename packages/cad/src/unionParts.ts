@@ -2,7 +2,7 @@ import { addLine, createCadPart } from './document';
 import { cadDrawnOnSupports, effectivePlacement, resolveDrawnPlacements } from './drawnOn';
 import { isJoinedBody } from './extrudeSteps';
 import { overlappedParts } from './partOverlap';
-import { evaluateCadFeatures } from './features';
+import { evaluateCadFeatures, isCadPart } from './features';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, pointInPolygon } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
 import { regionInteriorPoint, sketchRegions } from './sketchRegions';
@@ -150,7 +150,8 @@ function unite(document: CadDocument, step: CadPartCut): { part: EvaluatedCadPar
 export function mergedWithAll(
   document: CadDocument,
   part: CadPart
-): { hostId: string; joined: string[]; made: { part: EvaluatedCadPart } | { refused: string } } | null {
+): { hostId: string; joined: string[]; made: { part: EvaluatedCadPart } | { refused: string }; lost?: string[] } | null {
+  if (part.intersect && !part.suppressed && part.extrude !== false) return intersectedWith(document, part);
   if (!part.mergeAll || part.suppressed || part.extrude === false) return null;
   const touched = overlappedParts(document, part.id);
   if (!touched.length) return null;
@@ -168,4 +169,36 @@ export function mergedWithAll(
     operation: 'union',
   };
   return { hostId: touched[0]!, joined: step.tools, made: unionOf(document, step) };
+}
+
+/** As the reference says it when an Extrude › Intersect keeps nothing. */
+export const kNoIntersection = 'The parts either do not intersect or are totally contained.';
+
+/**
+ * What an Extrude › Intersect makes: the part it runs into cut down to what the extrude shares with it, in its place.
+ * The other parts before it share nothing, so they're used up too. Keeping nothing, it leaves no part, so all of them
+ * are lost.
+ */
+function intersectedWith(
+  document: CadDocument,
+  part: CadPart
+): { hostId: string; joined: string[]; made: { part: EvaluatedCadPart } | { refused: string }; lost: string[] } {
+  const scope = document.parts
+    .slice(0, document.parts.indexOf(part))
+    .filter(other => isCadPart(other) && !other.remove && !other.suppressed && !isJoinedBody(document, other))
+    .map(other => other.id);
+  const lost = [part.id, ...scope];
+  const touched = overlappedParts(document, part.id);
+  if (touched.length !== 1) {
+    const refused = touched.length ? 'Intersecting more than one part isn’t available yet.' : kNoIntersection;
+    return { hostId: scope[0] ?? part.id, joined: [], made: { refused }, lost };
+  }
+  const step: CadPartCut = { id: `${part.id}:intersect`, targets: [touched[0]!], tools: [part.id], clearance: 0, operation: 'intersect' };
+  const made = unionOf(document, step);
+  return {
+    hostId: touched[0]!,
+    joined: lost.filter(id => id !== touched[0]),
+    made: 'refused' in made ? { refused: kNoIntersection } : made,
+    lost,
+  };
 }
