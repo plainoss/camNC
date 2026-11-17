@@ -17,7 +17,7 @@ export const ALLOWED = {
   // Double-clicking a row (`feature`) or a dimension label (`editdim`) selects it, and so does a dialog's choice list.
   select: {
     // `key Enter` takes the highlighted choice of a field's list, such as New variable.
-    steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'partmenu', 'menuitem', 'patterncount', 'patternspacing', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click', 'panelclose', 'featurefilter', 'viewmenu', 'key Enter'],
+    steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'partmenu', 'menuitem', 'patterncount', 'patternspacing', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click', 'panelclose', 'featurefilter', 'viewmenu', 'dialogoption', 'key Enter'],
   },
   command: { steps: ['studiotool', 'searchtool', 'key', 'tool'] },
   draw: { steps: ['rect', 'circle', 'line', 'arc'] },

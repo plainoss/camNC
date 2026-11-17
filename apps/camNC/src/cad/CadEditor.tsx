@@ -52,7 +52,6 @@ import {
   drawnOnOutline,
   cadSketchFrame,
   resolveExtrudeSteps,
-  renamePartCopy,
 } from '@wbcnc/cad';
 import {
   useEffect,
@@ -189,6 +188,7 @@ import { usePartIsolation } from './usePartIsolation';
 import { SketchPlaneDialog, StudioSketchDialog } from './StudioSketchDialog';
 import { openSketchFinishReason, sketchPendingFinishReason } from './sketchPendingFinishReason';
 import { PartsList } from './PartsList';
+import { renamedStudioPart } from './renamedStudioPart';
 import { toggledKey } from './toggledKey';
 import { usePointPicker } from './pointPicker';
 import { ShortcutList } from './ShortcutList';
@@ -1508,19 +1508,8 @@ export function CadEditor({
           setSelected([]);
           chooseTool('select');
         }}
-        onRename={(partId, copyId, name) =>
-          commit(
-            copyId
-              ? renamePartCopy(documentRef.current, partId, copyId, name)
-              : replacePart(documentRef.current, partId, current => ({
-                  ...current,
-                  // The features keep the names they had: renaming a part never renames them.
-                  sketchName: current.sketchName ?? designStepLabel(documentRef.current, `${partId}:sketch`),
-                  extrudeName: current.extrudeName ?? designStepLabel(documentRef.current, `${partId}:extrude`),
-                  name,
-                }))
-          )
-        }
+        onRename={(partId, copyId, name) => commit(renamedStudioPart(documentRef.current, partId, copyId, name))}
+        onEdit={change => commit(change(documentRef.current))}
       />
     </>
   );

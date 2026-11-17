@@ -61,7 +61,7 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
-    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'featuremenu', 'partmenu', 'menuitem', 'exportstep', 'savedesign', 'featurefilter', 'panelclose', 'viewmenu', 'searchtool'].includes(verb)) return base.step(text);
+    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'featuremenu', 'partmenu', 'menuitem', 'exportstep', 'savedesign', 'featurefilter', 'panelclose', 'viewmenu', 'searchtool', 'dialogoption'].includes(verb)) return base.step(text);
     if (!(await base.inDemo())) throw new Error('Studio workflow input requires demo mode');
     const since = await settledSnapshot(page);
     if (verb === 'viewpick') {
@@ -96,6 +96,9 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
       await page.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+A`);
       if (rest) await page.keyboard.type(rest);
       else await page.keyboard.press('Backspace');
+    } else if (verb === 'dialogoption') {
+      // An entry of a dialog's open list, such as a material, by the start of its name.
+      await page.getByRole('dialog').getByRole('option', { name: new RegExp(`^${escapePattern(rest)}(?:\\s|$)`) }).first().click();
     } else if (verb === 'searchtool') {
       // A command found by name, as a person opens Search tools (Alt+C), types it and takes the first result with Enter.
       await page.keyboard.press('Alt+c');

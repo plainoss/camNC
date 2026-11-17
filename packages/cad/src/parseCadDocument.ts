@@ -281,6 +281,11 @@ export function parseCadDocument(input: unknown): CadDocument {
       (p.pieceOf !== undefined && (!p.pieceOf || typeof p.pieceOf.partId !== 'string' || typeof p.pieceOf.by !== 'string'))
     )
       throw new Error('Invalid CAD part piece');
+    if (p.material !== undefined) {
+      const material = p.material as unknown as Record<string, unknown> | null;
+      if (!material || typeof material.name !== 'string' || !material.name) throw new Error('Invalid CAD material');
+      number(material.density);
+    }
     if (p.split !== undefined) {
       const split = p.split as unknown as Record<string, unknown> | null;
       const across = split?.across as Record<string, unknown> | undefined;

@@ -506,6 +506,8 @@ it('renames a part from its row in the Parts list, leaving its features named as
   const menu = screen.getByRole('menu', { name: `${before} actions` });
   expect([...menu.querySelectorAll('[role=menuitem]')].map(item => item.textContent)).toEqual([
     'Rename',
+    'Properties…',
+    'Assign material…',
     'Hide',
     'Make transparent…',
     'Export…',

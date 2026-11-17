@@ -1,0 +1,57 @@
+/* The material picker: the chosen material as a button opening a searchable list. */
+.cad-material-library {
+  margin: 0;
+  color: #5b6b80;
+  font-size: 11px;
+}
+.cad-editor .cad-material-pick {
+  width: 100%;
+  border: 1px solid #cfd8e3;
+  border-radius: 4px;
+  padding: 4px 8px;
+  background: #fff;
+  text-align: left;
+}
+.cad-material-menu {
+  border: 1px solid #cfd8e3;
+  border-radius: 4px;
+  background: #fff;
+}
+.cad-material-menu input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  border-bottom: 1px solid #e3e8ef;
+  padding: 4px 8px;
+}
+.cad-material-menu ul {
+  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.cad-material-menu li {
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.cad-material-menu li:hover,
+.cad-material-menu li[aria-selected='true'] {
+  background: #eaf3fd;
+}
+.cad-material-menu small,
+.cad-material-properties dt {
+  color: #6a7a90;
+}
+.cad-material-properties {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  margin: 0;
+}
+.cad-material-properties div {
+  display: contents;
+}
+.cad-material-properties dd {
+  margin: 0;
+}

@@ -361,6 +361,8 @@ export interface CadPart {
    * part, taken out of its pattern to be split, so its sketch and extrude are that part's, not steps of its own.
    */
   split?: CadPartSplit;
+  /** What it's made of, from the material library: its weight follows from its density. Not a step of the design. */
+  material?: CadPartMaterial;
   /** Regions Extrude → Add steps join to this part. The design writes it from those steps; it's never edited. */
   addedRegions?: string[];
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
@@ -465,6 +467,12 @@ export interface CadMirrorJoin {
   datum?: string;
   suppressed?: true;
   line?: { x: number; y: number; nx: number; ny: number };
+}
+
+export interface CadPartMaterial {
+  name: string;
+  /** kg/m³. */
+  density: number;
 }
 
 export interface CadPartSplit {

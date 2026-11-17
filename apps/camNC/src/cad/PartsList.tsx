@@ -2,6 +2,9 @@ import { useDesignUnits } from './designUnits';
 import { edgeFilletProblems, type CadDocument, type CadFolder, type CadPart } from '@wbcnc/cad';
 import { useCallback, useState } from 'react';
 import { PartRowMenu } from './PartRowMenu';
+import { MaterialPanel } from './MaterialPanel';
+import { PartPropertiesDialog } from './PartPropertiesDialog';
+import { replacePart } from './editorHelpers';
 import { partMatchesFilter, useFeatureFilter } from './featureFilter';
 import { MakeTransparentPanel } from './MakeTransparentPanel';
 import { ExportDialog, type ExportTarget } from './export/ExportDialog';
@@ -28,6 +31,7 @@ export function PartsList({
   trouble,
   onPick,
   onRename,
+  onEdit,
   document,
   rolledTo,
   folders = document?.folders,
@@ -55,12 +59,17 @@ export function PartsList({
   onPick: (partId: string, copyId?: string) => void;
   /** A part, or one of its copies, named anew. */
   onRename: (partId: string, copyId: string | null, name: string) => void;
+  /** Changes the design as it now is, as assigning a material does. */
+  onEdit?: (change: (document: CadDocument) => CadDocument) => void;
 }) {
   const { formatLength, lengthUnit } = useDesignUnits();
   const [menu, setMenu] = useState<{ key: string; name: string; x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [exporting, setExporting] = useState<ExportTarget | null>(null);
   const [seeThrough, setSeeThrough] = useState(false);
+  // The row whose Material panel or Properties dialog is open: a copy's are its part's.
+  const [panel, setPanel] = useState<{ kind: 'material' | 'properties'; key: string; name: string } | null>(null);
+  const panelRow = panel && rows.find(row => row.key === panel.key);
   const closeMenu = useCallback(() => setMenu(null), []);
   // A Fillet step that leaves corners sharp is a problem with the part too, as the check reports it.
   const problemOf = (part: CadPart) => trouble(part.id) || edgeFilletProblems(part)[0]?.message;
@@ -169,6 +178,12 @@ export function PartsList({
           onClose={closeMenu}
           items={[
             { label: 'Rename', onSelect: () => setRenaming(menu.key) },
+            ...(onEdit
+              ? [
+                  { label: 'Properties…', onSelect: () => setPanel({ kind: 'properties', key: menu.key, name: menu.name }) },
+                  { label: 'Assign material…', onSelect: () => setPanel({ kind: 'material', key: menu.key, name: menu.name }) },
+                ]
+              : []),
             { label: hiddenParts.has(menu.key) ? 'Show' : 'Hide', onSelect: () => onToggleHidden(menu.key) },
             ...(transparent
               ? [
@@ -224,6 +239,22 @@ export function PartsList({
         />
       )}
       <ExportDialog target={exporting} unit={lengthUnit} onClose={() => setExporting(null)} />
+      {panel?.kind === 'material' && panelRow && onEdit && (
+        <MaterialPanel
+          partName={panel.name}
+          material={panelRow.part.material}
+          onClose={() => setPanel(null)}
+          onAssign={material => {
+            onEdit(current =>
+              replacePart(current, panelRow.part.id, ({ material: _material, ...part }) => (material ? { ...part, material } : part))
+            );
+            setPanel(null);
+          }}
+        />
+      )}
+      {panel?.kind === 'properties' && panelRow && (
+        <PartPropertiesDialog part={panelRow.part} name={panel.name} onClose={() => setPanel(null)} />
+      )}
       {transparent && seeThrough && (
         <MakeTransparentPanel
           onClose={() => {
