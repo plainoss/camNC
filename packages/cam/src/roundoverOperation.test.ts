@@ -57,6 +57,28 @@ describe('rounding over edges', () => {
     expect(cam.warnings.filter(w => /no 1 mm roundover bit/.test(w))).toHaveLength(2);
   });
 
+  it('finishes a round no roundover bit fits with a ball end, in laps from the wall up into the face', () => {
+    const { features, centre } = cup();
+    const ball: Tool = { number: 21, diameter: 6, shape: 'ball', name: 'ball end mill ⌀6' };
+    const cam = camPart(features, { tools: [endMill], roundBall: ball });
+    const rounds = cam.operations.filter(op => op.tool === ball);
+    expect(rounds.map(op => op.name)).toEqual(['Round over 1', 'Round over 2']);
+    expect(cam.operations.slice(-2)).toEqual(rounds);
+    for (const op of rounds) {
+      // From beside the wall, the ball's tip 4 mm down (radius 1 plus the ball's 3), up to the face.
+      const tips = op.passes.map(pass => pass.pts[0]![2]);
+      expect(tips[0]).toBeCloseTo(20 - 1 - 3, 6);
+      expect(tips.at(-1)).toBeCloseTo(20, 6);
+      expect(op.passes.length).toBeGreaterThan(4);
+    }
+    // At the last lap the ball's tip sits where the round meets the face: 1 mm in from each edge.
+    const reach = (op: (typeof rounds)[number]) => op.passes.at(-1)!.pts.map(p => Math.hypot(p[0] - centre.x, p[1] - centre.y));
+    for (const r of reach(rounds[0]!)) expect(r).toBeCloseTo(38.9 - 1, 1);
+    for (const r of reach(rounds[1]!)) expect(r).toBeCloseTo(33.6 + 1, 1);
+    expect(cam.warnings.some(w => /roundover bit/.test(w))).toBe(false);
+    expect(toGcode(splitByBit(cam).at(-1)!)).toContain('CR=3');
+  });
+
   it('never uses a roundover bit for pockets or outlines', () => {
     const { features } = cup();
     expect(() => camPart(features, { tools: [endMill, roundover] })).toThrow(/roundoverBits/);

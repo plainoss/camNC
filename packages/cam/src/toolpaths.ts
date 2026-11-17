@@ -32,7 +32,7 @@ import {
   finishRoles,
 } from './passPlanning';
 import { pocketOperation } from './pocketOperation';
-import { roundoverBitFor, roundoverOperation } from './roundoverOperation';
+import { ballRoundOperation, roundoverBitFor, roundoverOperation } from './roundoverOperation';
 import { loopNotches } from './outlineReach';
 import { roughAroundNotches } from './roughNotches';
 
@@ -666,12 +666,13 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
   // Edges the design rounds over, once the walls below them are cut: a roundover bit of the round's radius for each.
   (features.rounds ?? []).forEach((round, i) => {
     const name = `Round over ${i + 1}`;
-    const bit = roundoverBitFor(round, s.roundoverBits);
+    // A roundover bit of the round's radius cuts it in one lap; otherwise a ball end finishes it in laps.
+    const bit = roundoverBitFor(round, s.roundoverBits) ?? s.roundBall;
     if (!bit) return warnings.push(`edge round ${i + 1}: no ${round2(round.radius)} mm roundover bit, so the edge stays sharp`);
     // An outline's wall is only there once it's cut through.
     if (!s.cutThrough && round.material === 'inside')
       return warnings.push(`edge round ${i + 1}: the outline isn't cut, so the edge stays sharp`);
-    const op = roundoverOperation(name, round, bit, s);
+    const op = bit.shape === 'ball' ? ballRoundOperation(name, round, bit, s) : roundoverOperation(name, round, bit, s);
     if ('problem' in op) return warnings.push(op.problem);
     ops.push(op);
   });
@@ -683,7 +684,7 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
 
   // Stable sort: smallest tool first, keeps pockets -> holes -> outline within a tool. Roundovers come last, after
   // every wall they need is cut.
-  const last = (op: Operation) => (op.tool.shape === 'roundover' ? 1 : 0);
+  const last = (op: Operation) => (op.tool.shape === 'roundover' || op.tool.shape === 'ball' ? 1 : 0);
   const operations = ops
     .map((op, i) => ({ op, i }))
     .sort((a, b) => last(a.op) - last(b.op) || a.op.tool.diameter - b.op.tool.diameter || a.i - b.i)

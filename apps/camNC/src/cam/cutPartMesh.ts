@@ -1,4 +1,4 @@
-import { intersectPaths, roundOver, roundSlices, unionPaths, type MeshRound, type PartFeatures } from '@wbcnc/cam';
+import { intersectPaths, roundMover, roundOver, roundSlices, unionPaths, type MeshRound, type PartFeatures } from '@wbcnc/cam';
 import { ShapeUtils, Vector2 } from 'three';
 
 type Path = { x: number; y: number }[];
@@ -54,11 +54,18 @@ export function cutPartMesh(
   const positions: number[] = [];
   const triangle = (a: [number, number, number], b: [number, number, number], c: [number, number, number]) =>
     positions.push(...a, ...b, ...c);
+  // A face whose edges are rounded over is triangulated where its edges end up, set in from them by the rounds: moving
+  // a cap's corners afterwards, as the walls' are, would fold its long thin triangles over across a narrow face.
+  const move = rounds.length ? roundMover(rounds) : null;
+  const settled = (p: { x: number; y: number }, z: number) => {
+    const moved = move?.(p.x, p.y, z);
+    return moved ? new Vector2(moved.x, moved.y) : new Vector2(p.x, p.y);
+  };
   const cap = (region: Path[], z: number, up: boolean) => {
     // Match the walls' Clipper precision, including the original footprint whose curve vertices can have more digits.
     for (const { outer, holes } of shapes(unionPaths(region))) {
-      const contour = outer.map(p => new Vector2(p.x, p.y)),
-        rings = holes.map(hole => hole.map(p => new Vector2(p.x, p.y))),
+      const contour = outer.map(p => settled(p, z)),
+        rings = holes.map(hole => hole.map(p => settled(p, z))),
         all = [...contour, ...rings.flat()];
       for (const [i, j, k] of ShapeUtils.triangulateShape(contour, rings)) {
         const a = all[i!]!,

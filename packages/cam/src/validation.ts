@@ -58,8 +58,8 @@ export function validateTool(tool: Tool, field = 'tool'): void {
   ] as const)
     if (tool[key] !== undefined) positiveValue(`${field}.${key}`, tool[key]);
   if (tool.flutes !== undefined && !Number.isInteger(tool.flutes)) fail(`${field}.flutes`, 'must be an integer');
-  if (tool.shape !== undefined && tool.shape !== 'flat' && tool.shape !== 'v' && tool.shape !== 'roundover')
-    fail(`${field}.shape`, 'must be flat, v or roundover');
+  if (tool.shape !== undefined && tool.shape !== 'flat' && tool.shape !== 'v' && tool.shape !== 'roundover' && tool.shape !== 'ball')
+    fail(`${field}.shape`, 'must be flat, v, roundover or ball');
   if (tool.shape === 'roundover') {
     if (!(tool.radius! > 0)) fail(`${field}.radius`, 'must be more than 0');
     if (tool.tipDiameter !== undefined && !(tool.tipDiameter >= 0)) fail(`${field}.tipDiameter`, 'must be at least 0');
@@ -79,6 +79,10 @@ export function validateCamSettings(settings: CamSettings): void {
   if (!Array.isArray(settings.tools) || !settings.tools.length) fail('tools', 'at least one cutting tool is required');
   settings.tools.forEach((tool, i) => validateTool(tool, `tools[${i}]`));
   if (settings.tools.some(tool => tool.shape === 'roundover')) fail('tools', 'roundover bits go in roundoverBits');
+  if (settings.roundBall) {
+    validateTool(settings.roundBall, 'roundBall');
+    if (settings.roundBall.shape !== 'ball') fail('roundBall.shape', 'must be ball');
+  }
   settings.roundoverBits?.forEach((tool, i) => {
     validateTool(tool, `roundoverBits[${i}]`);
     if (tool.shape !== 'roundover') fail(`roundoverBits[${i}].shape`, 'must be roundover');

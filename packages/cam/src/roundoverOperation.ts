@@ -51,3 +51,53 @@ export function roundoverOperation(name: string, round: PartRound, bit: Tool, se
     ],
   };
 }
+
+/** The scallop a ball end leaves between its laps over a round, mm: finer than the wood's grain shows. */
+const kRoundScallop = 0.02;
+
+/**
+ * A round finished with a ball end mill, as a 3D finishing pass: laps around the edge, each one a step of the quarter
+ * circle further from the wall and up into the face, the ball's tip on the round all the way. It needs the wall below
+ * the edge cut first, and room beside it for the ball, in the waste a pocket or the outline cleared.
+ */
+export function ballRoundOperation(name: string, round: PartRound, bit: Tool, settings: CamSettings): Operation | { problem: string } {
+  const s = cuttingWith(bit, settings);
+  if (!round.down) return { problem: `${name}: a round on the underside needs the part turned over` };
+  const r = round.radius,
+    ball = bit.diameter / 2;
+  // Out of the material, into the waste: outside an outline, inside an opening.
+  const outward = round.material === 'inside' ? 1 : -1;
+  // Steps along the round's surface that leave a scallop no higher than kRoundScallop.
+  const along = 2 * Math.sqrt(Math.max(1e-9, 2 * ball * kRoundScallop - kRoundScallop * kRoundScallop));
+  const laps = Math.max(4, Math.min(90, Math.ceil(((Math.PI / 2) * r) / along)));
+  const climbCcw = (round.material === 'outside') === s.climb;
+  const feed = s.finishFeed ?? s.feed;
+  const passes: Operation['passes'] = [];
+  for (let k = 0; k <= laps; k++) {
+    const angle = ((Math.PI / 2) * k) / laps;
+    // The ball's centre stays r + ball from the round's axis, which runs r in from the edge and r below it.
+    const out = (r + ball) * Math.cos(angle) - r;
+    const tip = round.z - r + (r + ball) * Math.sin(angle) - ball;
+    const paths = Math.abs(out) < 1e-9 ? [round.loop] : offset([round.loop], outward * out, offsetToleranceFor(s));
+    const path = paths.sort((a, b) => Math.abs(areaD(b)) - Math.abs(areaD(a)))[0];
+    if (!path || path.length < 3) return { problem: `${name}: the ${bit.diameter} mm ball end doesn't fit beside the round` };
+    const loop: PathD = areaD(path) > 0 === climbCcw ? path : [...path].reverse();
+    const pts: Vec3[] = [...loop, loop[0]!].map(p => [p.x, p.y, tip]);
+    passes.push({
+      pts,
+      feeds: [s.plungeFeed, ...pts.slice(1).map(() => feed)],
+      materialSide: s.climb ? 'right' : 'left',
+      phase: 'finish',
+      entry: 'plunge',
+      link: 'retract',
+    });
+  }
+  return {
+    name,
+    kind: 'profile',
+    feature: round.material === 'inside' ? 'outline' : 'pocket',
+    tool: bit,
+    title: `R${+r.toFixed(2)} round, ball end ⌀${+bit.diameter.toFixed(2)}`,
+    passes,
+  };
+}

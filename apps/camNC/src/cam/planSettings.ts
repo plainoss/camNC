@@ -1,4 +1,4 @@
-import type { CamSettings, HoleChoice, LibraryTool } from '@wbcnc/cam';
+import type { CamSettings, HoleChoice, LibraryTool, Tool } from '@wbcnc/cam';
 import { DEFAULT_TABS, MATERIALS } from '@wbcnc/cam/settings';
 import { savedCuttingFor, resolveCutting, type CuttingData } from '@wbcnc/cam-settings';
 import type { HoleChoices } from './holeChoices';
@@ -68,6 +68,18 @@ const kMaxOutlineSkim = 0.2;
  * each bit cuts by its own. The settings' own feeds and speed are the main bit's: it cuts the outlines, and what follows
  * them (freeing the parts, removing tabs).
  */
+/** The ball end mill rounded edges are finished with: ⌀6, cautious cutting data for hardwood, as the carving bits'. */
+export const kRoundBall: Tool = {
+  number: 21,
+  diameter: 6,
+  shape: 'ball',
+  name: 'ball end mill ⌀6',
+  feed: 1200,
+  plungeFeed: 300,
+  rpm: 18000,
+  stepdown: 1,
+};
+
 export function toCamSettings(
   p: PlanSettingsV1,
   material: MaterialKey = p.material,
@@ -103,6 +115,8 @@ export function toCamSettings(
       finalFeedFactor: cut[i].finalFeedFactor,
       fluteLength: b.fluteLength,
     })),
+    // Edges a design rounds over are finished with a ball end where no roundover bit of their radius is set up.
+    roundBall: kRoundBall,
     material: MATERIALS[material],
     feed: main.feed,
     plungeFeed: main.plungeFeed,
