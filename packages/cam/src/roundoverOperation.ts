@@ -36,7 +36,8 @@ export function roundoverOperation(name: string, round: PartRound, bit: Tool, se
   return {
     name,
     kind: 'profile',
-    feature: round.material === 'inside' ? 'outline' : 'pocket',
+    // A finishing pass over an edge, not an outline: nothing holding a part, cutting it free or tabbed reads it as one.
+    feature: 'pocket',
     tool: bit,
     title: `R${+round.radius.toFixed(2)} roundover`,
     passes: [
@@ -104,7 +105,8 @@ export function ballRoundOperation(name: string, round: PartRound, bit: Tool, se
   return {
     name,
     kind: 'profile',
-    feature: round.material === 'inside' ? 'outline' : 'pocket',
+    // A finishing pass over an edge, not an outline: nothing holding a part, cutting it free or tabbed reads it as one.
+    feature: 'pocket',
     tool: bit,
     title: `R${+r.toFixed(2)} round, ball end ⌀${+bit.diameter.toFixed(2)}`,
     passes,

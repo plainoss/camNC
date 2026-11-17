@@ -4,6 +4,7 @@ import { camPart } from './toolpaths';
 import type { Tool } from './toolpathTypes';
 import { boardBits, camBoard, splitByBit } from './board';
 import { toGcode } from './gcode';
+import { freePartsProgram } from './tabPlan';
 
 const circle = (cx: number, cy: number, r: number) =>
   Array.from({ length: 256 }, (_, i) => ({ x: cx + r * Math.cos((2 * Math.PI * i) / 256), y: cy + r * Math.sin((2 * Math.PI * i) / 256) }));
@@ -162,6 +163,27 @@ describe('rounding over edges', () => {
     const programs = splitByBit(cam);
     expect(programs.some(program => program.operations[0]!.tool === ball)).toBe(true);
     expect(boardBits(cam).length).toBe(programs.length);
+  });
+
+  it('with a bottom skin, cuts the parts free with the flat bit only: a round is no outline', () => {
+    const { features } = cup();
+    const ball: Tool = { number: 21, diameter: 6, shape: 'ball', name: 'ball end mill ⌀6' };
+    const cam = camBoard(
+      {
+        id: 'b',
+        name: 'Board',
+        w: 140,
+        h: 140,
+        thickness: 20,
+        holdDown: 'skin',
+        parts: [{ id: 'cup', name: 'cup', features, size: [77.8, 77.8, 20], x: 20, y: 20, rotated: false }],
+      },
+      { tools: [endMill], roundBall: ball }
+    );
+    const free = freePartsProgram(cam, { feed: 1000, plungeFeed: 300, finalZ: -0.3 });
+    expect(free.cam.operations.length).toBeGreaterThan(0);
+    expect(free.cam.operations.every(op => op.tool === endMill)).toBe(true);
+    expect(() => toGcode(free.cam)).not.toThrow();
   });
 
   it('never uses a roundover bit for pockets or outlines', () => {
