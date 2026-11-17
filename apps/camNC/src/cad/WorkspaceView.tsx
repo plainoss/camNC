@@ -27,6 +27,7 @@ import { sketchLinesInModel } from './sketchLines';
 import { featureShownByDefault } from './sketchShown';
 import { sketchSelectionRegions } from './profileSelection';
 import type { StudioCameraRef } from './studioCamera';
+import { StudioViewMenu } from './StudioViewMenu';
 import type { CadConnectorPick } from './TransformDialog';
 import type { ExtrudeDepthControl } from './extrudeDepth';
 import { useStudioMeasure } from './useStudioMeasure';
@@ -380,6 +381,8 @@ export default function WorkspaceView({
           </button>
         )}
       </div>
+      {/* The studio's view menu under the cube, with its Named views. */}
+      {controlled && onViewRequest && <StudioViewMenu designId={document.id} camera={cameraState} onViewRequest={onViewRequest} />}
       <ModelViewport
         cameraState={cameraState}
         extrusionDepth={extrusionDepth}

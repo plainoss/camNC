@@ -10,6 +10,8 @@ export interface ViewRequest {
   /** For `normal`: the way the camera looks from, out of a plane or face, and which way is up on it. For a cube edge or corner: the way it looks from, with Z up. */
   direction?: [number, number, number];
   up?: [number, number, number];
+  /** A saved camera to go back to exactly, as a named view is: where it looks at, from where, which way up, how far in. */
+  camera?: { center: [number, number, number]; back: [number, number, number]; up: [number, number, number]; height: number };
 }
 
 const kViewDirections = {
@@ -63,9 +65,11 @@ export function FitCamera({
     // Fitted already, for this key and with the controls that orbit it.
     if (fitted.current && fitted.current.key === fitKey && fitted.current.controls === controls && fitted.current.seq === viewRequest?.seq)
       return;
-    const saved = (!fitted.current || !fitted.current.controls) && cameraState?.current;
+    const restoring = (!fitted.current || !fitted.current.controls) && cameraState?.current;
     fitted.current = { key: fitKey, controls, seq: viewRequest?.seq };
-    if (saved && saved.key === fitKey && saved.seq === viewRequest?.seq && 'isOrthographicCamera' in camera) {
+    // A named view asks for its camera exactly; otherwise the camera as it was left, when nothing has changed since.
+    const saved = viewRequest?.camera ?? (restoring && restoring.key === fitKey && restoring.seq === viewRequest?.seq ? restoring : null);
+    if (saved && 'isOrthographicCamera' in camera) {
       const center = new THREE.Vector3(...saved.center);
       camera.position.copy(center).addScaledVector(new THREE.Vector3(...saved.back), 20000);
       camera.up.set(...saved.up);
