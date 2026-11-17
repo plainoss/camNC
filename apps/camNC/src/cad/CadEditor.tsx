@@ -1,13 +1,4 @@
-import {
-  initialView,
-  numeric,
-  type ConstraintTool,
-  type DimensionMode,
-  type NumericConstraint,
-  type Point,
-  type Tool,
-  type View,
-} from './cadEditorShared';
+import { initialView, numeric, type ConstraintTool, type NumericConstraint, type Point, type Tool, type View } from './cadEditorShared';
 import type { SketchEditorInput } from './sketchEditorInput';
 import { sketchPointerDown } from './sketchPointerDown';
 import { cadEditorKeyDown } from './cadEditorKeyDown';
@@ -54,19 +45,13 @@ import {
   type CadDrawnOn,
   type CadSketch,
   type CadSketchSolveStatus,
-  moveFaceSketch,
-  removeCadFeature,
   cadCopyName,
-  setCutDepth,
-  setCutSuppressed,
-  withFeatureVersion,
   type CadPoint,
   cadVariableProblems,
   partCutInputProblems,
   drawnOnOutline,
   cadSketchFrame,
   resolveExtrudeSteps,
-  setPartPattern,
   renamePartCopy,
 } from '@wbcnc/cad';
 import {
@@ -120,14 +105,19 @@ import {
 import { SketchTransformManipulator } from './SketchTransformControls';
 import { initialTransformParameters } from './transformParameters';
 import { SelectionReadout } from './SelectionReadout';
-import { CadThicknessField } from './CadThicknessField';
+import { SketchPartProperties } from './SketchPartProperties';
+import {
+  SketchChamferHandles,
+  SketchCornerErrors,
+  SketchExtendEndpoint,
+  SketchRemoveCurveLabel,
+  SketchSelectionBox,
+  SketchSnapCue,
+  SketchSplitMark,
+} from './SketchCanvasMarks';
 import { CadVariablesPanel } from './CadVariablesPanel';
 import { DesignStepsList } from './DesignStepsList';
-import { CadDrawnOnField } from './CadDrawnOnField';
 import { drawnOnName, nextSketchLabel, pendingRow, sketchPlaneName } from './drawnOnName';
-import { CadReliefField } from './CadReliefField';
-import { CadPartPatternField } from './CadPartPatternField';
-import { CadCopyNames } from './CadCopyNames';
 import { SketchContextMenu } from './SketchContextMenu';
 import {
   createSketchContext,
@@ -162,7 +152,6 @@ import { CommandSearch, type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
 import { withRegionDepth, type CutRegion } from './cutRegions';
 import { CutOverlay } from './CutOverlay';
-import { PartFeatureList } from './PartFeatureList';
 import { RegionDepthField } from './RegionDepthField';
 import { sketchTools as tools, type SketchTool } from './sketchTools';
 import { SketchGeometry } from './SketchGeometry';
@@ -171,7 +160,7 @@ import { SketchToolPreview } from './SketchToolPreview';
 import { ModificationControls } from './ModificationControls';
 import { ModificationPreview } from './ModificationPreview';
 import { idleModificationWorkflow, transitionModification, type ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
-import { useSvgPixelScale, SKETCH_APPEARANCE, sketchStrokeColor } from './sketchAppearance';
+import { useSvgPixelScale, sketchStrokeColor } from './sketchAppearance';
 import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
@@ -226,7 +215,7 @@ import { useEditorCameras } from './studioCamera';
 import { sketchBackdropView } from './sketchBackdropView';
 import { initialFaceSketchView, assemblyCameraFromPart } from './faceSketchScene';
 import { useFaceSketchCamera } from './useFaceSketchCamera';
-import { fitSketchView, pointsOf } from './fitSketchView';
+import { fitSketchView } from './fitSketchView';
 import { sketchValuePosition, projectSketchPoint, focusSketchCanvas, creationEditorPositions, sketchPointAtClient } from './sketchViewport';
 import { addUsedPartEdges } from './partEdgeUse';
 import { PartReferenceGeometry } from './PartReferenceGeometry';
@@ -1656,170 +1645,36 @@ export function CadEditor({
           {!faceSketch && !studioSession && <DesignStepsList document={doc} selectedPartId={part?.id ?? null} onStep={openStep} />}
           {!studioSession && partsPanel}
           {part && !faceSketch && !(studioSession && showWorkspace) && (
-            <div className="cad-properties">
-              <h3>{part.name} · Sketch</h3>
-              <label htmlFor="cad-part-name">Part name</label>
-              <input
-                id="cad-part-name"
-                key={`${part.id}:${part.name}`}
-                defaultValue={part.name}
-                onKeyDown={event => {
-                  if (event.key === 'Enter' && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
-                    event.preventDefault();
-                    event.currentTarget.blur();
-                    svg.current?.focus();
-                  }
-                  if (event.key === 'Escape') {
-                    event.currentTarget.value = part.name;
-                    event.currentTarget.blur();
-                    svg.current?.focus();
-                  }
-                }}
-                onBlur={event => {
-                  const name = event.currentTarget.value.trim();
-                  if (name && name !== part.name) commit(replacePart(doc, part.id, p => ({ ...p, name })));
-                }}
-              />
-              {!studioSession && (
-                <>
-                  <CadThicknessField
-                    key={part.id}
-                    value={part.thickness}
-                    expression={part.thicknessExpression}
-                    variables={variableScope}
-                    onValidityChange={setThicknessValid}
-                    onDone={() => svg.current?.focus()}
-                    onCommit={(thickness, thicknessExpression) =>
-                      commit(
-                        replacePart(doc, part.id, p => {
-                          const next = { ...p, thickness, thicknessExpression };
-                          if (thicknessExpression === undefined) delete next.thicknessExpression;
-                          return next;
-                        })
-                      )
-                    }
-                  />
-                  {part.drawnOn && (
-                    <CadDrawnOnField
-                      key={`${part.id}:drawn-on`}
-                      document={doc}
-                      part={part as typeof part & { drawnOn: NonNullable<typeof part.drawnOn> }}
-                      variables={variableScope}
-                      onDone={() => svg.current?.focus()}
-                      onChange={drawnOn => commit(replacePart(documentRef.current, part.id, p => ({ ...p, drawnOn })))}
-                    />
-                  )}
-                  <CadReliefField
-                    key={`${part.id}:relief`}
-                    relief={part.cornerRelief}
-                    variables={variableScope}
-                    onDone={() => svg.current?.focus()}
-                    onChange={cornerRelief =>
-                      commit(
-                        replacePart(documentRef.current, part.id, p => {
-                          const next = { ...p, cornerRelief };
-                          if (!cornerRelief) delete next.cornerRelief;
-                          return next;
-                        })
-                      )
-                    }
-                  />
-                  <CadPartPatternField
-                    key={`${part.id}:pattern`}
-                    pattern={part.pattern}
-                    document={doc}
-                    pickDirection={picked => setDirectionPicker(() => picked)}
-                    variables={variableScope}
-                    onDone={() => svg.current?.focus()}
-                    onChange={pattern => commit(setPartPattern(documentRef.current, part.id, pattern))}
-                  />
-                  <CadCopyNames
-                    part={part}
-                    onRename={(copyId, name) => commit(renamePartCopy(documentRef.current, part.id, copyId, name))}
-                  />
-                </>
-              )}
-              {variableProblems
-                .filter(problem => problem.partId === part.id)
-                .map((problem, index) => (
-                  <p key={index} className="cad-variable-problem" role="alert">
-                    Can’t follow the variables, so this part keeps its last good shape. {problem.message}
-                  </p>
-                ))}
-              <button
-                type="button"
-                className="cad-delete-part"
-                onClick={() => {
-                  const parts = doc.parts.filter(p => p.id !== part.id);
-                  commit(withFeatureVersion({ ...doc, parts }));
-                  setPartId(parts[0]?.id ?? '');
-                  setSelected([]);
-                  chooseTool('select');
-                }}>
-                Delete part
-              </button>
-              {(!!part.features?.length || (onEditFaceSketch && part.extrude !== false)) && (
-                <PartFeatureList
-                  part={part}
-                  onRemove={featureId => commit(removeCadFeature(documentRef.current, part.id, featureId))}
-                  onSwitchCut={(cutId, on) => commit(setCutSuppressed(documentRef.current, part.id, cutId, !on))}
-                  onEdit={onEditFaceSketch && (sketchId => faceEditor.edit(part.id, sketchId))}
-                  variables={variableScope}
-                  onCutDepth={(cut, depth, expression) =>
-                    commit(setCutDepth(documentRef.current, part.id, cut.sketchId, cut.regionId, depth, expression))
-                  }
-                  onMoveToTop={sketchId => commit(moveFaceSketch(documentRef.current, part.id, sketchId, 'top'))}
-                  onNew={onEditFaceSketch && (face => faceEditor.create(face))}
-                />
-              )}
-              <div className="cad-divider" />
-              {!studioSession && (
-                <label className="cad-show-constraints">
-                  <input
-                    type="checkbox"
-                    checked={showConstraints}
-                    onChange={event => {
-                      setShowConstraints(event.target.checked);
-                      setHoveredConstraintEntities([]);
-                    }}
-                  />
-                  Show constraints
-                </label>
-              )}
-              {(tool === 'dimension' || placingDimension || dimension !== null) && (
-                <>
-                  <label className="cad-dimension-mode" htmlFor="cad-dimension-mode">
-                    Dimension type
-                    <select
-                      id="cad-dimension-mode"
-                      value={dimensionMode}
-                      onChange={event => applyDimensionEvent({ type: 'mode', mode: event.target.value as DimensionMode })}>
-                      <option value="auto">Automatic</option>
-                      <option value="distance">Length</option>
-                      <option value="distanceX">Horizontal distance</option>
-                      <option value="distanceY">Vertical distance</option>
-                      <option value="angle">Angle</option>
-                    </select>
-                  </label>
-                </>
-              )}
-              <p className="cad-muted">Select a constraint and press Delete to remove it. Double-click a dimension to edit its value.</p>
-              {selected.length === 1 &&
-                sketch?.entities.some(entity => entity.id === selected[0] && entity.type === 'conic') &&
-                tool === 'select' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const curve = sketch.entities.find(entity => entity.id === selected[0]);
-                      if (curve?.type === 'conic') {
-                        setRho(String(curve.rho));
-                        setConicEditing(curve.id);
-                      }
-                    }}>
-                    Edit conic rho
-                  </button>
-                )}
-            </div>
+            <SketchPartProperties
+              document={doc}
+              documentRef={documentRef}
+              part={part}
+              studio={studioSession}
+              commit={commit}
+              variables={variableScope}
+              variableProblems={variableProblems}
+              focusCanvas={() => svg.current?.focus()}
+              onThicknessValidity={setThicknessValid}
+              pickDirection={picked => setDirectionPicker(() => picked)}
+              setPartId={setPartId}
+              setSelected={setSelected}
+              chooseTool={chooseTool}
+              faceEditor={onEditFaceSketch && faceEditor}
+              showConstraints={showConstraints}
+              onShowConstraints={shown => {
+                setShowConstraints(shown);
+                setHoveredConstraintEntities([]);
+              }}
+              showDimensionMode={tool === 'dimension' || placingDimension || dimension !== null}
+              dimensionMode={dimensionMode}
+              onDimensionMode={mode => applyDimensionEvent({ type: 'mode', mode })}
+              selected={selected}
+              tool={tool}
+              onEditConic={(id, rho) => {
+                setRho(String(rho));
+                setConicEditing(id);
+              }}
+            />
           )}
           {studioSession && (
             <section className="cad-parts-panel" aria-label="Parts panel">
@@ -2281,71 +2136,18 @@ export function CadEditor({
                   }}
                 />
               )}
-              {tool === 'split' && splitFirst && (
-                <circle
-                  cx={splitFirst.point.x}
-                  cy={-splitFirst.point.y}
-                  r={5 / markerScale}
-                  fill="#fff"
-                  stroke="#2467d1"
-                  vectorEffect="non-scaling-stroke"
-                  pointerEvents="none"
-                  data-split-first="true"
+              {tool === 'split' && splitFirst && <SketchSplitMark point={splitFirst.point} pixelScale={markerScale} />}
+              {tool === 'chamfer' && chamferPreview?.ok && (
+                <SketchChamferHandles
+                  preview={chamferPreview}
+                  distances={chamferDistances}
+                  pixelScale={markerScale}
+                  onStart={startHandleDrag}
                 />
               )}
-              {tool === 'chamfer' &&
-                chamferPreview?.ok &&
-                chamferPreview.dimensionIds.map((id, side) => {
-                  const dimension = chamferPreview.sketch.constraints.find(c => c.id === id);
-                  if (dimension?.type !== 'distance') return null;
-                  const origin = chamferPreview.sketch.entities.find(e => e.id === dimension.pointAId);
-                  const point = chamferPreview.sketch.entities.find(e => e.id === dimension.pointBId);
-                  if (origin?.type !== 'point' || point?.type !== 'point') return null;
-                  const length = Math.hypot(point.x - origin.x, point.y - origin.y);
-                  return (
-                    <circle
-                      key={side}
-                      data-chamfer-handle={side}
-                      cx={point.x}
-                      cy={-point.y}
-                      r={6 / markerScale}
-                      fill="#fff"
-                      stroke="#2467d1"
-                      vectorEffect="non-scaling-stroke"
-                      style={{ cursor: 'move' }}
-                      onPointerDown={event => {
-                        event.stopPropagation();
-                        event.preventDefault();
-                        startHandleDrag(event, {
-                          tool: 'chamfer',
-                          side,
-                          origin,
-                          direction: { x: (point.x - origin.x) / length, y: (point.y - origin.y) / length },
-                          previous: chamferDistances,
-                        });
-                      }}
-                    />
-                  );
-                })}
-              {(tool === 'fillet' || tool === 'chamfer') &&
-                cornerPreview &&
-                !cornerPreview.ok &&
-                cornerPreview.cornerPointIds.map(id => {
-                  const point = sketch?.entities.find(entity => entity.type === 'point' && entity.id === id);
-                  return point?.type === 'point' ? (
-                    <circle
-                      key={id}
-                      data-fillet-error={id}
-                      cx={point.x}
-                      cy={-point.y}
-                      r={8 / markerScale}
-                      fill="#c43b3522"
-                      stroke="#c43b35"
-                      vectorEffect="non-scaling-stroke"
-                      pointerEvents="none"
-                    />
-                  ) : null;
-                })}
+              {(tool === 'fillet' || tool === 'chamfer') && cornerPreview && !cornerPreview.ok && (
+                <SketchCornerErrors sketch={sketch} cornerPointIds={cornerPreview.cornerPointIds} pixelScale={markerScale} />
+              )}
               {annotationSketch && showConstraints && (
                 <InlineConstraints
                   sketch={annotationSketch}
@@ -2396,26 +2198,7 @@ export function CadEditor({
                   interactive={false}
                 />
               )}
-              {snapCue && (
-                <g pointerEvents="none">
-                  <circle
-                    cx={snapCue.point.x}
-                    cy={-snapCue.point.y}
-                    r={5 / markerScale}
-                    fill="none"
-                    stroke="#bd7b18"
-                    strokeWidth="1.5"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  <text
-                    x={snapCue.point.x + 9 / markerScale}
-                    y={-snapCue.point.y - 8 / markerScale}
-                    fontSize={11 / markerScale}
-                    fill="#9b6516">
-                    {snapCue.label}
-                  </text>
-                </g>
-              )}
+              {snapCue && <SketchSnapCue cue={snapCue} pixelScale={markerScale} />}
               {modificationPreview && (
                 <ModificationPreview
                   sketch={modificationPreview.sketch}
@@ -2440,40 +2223,10 @@ export function CadEditor({
                   showLabel={false}
                 />
               )}
-              {modification.phase === 'extend' &&
-                modification.entityId &&
-                sketch &&
-                (() => {
-                  const curve = sketch.entities.find(e => e.id === modification.entityId);
-                  const point =
-                    curve &&
-                    (curve.type === 'line' || curve.type === 'arc') &&
-                    pointsOf(sketch).get(modification.end === 'start' ? curve.startId : curve.endId);
-                  return point ? (
-                    <circle
-                      data-extend-endpoint={modification.end}
-                      cx={point.x}
-                      cy={-point.y}
-                      r={5 / markerScale}
-                      fill="none"
-                      stroke={SKETCH_APPEARANCE.selectedColor}
-                      strokeWidth={1.5}
-                      vectorEffect="non-scaling-stroke"
-                      pointerEvents="none"
-                    />
-                  ) : null;
-                })()}
-              {extendPreview?.ok && extendPreview.kind === 'delete' && (
-                <text
-                  data-extend-removes-curve="true"
-                  x={cursor.x + 10 / markerScale}
-                  y={-cursor.y - 10 / markerScale}
-                  fontSize={13 / markerScale}
-                  fill="#c73535"
-                  pointerEvents="none">
-                  Remove curve
-                </text>
+              {modification.phase === 'extend' && modification.entityId && sketch && (
+                <SketchExtendEndpoint sketch={sketch} entityId={modification.entityId} end={modification.end} pixelScale={markerScale} />
               )}
+              {extendPreview?.ok && extendPreview.kind === 'delete' && <SketchRemoveCurveLabel cursor={cursor} pixelScale={markerScale} />}
               <SketchToolPreview
                 tool={tool}
                 pending={pending}
@@ -2495,21 +2248,7 @@ export function CadEditor({
                   pixelScale={markerScale}
                 />
               )}
-              {selectionBox && (
-                <rect
-                  data-sketch-selection-box={selectionBox.end.x >= selectionBox.start.x ? 'window' : 'crossing'}
-                  x={Math.min(selectionBox.start.x, selectionBox.end.x)}
-                  y={-Math.max(selectionBox.start.y, selectionBox.end.y)}
-                  width={Math.abs(selectionBox.end.x - selectionBox.start.x)}
-                  height={Math.abs(selectionBox.end.y - selectionBox.start.y)}
-                  fill={selectionBox.end.x >= selectionBox.start.x ? '#438bd522' : '#32a76a22'}
-                  stroke={selectionBox.end.x >= selectionBox.start.x ? '#438bd5' : '#32a76a'}
-                  strokeWidth="1"
-                  strokeDasharray={selectionBox.end.x >= selectionBox.start.x ? undefined : '4 3'}
-                  vectorEffect="non-scaling-stroke"
-                  pointerEvents="none"
-                />
-              )}
+              {selectionBox && <SketchSelectionBox box={selectionBox} />}
             </g>
           </svg>
           <ModificationControls
