@@ -209,7 +209,7 @@ export function FilletDialog({
       // Once an edge is picked the fillet has its place among its part's steps, and the number that goes with it.
       title={designStepLabel(candidate ?? document, featureId) ?? nextFilletLabel(document)}
       okDisabled={!picked.length}
-      className={refusal ? 'cad-feature-dialog-failed' : undefined}
+      failing={refusal && /overlap/.test(refusal) ? 'Overlapping fillets.' : refusal}
       onOk={save}
       onCancel={onCancel}>
       <div className="cad-feature-tabs" role="tablist" aria-label="Fillet type">
@@ -285,9 +285,10 @@ export function FilletDialog({
         <input type="checkbox" disabled />
         Smooth fillet corners
       </label>
-      {(error ?? refusal) && (
+      {/* A failing round says why on its title and row; only a pick that can't be taken says so here. */}
+      {error && (
         <p role="alert" className="cad-thickness-error">
-          {error ?? refusal}
+          {error}
         </p>
       )}
     </FeatureDialog>

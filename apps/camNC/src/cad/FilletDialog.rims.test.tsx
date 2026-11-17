@@ -51,9 +51,12 @@ it('picks a cup’s rim face as both of its edges, and refuses a radius the rim 
     { side: 'top', loops: ['outline', expect.stringContaining(':cut:')], face: true },
   ]);
   view.radius('3');
-  expect(screen.getByRole('alert').textContent).toMatch(/overlap on a 5\.3 mm wide face/);
-  view.radius('1');
+  // Rounds that run into each other turn the title red and say so on hovering it, with no line of text in the dialog.
+  const title = () => screen.getByRole('dialog').querySelector('h3')!;
   expect(screen.queryByRole('alert')).toBeNull();
+  expect(title().getAttribute('title')).toMatch(/did not regenerate properly: Overlapping fillets\.$/);
+  view.radius('1');
+  expect(title().getAttribute('title')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(view.save).toHaveBeenCalledTimes(1));
   expect(view.save.mock.calls[0]![0].parts[0]!.fillets).toMatchObject([{ radius: 1, corners: [], rims: [{ side: 'top', face: true }] }]);

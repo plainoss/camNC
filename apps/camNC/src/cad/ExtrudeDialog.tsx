@@ -1,5 +1,7 @@
 import { useDesignUnits } from './designUnits';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { addChangesNothing } from './addChangesNothing';
+import { ViewInfoBanner } from './ViewInfoBanner';
 import {
   type CadDrawnOn,
   cadFaceFrame,
@@ -210,6 +212,13 @@ export function ExtrudeDialog({
           const regions = keptRegions(p, own);
           if (regions?.length || p.sketchOf || nonePicked(p)) made.regions = regions ?? [];
         } else if (next === 'add') {
+          // A cut turned into an Add keeps its depth and direction, into the part, as the reference does.
+          if (p.remove && made.drawnOn && typeof p.remove.depth === 'number') {
+            made.drawnOn = { ...made.drawnOn, inward: true };
+            made.thickness = p.remove.depth;
+            if (p.remove.depthExpression) made.thicknessExpression = p.remove.depthExpression;
+            else delete made.thicknessExpression;
+          }
           const into = mergeable[0]!;
           // A solid face names the profile, not the body to join: that scope must be picked explicitly, as it must when
           // the regions run into, or lie on, more than one part.
@@ -289,6 +298,11 @@ export function ExtrudeDialog({
   // An Add folded into its part's profile is checked as that part, by its step problem.
   const mergeTarget = operation === 'add' ? document.parts.find(candidate => candidate.id === part.addTo) : undefined;
   const folded = !!mergeTarget && addsRegionsTo(mergeTarget, part);
+  // A valid Add that leaves its part as it was says so above the view, as information rather than a failure.
+  const unchangedAdd = useMemo(
+    () => operation === 'add' && !!mergeTarget && !stepProblem && addChangesNothing(document, part),
+    [operation, mergeTarget, stepProblem, document, part]
+  );
   const profileError =
     operation === 'remove' || folded || part.thin || apart || (part.regions?.length === 0 && alsoMade.length)
       ? undefined
@@ -337,6 +351,7 @@ export function ExtrudeDialog({
     <FeatureDialog
       title={designStepLabel(document, `${part.id}:extrude`) ?? part.extrudeName ?? `Extrude · ${part.name}`}
       okDisabled={!thicknessValid || !!depthError || !!profileError || !!stepProblem || !!removeError}
+      failing={operation === 'add' ? stepProblem : null}
       onOk={onOk}
       onCancel={onCancel}>
       {/* New makes the sketch a part of its own; Add joins it to one; Remove cuts it out of the board it's drawn on. */}
@@ -347,6 +362,11 @@ export function ExtrudeDialog({
           </button>
         ))}
       </div>
+      <ViewInfoBanner
+        message={
+          unchangedAdd ? 'Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.' : null
+        }
+      />
       {intersectProblem && (
         <p role="alert" className="cad-thickness-error">
           {intersectProblem}
@@ -358,7 +378,7 @@ export function ExtrudeDialog({
         </p>
       )}
       {operation !== 'new' && (
-        <div className="cad-feature-selection" data-active={stepProblem ? '' : undefined}>
+        <div className="cad-feature-selection" data-active={stepProblem && part.addTo !== '' ? '' : undefined}>
           <small>
             {part.faceProfile
               ? 'Face to extrude'
@@ -397,32 +417,46 @@ export function ExtrudeDialog({
             />
             Merge with all
           </label>
-          <label className="cad-number-field" hidden={!!part.mergeAll}>
-            Merge scope
-            <select
-              value={part.addTo}
-              onChange={event => {
-                if (!event.target.value) {
-                  setOperationError(null);
-                  return onChange(current => changePart(current, part.id, p => ({ ...p, addTo: '' })));
-                }
-                const into = document.parts.find(candidate => candidate.id === event.target.value)!;
-                const refused = partIsBuiltOn(document, part, into);
-                setOperationError(refused);
-                if (!refused) onChange(current => changePart(current, part.id, p => ({ ...p, addTo: into.id })));
-              }}>
-              <option value="">Pick a part</option>
-              {mergeable.map(candidate => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {stepProblem && (
-            <p role="alert" className="cad-thickness-error">
-              {stepProblem}
-            </p>
+          {/* As the reference's boxes: the part as a chip with a cross; empty, the box is the active pick. */}
+          {!part.mergeAll && (
+            <div className="cad-feature-selection" role="group" aria-label="Merge scope" data-active={mergeTarget ? undefined : ''}>
+              <small>Merge scope</small>
+              {mergeTarget ? (
+                <span className="cad-feature-selection-entries">
+                  <span className="cad-feature-chip">
+                    {mergeTarget.name}
+                    <button
+                      type="button"
+                      aria-label={`Take ${mergeTarget.name} out of merge scope`}
+                      onClick={() => {
+                        setOperationError(null);
+                        onChange(current => changePart(current, part.id, p => ({ ...p, addTo: '' })));
+                      }}>
+                      ×
+                    </button>
+                  </span>
+                </span>
+              ) : (
+                <select
+                  aria-label="Merge scope"
+                  className="cad-feature-selection-pick"
+                  value=""
+                  onChange={event => {
+                    if (!event.target.value) return;
+                    const into = document.parts.find(candidate => candidate.id === event.target.value)!;
+                    const refused = partIsBuiltOn(document, part, into);
+                    setOperationError(refused);
+                    if (!refused) onChange(current => changePart(current, part.id, p => ({ ...p, addTo: into.id })));
+                  }}>
+                  <option value="">Select a part</option>
+                  {mergeable.map(candidate => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           )}
         </>
       ) : operation === 'remove' ? (

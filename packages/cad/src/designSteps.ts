@@ -169,11 +169,12 @@ export function designSteps(document: CadDocument): DesignStep[] {
     // switched off, itself or by its folder, isn't made, so neither is its fillet.
     const sharp =
       step.kind === 'fillet' && part && !step.suppressed && !part.suppressed && !masked.has(part.id)
-        ? // A part that can't be built has nothing to round.
-          own || filletProblems(document, part).some(problem => problem.filletId === step.id)
-          ? // As the reference says it; the Fillet dialog and the part say which corners and why.
-            'Failed to fillet selections.'
-          : undefined
+        ? // A part that can't be built has nothing to round. Rounds that run into each other say so, as the reference does.
+          (() => {
+            const problems = filletProblems(document, part).filter(problem => problem.filletId === step.id);
+            if (!own && !problems.length) return undefined;
+            return problems.some(problem => /overlap/.test(problem.message)) ? 'Overlapping fillets.' : 'Failed to fillet selections.';
+          })()
         : undefined;
     // An Extrude › Intersect that keeps nothing says so on its row.
     if (step.kind === 'extrude' && part?.intersect && !step.suppressed) {

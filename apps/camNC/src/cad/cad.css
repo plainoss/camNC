@@ -1344,3 +1344,35 @@
 .cad-using-edges .cad-part-vertex:hover {
   stroke: rgb(47 128 237 / 0.85);
 }
+/* Information about a step that stays valid: blue, not the red of a failure. */
+.cad-notice.cad-view-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Clear of the feature dialog on the left and of the view's own controls along the top. */
+  inset-block-start: 92px;
+  inset-inline: 292px 12px;
+  margin: 0;
+  border-color: #a9c7ea;
+  background: #eaf3fd;
+  color: #24324a;
+  pointer-events: auto;
+}
+.cad-view-info-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2762a8;
+  color: #fff;
+  font: italic 600 11px/1 serif;
+}
+.cad-view-info button {
+  border: 0;
+  padding: 0 2px;
+  background: none;
+  color: #4b5c73;
+  font-size: 14px;
+  cursor: pointer;
+}
