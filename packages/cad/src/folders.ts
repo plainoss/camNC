@@ -1,6 +1,5 @@
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
 import { newCadId } from './document';
-import { cadDocumentVersion } from './documentVersion';
 import { cadFolderForStep, cadFolderIssue, cadFolderStepIssue } from './folderModel';
 import type { CadDocument, CadFolder } from './types';
 import { cadVariableUses } from './variables';
@@ -14,7 +13,6 @@ function changed(document: CadDocument, patch: Partial<CadDocument>): CadDocumen
   const next = { ...document, ...patch, revision: document.revision + 1 };
   if (!next.folders?.length) delete next.folders;
   if (!next.variables?.length) delete next.variables;
-  next.version = cadDocumentVersion(next);
   return next;
 }
 

@@ -60,7 +60,7 @@ it('carries legacy joined material through a complete cabinet, edits, reload, ph
     const pieces = cadPartsToCut(result.document, result.parts);
     expect(pieces.flatMap(piece => piece.names).sort()).toEqual(expected(count));
     expect(result.document.parts.map(part => part.id)).toEqual(ids);
-    expect(result.document.version).toBeLessThan(4);
+    expect(result.document.operationOrder).toBeUndefined();
     expect(result.document.parts.find(part => part.id === side.id)!.copies).toBeUndefined();
     expect(result.document.parts.find(part => part.id === shelf.id)!.copies).toBeUndefined();
     const current = sourcePart(result.document, 'Shelf').copies?.map(copy => copy.id) ?? [];

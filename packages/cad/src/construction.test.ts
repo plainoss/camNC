@@ -11,7 +11,6 @@ import {
   type CadConstruction,
 } from './index';
 import { constructionReferenceIssues, removeCadConstruction, setCadConstruction } from './construction';
-import { cadDocumentVersion } from './documentVersion';
 import { validateCadDocument } from './geometry';
 
 function fixture() {
@@ -93,38 +92,25 @@ describe('durable construction source and compatibility', () => {
       expect(() => setCadConstruction(document, { ...plan, assembly: [{ ...plan.assembly[0]!, moving }] })).toThrow(/Invalid/);
   });
 
-  it('opts only construction-bearing documents into v6 and preserves facts across JSON reload', () => {
+  it('preserves facts across JSON reload and removes the declaration whole', () => {
     const { document, plan } = fixture();
-    expect(document.version).toBe(3);
     const next = setCadConstruction(document, plan);
-    expect(next.version).toBe(6);
     expect(document.constructions).toBeUndefined();
     expect(parseCadDocument(JSON.parse(JSON.stringify(next)))).toEqual(next);
     expect(validateCadDocument(next).filter(d => d.severity === 'error')).toEqual([]);
     expect(constructionReferenceIssues(next)).toEqual([]);
     const removed = removeCadConstruction(next, plan.id);
-    expect(removed.version).toBe(3);
     expect(removed).not.toHaveProperty('constructions');
   });
 
-  it('retains the ordinary minimum versions, including feature edits with a plan present', () => {
-    const ordinary = createPlateDocument();
-    expect(cadDocumentVersion(ordinary)).toBe(1);
+  it('reloads a feature edit made with a plan present, and the design after the plan is removed', () => {
     const { document, plan } = fixture();
     const part = document.parts[0]!;
     const region = cadSketchRegions(part, part.sketch.id).find(r => r.curveIds.length === 1)!;
-    const plainPart = ordinary.parts[0]!;
-    plainPart.sketch = addCircle(plainPart.sketch, { x: 30, y: 30, radius: 4 });
-    const plainRegion = cadSketchRegions(plainPart, plainPart.sketch.id).find(r => r.curveIds.length === 1)!;
-    const featured = setCutDepth(ordinary, plainPart.id, plainPart.sketch.id, plainRegion.id, 2);
-    expect(cadDocumentVersion(featured)).toBe(2);
-    expect(parseCadDocument(featured)).toEqual(featured);
-    const withPlan = setCadConstruction(document, plan);
-    expect(setCutDepth(withPlan, part.id, part.sketch.id, region.id, 3).version).toBe(6);
+    const withPlan = setCutDepth(setCadConstruction(document, plan), part.id, part.sketch.id, region.id, 3);
+    expect(parseCadDocument(withPlan)).toEqual(withPlan);
     const noPlan = removeCadConstruction(withPlan, plan.id);
-    expect(cadDocumentVersion(noPlan)).toBe(3);
     expect(parseCadDocument(noPlan)).toEqual(noPlan);
-    expect(() => parseCadDocument({ ...ordinary, version: 6 })).toThrow('Invalid CAD document');
   });
 
   it('preserves exact physical/circle/variable identities through renaming and reports missing references without blocking reopen', () => {
@@ -137,7 +123,6 @@ describe('durable construction source and compatibility', () => {
     const removedCopy = structuredClone(renamed.document);
     delete removedCopy.parts[0]!.copies;
     const reopened = parseCadDocument(removedCopy);
-    expect(reopened.version).toBe(6);
     expect(reopened.constructions).toEqual(declared.constructions);
     expect(constructionReferenceIssues(reopened).some(d => d.message.includes('physical member key'))).toBe(true);
     // A same-named source is not a substitute for the bound physical copy.
@@ -147,26 +132,23 @@ describe('durable construction source and compatibility', () => {
     expect(constructionReferenceIssues(parseCadDocument(reopened)).some(d => d.message.includes('hardware hole key-bolt'))).toBe(true);
   });
 
-  it.each([null, {}, [null], Array(1), [{ recipe: 'unknown' }]])(
-    'refuses malformed construction data before deriving a reader version: %j',
-    constructions => {
-      const { document } = fixture();
-      expect(() => parseCadDocument({ ...document, version: 6, constructions })).toThrow('Invalid CAD construction');
-    }
-  );
-
-  it('bounds collections, rejects stored pass claims and refuses under-versioned declarations', () => {
-    const { document, plan } = fixture();
-    expect(() => parseCadDocument({ ...document, version: 6, constructions: Array(33).fill(plan) })).toThrow('Invalid CAD construction');
-    expect(() => parseCadDocument({ ...document, version: 6, constructions: [{ ...plan, passed: true }] })).toThrow(
-      'Invalid CAD construction'
-    );
-    expect(() => parseCadDocument({ ...document, constructions: [plan] })).toThrow();
-    expect(() => parseCadDocument({ ...document, version: 6, constructions: [] })).toThrow();
-    for (const version of [4, 5]) expect(() => parseCadDocument({ ...document, version, constructions: [plan] })).toThrow();
+  it.each([null, {}, [null], Array(1), [{ recipe: 'unknown' }]])('refuses malformed construction data: %j', constructions => {
+    const { document } = fixture();
+    expect(() => parseCadDocument({ ...document, constructions })).toThrow('Invalid CAD construction');
   });
 
-  it.each(['relief-off', 'relief-object'])('keeps a construction plan together with per-step corner relief at floor 6: %s', feature => {
+  it('bounds collections and rejects stored pass claims', () => {
+    const { document, plan } = fixture();
+    expect(() => parseCadDocument({ ...document, constructions: Array(33).fill(plan) })).toThrow('Invalid CAD construction');
+    expect(() => parseCadDocument({ ...document, constructions: [{ ...plan, passed: true }] })).toThrow('Invalid CAD construction');
+  });
+
+  it('loads an empty construction list', () => {
+    const { document } = fixture();
+    expect(parseCadDocument({ ...document, constructions: [] }).constructions).toEqual([]);
+  });
+
+  it.each(['relief-off', 'relief-object'])('keeps a construction plan together with per-step corner relief: %s', feature => {
     const { document, plan } = fixture();
     const planned = setCadConstruction(document, plan);
     const input = {
@@ -182,7 +164,7 @@ describe('durable construction source and compatibility', () => {
         },
       ],
     };
-    expect(parseCadDocument(input).version).toBe(6);
+    expect(() => parseCadDocument(input)).not.toThrow();
     expect(validateCadDocument(input).filter(d => d.code === 'invalid-document')).toEqual([]);
   });
 
@@ -212,7 +194,7 @@ describe('durable construction source and compatibility', () => {
       if (mutation === 'duplicate-entity') item.holes[0]!.entityIds.push(item.holes[0]!.entityIds[0]!);
       if (mutation.startsWith('purpose'))
         (item.holes[0] as unknown as Record<string, unknown>).purpose = mutation === 'purpose-array' ? ['clearance'] : { toString: null };
-      expect(() => parseCadDocument({ ...document, version: 6, constructions: [plan] })).toThrow('Invalid CAD construction plans');
+      expect(() => parseCadDocument({ ...document, constructions: [plan] })).toThrow('Invalid CAD construction plans');
     }
   );
 
@@ -238,7 +220,7 @@ describe('durable construction source and compatibility', () => {
       else (plan.assembly[0] as unknown as Record<string, unknown>).action = value;
       let caught: unknown;
       try {
-        parseCadDocument({ ...document, version: 6, constructions: [plan] });
+        parseCadDocument({ ...document, constructions: [plan] });
       } catch (error) {
         caught = error;
       }

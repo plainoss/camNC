@@ -65,7 +65,6 @@ describe('features on one physical copy', () => {
     const sourceId = document.parts[0]!.id;
     const copyId = document.parts[0]!.copies![0]!.id;
     document = hole(document, copyId).document;
-    expect(document.version).toBe(3);
     const solved = await solveCadDocument(document);
     expect(solved.status, JSON.stringify(solved.diagnostics)).toBe('solved');
     expect(solved.diagnostics.filter(item => item.severity === 'error')).toEqual([]);
@@ -78,7 +77,6 @@ describe('features on one physical copy', () => {
     expect(groups[0]!.part.cuts ?? []).toEqual([]);
     expect(groups[1]!.part.cuts).toHaveLength(1);
     expect(parseCadDocument(JSON.parse(JSON.stringify(solved.document)))).toEqual(solved.document);
-    expect(() => parseCadDocument({ ...document, version: 2 })).toThrow('version 3');
   });
 
   it('retains an absent copy’s feature IDs through width and count edits and reload', async () => {

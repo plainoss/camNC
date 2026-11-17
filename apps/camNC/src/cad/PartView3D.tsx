@@ -3,6 +3,7 @@ import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import {
   evaluateCadPart,
   partFaceAt,
+  CAD_DOCUMENT_VERSION,
   CAD_IDENTITY_PLACEMENT,
   type CadDrawnOn,
   pointInPolygon,
@@ -45,7 +46,13 @@ const kLift = 0.01;
 const kPartViewDirection: [number, number, number] = [0.2, -0.75, 1];
 const faceLabel = (face: CadFaceRef | { edge: string }) =>
   face === 'top' ? 'top' : face === 'underside' ? 'underside' : 'edge' in face ? 'side face' : 'pocket floor';
-const alone = (part: CadPart): CadDocument => ({ version: 2, id: 'part-view', name: part.name, revision: 0, parts: [part] });
+const alone = (part: CadPart): CadDocument => ({
+  version: CAD_DOCUMENT_VERSION,
+  id: 'part-view',
+  name: part.name,
+  revision: 0,
+  parts: [part],
+});
 
 const outlineOf = (part: CadPart) => evaluateCadPart(part).part?.outline ?? [];
 

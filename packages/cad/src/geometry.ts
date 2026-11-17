@@ -3,6 +3,7 @@ import { withMirrorJoins } from './mirrorJoins';
 import { slotIssue } from './slot';
 import { linearPatternIssue } from './pattern';
 import { constraintEntityIds, entityPointIds, originId } from './document';
+import { CAD_DOCUMENT_VERSION } from './types';
 import { sketchTargets, validateCadFeatures } from './featureModel';
 import type {
   CadArcEntity,
@@ -27,7 +28,6 @@ import { isOwnedSplineHandle, splineHandleIssue } from './splineHandles';
 import { regionProfile } from './regionProfile';
 import { withEdgeFillets } from './edgeFillets';
 import { cadFolderIssue } from './folderModel';
-import { cadDocumentVersion } from './documentVersion';
 import { constructionShapeIssue } from './constructionShape';
 import { partCutReliefIssue } from './partCutRelief';
 import { copyOperationSourceIssue } from './copyOperationSource';
@@ -47,16 +47,13 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
   const operationIssue = copyOperationSourceIssue(document);
   if (operationIssue) diagnostics.push({ code: 'invalid-copy-operations', message: operationIssue, severity: 'error' });
   for (const move of document.copyTransforms ?? []) addId(move.id, move.partId);
-  if (![1, 2, 3, 4, 5, 6, 7].includes(document.version) || !Number.isSafeInteger(document.revision) || document.revision < 0)
+  if (document.version !== CAD_DOCUMENT_VERSION || !Number.isSafeInteger(document.revision) || document.revision < 0)
     diagnostics.push({ code: 'invalid-document', message: 'Unsupported or invalid CAD document.', severity: 'error' });
   if (!document.parts.length) diagnostics.push({ code: 'no-parts', message: 'Add a part before preparing a cut.', severity: 'error' });
   const constructionIssue = constructionShapeIssue(document.constructions);
   if (constructionIssue) diagnostics.push({ code: 'invalid-construction', message: constructionIssue, severity: 'error' });
-  if (!constructionIssue && document.version < cadDocumentVersion(document))
-    diagnostics.push({ code: 'invalid-document', message: 'Unsupported or invalid CAD document.', severity: 'error' });
   const folderIssue = cadFolderIssue(document);
-  if (folderIssue || (document.version < 3 && document.folders?.length))
-    diagnostics.push({ code: 'invalid-folder', message: folderIssue ?? 'Folders require document version 3.', severity: 'error' });
+  if (folderIssue) diagnostics.push({ code: 'invalid-folder', message: folderIssue, severity: 'error' });
   for (const step of document.partCuts ?? []) {
     const issue = partCutReliefIssue(step.cornerRelief);
     if (issue) diagnostics.push({ code: 'invalid-part-cut-relief', message: issue, severity: 'error' });

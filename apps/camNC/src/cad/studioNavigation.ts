@@ -10,7 +10,6 @@ import {
   setCutSuppressed,
   setPartPattern,
   splitApartRegions,
-  withFeatureVersion,
   type CadDocument,
   type CadDrawnOn,
   type CadPart,
@@ -354,7 +353,7 @@ export function studioFeatureAction(editor: StudioNavigationInput, entry: Featur
   else if (step.kind === 'sketch' || step.kind === 'extrude') {
     // A part is its sketch pushed out, so deleting either deletes the part, and the parts its extrude made with it.
     const parts = withoutPartsMadeWith(current, step.partId).parts.filter(candidate => candidate.id !== step.partId);
-    commitKept(withFeatureVersion({ ...current, parts }));
+    commitKept({ ...current, parts });
     setPartId(parts[0]?.id ?? '');
   } else if (step.kind === 'pattern') commitKept(setPartPattern(current, step.partId, null));
   else if (step.kind === 'partCut' && step.partCutId) commitKept(removePartCut(current, step.partCutId));

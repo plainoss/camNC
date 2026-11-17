@@ -5,7 +5,6 @@ import {
   setCutDepth,
   setCutSuppressed,
   setPartPattern,
-  withFeatureVersion,
   type CadDiagnostic,
   type CadDocument,
   type CadDrawnOn,
@@ -168,7 +167,7 @@ export function SketchPartProperties({
         className="cad-delete-part"
         onClick={() => {
           const parts = doc.parts.filter(p => p.id !== part.id);
-          commit(withFeatureVersion({ ...doc, parts }));
+          commit({ ...doc, parts });
           setPartId(parts[0]?.id ?? '');
           setSelected([]);
           chooseTool('select');

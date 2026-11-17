@@ -72,9 +72,8 @@ Pockets that can be designed and cut, from the existing sketch editor.
   or `floorOf: cutId`), and cuts with a region and a depth or through.
 - Evaluate these into `EvaluatedCadPart.cuts`, with errors for a missing region or
   a lost face. Regions report their nested islands here, because a cut needs them.
-- Keep `version: 1` for documents with no features, and use `version: 2` for any
-  with features, so an older build refuses the file and doesn't drop pockets.
-- **Done when:** old documents round-trip byte for byte. There is no UI yet.
+- A document with no features carries no `features` key.
+- **Done when:** documents without features round-trip byte for byte. There is no UI yet.
 
 ### PR 3: Send native pockets to CAM from polygons (merged, #177)
 
@@ -260,7 +259,6 @@ Three things the code already does carry most of this:
   folder back on keeps a shelf that was switched off by hand.
 - The feature list selects a step or a folder, not a part: today every step of the
   selected part shows as current.
-- Documents with a folder get a new `version`, so an older build refuses the file.
 - **Done when:** the scripted cupboard's steps sit in one folder that moves and
   suppresses as a block, and adding, renaming or removing a folder leaves every
   part's geometry key unchanged.

@@ -36,7 +36,6 @@ it('loads an explicitly seed-only operation while preserving raw creation poses 
   const oldBytes = JSON.stringify(legacy);
   expect(JSON.stringify(reload(legacy))).toBe(oldBytes);
   expect(legacy.copyTransforms[0]).not.toHaveProperty('seed');
-  expect(() => reload({ ...f.source, version: 3 })).toThrow();
   expect(JSON.stringify(f.source)).toBe(bytes);
 });
 

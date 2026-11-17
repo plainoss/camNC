@@ -2,6 +2,7 @@ import { removeUnusedSlotWidths } from './slot';
 import { materializePatternJoins, removeUnusedPatternCenters } from './patternTopology';
 import { sketchPatternOwner, afterPatternEntityRemoval } from './pattern';
 import { refreshDimensionMeasurement } from './dimensions';
+import { CAD_DOCUMENT_VERSION } from './types';
 import type {
   CadArcEntity,
   CadCircleEntity,
@@ -23,12 +24,11 @@ import { constraintEntityIds, entityPointIds } from './entityReferences';
 export { constraintEntityIds, entityPointIds } from './entityReferences';
 export { parseCadDocument } from './parseCadDocument';
 
-export const CAD_DOCUMENT_VERSION = 1;
 export const newCadId = (): string => crypto.randomUUID();
 export const originId = (sketch: CadSketch): string => `${sketch.id}:origin`;
 
 export function createCadDocument(name = 'Untitled design'): CadDocument {
-  return { version: 1, id: newCadId(), name, revision: 0, parts: [] };
+  return { version: CAD_DOCUMENT_VERSION, id: newCadId(), name, revision: 0, parts: [] };
 }
 
 export function createCadPart(name = 'Part 1', thickness = 18): CadPart {

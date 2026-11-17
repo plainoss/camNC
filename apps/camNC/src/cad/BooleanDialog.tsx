@@ -1,12 +1,4 @@
-import {
-  cadDocumentVersion,
-  cadPartReferenceName,
-  newCadId,
-  updatePartCut,
-  type CadBooleanOperation,
-  type CadDocument,
-  type CadPartCut,
-} from '@wbcnc/cad';
+import { cadPartReferenceName, newCadId, updatePartCut, type CadBooleanOperation, type CadDocument, type CadPartCut } from '@wbcnc/cad';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FeatureDialog } from './FeatureDialog';
 import { useDialogPreview } from './useDialogPreview';
@@ -92,13 +84,12 @@ export function BooleanDialog({
     if (step) return updatePartCut(document, step.id, { ...result.change, consumeTools: result.change.consumeTools });
     const added: CadPartCut = { id: featureId, clearance: 0, ...result.change };
     if (!added.consumeTools) delete added.consumeTools;
-    const next = {
+    return {
       ...document,
       revision: document.revision + 1,
       partCuts: [...(document.partCuts ?? []), added],
       ...(document.operationOrder && { operationOrder: [...document.operationOrder, featureId] }),
     };
-    return { ...next, version: cadDocumentVersion(next) };
   }, [document, result, step, featureId]);
   useDialogPreview(candidate, onPreview);
   const name = (id: string) => cadPartReferenceName(document, id) ?? 'a removed part';

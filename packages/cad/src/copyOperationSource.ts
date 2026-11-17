@@ -3,9 +3,7 @@ import type { CadDocument } from './types';
 /** Structural checks precede history formatting or geometry. References may be absent; their source IDs stay editable. */
 export function copyOperationSourceIssue(document: CadDocument): string | null {
   const present = document.operationOrder !== undefined || document.copyTransforms !== undefined || document.legacyPartCutIds !== undefined;
-  if (!present) return document.version === 4 ? 'Reader version 4 requires an explicit operation order.' : null;
-  // Later readers (5 adds Cut parts corner relief) keep ordered operations, so 4 is a floor, not an exact match.
-  if (document.version < 4) return 'Physical-copy operations require reader version 4.';
+  if (!present) return null;
   const ids = new Set<string>();
   const text = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
   const vector = (value: unknown, length: number) =>

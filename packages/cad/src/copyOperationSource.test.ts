@@ -152,6 +152,16 @@ it.each(malformed)('rejects malformed operation source before formatting history
   expect(() => parseCadDocument(document)).toThrow(Error);
 });
 
+it('loads part cuts that carry no operation order', () => {
+  const document = createPlateDocument({ width: 100, height: 60, thickness: 18 });
+  const tool = createPlateDocument({ width: 20, height: 20, thickness: 18 }).parts[0]!;
+  document.parts.push(tool);
+  document.partCuts = [{ id: 'housing', tools: [tool.id], targets: [document.parts[0]!.id], clearance: 0 }];
+  const loaded = parseCadDocument(JSON.parse(JSON.stringify(document)));
+  expect(loaded.partCuts).toEqual(document.partCuts);
+  expect(loaded).not.toHaveProperty('operationOrder');
+});
+
 it('keeps absent raw targets valid source records while evaluation reports missing membership', () => {
   const document = source();
   document.copyTransforms![0]!.copyId = 'original-slot-now-absent';

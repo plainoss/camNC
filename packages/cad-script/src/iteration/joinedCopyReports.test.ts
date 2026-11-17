@@ -180,7 +180,6 @@ it.each([
     ...f.document,
     parts: [...parts, root],
     ...(folder && {
-      version: 3,
       folders: [{ id: 'masked-folder', name: 'Masked', partIds: [maskedId], suppressed: true }],
     }),
   };

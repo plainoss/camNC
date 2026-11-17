@@ -29,7 +29,7 @@ const disc = (inward: boolean): CadPart => {
   part.sketch = addCircle(part.sketch, { x: 0, y: 0, radius: 30 });
   return { ...part, regions: sketchRegions(part.sketch).map(region => region.id), intersect: true };
 };
-const design = (inward: boolean): CadDocument => ({ ...createCadDocument(), version: 7, parts: [board(), disc(inward)] });
+const design = (inward: boolean): CadDocument => ({ ...createCadDocument(), parts: [board(), disc(inward)] });
 
 it('keeps only what the extrude shares with the part it runs into: a quarter disc over the board', async () => {
   const solved = await solveCadDocument(design(false));

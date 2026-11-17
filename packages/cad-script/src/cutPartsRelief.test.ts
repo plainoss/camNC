@@ -16,7 +16,6 @@ it('relieves one step’s mortise corners for the named cutter, keeping its vari
   const { document, report } = await editCad(null, mortise({ dogbone: 'cutter' }));
   expect(report.errors).toEqual([]);
   expect(document.partCuts![0]!.cornerRelief).toEqual({ diameter: 6, diameterExpression: 'cutter' });
-  expect(document.version).toBe(5);
   // The seat itself stays square; only this step's opening has bones.
   expect(document.parts.find(part => part.name === 'Seat')!.cornerRelief).toBeUndefined();
 });

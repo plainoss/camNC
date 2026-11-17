@@ -20,7 +20,7 @@ const step = (seat: string, cornerRelief?: CadPartCut['cornerRelief']): CadPartC
   ...(cornerRelief !== undefined && { cornerRelief }),
 });
 
-it('saves a per-step dogbone with its cutter diameter variable, and previews it at the raised reader version', async () => {
+it('saves a per-step dogbone with its cutter diameter variable, and previews it', async () => {
   const base = design();
   const document = { ...base, partCuts: [step(base.parts[0]!.id)], variables: [{ id: 'cutter', name: 'cutter', expression: '6 mm' }] };
   const onSave = vi.fn(),
@@ -38,7 +38,13 @@ it('saves a per-step dogbone with its cutter diameter variable, and previews it 
   expect((screen.getByRole('combobox', { name: 'Corner relief' }) as HTMLSelectElement).value).toBe('inherit');
   fireEvent.change(screen.getByRole('combobox', { name: 'Corner relief' }), { target: { value: 'dogbone' } });
   fireEvent.change(screen.getByRole('textbox', { name: 'Cutter diameter' }), { target: { value: 'cutter' } });
-  await waitFor(() => expect(onPreview).toHaveBeenLastCalledWith(expect.objectContaining({ version: 5 })));
+  await waitFor(() =>
+    expect(onPreview).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        partCuts: [expect.objectContaining({ cornerRelief: { diameter: 6, diameterExpression: 'cutter' } })],
+      })
+    )
+  );
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() =>
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ cornerRelief: { diameter: 6, diameterExpression: 'cutter' } }))
@@ -68,7 +74,7 @@ it('refuses a dogbone without a positive cutter diameter', async () => {
   expect(onSave).not.toHaveBeenCalled();
 });
 
-it('previews a new step with an Off override at the raised reader version', async () => {
+it('previews a new step with an Off override', async () => {
   const document = design(),
     onPreview = vi.fn();
   const dialog = (pick: { partId: string; seq: number } | null) => (
@@ -78,9 +84,7 @@ it('previews a new step with an Off override at the raised reader version', asyn
   view.rerender(dialog({ partId: document.parts[0]!.id, seq: 1 }));
   fireEvent.change(screen.getByRole('combobox', { name: 'Corner relief' }), { target: { value: 'off' } });
   await waitFor(() =>
-    expect(onPreview).toHaveBeenLastCalledWith(
-      expect.objectContaining({ version: 5, partCuts: [expect.objectContaining({ cornerRelief: null })] })
-    )
+    expect(onPreview).toHaveBeenLastCalledWith(expect.objectContaining({ partCuts: [expect.objectContaining({ cornerRelief: null })] }))
   );
 });
 
