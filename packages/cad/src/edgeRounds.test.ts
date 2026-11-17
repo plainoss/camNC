@@ -86,7 +86,8 @@ describe('a Fillet step along a face', () => {
     const over = cup([rim(made(cup()), 3)]);
     expect(made(over).rounds).toBeUndefined();
     expect(filletProblems(over, over.parts[0]!)[0]?.message).toMatch(/overlap on a 5\.3 mm wide face/);
-    expect(designSteps(over).find(step => step.id === 'f')?.broken).toBe('Failed to fillet selections.');
+    // Rounds running into each other say so on the row.
+    expect(designSteps(over).find(step => step.id === 'f')?.broken).toBe('Overlapping fillets.');
   });
 
   it('on one edge of the rim fits the rim’s whole width, but not more than the wall below it', () => {

@@ -21,8 +21,9 @@ export const ALLOWED = {
   },
   command: { steps: ['studiotool', 'key', 'tool'] },
   draw: { steps: ['rect', 'circle', 'line', 'arc'] },
-  // A value typed into a box a chip or dimension opened: double-click it, type, and Enter.
-  field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'field', 'type', 'patterncount', 'patternspacing'], then: ['type', 'key Enter'] },
+  // A value typed into a box a chip or dimension opened: double-click it, type, and Enter (or Tab, moving on).
+  // A part taken out of a selection box with its chip's cross is a field's input too.
+  field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'dialogremove', 'field', 'type', 'patterncount', 'patternspacing'], then: ['type', 'key Enter', 'key Tab'] },
   confirm: { steps: ['dialogconfirm', 'closesketch', 'key Enter'] },
   cancel: { steps: ['dialogcancel', 'key Escape'] },
   // Zooming the drawing to show what's drawn next, and reopening the page, are what a person does to look.
