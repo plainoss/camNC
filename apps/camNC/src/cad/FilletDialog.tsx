@@ -2,13 +2,18 @@ import { useDesignUnits } from './designUnits';
 import {
   cadDrawnOnSupports,
   designStepLabel,
-  edgeFilletProblems,
   effectivePlacement,
+  evaluateCadDocument,
+  faceRims,
+  filletProblems,
   newCadId,
+  rimAt,
   rotateVector,
   type CadDocument,
   type CadEdgeFillet,
+  type CadFilletRim,
   type CadValueScope,
+  type EvaluatedCadPart,
 } from '@wbcnc/cad';
 import { useEffect, useMemo, useState } from 'react';
 import { CadValueInput } from './CadValueInput';
@@ -17,25 +22,56 @@ import { FeatureDialog } from './FeatureDialog';
 import { useDialogPreview } from './useDialogPreview';
 import type { CadConnectorPick } from './PartFeatureDialogs';
 
-type Picked = { partId: string; corner: string };
+type Picked = { partId: string; corner: string } | { partId: string; rim: CadFilletRim };
 
 const kUnsupported = 'Not available yet';
+/** The design has an error elsewhere, so the part isn't built: its edges along its faces can't be found. */
+const kUnbuilt = 'The design can’t be built as it is, so edges along its faces can’t be picked: fix its errors first.';
+
+const pickKey = (pick: Picked) =>
+  'corner' in pick ? pick.corner : `${pick.rim.face ? 'face' : 'edge'}:${pick.rim.side}:${pick.rim.loops.join(',')}`;
+
+// A pick is read against the design the dialog opened on, built once.
+const builtParts = new WeakMap<CadDocument, Map<string, EvaluatedCadPart>>();
+function builtPart(document: CadDocument, partId: string): EvaluatedCadPart | undefined {
+  let parts = builtParts.get(document);
+  if (!parts) builtParts.set(document, (parts = new Map(evaluateCadDocument(document).parts.map(part => [part.partId, part]))));
+  return parts.get(partId);
+}
 
 /**
- * The sketch corner a picked edge stands on: an edge through a part's thickness is where two of its sides meet. A top or
- * bottom edge can't be rounded with a straight bit, so it says so.
+ * What a click in the view picks: an edge through a part's thickness is the sketch corner where two of its sides meet;
+ * an edge along its top or underside, or a pocket's floor, is the loop it runs along; and a click on its top or
+ * underside picks every edge of that face, as both edges of a cup's rim.
  */
-function cornerOf(document: CadDocument, pick: CadConnectorPick): Picked | { error: string } {
+function pickedOf(document: CadDocument, pick: CadConnectorPick): Picked | { error: string } {
   const part = document.parts.find(candidate => candidate.id === pick.partId);
-  if (!part || !pick.edge) return { error: 'Click an edge of a part.' };
+  if (!part) return { error: 'Click an edge or a face of a part.' };
   if (pick.copy) return { error: 'Pick the edge on the part itself, not on a copy of it.' };
   const at = effectivePlacement(part, cadDrawnOnSupports(document)) ?? { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
   const back = [-at.rotation[0], -at.rotation[1], -at.rotation[2], at.rotation[3]];
   const local = (p: [number, number, number]) => rotateVector(back, [p[0] - at.position[0], p[1] - at.position[1], p[2] - at.position[2]]);
+  const built = () => builtPart(document, part.id);
+  if (!pick.edge) {
+    const normal = rotateVector(back, pick.normal);
+    const point = local(pick.surfacePoint ?? pick.point);
+    const made = built();
+    if (!made) return { error: kUnbuilt };
+    if (Math.abs(normal[2]) < 1 - 1e-6) return { error: 'Click an edge, or the top or underside of a part.' };
+    const side = normal[2] > 0 ? 'top' : 'underside';
+    if (Math.abs(point[2] - (side === 'top' ? made.thickness : 0)) > 1e-3)
+      return { error: 'A pocket’s floor meets its walls at inside edges, which can’t be rounded over: pick the edges to round.' };
+    const rim = faceRims(made, side, { x: point[0], y: point[1] });
+    return 'error' in rim ? rim : { partId: part.id, rim };
+  }
   const a = local(pick.edge.a),
     b = local(pick.edge.b);
-  if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 1e-3)
-    return { error: 'Only edges through the board can be rounded: a top or bottom edge needs a roundover bit.' };
+  if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 1e-3) {
+    const made = built();
+    if (!made) return { error: kUnbuilt };
+    const found = rimAt(made, a, b);
+    return 'error' in found ? found : { partId: part.id, rim: { side: found.side, loops: [found.loopId] } };
+  }
   const corner = part.sketch.entities.find(
     entity => entity.type === 'point' && !entity.construction && Math.hypot(entity.x - a[0], entity.y - a[1]) < 1e-3
   );
@@ -43,8 +79,8 @@ function cornerOf(document: CadDocument, pick: CadConnectorPick): Picked | { err
 }
 
 /**
- * A Fillet step: edges through a part's thickness, picked in the view, rounded to a radius. The part is rounded where
- * it's made, and its sketch keeps its corners.
+ * A Fillet step: edges through a part's thickness, and edges along its faces, picked in the view, rounded to a radius.
+ * The part is rounded where it's made, and its sketch keeps its corners.
  */
 export function FilletDialog({
   document,
@@ -69,20 +105,22 @@ export function FilletDialog({
 }) {
   const { parseCadValue, lengthText, formatLength, lengthUnit } = useDesignUnits();
   const fillet = document.parts.find(part => part.id === partId)?.fillets?.find(candidate => candidate.id === filletId);
-  const [picked, setPicked] = useState<Picked[]>(() => (fillet && partId ? fillet.corners.map(corner => ({ partId, corner })) : []));
+  const [picked, setPicked] = useState<Picked[]>(() =>
+    fillet && partId ? [...fillet.corners.map(corner => ({ partId, corner })), ...(fillet.rims ?? []).map(rim => ({ partId, rim }))] : []
+  );
   const [radiusText, setRadiusText] = useState(fillet ? (fillet.radiusExpression ?? lengthText(fillet.radius)) : lengthText(5));
   const [error, setError] = useState<string | null>(null);
   // Edges are picked while the dialog is open, one click after another, each toggling its corner.
   useEffect(() => {
     const listen = () =>
       pickEdge?.(pick => {
-        const found = cornerOf(document, pick);
+        const found = pickedOf(document, pick);
         if ('error' in found) setError(found.error);
         else {
           setError(null);
           setPicked(current =>
-            current.some(p => p.corner === found.corner)
-              ? current.filter(p => p.corner !== found.corner)
+            current.some(p => pickKey(p) === pickKey(found))
+              ? current.filter(p => pickKey(p) !== pickKey(found))
               : current.length && current[0]!.partId !== found.partId
                 ? current
                 : [...current, found]
@@ -112,9 +150,11 @@ export function FilletDialog({
     }
     const radius = parseCadValue(radiusText, { unit: 'mm', variables });
     if ('error' in radius || !(radius.value > 0)) return null;
+    const rims = picked.flatMap(p => ('rim' in p ? [p.rim] : []));
     const next: CadEdgeFillet = {
       id: featureId,
-      corners: picked.map(p => p.corner),
+      corners: picked.flatMap(p => ('corner' in p ? [p.corner] : [])),
+      ...(rims.length && { rims }),
       radius: radius.value,
       ...(radius.expression && { radiusExpression: radius.expression }),
     };
@@ -132,7 +172,7 @@ export function FilletDialog({
   // Corners the radius can't take are left sharp where it's made: say so as it's previewed. It can still be kept, marked
   // as broken on its row, as a step with an error can be.
   const owned = candidate?.parts.find(part => part.id === owner);
-  const refusal = (owned && edgeFilletProblems(owned).find(problem => problem.filletId === featureId)?.message) ?? null;
+  const refusal = (candidate && owned && filletProblems(candidate, owned).find(problem => problem.filletId === featureId)?.message) ?? null;
   const save = () => {
     const radius = parseCadValue(radiusText, { unit: 'mm', variables });
     if ('error' in radius) return setError(radius.error);
@@ -140,13 +180,26 @@ export function FilletDialog({
     if (!owner || !picked.length) return setError('Pick the edges to round.');
     if (candidate) onSave(candidate);
   };
-  // An edge is named for the feature that made it, as Edge of Extrude 1; where it stands tells picked edges apart.
-  const edgeName = (pick: Picked) => {
-    const made = document.parts.find(part => part.id === pick.partId)?.extrudedWith;
-    const label = designStepLabel(document, `${pick.partId}:extrude`) ?? (made && designStepLabel(document, `${made}:extrude`));
-    return `Edge of ${label || 'a part'}`;
+  // An edge is named for the feature that made it, as Edge of Extrude 1, and a face too; where it stands tells picked
+  // edges apart. A cut's opening was made by the step that cut it.
+  const madeBy = (partId: string, loopId?: string) => {
+    const cutBy = loopId?.includes(':cut:') ? loopId.slice(0, loopId.indexOf(':cut:')) : undefined;
+    const made = document.parts.find(part => part.id === partId)?.extrudedWith;
+    return (
+      (cutBy && designStepLabel(document, `${cutBy}:extrude`)) ||
+      designStepLabel(document, `${partId}:extrude`) ||
+      (made && designStepLabel(document, `${made}:extrude`)) ||
+      'a part'
+    );
   };
+  const edgeName = (pick: Picked) =>
+    'rim' in pick
+      ? pick.rim.face
+        ? `Face of ${madeBy(pick.partId)}`
+        : `Edge of ${madeBy(pick.partId, pick.rim.loops[0])}`
+      : `Edge of ${madeBy(pick.partId)}`;
   const edgeAt = (pick: Picked, index: number) => {
+    if ('rim' in pick) return `on the ${pick.rim.side === 'top' ? 'top' : 'underside'} ${index + 1}`;
     const part = document.parts.find(part => part.id === pick.partId);
     const point = part?.sketch.entities.find(entity => entity.type === 'point' && entity.id === pick.corner);
     return point?.type === 'point' ? `at ${formatLength(point.x)}, ${formatLength(point.y)} ${lengthUnit}` : `${index + 1}`;
@@ -156,7 +209,7 @@ export function FilletDialog({
       // Once an edge is picked the fillet has its place among its part's steps, and the number that goes with it.
       title={designStepLabel(candidate ?? document, featureId) ?? nextFilletLabel(document)}
       okDisabled={!picked.length}
-      className={refusal ? 'cad-feature-dialog-failed' : undefined}
+      failing={refusal && /overlap/.test(refusal) ? 'Overlapping fillets.' : refusal}
       onOk={save}
       onCancel={onCancel}>
       <div className="cad-feature-tabs" role="tablist" aria-label="Fillet type">
@@ -181,15 +234,15 @@ export function FilletDialog({
               const label = `${edgeName(pick)} ${edgeAt(pick, index)}`;
               return (
                 <li
-                  key={`${pick.partId}:${pick.corner}`}
+                  key={`${pick.partId}:${pickKey(pick)}`}
                   style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
                   <span title={label}>{edgeName(pick)}</span>
                   <button
                     type="button"
-                    aria-label={`Remove selected edge: ${label}`}
+                    aria-label={`Remove selected ${'rim' in pick && pick.rim.face ? 'face' : 'edge'}: ${label}`}
                     onClick={() => {
                       setError(null);
-                      setPicked(current => current.filter(edge => edge.partId !== pick.partId || edge.corner !== pick.corner));
+                      setPicked(current => current.filter(edge => edge.partId !== pick.partId || pickKey(edge) !== pickKey(pick)));
                     }}>
                     Remove
                   </button>
@@ -232,9 +285,10 @@ export function FilletDialog({
         <input type="checkbox" disabled />
         Smooth fillet corners
       </label>
-      {(error ?? refusal) && (
+      {/* A failing round says why on its title and row; only a pick that can't be taken says so here. */}
+      {error && (
         <p role="alert" className="cad-thickness-error">
-          {error ?? refusal}
+          {error}
         </p>
       )}
     </FeatureDialog>

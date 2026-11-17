@@ -1,6 +1,8 @@
 import { useId } from 'react';
 import { CadUnitSuffix } from './CadValueInput';
 import { FeatureDialog } from './FeatureDialog';
+import { ViewInfoBanner } from './ViewInfoBanner';
+import { sectionPlaneName } from './sectionPlaneName';
 import './SectionViewPanel.css';
 
 export interface SectionViewPlaneOption {
@@ -58,21 +60,48 @@ export function SectionViewPanel({
       okReason={reason}
       onOk={onConfirm}
       onCancel={onCancel}>
-      <div className="cad-feature-selection cad-section-plane" data-active={picking || !selected ? '' : undefined}>
-        <label htmlFor={`${id}-plane`}>Section plane</label>
-        <select id={`${id}-plane`} value={selected ? planeId! : ''} onChange={event => onSelectPlane(event.target.value)}>
-          <option value="" disabled>
-            Pick a plane or planar face
-          </option>
-          {planes.map(plane => (
-            <option key={plane.id} value={plane.id}>
-              {plane.label}
+      {/* What's cut away: everything but what's listed. Sectioning only some items isn't offered yet. */}
+      {/* Shown, not switched: only Exclude works, so the keyboard starts in the plane box rather than on a tab. */}
+      <div className="cad-feature-tabs cad-static-tabs" role="tablist" aria-label="Section mode">
+        <span role="tab" aria-selected>
+          Exclude
+        </span>
+        <span role="tab" aria-selected={false} aria-disabled title="Not available yet">
+          Include
+        </span>
+      </div>
+      <ViewInfoBanner message={selected ? null : 'Select a plane, planar face, cylinder, cone, or mate connector.'} />
+      <div
+        className="cad-feature-selection cad-section-plane"
+        role="group"
+        aria-label="Section planes"
+        data-active={picking || !selected ? '' : undefined}>
+        <label htmlFor={`${id}-plane`}>Section planes</label>
+        <span className="cad-section-plane-chip">
+          <select
+            id={`${id}-plane`}
+            aria-label="Section plane"
+            value={selected ? planeId! : ''}
+            onChange={event => onSelectPlane(event.target.value)}>
+            <option value="" disabled>
+              Pick a plane or planar face
             </option>
-          ))}
-        </select>
+            {planes.map(plane => (
+              <option key={plane.id} value={plane.id}>
+                {plane.id === planeId ? sectionPlaneName(plane.label, offset, flipped) : plane.label}
+              </option>
+            ))}
+          </select>
+          <button type="button" aria-label="Flip plane" title="Flip plane" aria-pressed={flipped} onClick={onFlip}>
+            ⇅
+          </button>
+        </span>
         <button type="button" aria-pressed={picking} onClick={onPickFace}>
           Pick planar face
         </button>
+      </div>
+      <div className="cad-feature-selection" role="group" aria-label="Items to exclude">
+        <small>Items to exclude</small>
       </div>
       {picking && (
         <p role="status" className="cad-feature-hint">
@@ -115,9 +144,6 @@ export function SectionViewPanel({
         </p>
       )}
       <div className="cad-section-actions">
-        <button type="button" aria-pressed={flipped} onClick={onFlip}>
-          Flip plane
-        </button>
         <button type="button" disabled={!selected} onClick={onViewNormal}>
           View normal
         </button>

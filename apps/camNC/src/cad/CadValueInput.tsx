@@ -1,6 +1,7 @@
 import { shownLengthText, useDesignUnits } from './designUnits';
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type Ref } from 'react';
 import { cadValueHasUnit } from './valueExpressions';
+import { CreateVariablePopup } from './CreateVariablePopup';
 import { settleField, useCadVariableFields, variableDefinition, variablePrefix, whenVariable } from './variableFields';
 
 type Props = ComponentPropsWithoutRef<'input'> & {
@@ -102,10 +103,25 @@ export function CadValueInput({
         { name: '', shown: 'New variable' },
       ]
     : [];
+  // New variable opens the Create variable popup, filled from the field: what was typed after `#`, and its value.
+  const [creating, setCreating] = useState<{ name: string; value: string; start: number; end: number; problem: string | null } | null>(
+    null
+  );
   const pick = (input: HTMLInputElement, option: { name: string }) => {
     if (!menu) return;
     const text = input.value,
       end = menu.start + 1 + menu.typed.length;
+    if (!option.name && fields) {
+      setCreating({
+        name: menu.typed,
+        value: plain.current.includes('#') ? '' : plain.current.trim(),
+        start: menu.start,
+        end,
+        problem: null,
+      });
+      setMenu(null);
+      return;
+    }
     // A new variable is typed in place, `#name = value`, and made on Enter.
     const start = option.name || plain.current.includes('#') ? '' : plain.current.trim();
     const insert = option.name ? `#${option.name}` : `#${menu.typed || 'name'} = ${start}`;
@@ -248,6 +264,39 @@ export function CadValueInput({
             </li>
           ))}
         </ul>
+      )}
+      {creating && fields && (
+        <CreateVariablePopup
+          at={(() => {
+            const box = own.current?.getBoundingClientRect();
+            return { left: box?.left ?? 0, top: (box?.bottom ?? 0) + 2 };
+          })()}
+          name={creating.name}
+          value={creating.value}
+          kind={unit === 'deg' ? 'angle' : unit === 'scalar' ? 'number' : 'length'}
+          problem={creating.problem}
+          onCreate={variable => {
+            const input = own.current;
+            if (!input) return;
+            const typedUnit =
+              variable.kind === 'angle' ? 'deg' : variable.kind === 'number' ? 'scalar' : variable.kind === 'length' ? 'mm' : unit;
+            const refused = !variable.name
+              ? 'Name the variable.'
+              : !variable.value
+                ? 'Give the variable a value.'
+                : fields.define(variable.name, variable.value, typedUnit);
+            if (refused) return setCreating({ ...creating, problem: refused });
+            // The field names it, ready for Enter to apply, as the reference leaves it.
+            quiet.current = true;
+            typeInto(input, input.value.slice(0, creating.start) + `#${variable.name}` + input.value.slice(creating.end));
+            setCreating(null);
+            input.focus();
+          }}
+          onCancel={() => {
+            setCreating(null);
+            own.current?.focus();
+          }}
+        />
       )}
       {problem && (
         <span role="alert" className="cad-variable-field-problem">

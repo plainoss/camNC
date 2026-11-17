@@ -1,5 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { type CadDrawnOn, setPartPattern, renamePartCopy, type CadDocument, type CadPart, type CadValueScope } from '@wbcnc/cad';
+import {
+  type CadDrawnOn,
+  designSteps,
+  setPartPattern,
+  renamePartCopy,
+  type CadDocument,
+  type CadPart,
+  type CadValueScope,
+} from '@wbcnc/cad';
 import { CadCopyNames } from './CadCopyNames';
 import { CadPartPatternField } from './CadPartPatternField';
 import { FeatureDialog } from './FeatureDialog';
@@ -52,6 +60,14 @@ export function PartPatternDialog({
   const hadPattern = useRef(initiallyPatterned ?? !!part.pattern);
   const [problem, setProblem] = useState<string | null>(null);
   const circular = part.pattern?.circular;
+  // A new circular pattern waits for its axis, as the reference's: no copies until an edge or face is picked.
+  const [axisPending, setAxisPending] = useState(!!circular && !hadPattern.current);
+  const pendingPattern = axisPending && part.pattern && !part.pattern.suppressed ? part.pattern : null;
+  useEffect(() => {
+    if (pendingPattern) onChange(document => setPartPattern(document, part.id, { ...pendingPattern, suppressed: true }));
+    // Only when a pending pattern still shows its copies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPattern]);
   const latestPickDirection = useRef(pickDirection);
   latestPickDirection.current = pickDirection;
   // Closed while picking, the view stops picking.
@@ -64,12 +80,27 @@ export function PartPatternDialog({
   );
   return (
     <FeatureDialog
-      title={`${circular ? 'Circular' : 'Linear'} pattern · ${part.name}`}
+      // A circular pattern is named as its row is, "Circular pattern 1".
+      title={
+        (circular && designSteps(document).find(step => step.id === part.pattern?.id)?.label) ||
+        `${circular ? 'Circular' : 'Linear'} pattern · ${part.name}`
+      }
       onOk={onOk}
       onCancel={onCancel}
       okDisabled={!!problem || !!blockedReason}
       okReason={blockedReason ?? problem}>
       {blockedReason && <p role="alert">{blockedReason}</p>}
+      {/* Copies are new parts; joining them to, cutting them from or intersecting them with others isn't offered yet. */}
+      <div className="cad-feature-tabs cad-static-tabs" role="tablist" aria-label="Pattern operation">
+        <span role="tab" aria-selected>
+          New
+        </span>
+        {['Add', 'Remove', 'Intersect'].map(label => (
+          <span key={label} role="tab" aria-selected={false} aria-disabled title="Not available yet">
+            {label}
+          </span>
+        ))}
+      </div>
       <label htmlFor={`${id}-type`} className="cad-number-field">
         Pattern type
         <span>
@@ -82,7 +113,9 @@ export function PartPatternDialog({
               setProblem(null);
               const kind = event.currentTarget.value === 'circular' ? 'circular' : 'linear';
               const pattern = partPatternForKind(kind, part.pattern, hadPattern.current);
-              onChange(document => setPartPattern(document, part.id, pattern));
+              const pending = kind === 'circular' && !hadPattern.current;
+              setAxisPending(pending);
+              onChange(document => setPartPattern(document, part.id, pending ? { ...pattern, suppressed: true } : pattern));
             }}>
             <option value="linear">Linear</option>
             <option value="circular">Circular</option>
@@ -90,7 +123,7 @@ export function PartPatternDialog({
         </span>
       </label>
       <DialogPartField
-        label="Part to pattern"
+        label="Entities to pattern"
         name={part.name}
         pick={partPick ?? null}
         onActivate={() => {
@@ -113,6 +146,8 @@ export function PartPatternDialog({
             })
           }
           onValidityChange={setProblem}
+          axisPending={axisPending}
+          onAxisPicked={() => setAxisPending(false)}
           onChange={pattern => onChange(document => setPartPattern(document, part.id, pattern))}
         />
       ) : (

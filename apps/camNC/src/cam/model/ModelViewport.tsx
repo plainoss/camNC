@@ -107,6 +107,7 @@ export function ModelViewport({
   showOrigin = false,
   display = 'shaded',
   palette,
+  perspective = false,
   regions = [],
   onPickRegion,
   cameraState,
@@ -160,6 +161,8 @@ export function ModelViewport({
   display?: ModelDisplay;
   /** `studio` shows parts as the reference does: grey, picked in orange. */
   palette?: 'studio';
+  /** The studio's view drawn in perspective rather than orthographic. */
+  perspective?: boolean;
   /** A sketch's regions to pick for an extrude, and picking one. */
   regions?: ViewRegion[];
   onPickRegion?: (id: string) => void;
@@ -325,10 +328,12 @@ export function ModelViewport({
   };
   return (
     <Canvas
+      // A new camera for the other projection: the canvas starts again with it, the view's camera state kept.
+      key={palette === 'studio' && perspective ? 'perspective' : 'orthographic'}
       {...settledCanvas}
       // Drawn when something changes, not every frame, so an idle view costs nothing.
       frameloop="demand"
-      orthographic={palette === 'studio'}
+      orthographic={palette === 'studio' && !perspective}
       camera={{ fov: 30 }}
       dpr={[1, 2]}
       onPointerLeave={() => {

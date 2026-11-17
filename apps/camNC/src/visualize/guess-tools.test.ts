@@ -16,10 +16,12 @@ describe('parseToolInfo', () => {
       '(Tools Table:)',
       '(T1 D=3.175 CR=0. - ZMIN=-4. - flat end mill)',
       '(T2 D=6.35 CR=0.5 TAPER=30deg - ZMIN=-1.5 - chamfer mill)',
+      '(T3 D=6 CR=3 - ZMIN=-5 - 6 mm ball end)',
     ].join('\n');
     expect(parseToolInfo(gcode)).toEqual([
       { tool: 1, diameter: 3.175, name: 'flat end mill', isFlat: true },
-      { tool: 2, diameter: 6.35, taper: 30, name: 'chamfer mill', isFlat: false },
+      { tool: 2, diameter: 6.35, taper: 30, cornerRadius: 0.5, name: 'chamfer mill', isFlat: false },
+      { tool: 3, diameter: 6, cornerRadius: 3, name: '6 mm ball end', isFlat: false },
     ]);
   });
 });

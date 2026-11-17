@@ -85,7 +85,8 @@ it('opens a compact nonmodal inspector with named geometry and allows working ou
   expect(dialog).not.toHaveAttribute('aria-modal');
   const plane = within(dialog).getByRole('combobox', { name: 'Section plane' });
   await waitFor(() => expect(document.activeElement).toBe(plane));
-  expect(within(plane).getByRole('option', { name: 'Top' })).toBeDefined();
+  // The picked plane is named as its chip shows it.
+  expect(within(plane).getByRole('option', { name: 'Section plane 1 (Top)' })).toBeDefined();
   expect(within(plane).getByRole('option', { name: 'Shelf height' })).toBeDefined();
   expect(within(plane).getByRole('option', { name: 'Side · outer face' })).toBeDefined();
   expect(plane).toHaveValue('top');

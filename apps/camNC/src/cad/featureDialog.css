@@ -187,3 +187,51 @@
   padding: 0;
   accent-color: #2762a8;
 }
+/** A step that fails or still needs a pick: its name red, as its row is; the reason shows on hovering it. */
+.cad-feature-dialog-head h3.cad-feature-dialog-failing {
+  color: #c62828;
+}
+/** A part in a selection box, with its cross to take it out. */
+.cad-feature-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #c9d4e2;
+  border-radius: 3px;
+  padding: 0 2px 0 6px;
+  background: #f4f7fb;
+}
+.cad-editor .cad-feature-chip button {
+  border: 0;
+  padding: 0 3px;
+  background: none;
+  color: #6a7a90;
+  line-height: 1;
+}
+/** An empty box's own pick: its caption grey, as a placeholder. */
+.cad-feature-selection select.cad-feature-selection-pick {
+  border: 0;
+  background: transparent;
+  color: #8592a5;
+}
+/** Tabs shown but not switched, such as Exclude / Include: drawn as the feature dialogs' tabs. */
+.cad-static-tabs span {
+  flex: 1;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+  text-align: center;
+}
+.cad-static-tabs span[aria-selected='true'] {
+  border-bottom-color: #2c6fbf;
+  color: #174f8f;
+  font-weight: 600;
+}
+.cad-static-tabs span[aria-disabled] {
+  color: #9aa6b6;
+}
+/** A box that must be filled before the step can be made: red until it is, as the reference marks it. */
+.cad-feature-selection[data-missing]:not([data-active]) {
+  border-color: #d64545;
+  background: #fff1f1;
+}

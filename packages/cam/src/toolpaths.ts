@@ -32,6 +32,7 @@ import {
   finishRoles,
 } from './passPlanning';
 import { pocketOperation } from './pocketOperation';
+import { ballRoundOperation, roundoverBitFor, roundoverOperation } from './roundoverOperation';
 import { loopNotches } from './outlineReach';
 import { roughAroundNotches } from './roughNotches';
 
@@ -662,16 +663,35 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
       // The outline's path bridges notches narrower than the bit, such as finger slots: they'd stay uncut.
       outlineNotches.push(...loopNotches(o, i, tools[0].diameter, offsetToleranceFor(s)));
     });
+  // Edges the design rounds over, once the walls below them are cut: a roundover bit of the round's radius for each.
+  const balls: Operation[] = [];
+  (features.rounds ?? []).forEach((round, i) => {
+    const name = `Round over ${i + 1}`;
+    // A roundover bit of the round's radius cuts it in one lap; otherwise a ball end finishes it in laps.
+    const bit = roundoverBitFor(round, s.roundoverBits) ?? s.roundBall;
+    if (!bit) return warnings.push(`edge round ${i + 1}: no ${round2(round.radius)} mm roundover bit, so the edge stays sharp`);
+    // An outline's wall is only there once it's cut through.
+    if (!s.cutThrough && round.material === 'inside')
+      return warnings.push(`edge round ${i + 1}: the outline isn't cut, so the edge stays sharp`);
+    const op = bit.shape === 'ball' ? ballRoundOperation(name, round, bit, s) : roundoverOperation(name, round, bit, s);
+    if ('problem' in op) return warnings.push(op.problem);
+    if (bit.shape === 'ball') balls.push(op);
+    else ops.push(op);
+  });
+  ops.push(...interleavedRounds(balls));
   if (features.bottomFaces.length && s.cutThrough)
     warnings.push(`bottom-side features at z=${features.bottomFaces.map(b => b.z).join(', ')}: need a second (flipped) setup`);
   if (features.slopedArea > 1) warnings.push(`${features.slopedArea.toFixed(0)}mm² of sloped faces ignored (not 2.5D)`);
 
   warnings.push(...ops.flatMap(op => op.warnings ?? []), ...fluteWarnings(ops, top));
 
-  // Stable sort: smallest tool first, keeps pockets -> holes -> outline within a tool.
+  // Stable sort: smallest tool first, keeps pockets -> holes -> outline within a tool. Rounded edges come first, from
+  // the face down, while the part is whole and held: their bit goes in once, before the flat bits.
+  const rounding = (op: Operation) => op.tool.shape === 'roundover' || op.tool.shape === 'ball';
+  const stage = (op: Operation) => (rounding(op) ? 0 : 1);
   const operations = ops
     .map((op, i) => ({ op, i }))
-    .sort((a, b) => a.op.tool.diameter - b.op.tool.diameter || a.i - b.i)
+    .sort((a, b) => stage(a.op) - stage(b.op) || a.op.tool.diameter - b.op.tool.diameter || a.i - b.i)
     .map(x => x.op);
   return finalizePlan(
     {
@@ -686,4 +706,28 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
     s,
     s.blankFootprint
   );
+}
+
+/**
+ * A part's ball-end rounds as one operation per bit, their laps taken together from the face down: both sides of a
+ * rim, outside and inside, go down side by side rather than one round to its foot and then the other.
+ */
+function interleavedRounds(rounds: Operation[]): Operation[] {
+  if (rounds.length < 2) return rounds;
+  const byTool = new Map<Tool, Operation[]>();
+  for (const op of rounds) byTool.set(op.tool, [...(byTool.get(op.tool) ?? []), op]);
+  return [...byTool.values()].map(ops => {
+    if (ops.length < 2) return ops[0]!;
+    // Lap k of each round in turn: each round's laps already run from its face down.
+    const passes = Array.from({ length: Math.max(...ops.map(op => op.passes.length)) }, (_, k) =>
+      ops.flatMap(op => (op.passes[k] ? [op.passes[k]!] : []))
+    ).flat();
+    const titles = [...new Set(ops.map(op => op.title))];
+    return {
+      ...ops[0]!,
+      name: ops.map(op => op.name).join(' + '),
+      title: titles.length === 1 ? `${titles[0]} ×${ops.length}` : titles.join(' + '),
+      passes,
+    };
+  });
 }

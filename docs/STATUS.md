@@ -31,40 +31,47 @@ Counted from the scenario files, without running them. PASS counts every scenari
 | Domain | Scenarios | PASS | XFAIL | FLAKY | Floor |
 | ------ | --------: | ---: | ----: | ----: | ----: |
 | sketch |       157 |  157 |     0 |     0 |   157 |
-| studio |        22 |   22 |     0 |     0 |    22 |
+| studio |        29 |   29 |     0 |     0 |    29 |
 
-| Group               | Scenarios | PASS | XFAIL | FLAKY |
-| ------------------- | --------: | ---: | ----: | ----: |
-| `sketch/appearance` |        11 |   11 |     0 |     0 |
-| `sketch/constraint` |         9 |    9 |     0 |     0 |
-| `sketch/dimension`  |        51 |   51 |     0 |     0 |
-| `sketch/draw`       |        21 |   21 |     0 |     0 |
-| `sketch/extend`     |         3 |    3 |     0 |     0 |
-| `sketch/file`       |         1 |    1 |     0 |     0 |
-| `sketch/finish`     |        15 |   15 |     0 |     0 |
-| `sketch/golden`     |         7 |    7 |     0 |     0 |
-| `sketch/history`    |         2 |    2 |     0 |     0 |
-| `sketch/keys`       |         3 |    3 |     0 |     0 |
-| `sketch/machine`    |         2 |    2 |     0 |     0 |
-| `sketch/mirror`     |         2 |    2 |     0 |     0 |
-| `sketch/modify`     |         6 |    6 |     0 |     0 |
-| `sketch/offset`     |         4 |    4 |     0 |     0 |
-| `sketch/part`       |         2 |    2 |     0 |     0 |
-| `sketch/persist`    |         3 |    3 |     0 |     0 |
-| `sketch/select`     |         4 |    4 |     0 |     0 |
-| `sketch/spline`     |         8 |    8 |     0 |     0 |
-| `sketch/view`       |         3 |    3 |     0 |     0 |
-| `studio/boolean`    |         2 |    2 |     0 |     0 |
-| `studio/cupboard`   |         5 |    5 |     0 |     0 |
-| `studio/extrude`    |         3 |    3 |     0 |     0 |
-| `studio/joints`     |         1 |    1 |     0 |     0 |
-| `studio/measure`    |         1 |    1 |     0 |     0 |
-| `studio/pattern`    |         2 |    2 |     0 |     0 |
-| `studio/section`    |         2 |    2 |     0 |     0 |
-| `studio/sketch`     |         1 |    1 |     0 |     0 |
-| `studio/stool`      |         1 |    1 |     0 |     0 |
-| `studio/tray`       |         2 |    2 |     0 |     0 |
-| `studio/view`       |         2 |    2 |     0 |     0 |
+| Group                            | Scenarios | PASS | XFAIL | FLAKY |
+| -------------------------------- | --------: | ---: | ----: | ----: |
+| `sketch/appearance`              |        11 |   11 |     0 |     0 |
+| `sketch/constraint`              |         9 |    9 |     0 |     0 |
+| `sketch/dimension`               |        51 |   51 |     0 |     0 |
+| `sketch/draw`                    |        21 |   21 |     0 |     0 |
+| `sketch/extend`                  |         3 |    3 |     0 |     0 |
+| `sketch/file`                    |         1 |    1 |     0 |     0 |
+| `sketch/finish`                  |        15 |   15 |     0 |     0 |
+| `sketch/golden`                  |         7 |    7 |     0 |     0 |
+| `sketch/history`                 |         2 |    2 |     0 |     0 |
+| `sketch/keys`                    |         3 |    3 |     0 |     0 |
+| `sketch/machine`                 |         2 |    2 |     0 |     0 |
+| `sketch/mirror`                  |         2 |    2 |     0 |     0 |
+| `sketch/modify`                  |         6 |    6 |     0 |     0 |
+| `sketch/offset`                  |         4 |    4 |     0 |     0 |
+| `sketch/part`                    |         2 |    2 |     0 |     0 |
+| `sketch/persist`                 |         3 |    3 |     0 |     0 |
+| `sketch/select`                  |         4 |    4 |     0 |     0 |
+| `sketch/spline`                  |         8 |    8 |     0 |     0 |
+| `sketch/view`                    |         3 |    3 |     0 |     0 |
+| `studio/boolean`                 |         2 |    2 |     0 |     0 |
+| `studio/circular-pattern`        |         1 |    1 |     0 |     0 |
+| `studio/cupboard`                |         5 |    5 |     0 |     0 |
+| `studio/dependencies-and-filter` |         1 |    1 |     0 |     0 |
+| `studio/dialog-error-styling`    |         1 |    1 |     0 |     0 |
+| `studio/extrude`                 |         3 |    3 |     0 |     0 |
+| `studio/fillet`                  |         1 |    1 |     0 |     0 |
+| `studio/joints`                  |         1 |    1 |     0 |     0 |
+| `studio/material`                |         1 |    1 |     0 |     0 |
+| `studio/measure`                 |         1 |    1 |     0 |     0 |
+| `studio/pattern`                 |         2 |    2 |     0 |     0 |
+| `studio/section`                 |         2 |    2 |     0 |     0 |
+| `studio/section-and-perspective` |         1 |    1 |     0 |     0 |
+| `studio/sketch`                  |         1 |    1 |     0 |     0 |
+| `studio/split`                   |         1 |    1 |     0 |     0 |
+| `studio/stool`                   |         1 |    1 |     0 |     0 |
+| `studio/tray`                    |         2 |    2 |     0 |     0 |
+| `studio/view`                    |         2 |    2 |     0 |     0 |
 
 ## Checklist
 

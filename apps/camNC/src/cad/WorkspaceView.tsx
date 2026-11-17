@@ -27,6 +27,7 @@ import { sketchLinesInModel } from './sketchLines';
 import { featureShownByDefault } from './sketchShown';
 import { sketchSelectionRegions } from './profileSelection';
 import type { StudioCameraRef } from './studioCamera';
+import { StudioViewMenu } from './StudioViewMenu';
 import type { CadConnectorPick } from './TransformDialog';
 import type { ExtrudeDepthControl } from './extrudeDepth';
 import { useStudioMeasure } from './useStudioMeasure';
@@ -198,6 +199,8 @@ export default function WorkspaceView({
   const setChoosing = (value: boolean) => (controlled ? onChoosingChange?.(value) : setOwnChoosing(value));
   // Feature pickers must own the first render, before an effect has closed the section's old picker state.
   const sectionEnabled = measurementEnabled && !choosing && !pickingMirrorPlane && !onPickPoint && !(onPickRegion && regions?.length);
+  // A view setting, not a design change: the view draws in perspective until it's switched back.
+  const [perspective, setPerspective] = useState(false);
   const section = useStudioSection(document, assembly, frame, sectionEnabled, onViewRequest, selectedPlane, selectedFace);
   const sectionEditing = sectionEnabled && section.editing;
   const sectionPicking = sectionEnabled && section.picking;
@@ -380,6 +383,17 @@ export default function WorkspaceView({
           </button>
         )}
       </div>
+      {/* The studio's view menu under the cube, with its Named views. */}
+      {controlled && onViewRequest && (
+        <StudioViewMenu
+          designId={document.id}
+          camera={cameraState}
+          onViewRequest={onViewRequest}
+          perspective={perspective}
+          onPerspective={setPerspective}
+          section={{ active: section.active, enabled: sectionEnabled, start: section.start, edit: section.edit, turnOff: section.turnOff }}
+        />
+      )}
       <ModelViewport
         cameraState={cameraState}
         extrusionDepth={extrusionDepth}
@@ -414,6 +428,7 @@ export default function WorkspaceView({
         // The studio shows parts as the reference does, and says in its status line when two overlap rather than colouring them.
         warnIds={controlled ? undefined : clashes.flatMap(clash => clash.partIds)}
         palette={controlled ? 'studio' : undefined}
+        perspective={perspective}
         highlightIds={hoverIds ? [...hoverIds] : undefined}
         milled={always}
         onPickFace={pickingMirrorPlane ? pickMirrorFace : sectionPicking ? section.pickFace : choosing ? pickFace : undefined}

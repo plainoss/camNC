@@ -355,6 +355,14 @@ export interface CadPart {
   fillets?: CadEdgeFillet[];
   /** Mirror › Add steps, after its fillets: the part joined with its own mirror image across a plane or a face. */
   mirrorJoins?: CadMirrorJoin[];
+  /**
+   * A Split: the part cut in two by a plane standing across its sketch plane. The part keeps the side the plane's
+   * `line` normal points to; the other side is a part of its own, `pieceOf` it. `fromCopy`: it was a copy of another
+   * part, taken out of its pattern to be split, so its sketch and extrude are that part's, not steps of its own.
+   */
+  split?: CadPartSplit;
+  /** What it's made of, from the material library: its weight follows from its density. Not a step of the design. */
+  material?: CadPartMaterial;
   /** Regions Extrude → Add steps join to this part. The design writes it from those steps; it's never edited. */
   addedRegions?: string[];
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
@@ -369,6 +377,18 @@ export interface CadPart {
   thin?: CadThinExtrude;
   /** A thin extrude of a picked shape: walls around its outline, with no floor. Ignored when the part is a `thin` board. */
   thinWall?: CadThinWall;
+  /**
+   * The open lines of the sketch a thin extrude walls instead of a shape: each becomes a strip, Thickness 1 to its right
+   * walking it from its start and Thickness 2 to its left, or centred on it with Mid plane. A Remove cuts them as slots.
+   */
+  thinEdges?: string[];
+  /**
+   * The piece of this part a through cut split it into that the part keeps, a region of one of its face sketches; the
+   * others are parts of their own, `pieceOf` it. The design writes both from its Remove steps; they're never edited.
+   */
+  piece?: CadPartPiece;
+  /** A piece of another part, split off it by a through cut: made by the design, which keeps it in step. */
+  pieceOf?: { partId: string; by: string };
   /**
    * A bone in every inside corner, so a bit of this diameter cuts it fully and a part that fits into it goes all the
    * way in. The diameter is the design's bit: a bigger bit in the job can't reach into the bones.
@@ -385,6 +405,12 @@ export interface CadPart {
  * A part's sketch x and y, with its thickness as z, turned by `rotation` (a unit quaternion x, y, z, w) and then moved by
  * `position`, in mm.
  */
+export interface CadPartPiece {
+  sketchId: string;
+  regionId: string;
+  /** The Remove step whose through cut split the part. */
+  by: string;
+}
 export interface CadThinWall {
   /** mm out from the shape's outline, or both ways around it when centred. */
   thickness1: number;
@@ -440,6 +466,22 @@ export interface CadMirrorJoin {
   across: CadDrawnOn['on'];
   datum?: string;
   suppressed?: true;
+  line?: { x: number; y: number; nx: number; ny: number };
+}
+
+export interface CadPartMaterial {
+  name: string;
+  /** kg/m³. */
+  density: number;
+}
+
+export interface CadPartSplit {
+  id: string;
+  across: CadDrawnOn['on'];
+  datum?: string;
+  suppressed?: true;
+  fromCopy?: true;
+  /** Where the plane crosses the sketch plane, in the sketch's coordinates, worked out as the design is laid out. */
   line?: { x: number; y: number; nx: number; ny: number };
 }
 
@@ -681,6 +723,8 @@ export interface CadVariable {
   expression: string;
   /** Association only: variable names remain unique across the entire document. */
   folderId?: string;
+  /** The design step it's listed before, as made while that step was edited: the feature list shows it there. */
+  before?: string;
 }
 
 export interface CadDiagnostic {
@@ -709,6 +753,8 @@ export interface EvaluatedCadPart {
   loops: EvaluatedCadLoop[];
   /** Cuts beyond the through-holes above, in feature order. Absent on plain profiles. */
   cuts?: EvaluatedCadCut[];
+  /** Edges along its faces that Fillet steps round over, in step order. Absent when there are none. */
+  rounds?: EvaluatedCadRound[];
   /** Complete cut sets for copies that differ, in the original's sketch frame before mirroring. Missing copies use `cuts`. */
   copyCuts?: Record<string, EvaluatedCadCut[]>;
   /** A copy can fill a profile hole with No cut, or turn it into a pocket. Evaluated material only, never saved source. */
@@ -733,6 +779,20 @@ export interface EvaluatedCadCut {
   /** For a cut another part makes: the bit diameter its opening's corners are relieved for, when they are. */
   relief?: number;
 }
+/** An edge along a face of the part, rounded over with a quarter circle: the face and the wall below it meet on the curve. */
+export interface EvaluatedCadRound {
+  filletId: string;
+  /** The rounded loop: `outline`, a through hole's loop ID, or a cut's ID. */
+  loopId: string;
+  side: 'top' | 'underside';
+  /** mm in from that side's surface where the edge sits: 0 on the surface itself, a cut's floor depth for one on it. */
+  at: number;
+  radius: number;
+  /** The edge, in the part's sketch coordinates. */
+  points: CadPoint[];
+  /** Where the part's material is: inside the loop for its outline, outside it for a hole or a cut's opening. */
+  material: 'inside' | 'outside';
+}
 export type CadEntityFreedom = 'fully-constrained' | 'underconstrained' | 'unknown';
 export interface CadSketchSolveStatus {
   partId: string;
@@ -754,11 +814,28 @@ export interface CadSolveResult extends CadEvaluation {
   featuresEvaluated?: true;
 }
 
-/** One Fillet step: corners of a part's sketch, rounded to a radius, as the edges through the part there. */
+/**
+ * Edges of a Fillet step along a face of the part: where its top or underside, or a pocket's floor, meets a wall going
+ * into the part. The round runs all the way along each loop.
+ */
+export interface CadFilletRim {
+  side: 'top' | 'underside';
+  /** The loops whose edge on that side is rounded: `outline`, a through hole's loop ID, or a cut's ID for its opening. */
+  loops: string[];
+  /** Picked as the face these loops bound, rather than edge by edge: it's listed as that one face. */
+  face?: true;
+}
+
+/**
+ * One Fillet step: corners of a part's sketch, rounded to a radius, as the edges through the part there, and edges along
+ * its faces, rounded over.
+ */
 export interface CadEdgeFillet {
   id: string;
   /** Corner points of the part's sketch, each where two straight sides meet. */
   corners: string[];
+  /** Edges along the part's faces, such as both edges of a cup's rim. */
+  rims?: CadFilletRim[];
   radius: number;
   radiusExpression?: string;
   suppressed?: true;

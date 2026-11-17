@@ -63,7 +63,7 @@ describe('circular part patterns', () => {
     expect(pieces[0]!.part.thickness).toBe(18);
     expect(parseCadDocument(JSON.parse(JSON.stringify(solved.document)))).toEqual(solved.document);
     expect(designSteps(document).find(step => step.kind === 'pattern')).toMatchObject({
-      label: 'Circular pattern · Leg × 4',
+      label: 'Circular pattern 1',
       detail: 'angle 360°',
     });
   });

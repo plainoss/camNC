@@ -42,8 +42,12 @@ export function startExtrude(
   if (part.extrude === false) {
     // Extruding a sketch makes a part of it; cancelling leaves the sketch as it was. One line is a board edge-on.
     // A sketch that can't be a part as a whole can still have a region picked from it; with none, it says why.
+    // Open lines on a part's face are extruded too: they split its face into regions, or are extruded thin.
+    const onFace = !!part.drawnOn && 'partId' in part.drawnOn.on;
+    const openLines = onFace && part.sketch.entities.some(entity => entity.type === 'line' && !entity.construction);
     const problem =
       !(part.drawnOn && isSingleLine(part)) &&
+      !openLines &&
       !sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).length &&
       evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
     if (problem) return { refusal: `Can’t extrude this sketch yet: ${problem.message}` };

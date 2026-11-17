@@ -1118,6 +1118,61 @@
   font-size: 11px;
 }
 /** The variables a value field offers after `#`. */
+/** The Create variable popup, under the field it was opened from. */
+.cad-create-variable {
+  position: fixed;
+  z-index: 45;
+  display: grid;
+  gap: 6px;
+  width: 15rem;
+  padding: 8px 10px;
+  border: 1px solid #c3cedb;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 4px 16px #24324722;
+  font-size: 13px;
+}
+.cad-create-variable [role='tablist'] {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid #d7e1ec;
+}
+.cad-create-variable [role='tab'] {
+  padding: 2px 6px;
+  border: 0;
+  background: none;
+}
+.cad-create-variable [role='tab'][aria-selected='true'] {
+  color: #1f6fc5;
+  border-bottom: 2px solid #1f6fc5;
+}
+.cad-create-variable [role='tab']:disabled {
+  color: #a0aec0;
+}
+.cad-create-variable input {
+  padding: 2px 4px;
+  border: 1px solid #c3cedb;
+  border-radius: 3px;
+}
+.cad-create-variable header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cad-create-variable label {
+  display: grid;
+  gap: 2px;
+}
+.cad-create-variable .cad-create-variable-ok {
+  color: #fff;
+  background: #2f9e44;
+  border-radius: 3px;
+  padding: 0 6px;
+}
+.cad-create-variable .cad-create-variable-cancel {
+  color: #c73535;
+  padding: 0 6px;
+}
 .cad-variable-menu {
   position: fixed;
   z-index: 40;
@@ -1288,4 +1343,36 @@
 }
 .cad-using-edges .cad-part-vertex:hover {
   stroke: rgb(47 128 237 / 0.85);
+}
+/* Information about a step that stays valid: blue, not the red of a failure. */
+.cad-notice.cad-view-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Clear of the feature dialog on the left and of the view's own controls along the top. */
+  inset-block-start: 92px;
+  inset-inline: 292px 12px;
+  margin: 0;
+  border-color: #a9c7ea;
+  background: #eaf3fd;
+  color: #24324a;
+  pointer-events: auto;
+}
+.cad-view-info-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2762a8;
+  color: #fff;
+  font: italic 600 11px/1 serif;
+}
+.cad-view-info button {
+  border: 0;
+  padding: 0 2px;
+  background: none;
+  color: #4b5c73;
+  font-size: 14px;
+  cursor: pointer;
 }

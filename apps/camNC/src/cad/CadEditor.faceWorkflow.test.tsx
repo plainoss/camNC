@@ -186,7 +186,8 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   await unchanged(secondView);
   await command('Extrude');
   await pickRegion();
-  expect((screen.getByRole('combobox', { name: 'Merge scope' }) as HTMLSelectElement).value).toBe(latest.parts[1]!.id);
+  // Drawn on one part's side and standing against another, it stays a new part: which to add to is picked by hand.
+  expect(screen.getByRole('tab', { name: 'New' }).getAttribute('aria-selected')).toBe('true');
   await thickness('3');
   await userEvent.click(screen.getByRole('button', { name: 'Flip direction' }));
   await userEvent.click(screen.getByRole('button', { name: 'Flip direction' }));
@@ -210,7 +211,14 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   await clickFace({ partId: first, face: 'underside' }, -28.5, 31.5);
   await waitFor(() => expect(latest.parts[3]!.thickness).toBeCloseTo(25, 3));
   await userEvent.click(screen.getByRole('tab', { name: 'Add' }));
-  expect(screen.getByRole('alert').textContent).toMatch(/merge scope/);
+  // The step still needs its part: the title turns red and says why on hovering, with no line of text in the dialog.
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(
+    screen
+      .getByRole('dialog', { name: /^Extrude/ })
+      .querySelector('h3')
+      ?.getAttribute('title')
+  ).toMatch(/merge scope/);
   expect(latest.parts.filter(isCadPart)).toHaveLength(3);
   expect(screen.getByRole('button', { name: 'OK' })).toHaveProperty('disabled', true);
   await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Merge scope' }), side);

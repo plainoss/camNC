@@ -466,6 +466,10 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
     );
     progress.done(partWork(part.features));
   }
+  // Rounded edges are finished with their own ball or roundover bit, in a stage of their own (below).
+  const rounding = (o: (typeof ops)[number]) => o.op.tool.shape === 'ball' || o.op.tool.shape === 'roundover';
+  const finishing = ops.filter(rounding);
+  ops.splice(0, ops.length, ...ops.filter(o => !rounding(o)));
   const diameters = [...new Set(ops.map(o => o.op.tool.diameter))].sort((a, b) => a - b);
   const operations: Operation[] = [];
   // Pin holes first, with the first bit: the board is still whole.
@@ -491,7 +495,18 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
         { d, stage: 'inner' as const },
         { d, stage: 'outline' as const },
       ]);
-  for (const { d, stage } of stages) {
+  // Rounded edges with their own bit, while the parts are still held: between the last pocket and the first outline
+  // when the flat bit changes there anyway, else first, from the face down, so the job swaps bits once less. One
+  // program per rounding bit.
+  const lastInner = stages.map(s => s.stage).lastIndexOf('inner');
+  const firstRelease = stages.findIndex((s, i) => i > lastInner && s.stage === 'outline');
+  const roundsAt = lastInner >= 0 && firstRelease > lastInner && stages[lastInner]!.d !== stages[firstRelease]!.d ? firstRelease : 0;
+  const pushRounds = () => {
+    for (const key of [...new Set(finishing.map(o => toolProgramKey(o.op.tool)))])
+      operations.push(...finishing.filter(o => toolProgramKey(o.op.tool) === key).map(o => o.op));
+  };
+  for (const [at, { d, stage }] of stages.entries()) {
+    if (at === roundsAt) pushRounds();
     {
       const group = ops.filter(o => o.op.tool.diameter === d && (o.op.feature === 'outline') === (stage === 'outline'));
       // Nearest part next; a part's own operations keep their order (deeper pockets start at the floor above).
@@ -517,6 +532,7 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
       }
     }
   }
+  if (roundsAt === stages.length) pushRounds();
   const blank = [
     [
       [0, 0, 0],
@@ -546,8 +562,7 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
 }
 
 /** Bits in the order a board program uses them. */
-export const boardBits = (cam: PartCam) =>
-  cam.operations.reduce<number[]>((bits, op) => (bits.at(-1) === op.tool.diameter ? bits : [...bits, op.tool.diameter]), []);
+export const boardBits = (cam: PartCam) => splitByBit(cam).map(program => program.operations[0]!.tool.diameter);
 
 /**
  * Board queue that reuses the bit in the collet: start with boards whose first bit is `startBit` (or the smallest),

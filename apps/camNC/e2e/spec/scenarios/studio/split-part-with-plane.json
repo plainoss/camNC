@@ -1,0 +1,80 @@
+[
+ {
+  "id": "studio/split/board-with-front-plane",
+  "title": "Split cuts one part in two with a default plane; the other parts stay whole",
+  "evidence": "design workflow parity spec",
+  "steps": [
+   "dialogcancel",
+   "view top",
+   "selectfeature Top",
+   "key Shift+s",
+   "key g",
+   "rect 0,0 100,60",
+   "closesketch",
+   "key Shift+e",
+   "viewpick 50,30,0",
+   "dialogfill Thickness = 40",
+   "key Enter",
+   "key Enter",
+   "key p",
+   "key p",
+   "key Shift+7",
+   "searchtool Circular pattern",
+   "selectpart Part 1",
+   "dialogfocus Axis of pattern",
+   "viewpick 100,0,20",
+   "dialogfill Instance count = 3",
+   "key Tab",
+   "dialogconfirm",
+   {
+    "spec": "1 command"
+   },
+   "searchtool Split",
+   {
+    "expect": {
+     "studio": {
+      "dialog": "Split 1"
+     }
+    }
+   },
+   {
+    "spec": "2 select"
+   },
+   "selectpart Part 1 2",
+   {
+    "spec": "3 select"
+   },
+   "dialogfocus Entity to split with",
+   {
+    "spec": "4 select"
+   },
+   "selectfeature Front",
+   {
+    "expect": {
+     "pageText": "Parts \\(4\\)"
+    }
+   },
+   {
+    "spec": "5 confirm"
+   },
+   "dialogconfirm",
+   {
+    "expect": {
+     "studio": {
+      "dialog": null
+     }
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Split 1"
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Parts \\(4\\)"
+    }
+   }
+  ]
+ }
+]

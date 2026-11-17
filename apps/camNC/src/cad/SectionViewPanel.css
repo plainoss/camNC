@@ -93,3 +93,22 @@
   outline: 2px solid #2762a8;
   outline-offset: 2px;
 }
+/* The picked plane as a chip, with its flip arrow. */
+.cad-section-plane-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid #c9d4e2;
+  border-radius: 3px;
+  padding: 0 2px 0 4px;
+  background: #f4f7fb;
+}
+.cad-section-plane-chip select {
+  border: 0;
+  background: transparent;
+}
+.cad-editor .cad-section-plane-chip button {
+  border: 0;
+  padding: 0 3px;
+  background: none;
+}

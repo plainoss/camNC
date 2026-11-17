@@ -230,6 +230,10 @@ Part Studio scenarios also use these steps, all through visible controls:
 | `pickviewcenter`                                                                                          | Click the center of the model canvas after a named view; intended for a single centered stock board. |
 | `viewpick x,y,z`                                                                                          | Click where a model point (mm, Top plane = XY, Z up) is drawn in the 3D view, through its camera.    |
 | `featuremenu <name>` / `menuitem <name>`                                                                  | Right-click a Feature list row to open its menu only; click a named item of the open menu.           |
+| `searchtool <name>`                                                                                       | Open Search tools (Alt+C), type a command's name and take the first result with Enter.               |
+| `viewmenu [item]`                                                                                         | Open the menu under the view cube, and pick a named item from it if one is given.                    |
+| `featurefilter <text>`                                                                                    | Type into the Feature list filter, replacing what is there; no text clears it.                       |
+| `panelclose <name>`                                                                                       | Click the close cross of a named panel, such as Dependencies of Extrude 1.                           |
 | `featureeye <name>` / `dialogtab <name>`                                                                  | Hover a Feature list row and click its Show/Hide eye; click a dialog tab such as Extrude's Add.      |
 | `selectfeature <name>`                                                                                    | Click one named Feature list row once, a default plane included.                                     |
 | `exportstep <file>` / `savedesign <file>`                                                                 | Download the shown parts as STEP (mm) through Export…, or the design through Save to file.           |
@@ -272,16 +276,16 @@ workflow that needs an extra click fails even when the result is right:
 pnpm --silent --filter @wbcnc/camNC spec:lint path/to/scenarios.json
 ```
 
-| Kind      | Allowed input (exactly one)                                                                                                                                       |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pick`    | `viewpick`                                                                                                                                                        |
-| `select`  | `selectfeature`, `featureeye`, `featuremenu`, `menuitem`, `dialogfocus`, `dialogtab` (a tab in a dialog), `selectpart` or `click` (a context menu is two selects) |
-| `command` | `studiotool`, `key` or `tool`                                                                                                                                     |
-| `draw`    | `rect`, `circle`, `line` or `arc`                                                                                                                                 |
-| `field`   | `dialogfill`, `dialogselect`, `dialogcheck`, `dialogtab` or `field`, then optionally `key Enter`                                                                  |
-| `confirm` | `dialogconfirm`, `closesketch` or `key Enter`                                                                                                                     |
-| `cancel`  | `dialogcancel` or `key Escape`                                                                                                                                    |
-| `view`    | `view`, or one view shortcut key: `F`, `N`, `Shift+1`…`Shift+7`                                                                                                   |
+| Kind      | Allowed input (exactly one)                                                                                                                                                                 |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pick`    | `viewpick`                                                                                                                                                                                  |
+| `select`  | `selectfeature`, `featureeye`, `featuremenu`, `menuitem`, `dialogfocus`, `dialogtab` (a tab in a dialog), `selectpart`, `viewmenu`, `panelclose` or `click` (a context menu is two selects) |
+| `command` | `studiotool`, `key` or `tool`                                                                                                                                                               |
+| `draw`    | `rect`, `circle`, `line` or `arc`                                                                                                                                                           |
+| `field`   | `dialogfill`, `dialogselect`, `dialogcheck`, `dialogtab` or `field`, then optionally `key Enter`                                                                                            |
+| `confirm` | `dialogconfirm`, `closesketch` or `key Enter`                                                                                                                                               |
+| `cancel`  | `dialogcancel` or `key Escape`                                                                                                                                                              |
+| `view`    | `view`, or one view shortcut key: `F`, `N`, `Shift+1`…`Shift+7`                                                                                                                             |
 
 Expectations, `frame`, `shot`, `checkpoint`, `exportstep` and `savedesign` are free; steps before the first marker are
 setup. `spec:names <table.md>` checks that the accessible names in a Markdown table (columns `camNC accessible name`,

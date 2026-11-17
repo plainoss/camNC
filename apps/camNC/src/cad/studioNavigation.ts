@@ -273,6 +273,9 @@ export function openDesignStep(editor: StudioNavigationInput, step: DesignStep) 
   } else if (step.kind === 'partCut') {
     setShowWorkspace(true);
     openDialog({ kind: 'partCut', id: step.partCutId });
+  } else if (step.kind === 'split') {
+    setShowWorkspace(true);
+    openDialog({ kind: 'split', partId: step.partId });
   } else if (step.kind === 'cut' || step.kind === 'extrude') {
     setShowWorkspace(false);
     setShow3D(hasOutline(documentRef.current, step.partId));
@@ -364,6 +367,8 @@ export function studioFeatureAction(editor: StudioNavigationInput, entry: Featur
     setPartId(parts[0]?.id ?? '');
   } else if (step.kind === 'pattern') commitKept(setPartPattern(current, step.partId, null));
   else if (step.kind === 'partCut' && step.partCutId) commitKept(removePartCut(current, step.partCutId));
+  // The part is whole again; one taken out of a pattern to be split stays a part of its own.
+  else if (step.kind === 'split') commitKept(replacePart(current, step.partId, ({ split: _split, ...p }) => p));
   else if (step.kind === 'cut' && step.cutId) commitKept(removeCadFeature(current, step.partId, step.cutId));
 }
 
@@ -504,7 +509,8 @@ export function runStudioCommand(editor: StudioNavigationInput, command: StudioC
   } else if (command === 'plane') {
     const preselected = planeOffsetFrom(documentRef.current, selectedPlane, selectedFace);
     openDialog({ kind: 'plane', ...(preselected && { preselected }) });
-  } else if (command === 'cutParts' || command === 'boolean')
+  } else if (command === 'split') openDialog({ kind: 'split' });
+  else if (command === 'cutParts' || command === 'boolean')
     openDialog({ kind: 'partCut', ...(command === 'boolean' && { boolean: true as const }) });
   else if (command === 'extrude' && (selectedFace || part)) {
     const mark = markCadSession(session);

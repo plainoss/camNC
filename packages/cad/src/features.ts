@@ -1,9 +1,12 @@
 import { withCadLengthUnit } from './lengthUnits';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { cadDocumentVersion } from './documentVersion';
+import { pieceProfile } from './partPieces';
+import { cadPartsMissingVariables, kVariableMissing } from './variables';
 import { featuresForCopy } from './copyFeatures';
 import { faceRemovalDepth } from './faceRemovalDepth';
 import { newCadId, originId } from './document';
+import { withEdgeRounds } from './edgeRounds';
 import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
 import { relieveCorners } from './cornerRelief';
@@ -244,7 +247,9 @@ export function evaluateCadFeatures(
   profile: EvaluatedCadPart,
   copyId?: string
 ): { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
-  const cut = cutFeatures({ ...part, features: featuresForCopy(part, copyId) }, profile);
+  // A part a through cut split is its own piece; the cuts that split it are its edges now.
+  const split = pieceProfile({ ...part, features: featuresForCopy(part, copyId) }, profile);
+  const cut = cutFeatures(split.part, split.profile);
   if (!part.cornerRelief) return cut;
   const { part: next, skipped } = relieveCorners(cut.part, part.cornerRelief.diameter);
   const diagnostics = [...cut.diagnostics];
@@ -422,7 +427,13 @@ export function evaluateCadDocument(given: CadDocument, options: { through?: str
   const diagnostics = validateCadDocument(given.operationOrder === undefined ? document : { ...document, partCuts: given.partCuts });
   if (diagnostics.some(d => d.severity === 'error')) return { parts: [], diagnostics };
   const parts: EvaluatedCadPart[] = [];
+  // A part whose values name a variable that's gone isn't built, and says why.
+  const missingVariables = cadPartsMissingVariables(document);
   for (const part of document.parts) {
+    if (missingVariables.has(part.id) && isCadBody(document, part)) {
+      diagnostics.push({ code: 'variable-missing', message: kVariableMissing, severity: 'error', partId: part.id });
+      continue;
+    }
     if (part.remove && !isSpatialRemoval(part) && part.extrude !== false && !part.suppressed) {
       const on = part.drawnOn?.on;
       const support = on && 'partId' in on && document.parts.find(candidate => candidate.id === on.partId);
@@ -450,5 +461,15 @@ export function evaluateCadDocument(given: CadDocument, options: { through?: str
       ? evaluateCopyOperations(document, removed.parts, options.through)
       : applyPartCuts(document, removed.parts);
   diagnostics.push(...cut.diagnostics);
-  return { ...cut, parts: diagnostics.some(d => d.severity === 'error') ? [] : cut.parts, diagnostics };
+  // Fillet steps along a part's faces round over the edges of what all its cuts leave, joints and other parts' Removes
+  // included.
+  const byId = new Map(document.parts.map(part => [part.id, part]));
+  const finished = cut.parts.map(made => {
+    const source = byId.get(made.partId);
+    if (!source?.fillets?.some(fillet => fillet.rims?.length)) return made;
+    const rounded = withEdgeRounds(source, made);
+    diagnostics.push(...rounded.diagnostics);
+    return rounded.part;
+  });
+  return { ...cut, parts: diagnostics.some(d => d.severity === 'error') ? [] : finished, diagnostics };
 }

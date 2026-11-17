@@ -113,7 +113,7 @@ describe('circular part pattern controls', () => {
   it('starts a fresh circular pattern with four instances and restores the design on cancel', () => {
     const { latest, onCancel, source } = setup();
     fireEvent.change(screen.getByLabelText('Pattern type'), { target: { value: 'circular' } });
-    expect(screen.getByRole('dialog', { name: 'Circular pattern · Leg' })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Circular pattern 1' })).toBeVisible();
     expect(screen.getByLabelText('Angle')).toHaveValue('360');
     expect(screen.getByLabelText('Instance count')).toHaveValue('4');
     expect(screen.getByLabelText('Equal spacing')).toBeChecked();

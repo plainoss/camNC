@@ -52,7 +52,6 @@ import {
   drawnOnOutline,
   cadSketchFrame,
   resolveExtrudeSteps,
-  renamePartCopy,
 } from '@wbcnc/cad';
 import {
   useEffect,
@@ -94,8 +93,9 @@ import { idleDrawingGesture, type DrawingGesture } from '@wbcnc/cad-editor/drawi
 import { advanceCreationValue, creationValueAnchor, creationValueAt, type CreationValues } from './creationValues';
 import { CreationValueControls } from './CreationValueControls';
 import { SketchConicRhoForm, SketchDimensionEditor, SketchPolygonForm, SketchShapeSizeForm } from './SketchValueForms';
-import { SketchLinearPatternManipulator } from './SketchLinearPatternControls';
+import { SketchLinearPatternGuides, SketchLinearPatternManipulator } from './SketchLinearPatternControls';
 import { openPatternField } from './openPatternField';
+import { startCircularPatternDrag } from './circularPatternDrag';
 import {
   initialLinearPatternParameters,
   linearPatternParameters,
@@ -181,13 +181,14 @@ import { StudioCommandSearch } from './StudioCommandSearch';
 import type { PatternOpening } from './partPatternKind';
 import { featureRowParts, picksFeatureRows, selectStudioFeature } from './studioFeatureSelection';
 import { startExtrude } from './studioExtrude';
-import { builtStudioParts, disabledStudioCommands, isBlankDesign, listedStudioParts } from './studioParts';
+import { builtStudioParts, disabledStudioCommands, isBlankDesign, listedStudioParts, studioListSource } from './studioParts';
 import { applyFramed } from './insertFraming';
 import { usePartCutSelection } from './usePartCutSelection';
 import { usePartIsolation } from './usePartIsolation';
 import { SketchPlaneDialog, StudioSketchDialog } from './StudioSketchDialog';
 import { openSketchFinishReason, sketchPendingFinishReason } from './sketchPendingFinishReason';
 import { PartsList } from './PartsList';
+import { renamedStudioPart } from './renamedStudioPart';
 import { toggledKey } from './toggledKey';
 import { usePointPicker } from './pointPicker';
 import { ShortcutList } from './ShortcutList';
@@ -228,7 +229,7 @@ import { dialogCommand, featureDialog, picksParts, previewOwner, sameDialogShown
 import { usePatternVariableCommit } from './studioPatternVariableSource';
 import { useStudioPreview } from './useStudioPreview';
 import { useEditorDocumentKeys } from './useEditorDocumentKeys';
-import { useEditorVariableFields } from './useEditorVariableFields';
+import { editedStep, useEditorVariableFields } from './useEditorVariableFields';
 import { useFeatureShown, withMadeSketchHidden } from './useFeatureShown';
 import './cad.css';
 
@@ -550,7 +551,7 @@ export function CadEditor({
   const { commit: variableCommit, normalized: normalizePatternVariableSource } = usePatternVariableCommit(dialog, documentRef, next =>
     commit(next)
   );
-  const variableScope = useEditorVariableFields(doc, documentRef, variableCommit);
+  const variableScope = useEditorVariableFields(doc, documentRef, variableCommit, editedStep(dialog, !showWorkspace && part?.id));
   const blankDesign = studioSession && isBlankDesign(doc);
   const extrusionDepth = useExtrudeDepth(doc, dialog?.kind === 'extrude' ? dialog.partId : undefined, next => commit(next));
   const studioPreview = useStudioPreview(doc, previewOwner(dialog));
@@ -1440,7 +1441,7 @@ export function CadEditor({
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   // A tool used up by its cut isn't a part of its own any more.
   // A part whose extrude wasn't built isn't a part yet.
-  const listed = dialog?.kind === 'transform' ? studioPreview.document : dialog?.kind === 'extrude' ? shownDocument : doc;
+  const listed = studioListSource(dialog?.kind, studioPreview.document, shownDocument, doc);
   const builtParts = studioSession
     ? listedStudioParts(listed, dialog, rolledBack).filter(p => !unbuiltParts?.includes(p.id))
     : builtStudioParts(doc);
@@ -1455,7 +1456,7 @@ export function CadEditor({
   // Labels and points are turned back where they stand, to read and look the same from any side.
   const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
   const studioDisabled = disabledStudioCommands(part, partHasOutline, builtParts.length);
-  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback, unbuiltParts);
+  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback, unbuiltParts, featureProblems);
   shownNow.current = featureShown;
   const partsPanel = (
     <>
@@ -1497,6 +1498,7 @@ export function CadEditor({
         ])}
         selectedKey={cutSelection.selectedKey}
         hiddenParts={hiddenParts}
+        transparent={studioSession ? [transparentParts, setTransparentParts] : undefined}
         onToggleHidden={key => setHiddenParts(previous => toggledKey(previous, key))}
         trouble={partTrouble}
         onPick={(partId, copyId) => {
@@ -1506,19 +1508,8 @@ export function CadEditor({
           setSelected([]);
           chooseTool('select');
         }}
-        onRename={(partId, copyId, name) =>
-          commit(
-            copyId
-              ? renamePartCopy(documentRef.current, partId, copyId, name)
-              : replacePart(documentRef.current, partId, current => ({
-                  ...current,
-                  // The features keep the names they had: renaming a part never renames them.
-                  sketchName: current.sketchName ?? designStepLabel(documentRef.current, `${partId}:sketch`),
-                  extrudeName: current.extrudeName ?? designStepLabel(documentRef.current, `${partId}:extrude`),
-                  name,
-                }))
-          )
-        }
+        onRename={(partId, copyId, name) => commit(renamedStudioPart(documentRef.current, partId, copyId, name))}
+        onEdit={change => commit(change(documentRef.current))}
       />
     </>
   );
@@ -2093,22 +2084,20 @@ export function CadEditor({
                     circularFields.current[field]?.focus();
                     circularFields.current[field]?.select();
                   }}
-                  onStart={(kind, event) => {
-                    const start = sketchPointAtClient(event, drawingGroup.current ?? svg.current);
-                    if (!start) return;
-                    startHandleDrag(event, {
-                      tool: 'circularPattern',
+                  onStart={(kind, event) =>
+                    startCircularPatternDrag(
                       kind,
-                      start,
-                      parameters: circularParameters,
-                      last: Math.atan2(start.y - parsedCircular.center.y, start.x - parsedCircular.center.x),
-                      sweep:
-                        ((parsedCircular.angle * Math.PI) / 180) *
-                        (parsedCircular.closed ? (parsedCircular.count - 1) / parsedCircular.count : 1),
-                    });
-                    svg.current?.focus();
-                  }}
+                      event,
+                      drawingGroup.current ?? svg.current,
+                      parsedCircular,
+                      circularParameters,
+                      startHandleDrag
+                    )
+                  }
                 />
+              )}
+              {sketch && tool !== 'linearPattern' && (
+                <SketchLinearPatternGuides sketch={sketch} pixelScale={markerScale} onEdit={editPattern} />
               )}
               {tool === 'linearPattern' && selected.length > 0 && parsedLinear.ok && (
                 <SketchLinearPatternManipulator

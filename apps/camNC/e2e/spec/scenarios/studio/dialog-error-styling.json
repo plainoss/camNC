@@ -1,0 +1,225 @@
+[
+ {
+  "id": "studio/dialog-error-styling/unmet-scope-and-overlapping-fillets",
+  "title": "An unmet merge scope and overlapping fillets show on the dialog title, an Add that changes nothing says so",
+  "evidence": "design workflow parity spec",
+  "steps": [
+   "dialogcancel",
+   "view top",
+   "selectfeature Top",
+   "key Shift+s",
+   "key c",
+   "circle 0,0 30",
+   "key d",
+   "viewpick -21.213,21.213,0",
+   "viewpick -40,40,0",
+   "field diameter 77.8",
+   "key Escape",
+   "closesketch",
+   "key Shift+e",
+   "viewpick 10,-10,0",
+   "dialogfill Thickness = 20",
+   "key Enter",
+   "dialogconfirm",
+   {
+    "expect": {
+     "studio": {
+      "dialog": null,
+      "features": [
+       {
+        "name": "Sketch 1",
+        "state": [
+         "hidden"
+        ]
+       },
+       "Extrude 1"
+      ],
+      "parts": [
+       "Part 1"
+      ]
+     }
+    }
+   },
+   "viewpick 10,-10,20",
+   "key Shift+s",
+   "key c",
+   "circle 0,0 35",
+   "key d",
+   "viewpick -24.749,24.749,0",
+   "viewpick -45,45,0",
+   "field diameter 67.2",
+   "key Escape",
+   "closesketch",
+   "key Shift+e",
+   "viewpick 0,0,20",
+   "dialogtab Remove",
+   "dialogfill Cut depth = 16",
+   "key Enter",
+   "dialogconfirm",
+   {
+    "expect": {
+     "studio": {
+      "dialog": null,
+      "features": [
+       {
+        "name": "Sketch 1",
+        "state": [
+         "hidden"
+        ]
+       },
+       "Extrude 1",
+       {
+        "name": "Sketch 2",
+        "state": [
+         "hidden"
+        ]
+       },
+       "Extrude 2"
+      ],
+      "parts": [
+       "Part 1"
+      ]
+     }
+    }
+   },
+   "key Shift+5",
+   "studiotool Fillet",
+   {
+    "expect": {
+     "pageText": "Full round"
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Tangent propagation"
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Asymmetric"
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Partial fillet"
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Variable fillet"
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Allow edge overflow"
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Smooth fillet corners"
+    }
+   },
+   "viewpick -26,26,20",
+   {
+    "expect": {
+     "pageText": "Face of Extrude 1"
+    }
+   },
+   "dialogfill Radius = 1",
+   "dialogconfirm",
+   {
+    "expect": {
+     "studio": {
+      "dialog": null,
+      "features": [
+       {
+        "name": "Sketch 1",
+        "state": [
+         "hidden"
+        ]
+       },
+       "Extrude 1",
+       {
+        "name": "Sketch 2",
+        "state": [
+         "hidden"
+        ]
+       },
+       "Extrude 2",
+       "Fillet 1"
+      ],
+      "parts": [
+       "Part 1"
+      ]
+     }
+    }
+   },
+   {
+    "spec": "1 select"
+   },
+   "feature Extrude 2",
+   {
+    "spec": "2 field"
+   },
+   "dialogtab Add",
+   {
+    "expect": {
+     "pageText": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained."
+    }
+   },
+   {
+    "spec": "3 field"
+   },
+   "dialogremove Merge scope = Part 1",
+   {
+    "expect": {
+     "pageText": "Select a part"
+    }
+   },
+   {
+    "spec": "4 cancel"
+   },
+   "dialogcancel",
+   {
+    "spec": "5 select"
+   },
+   "feature Fillet 1",
+   {
+    "spec": "6 field"
+   },
+   "dialogfill Radius = 3",
+   "key Tab",
+   {
+    "spec": "8 cancel"
+   },
+   "dialogcancel",
+   {
+    "expect": {
+     "studio": {
+      "dialog": null,
+      "features": [
+       {
+        "name": "Sketch 1",
+        "state": [
+         "hidden"
+        ]
+       },
+       "Extrude 1",
+       {
+        "name": "Sketch 2",
+        "state": [
+         "hidden"
+        ]
+       },
+       "Extrude 2",
+       "Fillet 1"
+      ],
+      "parts": [
+       "Part 1"
+      ]
+     }
+    }
+   }
+  ]
+ }
+]

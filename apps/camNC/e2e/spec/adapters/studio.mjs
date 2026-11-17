@@ -61,7 +61,7 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
-    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'featuremenu', 'partmenu', 'menuitem', 'exportstep', 'savedesign'].includes(verb)) return base.step(text);
+    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'featuremenu', 'partmenu', 'menuitem', 'exportstep', 'savedesign', 'featurefilter', 'panelclose', 'viewmenu', 'searchtool', 'dialogoption'].includes(verb)) return base.step(text);
     if (!(await base.inDemo())) throw new Error('Studio workflow input requires demo mode');
     const since = await settledSnapshot(page);
     if (verb === 'viewpick') {
@@ -89,8 +89,35 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
       if (await row.count() !== 1) throw new Error(`Feature name must identify one row: ${rest}`);
       await row.click({ button: 'right' });
       await page.getByRole('menu').first().waitFor();
+    } else if (verb === 'featurefilter') {
+      // Into the box above the Feature list, as a person clicks it, selects what's there and types; nothing clears it.
+      const box = page.getByRole('searchbox', { name: 'Filter by name or type', exact: true });
+      await box.click();
+      await page.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+A`);
+      if (rest) await page.keyboard.type(rest);
+      else await page.keyboard.press('Backspace');
+    } else if (verb === 'dialogoption') {
+      // An entry of a dialog's open list, such as a material, by the start of its name.
+      await page.getByRole('dialog').getByRole('option', { name: new RegExp(`^${escapePattern(rest)}(?:\\s|$)`) }).first().click();
+    } else if (verb === 'searchtool') {
+      // A command found by name, as a person opens Search tools (Alt+C), types it and takes the first result with Enter.
+      await page.keyboard.press('Alt+c');
+      await page.keyboard.type(rest);
+      await page.keyboard.press('Enter');
+    } else if (verb === 'viewmenu') {
+      // The menu under the view cube, then one of its items, as a person opens it and picks: `viewmenu` alone only opens it.
+      await page.getByRole('button', { name: 'View menu', exact: true }).click();
+      if (rest) {
+        const menu = page.getByRole('menu', { name: 'View menu', exact: true });
+        await menu.getByRole('menuitem', { name: rest, exact: true }).or(menu.getByRole('menuitemcheckbox', { name: rest, exact: true })).click();
+      }
+    } else if (verb === 'panelclose') {
+      // The close cross of a named panel, such as Dependencies of Extrude 1.
+      await page.getByRole('dialog', { name: rest, exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
     } else if (verb === 'menuitem') {
-      const item = page.getByRole('menu').getByRole('menuitem', { name: rest, exact: true });
+      // A switch in a menu, such as Perspective view, is a checkbox item.
+      const menu = page.getByRole('menu');
+      const item = menu.getByRole('menuitem', { name: rest, exact: true }).or(menu.getByRole('menuitemcheckbox', { name: rest, exact: true }));
       if (await item.count() !== 1) throw new Error(`The open menu must have one item named ${rest}`);
       await item.click();
     } else if (verb === 'selectfeature') {
@@ -132,7 +159,9 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
       if (await rows.count() !== 1) throw new Error(`Part name must identify one rendered row: ${rest}`);
       await rows.getByRole('button').first().click();
     } else if (verb === 'dialogfocus') {
-      await page.getByRole('dialog').getByRole('group', { name: rest, exact: true }).click();
+      // A selection box is a group, or a button where the whole box starts its pick.
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('group', { name: rest, exact: true }).or(dialog.getByRole('button', { name: rest, exact: true })).click();
     } else if (verb === 'dialogremove') {
       const at = rest.indexOf(' = ');
       if (at < 0) throw new Error('dialogremove takes Box = Part name');
@@ -178,7 +207,7 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
       await field.fill(rest.slice(at + 3));
     } else if (verb === 'dialogconfirm' || verb === 'dialogcancel') {
       const dialog = page.getByRole('dialog');
-      await dialog.getByRole('button', { name: verb === 'dialogconfirm' ? /^(OK|Save|Cut)$/ : 'Cancel', exact: true }).click();
+      await dialog.getByRole('button', { name: verb === 'dialogconfirm' ? /^(OK|Save|Cut|Confirm [a-z ]+)$/ : 'Cancel', exact: true }).click();
       await dialog.waitFor({ state: 'hidden' });
     } else {
       if (!rest || checkpoints.has(rest)) throw new Error(`Checkpoint must have a unique name: ${rest}`);

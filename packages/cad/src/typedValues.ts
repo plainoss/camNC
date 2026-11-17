@@ -85,7 +85,8 @@ const kPartPatternAngle: TypedValueKind = { label: 'Part pattern', unit: 'deg' }
 const cutDepthError = (value: number) =>
   value < 0 ? 'A cut can’t be less than nothing deep.' : value === 0 ? 'A cut needs some depth.' : null;
 const kCutDepth: TypedValueKind = { label: 'Cut depth', unit: 'mm', check: cutDepthError };
-const kRemoveDepth: TypedValueKind = { unit: 'mm', check: cutDepthError, quiet: true };
+// A Remove's depth follows its variables to zero or below too: it then cuts nothing, and says so when it's zero.
+const kRemoveDepth: TypedValueKind = { unit: 'mm', quiet: true };
 const kHoleDiameter: TypedValueKind = {
   unit: 'mm',
   check: moreThanNothing('A hole needs to be wider than nothing.'),

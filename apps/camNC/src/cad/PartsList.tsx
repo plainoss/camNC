@@ -2,6 +2,11 @@ import { useDesignUnits } from './designUnits';
 import { edgeFilletProblems, type CadDocument, type CadFolder, type CadPart } from '@wbcnc/cad';
 import { useCallback, useState } from 'react';
 import { PartRowMenu } from './PartRowMenu';
+import { MaterialPanel } from './MaterialPanel';
+import { PartPropertiesDialog } from './PartPropertiesDialog';
+import { replacePart } from './editorHelpers';
+import { partMatchesFilter, useFeatureFilter } from './featureFilter';
+import { MakeTransparentPanel } from './MakeTransparentPanel';
 import { ExportDialog, type ExportTarget } from './export/ExportDialog';
 import { shownPartsTarget } from './export/shownPartsTarget';
 
@@ -26,12 +31,16 @@ export function PartsList({
   trouble,
   onPick,
   onRename,
+  onEdit,
   document,
   rolledTo,
   folders = document?.folders,
   onSketchCopy,
   onDetachCopy,
+  transparent,
 }: {
+  /** The parts made see-through in the view, and how to change them, as the Part menu's Make transparent does. */
+  transparent?: [ReadonlySet<string>, (keys: ReadonlySet<string>) => void];
   rows: PartsListRow[];
   folders?: CadFolder[];
   onSketchCopy?: (partId: string, copyId: string, face: 'top' | 'underside') => void;
@@ -50,11 +59,17 @@ export function PartsList({
   onPick: (partId: string, copyId?: string) => void;
   /** A part, or one of its copies, named anew. */
   onRename: (partId: string, copyId: string | null, name: string) => void;
+  /** Changes the design as it now is, as assigning a material does. */
+  onEdit?: (change: (document: CadDocument) => CadDocument) => void;
 }) {
   const { formatLength, lengthUnit } = useDesignUnits();
   const [menu, setMenu] = useState<{ key: string; name: string; x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [exporting, setExporting] = useState<ExportTarget | null>(null);
+  const [seeThrough, setSeeThrough] = useState(false);
+  // The row whose Material panel or Properties dialog is open: a copy's are its part's.
+  const [panel, setPanel] = useState<{ kind: 'material' | 'properties'; key: string; name: string } | null>(null);
+  const panelRow = panel && rows.find(row => row.key === panel.key);
   const closeMenu = useCallback(() => setMenu(null), []);
   // A Fillet step that leaves corners sharp is a problem with the part too, as the check reports it.
   const problemOf = (part: CadPart) => trouble(part.id) || edgeFilletProblems(part)[0]?.message;
@@ -120,20 +135,36 @@ export function PartsList({
     </li>
   );
   const grouped = new Set<string>();
-  const listed = rows.map(row => {
-    const folder = folders?.find(folder => folder.partIds.includes(row.part.id));
-    if (!folder) return renderRow(row);
-    if (grouped.has(folder.id)) return null;
-    grouped.add(folder.id);
-    return (
-      <li key={folder.id} className="cad-parts-folder">
-        <details open>
-          <summary>{folder.name}</summary>
-          <ul aria-label={`${folder.name} parts`}>{rows.filter(candidate => folder.partIds.includes(candidate.part.id)).map(renderRow)}</ul>
-        </details>
-      </li>
-    );
-  });
+  // The Feature list's filter narrows the parts too: those it drops are one "…".
+  const filterText = useFeatureFilter();
+  const kept = filterText.trim() ? rows.filter(row => partMatchesFilter(row.part.name, filterText)) : null;
+  const listed = kept
+    ? [
+        ...kept.map(renderRow),
+        ...(kept.length < rows.length
+          ? [
+              <li key="elided" className="cad-feature-elided">
+                …
+              </li>,
+            ]
+          : []),
+      ]
+    : rows.map(row => {
+        const folder = folders?.find(folder => folder.partIds.includes(row.part.id));
+        if (!folder) return renderRow(row);
+        if (grouped.has(folder.id)) return null;
+        grouped.add(folder.id);
+        return (
+          <li key={folder.id} className="cad-parts-folder">
+            <details open>
+              <summary>{folder.name}</summary>
+              <ul aria-label={`${folder.name} parts`}>
+                {rows.filter(candidate => folder.partIds.includes(candidate.part.id)).map(renderRow)}
+              </ul>
+            </details>
+          </li>
+        );
+      });
   return (
     <>
       <ul className="cad-part-list" aria-label="Parts" hidden={hidden}>
@@ -147,7 +178,36 @@ export function PartsList({
           onClose={closeMenu}
           items={[
             { label: 'Rename', onSelect: () => setRenaming(menu.key) },
+            ...(onEdit
+              ? [
+                  { label: 'Properties…', onSelect: () => setPanel({ kind: 'properties', key: menu.key, name: menu.name }) },
+                  { label: 'Assign material…', onSelect: () => setPanel({ kind: 'material', key: menu.key, name: menu.name }) },
+                ]
+              : []),
             { label: hiddenParts.has(menu.key) ? 'Show' : 'Hide', onSelect: () => onToggleHidden(menu.key) },
+            ...(transparent
+              ? [
+                  {
+                    label: 'Make transparent…',
+                    onSelect: () => {
+                      transparent[1](new Set([...transparent[0], menu.key]));
+                      setSeeThrough(true);
+                    },
+                  },
+                  // While parts are see-through, any part's menu can end it.
+                  ...(transparent[0].size || seeThrough
+                    ? [
+                        {
+                          label: 'Exit make transparent',
+                          onSelect: () => {
+                            transparent[1](new Set());
+                            setSeeThrough(false);
+                          },
+                        },
+                      ]
+                    : []),
+                ]
+              : []),
             ...(() => {
               const row = rows.find(row => row.key === menu.key);
               const exportDocument = studio ? document : undefined;
@@ -179,6 +239,30 @@ export function PartsList({
         />
       )}
       <ExportDialog target={exporting} unit={lengthUnit} onClose={() => setExporting(null)} />
+      {panel?.kind === 'material' && panelRow && onEdit && (
+        <MaterialPanel
+          partName={panel.name}
+          material={panelRow.part.material}
+          onClose={() => setPanel(null)}
+          onAssign={material => {
+            onEdit(current =>
+              replacePart(current, panelRow.part.id, ({ material: _material, ...part }) => (material ? { ...part, material } : part))
+            );
+            setPanel(null);
+          }}
+        />
+      )}
+      {panel?.kind === 'properties' && panelRow && (
+        <PartPropertiesDialog part={panelRow.part} name={panel.name} onClose={() => setPanel(null)} />
+      )}
+      {transparent && seeThrough && (
+        <MakeTransparentPanel
+          onClose={() => {
+            transparent[1](new Set());
+            setSeeThrough(false);
+          }}
+        />
+      )}
     </>
   );
 }

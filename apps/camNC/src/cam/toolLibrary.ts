@@ -111,11 +111,11 @@ export type LibraryImport =
   | { ok: true; file: string; tools: LibraryTool[]; skipped: Record<string, number> }
   | { ok: false; error: string };
 
-/** Read a Fusion tool library file (.json, or a zipped .tools export): its flat end mills and what was skipped. */
+/** Read a Fusion tool library file (.json, or a zipped .tools export): its flat and ball end mills and what was skipped. */
 export async function readLibraryFile(file: File): Promise<LibraryImport> {
   try {
     const { tools, skipped } = readFusionToolLibrary(await fusionLibraryText(file));
-    if (!tools.length) return { ok: false, error: `No flat end mills in ${file.name}.` };
+    if (!tools.length) return { ok: false, error: `No flat or ball end mills in ${file.name}.` };
     return { ok: true, file: file.name, tools, skipped };
   } catch (e) {
     return { ok: false, error: `${file.name}: ${e instanceof Error ? e.message : String(e)}` };

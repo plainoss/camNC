@@ -177,6 +177,14 @@ export function useStudioSection(
     setPickProblem(null);
     return true;
   };
+  // A plane picked in the Feature list while the panel is open is the section plane, as one clicked in the view is.
+  const latestPick = useRef(pickPlane);
+  latestPick.current = pickPlane;
+  useEffect(() => {
+    if (enabled && selectedPlane) latestPick.current(selectedPlane);
+    // Only when the pick changes: opening the panel takes the plane already picked itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPlane]);
   const pickFace = (pick: ModelFacePick) => {
     if (!state?.editing || !state.picking) return;
     if (pick.sectionCap) return setPickProblem('Pick a model face rather than the temporary cut surface.');

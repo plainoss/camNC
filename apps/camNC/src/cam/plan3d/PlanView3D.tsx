@@ -4,7 +4,7 @@ import { Focus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Vector3 } from 'three';
 import { playheadAt, type Playhead } from '@/visualize/stockSim/jobTimeline';
-import type { ToolShape } from '@/visualize/stockSim/toolShapes';
+import { shapeFromToolInfo, type ToolShape } from '@/visualize/stockSim/toolShapes';
 import { parseToolInfo } from '@/visualize/guess-tools';
 import type { BoardRequest, CamPartInfo, PlanResult } from '../camTypes';
 import { Hint } from '../Hint';
@@ -217,18 +217,16 @@ function Scene({
   const playhead = playheadAt(model.times, time);
   const selectedOps = useMemo(() => (selected === null ? [] : groupOpsOf(model, selected)), [model, selected]);
   const highlight = selected !== null ? model.groups[selected].color : '#ffffff';
-  // V-bits say so in the program's tool table (TAPER); every other bit is flat.
-  const tapers = useMemo(
-    () => new Map(parseToolInfo(plan.gcode).flatMap(t => (t.taper ? [[t.tool, t.taper] as const] : []))),
-    [plan.gcode]
-  );
+  // The program's tool table says each bit's shape: V-bits by TAPER, ball ends by a corner radius of half the
+  // diameter; every other bit is flat.
+  const infos = useMemo(() => new Map(parseToolInfo(plan.gcode).map(t => [t.tool, t] as const)), [plan.gcode]);
   const toolShape = useCallback(
     (tool: number | undefined): ToolShape => {
       const d = (tool !== undefined && model.bits.get(tool)) || (plan.bits[0] ?? 3);
-      const taper = tool !== undefined ? tapers.get(tool) : undefined;
-      return taper ? { kind: 'vbit', radius: d / 2, halfAngle: taper } : { kind: 'flat', radius: d / 2 };
+      const info = tool !== undefined ? infos.get(tool) : undefined;
+      return info ? { ...shapeFromToolInfo(info), radius: d / 2 } : { kind: 'flat', radius: d / 2 };
     },
-    [plan, model, tapers]
+    [plan, model, infos]
   );
   const [w, h, top] = plan.size;
   const groupOps = useMemo(() => model.groups.map((_, n) => groupOpsOf(model, n)), [model]);
@@ -282,24 +280,47 @@ function Scene({
         )
       )}
       {mode !== 'toolpath' && time < model.total && (
-        <ToolMarker model={model} playhead={playhead} radius={toolShape(model.toolpath.modals[playhead.index]?.tool).radius} top={top} />
+        <ToolMarker model={model} playhead={playhead} shape={toolShape(model.toolpath.modals[playhead.index]?.tool)} top={top} />
       )}
     </>
   );
 }
 
-/** The bit at the playhead: a faint cylinder standing on the cut. */
-function ToolMarker({ model, playhead, radius, top }: { model: PlanModel; playhead: Playhead; radius: number; top: number }) {
+/**
+ * The bit at the playhead, faint, standing on the cut, in its own shape: a flat end, a ball end (its tip at the
+ * cut, the ball's centre one radius above), or a V-bit's cone.
+ */
+function ToolMarker({ model, playhead, shape, top }: { model: PlanModel; playhead: Playhead; shape: ToolShape; top: number }) {
   const points = model.toolpath.pathPoints;
   const b = points[Math.min(playhead.index, points.length - 1)];
   const a = points[Math.max(playhead.index - 1, 0)];
   const p = new Vector3().lerpVectors(a, b, playhead.fraction);
-  const length = Math.max(top - p.z, 0) + 20;
+  const radius = shape.radius;
+  // How far up the tip shape goes before the shank: the ball's radius, or the cone's height.
+  const tip = shape.kind === 'ball' ? radius : shape.kind === 'vbit' ? radius / Math.tan(((shape.halfAngle ?? 45) * Math.PI) / 180) : 0;
+  const length = Math.max(top - p.z - tip, 0) + 20;
+  const material = <meshBasicMaterial color="#f4f4f5" transparent opacity={0.55} depthTest={false} />;
   return (
-    <mesh position={[p.x, p.y, p.z + length / 2]} rotation={[Math.PI / 2, 0, 0]} renderOrder={4}>
-      <cylinderGeometry args={[radius, radius, length, 24]} />
-      <meshBasicMaterial color="#f4f4f5" transparent opacity={0.55} depthTest={false} />
-    </mesh>
+    <group position={[p.x, p.y, p.z]} renderOrder={4}>
+      <mesh position={[0, 0, tip + length / 2]} rotation={[Math.PI / 2, 0, 0]} renderOrder={4}>
+        <cylinderGeometry args={[radius, radius, length, 24]} />
+        {material}
+      </mesh>
+      {shape.kind === 'ball' && (
+        // The lower half of a sphere; three.js spheres stand on Y, the view on Z.
+        <mesh position={[0, 0, radius]} rotation={[Math.PI / 2, 0, 0]} renderOrder={4}>
+          <sphereGeometry args={[radius, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+          {material}
+        </mesh>
+      )}
+      {shape.kind === 'vbit' && (
+        // A cone with its point at the cut.
+        <mesh position={[0, 0, tip / 2]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={4}>
+          <coneGeometry args={[radius, tip, 24]} />
+          {material}
+        </mesh>
+      )}
+    </group>
   );
 }
 

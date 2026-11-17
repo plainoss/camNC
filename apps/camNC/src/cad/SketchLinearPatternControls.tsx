@@ -1,8 +1,8 @@
 import { useDesignUnits } from './designUnits';
-import type { CadPoint } from '@wbcnc/cad';
+import { patternSourceIds, type CadPoint, type CadSketch } from '@wbcnc/cad';
 import type { PointerEvent } from 'react';
 import { CadValueInput } from './CadValueInput';
-import type { LinearPatternParameters } from './linearPatternParameters';
+import { linearPatternAnchor, type LinearPatternParameters } from './linearPatternParameters';
 const closeField = (input: HTMLInputElement) => {
   const box = input.closest('label');
   if (box instanceof HTMLElement) delete box.dataset.open;
@@ -118,6 +118,7 @@ export function SketchLinearPatternManipulator({
   pixelScale,
   onStart,
   onEdit,
+  made = false,
 }: {
   anchor: CadPoint;
   steps: CadPoint[];
@@ -125,6 +126,8 @@ export function SketchLinearPatternManipulator({
   bound?: boolean[];
   pixelScale: number;
   onStart: (index: number, event: PointerEvent<SVGElement>) => void;
+  /** A pattern the sketch has, shown as it's drawn: no handles to drag, and a horizontal guide marked as such. */
+  made?: boolean;
   onEdit: (field: 'countX' | 'countY' | 'spacingX' | 'spacingY' | 'angleX' | 'angleY', chip: Element) => void;
 }) {
   const { formatLength } = useDesignUnits();
@@ -161,7 +164,20 @@ export function SketchLinearPatternManipulator({
               pointerEvents="none"
             />
             <path d={`M${left.x} ${-left.y}L${end.x} ${-end.y}L${right.x} ${-right.y}`} fill="none" pointerEvents="none" />
-            {count > 1 && (
+            {made && count > 1 && Math.abs(unit.y) < 1e-9 && (
+              <text
+                data-pattern-horizontal={index}
+                x={anchor.x + (end.x - anchor.x) / 2}
+                y={-anchor.y + 14 * k}
+                textAnchor="middle"
+                fill="currentColor"
+                stroke="none"
+                fontSize={11 * k}
+                pointerEvents="none">
+                —<title>Horizontal</title>
+              </text>
+            )}
+            {count > 1 && !made && (
               <circle
                 data-pattern-direction={index}
                 cx={first.x}
@@ -224,6 +240,40 @@ export function SketchLinearPatternManipulator({
           </g>
         );
       })}
+    </g>
+  );
+}
+
+/**
+ * The linear patterns a sketch has, each drawn as it was set up: its guide, count chip and spacing, as the reference
+ * keeps them in the sketch. Double-clicking a chip or the spacing edits the pattern.
+ */
+export function SketchLinearPatternGuides({
+  sketch,
+  pixelScale,
+  onEdit,
+}: {
+  sketch: CadSketch;
+  pixelScale: number;
+  onEdit: (patternId: string) => void;
+}) {
+  return (
+    <g data-pattern-guides="">
+      {sketch.constraints.map(pattern =>
+        pattern.type !== 'linearPattern' ? null : (
+          <SketchLinearPatternManipulator
+            key={pattern.id}
+            made
+            anchor={linearPatternAnchor(sketch, patternSourceIds(pattern))}
+            steps={[pattern.stepX, pattern.stepY]}
+            counts={[pattern.countX, pattern.countY]}
+            bound={[!!pattern.expressions?.countX, !!pattern.expressions?.countY]}
+            pixelScale={pixelScale}
+            onStart={() => {}}
+            onEdit={() => onEdit(pattern.id)}
+          />
+        )
+      )}
     </g>
   );
 }

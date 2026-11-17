@@ -44,17 +44,20 @@ it('says in the Fillet dialog, as it previews, that a radius uses up a side', as
   const features = screen.getByRole('region', { name: 'Features' });
   await userEvent.dblClick(within(features).getByRole('button', { name: /^Fillet 1/ }));
   const dialog = await screen.findByRole('dialog', { name: /^Fillet \d/ });
-  expect(within(dialog).queryByRole('alert')).toBeNull();
+  const title = () => dialog.querySelector('h3')!.getAttribute('title');
+  expect(title()).toBeNull();
   const radius = within(dialog).getByRole('textbox', { name: 'Radius' });
   await userEvent.clear(radius);
   await userEvent.type(radius, '125');
-  await waitFor(() => expect(within(dialog).getByRole('alert').textContent).toBe(message));
+  // The reason shows on hovering the red title, not as a line of text in the dialog.
+  await waitFor(() => expect(title()).toBe(`${dialog.querySelector('h3')!.textContent} did not regenerate properly: ${message}`));
+  expect(within(dialog).queryByRole('alert')).toBeNull();
   // A step with an error can still be kept: OK stays usable, and the step is marked once it's kept.
   expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', false);
   // A radius every corner can take is fine again.
   await userEvent.clear(radius);
   await userEvent.type(radius, '124');
-  await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+  await waitFor(() => expect(title()).toBeNull());
 }, 30_000);
 
 it('keeps a fillet whose radius uses up a side, and marks its row', async () => {
@@ -66,7 +69,7 @@ it('keeps a fillet whose radius uses up a side, and marks its row', async () => 
   const radius = within(dialog).getByRole('textbox', { name: 'Radius' });
   await userEvent.clear(radius);
   await userEvent.type(radius, '125');
-  await waitFor(() => expect(within(dialog).getByRole('alert').textContent).toBe(message));
+  await waitFor(() => expect(dialog.querySelector('h3')!.getAttribute('title')).toContain(message));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Fillet \d/ })).toBeNull());
   await waitFor(() => expect(change.mock.calls.at(-1)?.[0].parts[0]!.fillets).toMatchObject([{ id: 'fillet', radius: 125 }]));
