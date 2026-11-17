@@ -9,7 +9,7 @@ const circle = (cx: number, cy: number, r: number) =>
   Array.from({ length: 256 }, (_, i) => ({ x: cx + r * Math.cos((2 * Math.PI * i) / 256), y: cy + r * Math.sin((2 * Math.PI * i) / 256) }));
 
 /** A cup: a Ø77.8 × 20 cylinder with a Ø67.2 pocket 16 deep, both edges of its rim rounded over by 1 mm. */
-function cup() {
+function cup(radius = 1) {
   const outline = circle(0, 0, 38.9),
     opening = circle(0, 0, 33.6);
   const { features, offset } = profileFeatures({
@@ -20,8 +20,8 @@ function cup() {
   });
   const moved = (points: typeof outline) => points.map(p => ({ x: p.x - offset.x, y: p.y - offset.y }));
   features.rounds = [
-    { loop: moved(outline), z: 20, down: true, radius: 1, material: 'inside' },
-    { loop: moved(opening), z: 20, down: true, radius: 1, material: 'outside' },
+    { loop: moved(outline), z: 20, down: true, radius, material: 'inside' },
+    { loop: moved(opening), z: 20, down: true, radius, material: 'outside' },
   ];
   return { features, centre: { x: -offset.x, y: -offset.y } };
 }
@@ -80,6 +80,51 @@ describe('rounding over edges', () => {
     for (const r of reach(rounds[1]!)) expect(r).toBeCloseTo(33.6 + 1, 1);
     expect(cam.warnings.some(w => /roundover bit/.test(w))).toBe(false);
     expect(toGcode(splitByBit(cam).at(-2)!)).toContain('CR=3');
+  });
+
+  it('leaves both rims of the cup rounded, within a few hundredths of the round, once every cut is simulated', () => {
+    const r = 2,
+      ballR = 3;
+    const { features, centre } = cup(r);
+    const ball: Tool = { number: 21, diameter: 2 * ballR, shape: 'ball', name: 'ball end mill ⌀6' };
+    const cam = camPart(features, { tools: [endMill], roundBall: ball });
+    // The stock's height along a ray out from the cup's centre: the lowest any tool reaches there, by its shape.
+    const segments = cam.operations.flatMap(op =>
+      op.passes.flatMap(pass => pass.pts.slice(1).map((b, i) => ({ a: pass.pts[i]!, b, tool: op.tool })))
+    );
+    const height = (rho: number) => {
+      const px = centre.x + rho,
+        py = centre.y;
+      let z = 20;
+      for (const { a, b, tool } of segments) {
+        const radius = tool.diameter / 2;
+        if (Math.min(a[1], b[1]) - radius > py || Math.max(a[1], b[1]) + radius < py) continue;
+        for (let k = 0; k <= 8; k++) {
+          const x = a[0] + ((b[0] - a[0]) * k) / 8,
+            y = a[1] + ((b[1] - a[1]) * k) / 8,
+            tz = a[2] + ((b[2] - a[2]) * k) / 8;
+          const d = Math.hypot(x - px, y - py);
+          if (d > radius) continue;
+          z = Math.min(z, tool.shape === 'ball' ? tz + radius - Math.sqrt(radius * radius - d * d) : tz);
+        }
+      }
+      return z;
+    };
+    // The round's own surface: flat up to r in from the edge, then a quarter circle down to the edge.
+    const ideal = (rho: number, edge: number, inward: 1 | -1) => {
+      const into = inward * (edge - rho);
+      return into >= r ? 20 : 20 - r + Math.sqrt(Math.max(0, r * r - (r - into) ** 2));
+    };
+    let worst = 0;
+    for (const [edge, inward] of [
+      [38.9, 1],
+      [33.6, -1],
+    ] as const)
+      for (let into = 0.05; into <= r + 0.5; into += 0.02) {
+        const rho = edge - inward * into;
+        worst = Math.max(worst, Math.abs(height(rho) - ideal(rho, edge, inward)));
+      }
+    expect(worst).toBeLessThan(0.05);
   });
 
   it('on a board, rounds once every pocket is cut and before the outlines cut the parts loose', () => {
