@@ -101,7 +101,7 @@ it.each([
     const reverted = await acceptDesign(await saveDesignDraft(changed, restoredDocument), restoredDocument);
     const after = await queueFor((await getJob(reverted.id))!);
     expect(reverted.design!.acceptedRevision).toBeGreaterThan(changed.design!.acceptedRevision);
-    expect(reverted.design!.partRevisions[instances[0]!.partId]).toBeGreaterThan(changed.design!.partRevisions[instances[0]!.partId]);
+    expect(reverted.design!.partGeometryKeys).toEqual(original.design!.partGeometryKeys);
     expect(modelKey(reverted)).not.toBe(modelKey(original));
     expect(after.sourceKey).toBe(before.sourceKey);
     expect(after.ready.board.designIssues).toBeUndefined();

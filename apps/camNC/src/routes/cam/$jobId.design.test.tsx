@@ -186,7 +186,7 @@ beforeEach(() => {
     createdAt: 0,
     updatedAt: 0,
     parts: [],
-    design: { draft: document, accepted: document, acceptedRevision: 1, partRevisions: {} },
+    design: { draft: document, accepted: document, acceptedRevision: 1, partGeometryKeys: {} },
   };
   state.search = {};
   state.editorBlocked = false;

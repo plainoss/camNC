@@ -67,7 +67,7 @@ export function modelOfBodies(bodies: StepBody[], readMs: number): { model: Mode
 }
 
 /** A part of an imported model, ready to plan. */
-export function loadedPart(entries: ReadonlyMap<string, ModelEntry> | undefined, partId: string) {
+function loadedPart(entries: ReadonlyMap<string, ModelEntry> | undefined, partId: string) {
   const entry = entries?.get(partId);
   if (!entry) throw new Error('Open the model again: this part is not loaded.');
   // A 3D part milled as flat anyway: extract its features now.

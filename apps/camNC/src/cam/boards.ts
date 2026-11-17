@@ -209,7 +209,7 @@ function outlineOf(part: CamPartInfo) {
 export function holdDownOf(board: Pick<BoardV1, 'retention' | 'guidedTabs' | 'taped'>): HoldDown {
   if (board.retention === 'skin') return board.taped ? 'fixture-tape' : 'skin';
   if (board.retention === 'none') return 'none';
-  // Anything else gets tabs, which block the job if they can't hold: never parts cut loose by accident.
+  // Tabs block the job if they can't hold.
   return board.guidedTabs ? 'tabs-guided' : 'tabs';
 }
 
@@ -332,11 +332,10 @@ export function reconcileBoards(
     const items = preserveReferences
       ? [...b.items]
       : b.items.filter(id => byId.get(id)?.thickness !== undefined && thicknessKey(byId.get(id)!.thickness) === b.thickness);
-    // Saved before `retention`: tabs, which say so if they can't hold.
-    const held = { ...b, retention: b.retention ?? ('tabs' as const), items };
+    const held = { ...b, items };
     const pins = b.pinned ? { ...held, pinned: b.pinned.filter(id => items.includes(id)) } : held;
     const kept = b.setAside ? { ...pins, setAside: onlyFor(b.setAside, items) } : pins;
-    // Saved before layouts were stored: its parts get new spots, so what was cut on it no longer applies.
+    // Its parts get new spots, so what was cut on it no longer applies.
     if (!b.layout) {
       return kept.cut ? startOverBoard(kept) : kept;
     }
@@ -555,7 +554,7 @@ export function keepWithinMachine(boards: BoardV1[], instances: PartInstance[], 
 export function withLayout(board: BoardV1, nest: Pick<BoardNest, 'board' | 'placements'>): BoardV1 {
   const rest = { ...board };
   delete rest.layout;
-  // A cut board keeps one even with no part left: it's how a board saved before layouts is told apart.
+  // A cut board keeps one even with no part left: without it the board would start over.
   if (!nest.placements.length && !isCut(board)) return rest;
   const at = Object.fromEntries(nest.placements.map(p => [p.id, { x: p.x, y: p.y, rotated: p.rotated }]));
   return { ...rest, layout: { w: nest.board.w, h: nest.board.h, at } };

@@ -159,8 +159,6 @@ export const kDefaultVBit = kVBits.find(bit => bit.number === 14)!;
 
 export const kCarvingBoard = { w: 300, h: 140, thickness: 18 };
 
-export const isCarvingJob = (job: Pick<CamJobV1, 'carving'> | null | undefined): boolean => !!job?.carving;
-
 /** A board planned with something to cut: parts, or a carving. */
 export const hasWork = (request: Pick<BoardRequest, 'parts' | 'carvings'>) => request.parts.length > 0 || !!request.carvings?.length;
 

@@ -885,11 +885,8 @@ describe('boards', () => {
       expect(big!.fixtures![0]).toMatchObject({ d: 200, w: 1300 });
     });
 
-    it('a board saved without a retention gets tabs, never parts cut loose', () => {
-      const [a] = reconcileBoards(undefined, parts, 'oak');
-      const old = { ...a, retention: undefined } as unknown as BoardV1;
-      expect(reconcileBoards([old], parts, 'oak')[0].retention).toBe('tabs');
-      expect(holdDownOf(old)).toBe('tabs');
+    it('tells the cutting program how the board holds its parts', () => {
+      expect(holdDownOf({ retention: 'tabs' })).toBe('tabs');
       expect(holdDownOf({ retention: 'none' })).toBe('none');
       expect(holdDownOf({ retention: 'skin', taped: true })).toBe('fixture-tape');
       expect(holdDownOf({ retention: 'tabs', guidedTabs: true })).toBe('tabs-guided');

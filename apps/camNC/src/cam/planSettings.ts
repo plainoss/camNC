@@ -1,5 +1,5 @@
 import type { CamSettings, HoleChoice, LibraryTool } from '@wbcnc/cam';
-import { DEFAULT_TABS, MATERIALS } from '@wbcnc/cam/settings';
+import { MATERIALS } from '@wbcnc/cam/settings';
 import { savedCuttingFor, resolveCutting, type CuttingData } from '@wbcnc/cam-settings';
 import type { HoleChoices } from './holeChoices';
 
@@ -13,8 +13,6 @@ export interface PlanSettingsV1 {
   material: MaterialKey;
   /** How far the final pass cuts below the board into the spoilboard, mm. */
   cutBelow: number;
-  /** 2 mm high, 5 mm long holding tabs, at least 3 per outline. */
-  tabs: boolean;
   /** Cutting data for the main bit in this job only, over what's saved for the bit + material. */
   cutting?: Partial<CuttingData>;
   /** Explicitly excluded instance IDs, until the user chooses Include again, even after geometry is repaired. */
@@ -48,7 +46,6 @@ export const kDefaultPlan: PlanSettingsV1 = {
   bit: kDefaultBit,
   material: 'oak',
   cutBelow: 0.3,
-  tabs: false,
 };
 
 /**
@@ -120,6 +117,5 @@ export function toCamSettings(
     ...(main.outlineFinish > kMaxOutlineSkim && { profileFinishStepdown: main.stepdown }),
     spindleRpm: main.rpm,
     finalZ: -p.cutBelow,
-    tabs: p.tabs ? DEFAULT_TABS : false,
   };
 }

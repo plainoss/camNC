@@ -1,11 +1,11 @@
-import { camPart, loadStep, loadStl, planBoard, summarizePlan, type CamSettings, type OnProgress, type StepBody } from '@wbcnc/cam';
+import { loadStep, loadStl, planBoard, type CamSettings, type OnProgress, type StepBody } from '@wbcnc/cam';
 import * as Comlink from 'comlink';
 // Lazy: this worker only starts when a model is opened, and occt only loads the wasm on the first STEP file.
 import occtWasmUrl from 'occt-import-js/dist/occt-import-js.wasm?url';
 import type { BoardRequest, ModelImport, PlanResult } from '../cam/camTypes';
 import type { CadDocument } from '@wbcnc/cad';
 import { nativeCadModel } from '../cam/nativeCadModel';
-import { loadedPart, modelOfBodies, partSource, type ModelEntry } from '../cam/importedModel';
+import { modelOfBodies, partSource, type ModelEntry } from '../cam/importedModel';
 
 /** Parts of the models imported in this worker, by model key, so generating G-code needs no re-import. */
 const models = new Map<string, Map<string, ModelEntry>>();
@@ -40,13 +40,6 @@ const api = {
     );
   },
 
-  /** Toolpaths and FluidNC G-code for one part of an imported model, with per-operation numbers and safety checks. */
-  async generate(key: string, partId: string, settings: Partial<CamSettings>): Promise<PlanResult> {
-    const { part, features } = loaded(key, partId);
-    const cam = camPart(features, settings);
-    return summarizePlan(cam, part.name, part.size, settings);
-  },
-
   /** One program for a whole board: its parts at their nested positions, operations grouped by bit. */
   async generateBoard(
     key: string,
@@ -73,10 +66,6 @@ function throttled(onProgress: OnProgress): OnProgress {
     last = now;
     void onProgress(fraction);
   };
-}
-
-function loaded(key: string, partId: string) {
-  return loadedPart(models.get(key), partId);
 }
 
 export type CamWorkerAPI = typeof api;

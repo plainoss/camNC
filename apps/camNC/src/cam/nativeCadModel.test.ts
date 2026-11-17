@@ -22,6 +22,24 @@ import { camWorker } from './camQueries';
 import { nativeCadModel } from './nativeCadModel';
 import { missingNativeHoleChoices } from './holeChoices';
 import { kDefaultPlan, toCamSettings } from './planSettings';
+import { boardRequest, instancesOf, nestBoard, newBoard, type BoardV1 } from './boards';
+import type { ModelImport } from './camTypes';
+
+/** The program for a board that holds only the model's first part, cut free without tabs. */
+function planAlone(key: string, model: ModelImport) {
+  const instances = instancesOf(model.parts.slice(0, 1), () => true);
+  const board: BoardV1 = {
+    ...newBoard(
+      [],
+      instances[0].thickness,
+      kDefaultPlan.material,
+      instances.map(instance => instance.id)
+    ),
+    retention: 'none',
+  };
+  const request = boardRequest(board, nestBoard(board, instances, kDefaultPlan.bit.diameter), instances);
+  return camWorker().generateBoard(key, request, toCamSettings(kDefaultPlan));
+}
 
 describe('native CAD to CAM', () => {
   it('compiles solved profiles and through holes directly, with stable IDs and a display solid', async () => {
@@ -78,7 +96,7 @@ describe('native CAD to CAM', () => {
     const model = await camWorker().importDesign(document, key);
     const partId = document.parts[0].id;
     expect(model.parts[0].id).toBe(partId);
-    const result = await camWorker().generate(key, partId, toCamSettings(kDefaultPlan));
+    const result = await planAlone(key, model);
     expect(result.programs.length).toBeGreaterThan(0);
     expect(result.gcode).toContain('G');
     expect(result.ops.some(op => op.kind === 'profile')).toBe(true);
@@ -133,7 +151,7 @@ describe('native CAD to CAM', () => {
       const document = pocketed(5),
         key = `${document.id}:native-pocket`,
         model = await camWorker().importDesign(document, key),
-        result = await camWorker().generate(key, model.parts[0].id, toCamSettings(kDefaultPlan));
+        result = await planAlone(key, model);
       expect(result.programs.length).toBeGreaterThan(0);
       expect(result.safety).toEqual([]);
       expect(result.ops.some(op => op.kind === 'pocket' && Math.abs(op.zBottom - 7) < 0.01)).toBe(true);
@@ -174,7 +192,7 @@ describe('native CAD to CAM', () => {
       const document = setCutDepth(added.document, partId, added.sketchId, regionAt(added.document, added.sketchId, 190, 60).id, 3),
         key = `${document.id}:native-mixed`,
         model = await camWorker().importDesign(document, key),
-        result = await camWorker().generate(key, partId, toCamSettings(kDefaultPlan));
+        result = await planAlone(key, model);
       expect(model.parts[0].shape.pockets.map(pocket => pocket.depth).sort()).toEqual([3, 6]);
       expect(model.parts[0].shape.holes).toHaveLength(1);
       expect(result.safety).toEqual([]);
@@ -261,7 +279,7 @@ describe('native CAD to CAM', () => {
       const document = setCutDepth(added.document, partId, added.sketchId, regionAt(added.document, added.sketchId, -90, 30).id, 4),
         key = `${document.id}:native-underside-rabbet`,
         model = await camWorker().importDesign(document, key),
-        result = await camWorker().generate(key, partId, toCamSettings(kDefaultPlan));
+        result = await planAlone(key, model);
       expect(model.parts[0].summary.needsFlip).toBe(false);
       expect(model.parts[0].shape.pockets.map(pocket => pocket.depth)).toEqual([4]);
       // Turned over, the rabbet runs along the left end.

@@ -37,7 +37,7 @@ beforeEach(() => {
     name: 'Plate',
     fileName: 'Plate',
     id: 'job',
-    design: { draft: createCadDocument(), acceptedRevision: 0, partRevisions: {} },
+    design: { draft: createCadDocument(), acceptedRevision: 0, partGeometryKeys: {} },
     boards: [],
   };
 });

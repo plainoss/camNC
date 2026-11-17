@@ -8,7 +8,7 @@ type Worker = Comlink.Remote<CamWorkerAPI>;
  * The CAM worker for browser route tests, with each result computed once per test file. Most tests open the same
  * STEP file as a new job: a new model key, so the real worker would read it and plan its boards again for each test,
  * and plans a test left running would hold up the next one. Here a file with the same bytes reuses the first read
- * (and the real worker's parts, under that first key), and a board or part already planned with the same request and
+ * (and the real worker's parts, under that first key), and a board already planned with the same request and
  * settings reuses that program. Results are copied out, so a test can't change what the next one gets.
  *
  * The results are the real worker's, from this run: route tests still check real CAM output, only not repeatedly.
@@ -47,10 +47,6 @@ export function camWorkerCache(real: Worker): Worker {
       canonical.delete(args[1]);
       return real.importDesign(...args);
     },
-    generate: (key, partId, settings) =>
-      once(plans, JSON.stringify(['part', realKey(key), partId, settings]), () =>
-        Promise.resolve(real.generate(realKey(key), partId, settings))
-      ),
     generateBoard: (key, board, settings, options, onProgress) =>
       once(plans, JSON.stringify(['board', realKey(key), board, settings, options ?? {}]), () =>
         Promise.resolve(real.generateBoard(realKey(key), board, settings, options, onProgress))

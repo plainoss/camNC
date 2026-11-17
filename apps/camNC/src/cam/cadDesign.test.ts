@@ -45,7 +45,6 @@ describe('native design revisions', () => {
     ]);
     const moved = await acceptDesign(await saveDesignDraft(accepted, placed), placed);
     expect(moved.design!.partGeometryKeys).toEqual(accepted.design!.partGeometryKeys);
-    expect(moved.design!.partRevisions).toEqual(accepted.design!.partRevisions);
   });
   it('treats a restored accepted source as clean despite its newer undo-session revision', async () => {
     const first = await plateJob();
@@ -127,7 +126,7 @@ describe('native design revisions', () => {
     document.revision++;
     const drafted = await saveDesignDraft(first, document);
     const accepted = await acceptDesign(drafted, document);
-    expect(accepted.design!.partRevisions).toEqual(first.design!.partRevisions);
+    expect(accepted.design!.partGeometryKeys).toEqual(first.design!.partGeometryKeys);
     expect(boardGeometryKey(accepted, [document.parts[0].id])).toBe(boardGeometryKey(first, [document.parts[0].id]));
     expect(accepted.parts[0].name).toBe('Renamed plate');
   });
@@ -180,7 +179,12 @@ describe('native design revisions', () => {
     expect(accepted.boards![0].items).toEqual([`${old.id}#0`]);
     expect(accepted.parts.some(p => p.id === old.id)).toBe(true);
     expect(accepted.parts.some(p => p.id === replacement.id)).toBe(true);
+    // A sheet cut with the part reads as cut from an earlier design, for as long as the part stays away.
+    expect(accepted.design!.partGeometryKeys[old.id]).toBeUndefined();
     expect(boardGeometryKey(accepted, [old.id])).not.toBe(boardGeometryKey(configured, [old.id]));
+    const renamed = { ...accepted.design!.draft, revision: 2, name: 'Renamed' };
+    const again = await acceptDesign(await saveDesignDraft(accepted, renamed), renamed);
+    expect(boardGeometryKey(again, [old.id])).toBe(boardGeometryKey(accepted, [old.id]));
   });
 
   describe('a part cut only from below', () => {
@@ -199,10 +203,10 @@ describe('native design revisions', () => {
       const first = await plateJob();
       const partId = first.design!.accepted!.parts[0]!.id;
       const plainKey = await designGeometryKey(evaluateCadDocument(first.design!.accepted!).parts[0]!);
-      expect(first.design!.partGeometryKeys![partId]).toBe(plainKey);
+      expect(first.design!.partGeometryKeys[partId]).toBe(plainKey);
       const document = rabbetBelow(first.design!.draft);
       const accepted = await acceptDesign(await saveDesignDraft(first, document), document);
-      expect(accepted.design!.partGeometryKeys![partId]).not.toBe(await designGeometryKey(evaluateCadDocument(document).parts[0]!));
+      expect(accepted.design!.partGeometryKeys[partId]).not.toBe(await designGeometryKey(evaluateCadDocument(document).parts[0]!));
       const model = await camWorker().importDesign(accepted.design!.accepted!, modelKey(accepted));
       expect(model.parts[0]!.summary.needsFlip).toBe(false);
     });
