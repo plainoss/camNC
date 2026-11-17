@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { createFileRoute } from '@tanstack/react-router';
 import { CodecName, connect } from '@wbcnc/go2webrtc/client';
 import { createClient } from '@wbcnc/go2webrtc/trystero';
-import { genRandomWebtorrent } from '@wbcnc/go2webrtc/url-helpers';
+import { generatePassword } from '@wbcnc/go2webrtc/url-helpers';
 import { Button } from '@wbcnc/ui/components/button';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@wbcnc/ui/components/form';
 import { Input } from '@wbcnc/ui/components/input';
@@ -17,20 +17,19 @@ export const Route = createFileRoute('/go2webrtc')({
   component: RouteComponent,
 });
 
-const SERVE_URL_WEBTORRENT = 'https://cam.camnc.app/webtorrent';
 const SERVE_URL_TRYSTERO = 'https://cam.camnc.app/webrtc-custom';
+const WEBTORRENT_PREFIX = 'webtorrent:?';
+const TRYSTERO_PREFIX = 'webrtc+custom://?';
 
 type ParsedValues = { accessToken: string };
 
 function parseConnectionString(raw: string): ParsedValues | null {
-  const webtorrentPrefix = 'webtorrent:?';
-  const trysteroPrefix = 'webrtc+custom://?';
   let paramsString = '';
 
-  if (raw.startsWith(webtorrentPrefix)) {
-    paramsString = raw.slice(webtorrentPrefix.length);
-  } else if (raw.startsWith(trysteroPrefix)) {
-    paramsString = raw.slice(trysteroPrefix.length);
+  if (raw.startsWith(WEBTORRENT_PREFIX)) {
+    paramsString = raw.slice(WEBTORRENT_PREFIX.length);
+  } else if (raw.startsWith(TRYSTERO_PREFIX)) {
+    paramsString = raw.slice(TRYSTERO_PREFIX.length);
   } else {
     return null;
   }
@@ -96,7 +95,7 @@ function useWebRTCStreaming(videoRef: RefObject<HTMLVideoElement | null>) {
       if (method === 'webtorrent') {
         try {
           const { stream } = await connect({
-            share: values.accessToken, // webtorrent still expects share/pwd
+            share: values.accessToken,
             pwd: 'pwd',
             onStatusUpdate(update) {
               toast.info('Status', {
@@ -148,25 +147,28 @@ function useWebRTCStreaming(videoRef: RefObject<HTMLVideoElement | null>) {
 
 /* ------------------------------------------------------------------ */
 
-function getDefaultTorrent() {
+function genRandomTrystero() {
+  return `${TRYSTERO_PREFIX}${new URLSearchParams({ accessToken: generatePassword(16) }).toString()}`;
+}
+
+function getDefaultConnectionString() {
   if (typeof window === 'undefined') return ''; // SSR guard
   let connectionString = (localStorage as any).go2webrtcConnectionString;
-  if (!connectionString || (!connectionString.startsWith('webtorrent:?') && !connectionString.startsWith('webrtc+custom://?'))) {
-    connectionString = genRandomWebtorrent();
+  if (!connectionString || (!connectionString.startsWith(WEBTORRENT_PREFIX) && !connectionString.startsWith(TRYSTERO_PREFIX))) {
+    connectionString = genRandomTrystero();
     (localStorage as any).go2webrtcConnectionString = connectionString;
   }
   return connectionString;
 }
 
-export function ConnectionQR({ method, connectionString }: { method: FormValues['method']; connectionString: string }) {
+/** QR code that opens the phone page serving the camera for this webrtc+custom connection string. */
+export function ConnectionQR({ connectionString }: { connectionString: string }) {
   const parsed = parseConnectionString(connectionString);
   const { SVG } = useQRCode();
   if (!parsed) return null;
 
-  const accessToken = parsed.accessToken;
-  const params = new URLSearchParams({ accessToken });
-  const baseUrl = method === 'webtorrent' ? SERVE_URL_WEBTORRENT : SERVE_URL_TRYSTERO;
-  const url = `${baseUrl}?${params.toString()}`;
+  const params = new URLSearchParams({ accessToken: parsed.accessToken });
+  const url = `${SERVE_URL_TRYSTERO}?${params.toString()}`;
   return <SVG text={url} />;
 }
 
@@ -207,21 +209,18 @@ export function ConnectForm({
 }: {
   onConnect: (values: ParsedValues, method: FormValues['method'], preferredCodec?: string) => void;
 }) {
+  const [defaultConnectionString] = useState(getDefaultConnectionString);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      connectionString: getDefaultTorrent(),
-      method: 'webrtc+custom',
+      connectionString: defaultConnectionString,
+      method: defaultConnectionString.startsWith(WEBTORRENT_PREFIX) ? 'webtorrent' : 'webrtc+custom',
     },
   });
 
   const currentMethod = form.watch('method');
 
-  function onNewRandomTorrent() {
-    const base = genRandomWebtorrent().slice('webtorrent:?'.length);
-    const prefix = currentMethod === 'webtorrent' ? 'webtorrent:?' : 'webrtc+custom://?';
-    form.setValue('connectionString', `${prefix}${base}`);
-  }
+  const isTrystero = currentMethod !== 'webtorrent';
 
   function onSubmit(values: FormValues) {
     (localStorage as any).go2webrtcConnectionString = values.connectionString;
@@ -231,10 +230,9 @@ export function ConnectForm({
     }
   }
 
-  const placeholder = currentMethod === 'webtorrent' ? 'webtorrent:?share=...&pwd=...' : 'webrtc+custom://?accessToken=...';
+  const placeholder = isTrystero ? 'webrtc+custom://?accessToken=...' : 'webtorrent:?share=...&pwd=...';
 
-  const description =
-    currentMethod === 'webtorrent' ? 'Paste the full webtorrent connection string.' : 'Paste the full webrtc+custom connection string.';
+  const description = isTrystero ? 'Paste the full webrtc+custom connection string.' : 'Paste the full webtorrent connection string.';
 
   return (
     <Form {...form}>
@@ -253,7 +251,7 @@ export function ConnectForm({
                     const current = form.getValues('connectionString');
                     const parsed = parseConnectionString(current);
                     if (parsed) {
-                      const newPrefix = value === 'webtorrent' ? 'webtorrent:?' : 'webrtc+custom://?';
+                      const newPrefix = value === 'webtorrent' ? WEBTORRENT_PREFIX : TRYSTERO_PREFIX;
                       const params = new URLSearchParams(parsed).toString();
                       form.setValue('connectionString', `${newPrefix}${params}`);
                     } else {
@@ -316,12 +314,14 @@ export function ConnectForm({
 
         <div className="flex gap-2">
           <Button type="submit">Connect</Button>
-          <Button variant="secondary" type="button" onClick={onNewRandomTorrent}>
-            Random
-          </Button>
+          {isTrystero && (
+            <Button variant="secondary" type="button" onClick={() => form.setValue('connectionString', genRandomTrystero())}>
+              Random
+            </Button>
+          )}
         </div>
 
-        <ConnectionQR method={currentMethod} connectionString={form.watch('connectionString') || ''} />
+        {isTrystero && <ConnectionQR connectionString={form.watch('connectionString') || ''} />}
       </form>
     </Form>
   );

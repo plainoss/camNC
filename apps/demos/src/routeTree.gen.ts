@@ -9,18 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ServeWebrtcRouteImport } from './routes/serve-webrtc'
 import { Route as ServeTrysteroRouteImport } from './routes/serve-trystero'
 import { Route as PlayTrysteroRouteImport } from './routes/play-trystero'
 import { Route as Go2webrtcRouteImport } from './routes/go2webrtc'
 import { Route as CameraCalibrationRouteImport } from './routes/camera-calibration'
 import { Route as WebrtcChannelRoomRouteImport } from './routes/webrtc-channel.$room'
 
-const ServeWebrtcRoute = ServeWebrtcRouteImport.update({
-  id: '/serve-webrtc',
-  path: '/serve-webrtc',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ServeTrysteroRoute = ServeTrysteroRouteImport.update({
   id: '/serve-trystero',
   path: '/serve-trystero',
@@ -52,7 +46,6 @@ export interface FileRoutesByFullPath {
   '/go2webrtc': typeof Go2webrtcRoute
   '/play-trystero': typeof PlayTrysteroRoute
   '/serve-trystero': typeof ServeTrysteroRoute
-  '/serve-webrtc': typeof ServeWebrtcRoute
   '/webrtc-channel/$room': typeof WebrtcChannelRoomRoute
 }
 export interface FileRoutesByTo {
@@ -60,7 +53,6 @@ export interface FileRoutesByTo {
   '/go2webrtc': typeof Go2webrtcRoute
   '/play-trystero': typeof PlayTrysteroRoute
   '/serve-trystero': typeof ServeTrysteroRoute
-  '/serve-webrtc': typeof ServeWebrtcRoute
   '/webrtc-channel/$room': typeof WebrtcChannelRoomRoute
 }
 export interface FileRoutesById {
@@ -69,7 +61,6 @@ export interface FileRoutesById {
   '/go2webrtc': typeof Go2webrtcRoute
   '/play-trystero': typeof PlayTrysteroRoute
   '/serve-trystero': typeof ServeTrysteroRoute
-  '/serve-webrtc': typeof ServeWebrtcRoute
   '/webrtc-channel/$room': typeof WebrtcChannelRoomRoute
 }
 export interface FileRouteTypes {
@@ -79,7 +70,6 @@ export interface FileRouteTypes {
     | '/go2webrtc'
     | '/play-trystero'
     | '/serve-trystero'
-    | '/serve-webrtc'
     | '/webrtc-channel/$room'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -87,7 +77,6 @@ export interface FileRouteTypes {
     | '/go2webrtc'
     | '/play-trystero'
     | '/serve-trystero'
-    | '/serve-webrtc'
     | '/webrtc-channel/$room'
   id:
     | '__root__'
@@ -95,7 +84,6 @@ export interface FileRouteTypes {
     | '/go2webrtc'
     | '/play-trystero'
     | '/serve-trystero'
-    | '/serve-webrtc'
     | '/webrtc-channel/$room'
   fileRoutesById: FileRoutesById
 }
@@ -104,19 +92,11 @@ export interface RootRouteChildren {
   Go2webrtcRoute: typeof Go2webrtcRoute
   PlayTrysteroRoute: typeof PlayTrysteroRoute
   ServeTrysteroRoute: typeof ServeTrysteroRoute
-  ServeWebrtcRoute: typeof ServeWebrtcRoute
   WebrtcChannelRoomRoute: typeof WebrtcChannelRoomRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/serve-webrtc': {
-      id: '/serve-webrtc'
-      path: '/serve-webrtc'
-      fullPath: '/serve-webrtc'
-      preLoaderRoute: typeof ServeWebrtcRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/serve-trystero': {
       id: '/serve-trystero'
       path: '/serve-trystero'
@@ -160,7 +140,6 @@ const rootRouteChildren: RootRouteChildren = {
   Go2webrtcRoute: Go2webrtcRoute,
   PlayTrysteroRoute: PlayTrysteroRoute,
   ServeTrysteroRoute: ServeTrysteroRoute,
-  ServeWebrtcRoute: ServeWebrtcRoute,
   WebrtcChannelRoomRoute: WebrtcChannelRoomRoute,
 }
 export const routeTree = rootRouteImport

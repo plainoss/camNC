@@ -1559,9 +1559,6 @@ importers:
       '@wbcnc/public-config':
         specifier: workspace:*
         version: link:../public-config
-      comlink:
-        specifier: 'catalog:'
-        version: 4.4.2
       loglevel:
         specifier: 'catalog:'
         version: 1.9.2
