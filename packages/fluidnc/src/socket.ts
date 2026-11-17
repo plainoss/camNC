@@ -17,8 +17,6 @@ export type SocketEvents = {
   close: { wasOpen: boolean; reason: string };
   /** One complete line of controller output, without the line terminator. */
   line: string;
-  /** Raw bytes of controller output, delivered before they are split into lines. */
-  data: Uint8Array;
   /** Text control frames (`currentID:1`, `PING:…`). */
   control: string;
 };
@@ -170,13 +168,6 @@ export class FluidncSocket {
     this.ws!.send(bytes as Uint8Array<ArrayBuffer>);
   }
 
-  /** Drop raw-transfer bytes and resume line parsing with any unconsumed response bytes. */
-  resetLineBuffer(remainder?: Uint8Array) {
-    this.decoder = new TextDecoder();
-    this.partial = '';
-    if (remainder) this.pushText(this.decoder.decode(remainder, { stream: true }));
-  }
-
   private setState(state: SocketState) {
     if (this.state === state) return;
     this.state = state;
@@ -297,9 +288,7 @@ export class FluidncSocket {
       this.events.emit('control', event.data);
       return;
     }
-    const bytes = new Uint8Array(event.data as ArrayBuffer);
-    this.events.emit('data', bytes);
-    this.pushText(this.decoder.decode(bytes, { stream: true }));
+    this.pushText(this.decoder.decode(new Uint8Array(event.data as ArrayBuffer), { stream: true }));
   };
 
   private pushText(text: string) {

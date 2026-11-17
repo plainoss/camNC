@@ -151,8 +151,6 @@ export class FluidncProtocol {
   private inFlight: PendingCommand | null = null;
   private lastStatusAt = 0;
   private pollTimer: ReturnType<typeof setInterval> | undefined;
-  /** When set, raw bytes go here instead of the line parser (XMODEM). */
-  private rawHandler: ((bytes: Uint8Array) => void) | null = null;
   private generation = 0;
 
   constructor(
@@ -162,7 +160,6 @@ export class FluidncProtocol {
     socket.on('open', ({ variant }) => void this.onOpen(variant));
     socket.on('close', ({ wasOpen, reason }) => this.onClose(wasOpen, reason));
     socket.on('line', line => this.onLine(line));
-    socket.on('data', bytes => this.rawHandler?.(bytes));
   }
 
   start() {
@@ -226,63 +223,8 @@ export class FluidncProtocol {
     this.realtime(Realtime.jogCancel);
   }
 
-  /** Send raw bytes (XMODEM). */
-  sendRaw(bytes: Uint8Array) {
-    this.socket.send(bytes);
-  }
-
-  /**
-   * Send a line and hand the raw byte stream to `fn` until it returns (XMODEM receive).
-   * The command stays in flight until its own `ok`, so nothing else is interleaved.
-   * `returnRemainder` hands back response bytes received alongside the final binary acknowledgement.
-   */
-  async sendAndTakeStream<T>(
-    line: string,
-    fn: (subscribe: (handler: (bytes: Uint8Array) => void) => void, returnRemainder: (bytes: Uint8Array) => void) => Promise<T>
-  ) {
-    await this.drain();
-    if (!this.isConnected()) throw new FluidncAbortError('not connected', line);
-    let handler: ((bytes: Uint8Array) => void) | null = null;
-    const done = new Promise<string[]>((resolve, reject) => {
-      this.inFlight = { line, lines: [], timeoutMs: 0, resolve, reject };
-    });
-    done.catch(() => {});
-    this.rawHandler = bytes => handler?.(bytes);
-    this.emitConsole('sent', line);
-    this.socket.send(line + '\n');
-    let result: T;
-    let remainder: Uint8Array | undefined;
-    try {
-      result = await fn(
-        h => {
-          handler = h;
-        },
-        bytes => {
-          remainder = bytes;
-        }
-      );
-    } catch (err) {
-      this.rawHandler = null;
-      this.socket.resetLineBuffer();
-      // The receiver may still be in binary mode, and its eventual error must not acknowledge queued G-code.
-      this.socket.reconnect('binary transfer failed');
-      throw err;
-    }
-    this.rawHandler = null;
-    this.socket.resetLineBuffer(remainder);
-    await done;
-    return result;
-  }
-
-  /** Resolve once nothing is queued or in flight. */
-  async drain() {
-    while (this.inFlight || this.queue.length) {
-      await new Promise(resolve => setTimeout(resolve, 20));
-    }
-  }
-
   private pump() {
-    if (this.inFlight || !this.queue.length || this.rawHandler) return;
+    if (this.inFlight || !this.queue.length) return;
     if (!this.isConnected()) {
       this.rejectAll('not connected');
       return;
@@ -335,7 +277,7 @@ export class FluidncProtocol {
     // Auto-reports only fire on changes while idle, so poll `?` whenever reports go quiet.
     // This doubles as keepalive traffic for 3.9.9, which has no PING.
     this.pollTimer = setInterval(() => {
-      if (this.isConnected() && !this.rawHandler && Date.now() - this.lastStatusAt > (this.options.statusPollMs ?? 1500)) {
+      if (this.isConnected() && Date.now() - this.lastStatusAt > (this.options.statusPollMs ?? 1500)) {
         this.socket.send(new Uint8Array([Realtime.statusQuery]));
       }
     }, 500);
@@ -361,7 +303,6 @@ export class FluidncProtocol {
   }
 
   private onLine(line: string) {
-    if (this.rawHandler) return;
     if (line.startsWith('<')) {
       const parsed = parseFluidNCLine(line);
       if (parsed) this.onStatus(parsed);

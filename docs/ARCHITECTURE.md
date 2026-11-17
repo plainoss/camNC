@@ -293,15 +293,13 @@ over their data channel once connected. The CNC controller is reached directly.
   variant is detected on connect and remembered. From `https://run.camnc.app`
   this relies on Chrome/Edge 147+ Local Network Access, which also lifts
   mixed-content blocking once the user allows it. Uploads are `no-cors` POSTs
-  to `/upload` (FluidNC sends no CORS headers), verified with `$SD/ListJSON`;
-  XMODEM over the socket is the fallback. Only one tab holds the connection
-  (Web Locks), and nothing is re-sent after a reconnect.
+  to `/upload` (FluidNC sends no CORS headers), verified with `$SD/ListJSON`.
+  Only one tab holds the connection (Web Locks), and nothing is re-sent after
+  a reconnect.
 
 Connection attempts belong to a generation: stopping cancels pending sockets,
 and a completed handshake from an older generation cannot attach after a
-restart. During XMODEM, the transfer owns the raw byte stream and command slot.
-Any text received after its final binary ACK is returned to the line parser
-before the command queue resumes.
+restart.
 
 ## Desktop app
 
