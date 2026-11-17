@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { featureUses, type CadDocument, type DesignStep } from '@wbcnc/cad';
 
 /** The filter syntax, as the box's help lists it. A bare word filters by name or type. */
@@ -122,3 +123,6 @@ export const subscribeFeatureFilter = (listener: () => void) => {
   return () => listeners.delete(listener);
 };
 export const featureFilterNow = () => current;
+
+/** The filter typed above the Feature list, shared with the Parts list. */
+export const useFeatureFilter = () => useSyncExternalStore(subscribeFeatureFilter, featureFilterNow);

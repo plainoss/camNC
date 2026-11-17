@@ -1,6 +1,6 @@
 import { useDesignUnits } from './designUnits';
-import { filteredFeatureRows } from './featureFilter';
-import { FeatureDependenciesPanel, FeatureFilterBox, useFeatureFilter } from './FeatureListTools';
+import { filteredFeatureRows, useFeatureFilter } from './featureFilter';
+import { FeatureDependenciesPanel, FeatureFilterBox } from './FeatureListTools';
 import { cadFolderSteps, cadVariableValues, designSteps, moveCadFolder, type CadDocument } from '@wbcnc/cad';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
 import { pendingProblemNow, subscribePendingProblem } from './pendingProblem';

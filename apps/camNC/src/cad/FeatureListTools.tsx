@@ -1,9 +1,6 @@
 import { featureDependencies, type CadDocument } from '@wbcnc/cad';
-import { useState, useSyncExternalStore } from 'react';
-import { featureFilterNow, kFeatureFilterHelp, setFeatureFilter, subscribeFeatureFilter } from './featureFilter';
-
-/** The filter typed above the Feature list, shared with the Parts list. */
-export const useFeatureFilter = () => useSyncExternalStore(subscribeFeatureFilter, featureFilterNow);
+import { useState } from 'react';
+import { kFeatureFilterHelp, setFeatureFilter, useFeatureFilter } from './featureFilter';
 
 /** "Filter by name or type" above the Feature list; while it has the keyboard, the syntax it takes. */
 export function FeatureFilterBox() {
