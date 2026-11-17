@@ -19,7 +19,7 @@ export const ALLOWED = {
     // `key Enter` takes the highlighted choice of a field's list, such as New variable.
     steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'partmenu', 'menuitem', 'patterncount', 'patternspacing', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click', 'panelclose', 'featurefilter', 'viewmenu', 'key Enter'],
   },
-  command: { steps: ['studiotool', 'key', 'tool'] },
+  command: { steps: ['studiotool', 'searchtool', 'key', 'tool'] },
   draw: { steps: ['rect', 'circle', 'line', 'arc'] },
   // A value typed into a box a chip or dimension opened: double-click it, type, and Enter (or Tab, moving on).
   // A part taken out of a selection box with its chip's cross is a field's input too.

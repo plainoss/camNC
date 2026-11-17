@@ -214,3 +214,19 @@
   background: transparent;
   color: #8592a5;
 }
+/** Tabs shown but not switched, such as Exclude / Include: drawn as the feature dialogs' tabs. */
+.cad-static-tabs span {
+  flex: 1;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+  text-align: center;
+}
+.cad-static-tabs span[aria-selected='true'] {
+  border-bottom-color: #2c6fbf;
+  color: #174f8f;
+  font-weight: 600;
+}
+.cad-static-tabs span[aria-disabled] {
+  color: #9aa6b6;
+}

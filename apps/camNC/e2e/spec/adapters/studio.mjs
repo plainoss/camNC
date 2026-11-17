@@ -61,7 +61,7 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
-    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'featuremenu', 'partmenu', 'menuitem', 'exportstep', 'savedesign', 'featurefilter', 'panelclose', 'viewmenu'].includes(verb)) return base.step(text);
+    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'featuremenu', 'partmenu', 'menuitem', 'exportstep', 'savedesign', 'featurefilter', 'panelclose', 'viewmenu', 'searchtool'].includes(verb)) return base.step(text);
     if (!(await base.inDemo())) throw new Error('Studio workflow input requires demo mode');
     const since = await settledSnapshot(page);
     if (verb === 'viewpick') {
@@ -96,6 +96,11 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
       await page.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+A`);
       if (rest) await page.keyboard.type(rest);
       else await page.keyboard.press('Backspace');
+    } else if (verb === 'searchtool') {
+      // A command found by name, as a person opens Search tools (Alt+C), types it and takes the first result with Enter.
+      await page.keyboard.press('Alt+c');
+      await page.keyboard.type(rest);
+      await page.keyboard.press('Enter');
     } else if (verb === 'viewmenu') {
       // The menu under the view cube, then one of its items, as a person opens it and picks: `viewmenu` alone only opens it.
       await page.getByRole('button', { name: 'View menu', exact: true }).click();
@@ -151,7 +156,9 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
       if (await rows.count() !== 1) throw new Error(`Part name must identify one rendered row: ${rest}`);
       await rows.getByRole('button').first().click();
     } else if (verb === 'dialogfocus') {
-      await page.getByRole('dialog').getByRole('group', { name: rest, exact: true }).click();
+      // A selection box is a group, or a button where the whole box starts its pick.
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('group', { name: rest, exact: true }).or(dialog.getByRole('button', { name: rest, exact: true })).click();
     } else if (verb === 'dialogremove') {
       const at = rest.indexOf(' = ');
       if (at < 0) throw new Error('dialogremove takes Box = Part name');

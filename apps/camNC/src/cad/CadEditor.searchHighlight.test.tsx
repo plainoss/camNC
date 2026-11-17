@@ -114,7 +114,7 @@ it('moves the toolbar highlight with keyboard and pointer results, clearing it f
   await search('circular pattern');
   await userEvent.keyboard('{Enter}');
   await settled();
-  expect(screen.getByRole('dialog', { name: 'Circular pattern · Plate' })).toBeVisible();
+  expect(screen.getByRole('dialog', { name: 'Circular pattern 1' })).toBeVisible();
   expect(highlighted()).toHaveLength(0);
   expect(studioToolbar().getByRole('button', { name: 'Pattern' })).toHaveAttribute('aria-pressed', 'true');
   unchanged();

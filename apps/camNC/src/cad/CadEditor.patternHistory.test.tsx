@@ -82,11 +82,13 @@ it.each(['new plate', 'complete cabinet', 'new circular plate', 'existing circul
     expect(session.past).toHaveLength(0);
     await userEvent.click(await studioCommand(/Pattern/));
     let dialog = await screen.findByRole('dialog', {
-      name: `${fixture === 'existing circular plate' ? 'Circular' : 'Linear'} pattern · ${name}`,
+      name: fixture === 'existing circular plate' ? 'Circular pattern 1' : `Linear pattern · ${name}`,
     });
     if (fixture === 'new circular plate') {
       await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Pattern type' }), 'circular');
-      dialog = await screen.findByRole('dialog', { name: `Circular pattern · ${name}` });
+      dialog = await screen.findByRole('dialog', { name: 'Circular pattern 1' });
+      // A new circular pattern waits for its axis: the main Z axis is chosen, as before the pick was asked for.
+      await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Axis direction' }), 'z');
     }
     await userEvent.fill(within(dialog).getByRole('textbox', { name: circular ? 'Instance count' : 'How many' }), '5');
     await userEvent.tab();
@@ -128,10 +130,14 @@ it.each([
     const { session, toolbar, latest, settled } = await studio(source, 'Plate');
     const before = structuredClone(latest());
     await userEvent.click(await studioCommand(/Pattern/));
-    let dialog = await screen.findByRole('dialog', { name: `${existing && mode === 'circular' ? 'Circular' : 'Linear'} pattern · Plate` });
+    let dialog = await screen.findByRole('dialog', {
+      name: existing && mode === 'circular' ? 'Circular pattern 1' : 'Linear pattern · Plate',
+    });
     if (mode === 'circular' && !existing) {
       await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Pattern type' }), 'circular');
-      dialog = await screen.findByRole('dialog', { name: 'Circular pattern · Plate' });
+      dialog = await screen.findByRole('dialog', { name: 'Circular pattern 1' });
+      // A new circular pattern waits for its axis: the main Z axis is chosen, as before the pick was asked for.
+      await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Axis direction' }), 'z');
     }
     const field = within(dialog).getByRole('textbox', { name: mode === 'circular' ? 'Instance count' : 'How many' });
     await userEvent.fill(field, '4');

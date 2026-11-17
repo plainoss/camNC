@@ -79,7 +79,7 @@ it('patterns the part clicked while the dialog is open, with what was set up so 
   const { latest } = await open();
   await userEvent.click(await studioCommand(/Pattern/));
   const dialog = await screen.findByRole('dialog', { name: /^Linear pattern/ });
-  const field = within(dialog).getByRole('button', { name: 'Part to pattern' });
+  const field = within(dialog).getByRole('button', { name: 'Entities to pattern' });
   expect(field.textContent).toContain('Shelf');
   expect(field).toHaveAttribute('data-active');
   const count = within(dialog).getByLabelText('How many');

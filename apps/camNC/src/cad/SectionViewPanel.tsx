@@ -62,7 +62,7 @@ export function SectionViewPanel({
       onCancel={onCancel}>
       {/* What's cut away: everything but what's listed. Sectioning only some items isn't offered yet. */}
       {/* Shown, not switched: only Exclude works, so the keyboard starts in the plane box rather than on a tab. */}
-      <div className="cad-feature-tabs cad-section-tabs" role="tablist" aria-label="Section mode">
+      <div className="cad-feature-tabs cad-static-tabs" role="tablist" aria-label="Section mode">
         <span role="tab" aria-selected>
           Exclude
         </span>

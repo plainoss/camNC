@@ -1,0 +1,88 @@
+[
+ {
+  "id": "studio/circular-pattern/three-boards-about-a-vertical-edge",
+  "title": "A circular pattern of a part about a vertical edge makes equally spaced copies",
+  "evidence": "design workflow parity spec",
+  "steps": [
+   "dialogcancel",
+   "view top",
+   "selectfeature Top",
+   "key Shift+s",
+   "key g",
+   "rect 0,0 100,60",
+   "closesketch",
+   "key Shift+e",
+   "viewpick 50,30,0",
+   "dialogfill Thickness = 40",
+   "key Enter",
+   "key Enter",
+   "key p",
+   "key p",
+   "key Shift+7",
+   {
+    "spec": "1 command"
+   },
+   "searchtool Circular pattern",
+   {
+    "expect": {
+     "studio": {
+      "dialog": "Circular pattern 1"
+     }
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Entities to pattern"
+    }
+   },
+   {
+    "spec": "2 select"
+   },
+   "selectpart Part 1",
+   {
+    "spec": "3 select"
+   },
+   "dialogfocus Axis of pattern",
+   {
+    "spec": "4 pick"
+   },
+   "viewpick 100,0,20",
+   {
+    "expect": {
+     "pageText": "Parts \\(4\\)"
+    }
+   },
+   {
+    "spec": "5 field"
+   },
+   "dialogfill Instance count = 3",
+   "key Tab",
+   {
+    "expect": {
+     "pageText": "Parts \\(3\\)"
+    }
+   },
+   {
+    "spec": "6 confirm"
+   },
+   "dialogconfirm",
+   {
+    "expect": {
+     "studio": {
+      "dialog": null
+     }
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Circular pattern 1"
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Parts \\(3\\)"
+    }
+   }
+  ]
+ }
+]

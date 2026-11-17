@@ -230,6 +230,7 @@ Part Studio scenarios also use these steps, all through visible controls:
 | `pickviewcenter`                                                                                          | Click the center of the model canvas after a named view; intended for a single centered stock board. |
 | `viewpick x,y,z`                                                                                          | Click where a model point (mm, Top plane = XY, Z up) is drawn in the 3D view, through its camera.    |
 | `featuremenu <name>` / `menuitem <name>`                                                                  | Right-click a Feature list row to open its menu only; click a named item of the open menu.           |
+| `searchtool <name>`                                                                                       | Open Search tools (Alt+C), type a command's name and take the first result with Enter.               |
 | `viewmenu [item]`                                                                                         | Open the menu under the view cube, and pick a named item from it if one is given.                    |
 | `featurefilter <text>`                                                                                    | Type into the Feature list filter, replacing what is there; no text clears it.                       |
 | `panelclose <name>`                                                                                       | Click the close cross of a named panel, such as Dependencies of Extrude 1.                           |

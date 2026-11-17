@@ -387,7 +387,8 @@ function listedSteps(document: CadDocument): DesignStep[] {
               part.remove && !part.pattern.circular
                 ? `Linear pattern ${document.parts.filter(other => other.remove && other.pattern && !other.pattern.circular).indexOf(part) + 1}`
                 : part.pattern.circular
-                  ? `Circular pattern · ${part.name} × ${part.pattern.count}`
+                  ? // Numbered among the circular patterns, as the reference numbers features.
+                    `Circular pattern ${document.parts.filter(other => other.pattern?.circular).indexOf(part) + 1}`
                   : `Pattern · ${part.name} × ${part.pattern.count} along ${part.pattern.axis}`,
             detail: part.pattern.circular
               ? `angle ${part.pattern.circular.angleExpression ? `${part.pattern.circular.angleExpression} = ` : ''}${+part.pattern.circular.angle.toFixed(3)}°`

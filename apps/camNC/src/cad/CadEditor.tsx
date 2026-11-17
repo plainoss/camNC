@@ -182,7 +182,7 @@ import { StudioCommandSearch } from './StudioCommandSearch';
 import type { PatternOpening } from './partPatternKind';
 import { featureRowParts, picksFeatureRows, selectStudioFeature } from './studioFeatureSelection';
 import { startExtrude } from './studioExtrude';
-import { builtStudioParts, disabledStudioCommands, isBlankDesign, listedStudioParts } from './studioParts';
+import { builtStudioParts, disabledStudioCommands, isBlankDesign, listedStudioParts, studioListSource } from './studioParts';
 import { applyFramed } from './insertFraming';
 import { usePartCutSelection } from './usePartCutSelection';
 import { usePartIsolation } from './usePartIsolation';
@@ -1441,7 +1441,7 @@ export function CadEditor({
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   // A tool used up by its cut isn't a part of its own any more.
   // A part whose extrude wasn't built isn't a part yet.
-  const listed = dialog?.kind === 'transform' ? studioPreview.document : dialog?.kind === 'extrude' ? shownDocument : doc;
+  const listed = studioListSource(dialog?.kind, studioPreview.document, shownDocument, doc);
   const builtParts = studioSession
     ? listedStudioParts(listed, dialog, rolledBack).filter(p => !unbuiltParts?.includes(p.id))
     : builtStudioParts(doc);

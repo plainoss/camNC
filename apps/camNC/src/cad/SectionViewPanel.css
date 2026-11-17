@@ -112,19 +112,3 @@
   padding: 0 3px;
   background: none;
 }
-/* Exclude / Include, drawn as the feature dialogs' tabs. */
-.cad-section-tabs span {
-  flex: 1;
-  padding: 4px 0;
-  border-bottom: 2px solid transparent;
-  font-size: 12px;
-  text-align: center;
-}
-.cad-section-tabs span[aria-selected='true'] {
-  border-bottom-color: #2c6fbf;
-  color: #174f8f;
-  font-weight: 600;
-}
-.cad-section-tabs span[aria-disabled] {
-  color: #9aa6b6;
-}
