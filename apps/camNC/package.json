@@ -39,7 +39,6 @@
     "@huggingface/transformers": "^3.6.3",
     "@preact/signals-react": "catalog:",
     "@preact/signals-react-transform": "catalog:",
-    "@radix-ui/react-avatar": "catalog:",
     "@radix-ui/react-collapsible": "catalog:",
     "@radix-ui/react-dialog": "catalog:",
     "@radix-ui/react-dropdown-menu": "catalog:",

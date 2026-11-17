@@ -15,7 +15,6 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SetupIndexRouteImport } from './routes/setup/index'
 import { Route as CamIndexRouteImport } from './routes/cam/index'
-import { Route as VisualizeVisualizeCommandsRouteImport } from './routes/visualize/VisualizeCommands'
 import { Route as Visualize2DViewRouteImport } from './routes/visualize/2DView'
 import { Route as SetupUrlEntryRouteImport } from './routes/setup/url-entry'
 import { Route as SetupPointSelectionRouteImport } from './routes/setup/point-selection'
@@ -71,12 +70,6 @@ const CamIndexRoute = CamIndexRouteImport.update({
   path: '/cam/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VisualizeVisualizeCommandsRoute =
-  VisualizeVisualizeCommandsRouteImport.update({
-    id: '/visualize/VisualizeCommands',
-    path: '/visualize/VisualizeCommands',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const Visualize2DViewRoute = Visualize2DViewRouteImport.update({
   id: '/visualize/2DView',
   path: '/visualize/2DView',
@@ -220,7 +213,6 @@ export interface FileRoutesByFullPath {
   '/setup/point-selection': typeof SetupPointSelectionRoute
   '/setup/url-entry': typeof SetupUrlEntryRoute
   '/visualize/2DView': typeof Visualize2DViewRoute
-  '/visualize/VisualizeCommands': typeof VisualizeVisualizeCommandsRoute
   '/cam': typeof CamIndexRoute
   '/setup': typeof SetupIndexRoute
   '/cam/$jobId/boards': typeof CamJobIdBoardsRoute
@@ -253,7 +245,6 @@ export interface FileRoutesByTo {
   '/setup/point-selection': typeof SetupPointSelectionRoute
   '/setup/url-entry': typeof SetupUrlEntryRoute
   '/visualize/2DView': typeof Visualize2DViewRoute
-  '/visualize/VisualizeCommands': typeof VisualizeVisualizeCommandsRoute
   '/cam': typeof CamIndexRoute
   '/setup': typeof SetupIndexRoute
   '/cam/$jobId/boards': typeof CamJobIdBoardsRoute
@@ -287,7 +278,6 @@ export interface FileRoutesById {
   '/setup/point-selection': typeof SetupPointSelectionRoute
   '/setup/url-entry': typeof SetupUrlEntryRoute
   '/visualize/2DView': typeof Visualize2DViewRoute
-  '/visualize/VisualizeCommands': typeof VisualizeVisualizeCommandsRoute
   '/cam/': typeof CamIndexRoute
   '/setup/': typeof SetupIndexRoute
   '/cam/$jobId/boards': typeof CamJobIdBoardsRoute
@@ -322,7 +312,6 @@ export interface FileRouteTypes {
     | '/setup/point-selection'
     | '/setup/url-entry'
     | '/visualize/2DView'
-    | '/visualize/VisualizeCommands'
     | '/cam'
     | '/setup'
     | '/cam/$jobId/boards'
@@ -355,7 +344,6 @@ export interface FileRouteTypes {
     | '/setup/point-selection'
     | '/setup/url-entry'
     | '/visualize/2DView'
-    | '/visualize/VisualizeCommands'
     | '/cam'
     | '/setup'
     | '/cam/$jobId/boards'
@@ -388,7 +376,6 @@ export interface FileRouteTypes {
     | '/setup/point-selection'
     | '/setup/url-entry'
     | '/visualize/2DView'
-    | '/visualize/VisualizeCommands'
     | '/cam/'
     | '/setup/'
     | '/cam/$jobId/boards'
@@ -422,7 +409,6 @@ export interface RootRouteChildren {
   SetupPointSelectionRoute: typeof SetupPointSelectionRoute
   SetupUrlEntryRoute: typeof SetupUrlEntryRoute
   Visualize2DViewRoute: typeof Visualize2DViewRoute
-  VisualizeVisualizeCommandsRoute: typeof VisualizeVisualizeCommandsRoute
   CamIndexRoute: typeof CamIndexRoute
   SetupIndexRoute: typeof SetupIndexRoute
   CamJobIdBoardsRoute: typeof CamJobIdBoardsRoute
@@ -476,13 +462,6 @@ declare module '@tanstack/react-router' {
       path: '/cam'
       fullPath: '/cam'
       preLoaderRoute: typeof CamIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/visualize/VisualizeCommands': {
-      id: '/visualize/VisualizeCommands'
-      path: '/visualize/VisualizeCommands'
-      fullPath: '/visualize/VisualizeCommands'
-      preLoaderRoute: typeof VisualizeVisualizeCommandsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/visualize/2DView': {
@@ -678,7 +657,6 @@ const rootRouteChildren: RootRouteChildren = {
   SetupPointSelectionRoute: SetupPointSelectionRoute,
   SetupUrlEntryRoute: SetupUrlEntryRoute,
   Visualize2DViewRoute: Visualize2DViewRoute,
-  VisualizeVisualizeCommandsRoute: VisualizeVisualizeCommandsRoute,
   CamIndexRoute: CamIndexRoute,
   SetupIndexRoute: SetupIndexRoute,
   CamJobIdBoardsRoute: CamJobIdBoardsRoute,
