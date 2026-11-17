@@ -359,9 +359,19 @@ describe('CAD feature format', () => {
     expect(parseCadDocument(saved).parts[0]!.features).toEqual(document.parts[0]!.features);
   });
 
+  it('loads saved reader versions 2 through 7 and normalizes them to the current version', () => {
+    const source = featured();
+    for (const version of [2, 3, 4, 5, 6, 7]) {
+      const saved = { ...source, version, ...(version >= 4 ? { operationOrder: [] } : {}) };
+      const loaded = parseCadDocument(saved);
+      expect(loaded.version).toBe(1);
+      expect(loaded.parts).toEqual(source.parts);
+    }
+  });
+
   it('refuses another document version, and broken features', () => {
-    expect(() => parseCadDocument({ ...featured(), version: 2 })).toThrow('Invalid CAD document');
-    expect(evaluated({ ...featured(), version: 2 as never }).errors).toContain('invalid-document');
+    expect(() => parseCadDocument({ ...featured(), version: 8 })).toThrow('Invalid CAD document');
+    expect(evaluated({ ...featured(), version: 8 as never }).errors).toContain('invalid-document');
     const brokenDepth = featured();
     (brokenDepth.parts[0]!.features![0] as { depth: unknown }).depth = 'deep';
     expect(() => parseCadDocument(brokenDepth)).toThrow();

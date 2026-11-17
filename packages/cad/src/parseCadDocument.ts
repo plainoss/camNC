@@ -21,7 +21,10 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (!input || typeof input !== 'object' || nestedDeeperThan(input, 64)) throw new Error('Invalid CAD document');
   const d = input as CadDocument;
   if (
-    d.version !== CAD_DOCUMENT_VERSION ||
+    // Writers save version 1; retain files from the previously supported reader versions.
+    !Number.isInteger(d.version) ||
+    d.version < CAD_DOCUMENT_VERSION ||
+    d.version > 7 ||
     typeof d.id !== 'string' ||
     typeof d.name !== 'string' ||
     (d.lengthUnit !== undefined && !['mm', 'cm', 'm', 'in', 'ft'].includes(d.lengthUnit)) ||
@@ -572,6 +575,7 @@ export function parseCadDocument(input: unknown): CadDocument {
     for (const hardware of plan.hardware) addId(hardware.id);
   }
   const parsed = structuredClone(d);
+  parsed.version = CAD_DOCUMENT_VERSION;
   for (const part of parsed.parts) {
     part.sketch = withSplineHandleSegments(part.sketch);
     for (const feature of part.features ?? []) if (feature.type === 'sketch') feature.sketch = withSplineHandleSegments(feature.sketch);
