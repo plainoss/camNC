@@ -61,7 +61,7 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
-    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'featuremenu', 'partmenu', 'menuitem', 'exportstep', 'savedesign'].includes(verb)) return base.step(text);
+    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'featuremenu', 'partmenu', 'menuitem', 'exportstep', 'savedesign', 'featurefilter', 'panelclose'].includes(verb)) return base.step(text);
     if (!(await base.inDemo())) throw new Error('Studio workflow input requires demo mode');
     const since = await settledSnapshot(page);
     if (verb === 'viewpick') {
@@ -89,6 +89,16 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
       if (await row.count() !== 1) throw new Error(`Feature name must identify one row: ${rest}`);
       await row.click({ button: 'right' });
       await page.getByRole('menu').first().waitFor();
+    } else if (verb === 'featurefilter') {
+      // Into the box above the Feature list, as a person clicks it, selects what's there and types; nothing clears it.
+      const box = page.getByRole('searchbox', { name: 'Filter by name or type', exact: true });
+      await box.click();
+      await page.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+A`);
+      if (rest) await page.keyboard.type(rest);
+      else await page.keyboard.press('Backspace');
+    } else if (verb === 'panelclose') {
+      // The close cross of a named panel, such as Dependencies of Extrude 1.
+      await page.getByRole('dialog', { name: rest, exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
     } else if (verb === 'menuitem') {
       const item = page.getByRole('menu').getByRole('menuitem', { name: rest, exact: true });
       if (await item.count() !== 1) throw new Error(`The open menu must have one item named ${rest}`);

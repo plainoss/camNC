@@ -94,3 +94,4 @@ export { smallestCornerRelief } from './partCutRelief';
 export * from './physicalCadView';
 export * from './copyOperationHistory';
 export { missingRegionProblem } from './regionProfile';
+export * from './featureDependencies';

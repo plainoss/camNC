@@ -70,7 +70,14 @@ export function ballRoundOperation(name: string, round: PartRound, bit: Tool, se
   // Steps along the round's surface that leave a scallop no higher than kRoundScallop: a ball on a convex round leaves
   // about step² / 8 · (1 / ball + 1 / r).
   const along = Math.sqrt((8 * kRoundScallop) / (1 / ball + 1 / r));
-  const laps = Math.max(4, Math.min(90, Math.ceil(((Math.PI / 2) * r) / along)));
+  // Each lap a little deeper than the last: where nothing is cut beside the round yet, the ball cuts its full width,
+  // so a lap takes at most a quarter of its diameter (less if the bit's own stepdown says so). Down the steepest part,
+  // a lap goes (r + ball) · step deeper.
+  const deepest = Math.min(bit.diameter / 4, bit.stepdown ?? Infinity);
+  const laps = Math.max(
+    4,
+    Math.min(180, Math.max(Math.ceil(((Math.PI / 2) * r) / along), Math.ceil(((Math.PI / 2) * (r + ball)) / deepest)))
+  );
   const climbCcw = (round.material === 'outside') === s.climb;
   const feed = s.finishFeed ?? s.feed;
   const passes: Operation['passes'] = [];

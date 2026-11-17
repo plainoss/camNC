@@ -57,7 +57,7 @@ export interface OpSummary {
   /** For people: "Pocket 4.2 deep", "Outline: rough + final pass". */
   label: string;
   kind: Operation['kind'];
-  tool: { number: number; diameter: number; shape?: 'flat' | 'v'; angle?: number };
+  tool: { number: number; diameter: number; shape?: 'flat' | 'v' | 'ball' | 'roundover'; angle?: number; name?: string };
   zTop: number;
   zBottom: number;
   /** Distinct depths the operation cuts at (pocket stepdowns, outline roughing + final). */
@@ -732,6 +732,8 @@ function opSummaries(cam: PartCam, partTop: number): OpSummary[] {
         number: op.tool.number,
         diameter: op.tool.diameter,
         ...(op.tool.shape === 'v' && { shape: 'v' as const, angle: op.tool.angle }),
+        ...((op.tool.shape === 'ball' || op.tool.shape === 'roundover') && { shape: op.tool.shape }),
+        ...(op.tool.name && { name: op.tool.name }),
       },
       zTop,
       zBottom: minOf(zs),

@@ -29,14 +29,13 @@ const endMill: Tool = { number: 1, diameter: 6 };
 const roundover: Tool = { number: 2, diameter: 6, shape: 'roundover', radius: 1, tipDiameter: 3, name: 'R1 roundover' };
 
 describe('rounding over edges', () => {
-  it('runs a roundover bit of the round’s radius around each rounded edge, at the round’s foot, after the pocket and before the outline', () => {
+  it('runs a roundover bit of the round’s radius around each rounded edge, at the round’s foot, first, while the part is whole', () => {
     const { features, centre } = cup();
     const cam = camPart(features, { tools: [endMill], roundoverBits: [roundover] });
     const names = cam.operations.map(op => op.name);
-    expect(names.slice(-3, -1)).toEqual(['Round over 1', 'Round over 2']);
+    expect(names.slice(0, 2)).toEqual(['Round over 1', 'Round over 2']);
     expect(cam.operations.at(-1)!.feature).toBe('outline');
-    expect(cam.operations.slice(0, -3).every(op => op.feature !== 'outline')).toBe(true);
-    const [outer, inner] = cam.operations.slice(-3, -1);
+    const [outer, inner] = cam.operations.slice(0, 2);
     for (const op of [outer!, inner!]) {
       expect(op.tool).toBe(roundover);
       expect(op.passes).toHaveLength(1);
@@ -46,10 +45,10 @@ describe('rounding over edges', () => {
     const reach = (op: typeof outer) => op!.passes[0]!.pts.map(p => Math.hypot(p[0] - centre.x, p[1] - centre.y));
     for (const r of reach(outer)) expect(r).toBeCloseTo(38.9 + 1.5, 1);
     for (const r of reach(inner)) expect(r).toBeCloseTo(33.6 - 1.5, 1);
-    // Its own program between the end mill's pocket and outline, naming the bit in its tool table.
+    // Its own program before the end mill's, naming the bit in its tool table: one bit swap in all.
     const programs = splitByBit(cam);
-    expect(programs.map(program => program.operations[0]!.tool.number)).toEqual([1, 2, 1]);
-    expect(toGcode(programs[1]!)).toContain('ROUNDOVER R=1');
+    expect(programs.map(program => program.operations[0]!.tool.number)).toEqual([2, 1]);
+    expect(toGcode(programs[0]!)).toContain('ROUNDOVER R=1');
   });
 
   it('leaves an edge sharp, and says so, without a roundover bit of its radius', () => {
@@ -59,27 +58,36 @@ describe('rounding over edges', () => {
     expect(cam.warnings.filter(w => /no 1 mm roundover bit/.test(w))).toHaveLength(2);
   });
 
-  it('finishes a round no roundover bit fits with a ball end, in laps from the face down to the wall', () => {
+  it('finishes a round no roundover bit fits with a ball end, in laps from the face down, both sides of the rim together', () => {
     const { features, centre } = cup();
     const ball: Tool = { number: 21, diameter: 6, shape: 'ball', name: 'ball end mill ⌀6' };
     const cam = camPart(features, { tools: [endMill], roundBall: ball });
     const rounds = cam.operations.filter(op => op.tool === ball);
-    expect(rounds.map(op => op.name)).toEqual(['Round over 1', 'Round over 2']);
-    expect(cam.operations.slice(-3, -1)).toEqual(rounds);
-    for (const op of rounds) {
-      // From the face, each lap deeper, down to beside the wall with the ball's tip 4 mm down (radius 1 plus the ball's 3).
-      const tips = op.passes.map(pass => pass.pts[0]![2]);
+    // One operation, first in the job: the rim's two rounds lap by lap, outside then inside.
+    expect(rounds.map(op => op.name)).toEqual(['Round over 1 + Round over 2']);
+    expect(cam.operations[0]).toBe(rounds[0]);
+    const [op] = rounds;
+    expect(op!.title).toBe('R1 round, ball end ⌀6 ×2');
+    const outer = op!.passes.filter((_, i) => i % 2 === 0),
+      inner = op!.passes.filter((_, i) => i % 2 === 1);
+    for (const laps of [outer, inner]) {
+      // From the face down to beside the wall, with the ball's tip 4 mm down (radius 1 plus the ball's 3).
+      const tips = laps.map(pass => pass.pts[0]![2]);
       expect(tips[0]).toBeCloseTo(20, 6);
       expect(tips.at(-1)).toBeCloseTo(20 - 1 - 3, 6);
-      for (let i = 1; i < tips.length; i++) expect(tips[i]!).toBeLessThan(tips[i - 1]!);
-      expect(op.passes.length).toBeGreaterThan(4);
+      // Each lap deeper, by at most a quarter of the ball's diameter: the first laps cut its full width in solid stock.
+      for (let i = 1; i < tips.length; i++) {
+        expect(tips[i]!).toBeLessThan(tips[i - 1]!);
+        expect(tips[i - 1]! - tips[i]!).toBeLessThanOrEqual(6 / 4 + 1e-9);
+      }
+      expect(laps.length).toBeGreaterThan(4);
     }
-    // At the first lap the ball's tip sits where the round meets the face: 1 mm in from each edge.
-    const reach = (op: (typeof rounds)[number]) => op.passes[0]!.pts.map(p => Math.hypot(p[0] - centre.x, p[1] - centre.y));
-    for (const r of reach(rounds[0]!)) expect(r).toBeCloseTo(38.9 - 1, 1);
-    for (const r of reach(rounds[1]!)) expect(r).toBeCloseTo(33.6 + 1, 1);
+    // At the first laps the ball's tip sits where each round meets the face: 1 mm in from each edge.
+    const reach = (pass: (typeof outer)[number]) => pass.pts.map(p => Math.hypot(p[0] - centre.x, p[1] - centre.y));
+    for (const r of reach(outer[0]!)) expect(r).toBeCloseTo(38.9 - 1, 1);
+    for (const r of reach(inner[0]!)) expect(r).toBeCloseTo(33.6 + 1, 1);
     expect(cam.warnings.some(w => /roundover bit/.test(w))).toBe(false);
-    expect(toGcode(splitByBit(cam).at(-2)!)).toContain('CR=3');
+    expect(toGcode(splitByBit(cam)[0]!)).toContain('CR=3');
   });
 
   it('leaves both rims of the cup rounded, within a few hundredths of the round, once every cut is simulated', () => {
@@ -122,12 +130,13 @@ describe('rounding over edges', () => {
     ] as const)
       for (let into = 0.05; into <= r + 0.5; into += 0.02) {
         const rho = edge - inward * into;
-        worst = Math.max(worst, Math.abs(height(rho) - ideal(rho, edge, inward)));
+        const err = Math.abs(height(rho) - ideal(rho, edge, inward));
+        worst = Math.max(worst, err);
       }
     expect(worst).toBeLessThan(0.05);
   });
 
-  it('on a board, rounds once every pocket is cut and before the outlines cut the parts loose', () => {
+  it('on a board, rounds first, from the face down, so the job swaps bits once less', () => {
     const { features } = cup();
     const ball: Tool = { number: 21, diameter: 6, shape: 'ball', name: 'ball end mill ⌀6' };
     const flat8: Tool = { number: 2, diameter: 8, name: 'flat end mill 8' };
@@ -144,13 +153,11 @@ describe('rounding over edges', () => {
       { tools: [flat8, endMill], roundBall: ball }
     );
     const kinds = cam.operations.map(op => (op.tool === ball ? 'round' : op.feature === 'outline' ? 'outline' : 'inner'));
-    const firstRound = kinds.indexOf('round'),
-      lastRound = kinds.lastIndexOf('round');
-    expect(firstRound).toBeGreaterThan(0);
-    expect(kinds.slice(0, firstRound).every(k => k === 'inner')).toBe(true);
-    expect(kinds.slice(firstRound, lastRound + 1).every(k => k === 'round')).toBe(true);
-    expect(kinds.slice(lastRound + 1).every(k => k === 'outline')).toBe(true);
+    expect(kinds[0]).toBe('round');
+    expect(kinds.slice(1).includes('round')).toBe(false);
     expect(kinds.at(-1)).toBe('outline');
+    // The ball, then the one flat bit: a single swap.
+    expect(splitByBit(cam).map(program => program.operations[0]!.tool)).toEqual([ball, flat8]);
     // The ball has a program of its own, named apart from a flat bit of its size.
     const programs = splitByBit(cam);
     expect(programs.some(program => program.operations[0]!.tool === ball)).toBe(true);

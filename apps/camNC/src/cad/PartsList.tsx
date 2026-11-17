@@ -2,6 +2,8 @@ import { useDesignUnits } from './designUnits';
 import { edgeFilletProblems, type CadDocument, type CadFolder, type CadPart } from '@wbcnc/cad';
 import { useCallback, useState } from 'react';
 import { PartRowMenu } from './PartRowMenu';
+import { partMatchesFilter } from './featureFilter';
+import { useFeatureFilter } from './FeatureListTools';
 import { MakeTransparentPanel } from './MakeTransparentPanel';
 import { ExportDialog, type ExportTarget } from './export/ExportDialog';
 import { shownPartsTarget } from './export/shownPartsTarget';
@@ -125,20 +127,36 @@ export function PartsList({
     </li>
   );
   const grouped = new Set<string>();
-  const listed = rows.map(row => {
-    const folder = folders?.find(folder => folder.partIds.includes(row.part.id));
-    if (!folder) return renderRow(row);
-    if (grouped.has(folder.id)) return null;
-    grouped.add(folder.id);
-    return (
-      <li key={folder.id} className="cad-parts-folder">
-        <details open>
-          <summary>{folder.name}</summary>
-          <ul aria-label={`${folder.name} parts`}>{rows.filter(candidate => folder.partIds.includes(candidate.part.id)).map(renderRow)}</ul>
-        </details>
-      </li>
-    );
-  });
+  // The Feature list's filter narrows the parts too: those it drops are one "…".
+  const filterText = useFeatureFilter();
+  const kept = filterText.trim() ? rows.filter(row => partMatchesFilter(row.part.name, filterText)) : null;
+  const listed = kept
+    ? [
+        ...kept.map(renderRow),
+        ...(kept.length < rows.length
+          ? [
+              <li key="elided" className="cad-feature-elided">
+                …
+              </li>,
+            ]
+          : []),
+      ]
+    : rows.map(row => {
+        const folder = folders?.find(folder => folder.partIds.includes(row.part.id));
+        if (!folder) return renderRow(row);
+        if (grouped.has(folder.id)) return null;
+        grouped.add(folder.id);
+        return (
+          <li key={folder.id} className="cad-parts-folder">
+            <details open>
+              <summary>{folder.name}</summary>
+              <ul aria-label={`${folder.name} parts`}>
+                {rows.filter(candidate => folder.partIds.includes(candidate.part.id)).map(renderRow)}
+              </ul>
+            </details>
+          </li>
+        );
+      });
   return (
     <>
       <ul className="cad-part-list" aria-label="Parts" hidden={hidden}>

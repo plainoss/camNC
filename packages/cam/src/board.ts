@@ -495,11 +495,12 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
         { d, stage: 'inner' as const },
         { d, stage: 'outline' as const },
       ]);
-  // Rounded edges once every pocket is cut, so the ball never plunges into solid stock where a pocket goes, and before
-  // the outline that cuts the part loose: one program per rounding bit.
+  // Rounded edges with their own bit, while the parts are still held: between the last pocket and the first outline
+  // when the flat bit changes there anyway, else first, from the face down, so the job swaps bits once less. One
+  // program per rounding bit.
   const lastInner = stages.map(s => s.stage).lastIndexOf('inner');
   const firstRelease = stages.findIndex((s, i) => i > lastInner && s.stage === 'outline');
-  const roundsAt = firstRelease < 0 ? stages.length : firstRelease;
+  const roundsAt = lastInner >= 0 && firstRelease > lastInner && stages[lastInner]!.d !== stages[firstRelease]!.d ? firstRelease : 0;
   const pushRounds = () => {
     for (const key of [...new Set(finishing.map(o => toolProgramKey(o.op.tool)))])
       operations.push(...finishing.filter(o => toolProgramKey(o.op.tool) === key).map(o => o.op));
