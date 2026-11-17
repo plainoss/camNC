@@ -28,10 +28,18 @@ export function StudioViewMenu({
   designId,
   camera,
   onViewRequest,
+  perspective,
+  onPerspective,
+  section,
 }: {
   designId: string;
   camera?: StudioCameraRef;
   onViewRequest: (request: Omit<ViewRequest, 'seq'>) => void;
+  /** Whether the view draws in perspective, and switching it. */
+  perspective?: boolean;
+  onPerspective?: (on: boolean) => void;
+  /** The section view: started, edited or turned off from here too, as it is from its own buttons. */
+  section?: { active: boolean; enabled: boolean; start: () => void; edit: () => void; turnOff: () => void };
 }) {
   const [open, setOpen] = useState(false);
   const [panel, setPanel] = useState(false);
@@ -95,14 +103,29 @@ export function StudioViewMenu({
             {item('Previous view', previous ? () => go({ name: 'fit', camera: previous }) : undefined)}
             {item('Zoom to fit', () => go({ name: 'fit' }))}
             {item('Zoom to window')}
-            {item('Perspective view')}
-            {item('Orient normal to sketch on edit')}
+            {item(
+              'Perspective view',
+              onPerspective &&
+                (() => {
+                  onPerspective(!perspective);
+                  setOpen(false);
+                }),
+              !!perspective
+            )}
+            {item('Orient normal to…')}
             {item('Shaded with edges', undefined, true)}
             {item('Hidden edges removed', undefined, true)}
             {item('Tangent edges visible', undefined, true)}
             {item('View in high quality')}
             {item('Highlight boundary edges')}
-            {item('Section view…')}
+            {section?.active ? (
+              <>
+                {item('Edit section view…', section.enabled ? () => (section.edit(), setOpen(false)) : undefined)}
+                {item('Turn off section view', () => (section.turnOff(), setOpen(false)))}
+              </>
+            ) : (
+              item('Section view…', section?.enabled ? () => (section.start(), setOpen(false)) : undefined)
+            )}
           </div>
         )}
       </div>

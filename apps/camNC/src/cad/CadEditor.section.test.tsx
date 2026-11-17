@@ -227,7 +227,7 @@ it('uses the actual picked model face as a section plane with a signed offset', 
   await click([50, 30, 18]);
   const plane = within(dialog).getByRole('combobox', { name: 'Section plane' });
   await waitFor(() => expect(plane).toHaveValue('picked-face'));
-  expect(within(plane).getByRole('option', { name: 'Plate face' })).toBeDefined();
+  expect(within(plane).getByRole('option', { name: 'Section plane 1 (Plate face)' })).toBeDefined();
   await userEvent.fill(page.getByRole('textbox', { name: 'Offset', exact: true }), '-9');
   await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm section view' }));
   await waitFor(() => expect(zBounds()).toEqual([0, 9]));
