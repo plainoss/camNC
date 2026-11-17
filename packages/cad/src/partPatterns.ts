@@ -131,15 +131,23 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
   // A Mirror › Add follows where its plane crosses the part, wherever either has moved.
   const placed = { ...document, parts: mirrored };
   const joined = mirrored.map(part => {
-    if (!part.mirrorJoins?.length) return part;
+    if (!part.mirrorJoins?.length && !part.split) return part;
     const at = effectivePlacement(part, supports) ?? CAD_IDENTITY_PLACEMENT;
-    const mirrorJoins = part.mirrorJoins.map(({ line: _line, ...join }) => {
+    const mirrorJoins = part.mirrorJoins?.map(({ line: _line, ...join }) => {
       const line = mirrorJoinLine(placed, at, join);
       return line ? { ...join, line } : join;
     });
-    if (JSON.stringify(mirrorJoins) === JSON.stringify(part.mirrorJoins)) return part;
+    // A Split follows where its plane crosses the part, as a Mirror › Add does.
+    let split = part.split;
+    if (split) {
+      const { line: _line, ...plain } = split;
+      const line = mirrorJoinLine(placed, at, { id: plain.id, across: plain.across, ...(plain.datum && { datum: plain.datum }) });
+      split = line ? { ...plain, line } : plain;
+    }
+    if (JSON.stringify(mirrorJoins) === JSON.stringify(part.mirrorJoins) && JSON.stringify(split) === JSON.stringify(part.split))
+      return part;
     changed = true;
-    return { ...part, mirrorJoins };
+    return { ...part, ...(mirrorJoins && { mirrorJoins }), ...(split && { split }) };
   });
   return changed ? { ...document, parts: joined } : document;
 }

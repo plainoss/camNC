@@ -13,6 +13,7 @@ const kIcons: Record<DesignStep['kind'], string> = {
   copy: '⧉',
   pattern: '⋯',
   partCut: '⊟',
+  split: '⫼',
 };
 
 /** The design's steps in order. Clicking one selects its part and opens what it made. */

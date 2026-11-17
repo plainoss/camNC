@@ -19,7 +19,7 @@ import { missingRegionMessage, missingRegionProblem } from './regionProfile';
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
   id: string;
-  kind: 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'fillet' | 'mirror' | 'copy' | 'pattern' | 'partCut';
+  kind: 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'fillet' | 'mirror' | 'copy' | 'pattern' | 'partCut' | 'split';
   label: string;
   /** A short reading of the step's main value, such as a thickness or depth. */
   detail?: string;
@@ -277,12 +277,12 @@ function listedSteps(document: CadDocument): DesignStep[] {
         // A piece a through cut split off a part is a part, not a step of the design.
         if (part.pieceOf) return [];
         const steps: DesignStep[] = [
-          // A part extruding another's sketch has none of its own.
-          ...(part.sketchOf || part.faceProfile
+          // A part extruding another's sketch has none of its own, nor has a copy taken out of its pattern to be split.
+          ...(part.sketchOf || part.faceProfile || part.split?.fromCopy
             ? []
             : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: sketchStepLabel(part), partId: part.id }]),
           // A sketch not yet extruded is only its sketch, and a part made by another's extrude is listed in that one.
-          ...(part.extrude === false || madeWith(part)
+          ...(part.extrude === false || madeWith(part) || part.split?.fromCopy
             ? []
             : [
                 {
@@ -395,6 +395,15 @@ function listedSteps(document: CadDocument): DesignStep[] {
               : `spacing ${typed(part.pattern.spacingExpression, part.pattern.spacing, document.lengthUnit)}`,
             partId: part.id,
             suppressed: !!part.pattern.suppressed,
+          });
+        // A Split, numbered among them as the reference numbers features.
+        if (part.split)
+          steps.push({
+            id: part.split.id,
+            kind: 'split',
+            label: `Split ${document.parts.filter(other => other.split).indexOf(part) + 1}`,
+            partId: part.id,
+            suppressed: !!part.split.suppressed,
           });
         return [...steps, ...(after.get(partIndex) ?? [])];
       })

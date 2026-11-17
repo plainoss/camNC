@@ -355,6 +355,12 @@ export interface CadPart {
   fillets?: CadEdgeFillet[];
   /** Mirror › Add steps, after its fillets: the part joined with its own mirror image across a plane or a face. */
   mirrorJoins?: CadMirrorJoin[];
+  /**
+   * A Split: the part cut in two by a plane standing across its sketch plane. The part keeps the side the plane's
+   * `line` normal points to; the other side is a part of its own, `pieceOf` it. `fromCopy`: it was a copy of another
+   * part, taken out of its pattern to be split, so its sketch and extrude are that part's, not steps of its own.
+   */
+  split?: CadPartSplit;
   /** Regions Extrude → Add steps join to this part. The design writes it from those steps; it's never edited. */
   addedRegions?: string[];
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
@@ -458,6 +464,16 @@ export interface CadMirrorJoin {
   across: CadDrawnOn['on'];
   datum?: string;
   suppressed?: true;
+  line?: { x: number; y: number; nx: number; ny: number };
+}
+
+export interface CadPartSplit {
+  id: string;
+  across: CadDrawnOn['on'];
+  datum?: string;
+  suppressed?: true;
+  fromCopy?: true;
+  /** Where the plane crosses the sketch plane, in the sketch's coordinates, worked out as the design is laid out. */
   line?: { x: number; y: number; nx: number; ny: number };
 }
 

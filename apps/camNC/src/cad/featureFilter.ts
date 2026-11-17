@@ -49,6 +49,7 @@ const kStepTypes: Record<DesignStep['kind'], string> = {
   copy: 'Transform',
   pattern: 'Linear pattern',
   partCut: 'Cut parts',
+  split: 'Split',
 };
 
 const typeOf = (row: FilterRow) =>

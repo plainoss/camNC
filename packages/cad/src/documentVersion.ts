@@ -14,6 +14,7 @@ export function cadDocumentVersion(document: CadDocument): CadDocument['version'
         part?.thinEdges ||
         part?.piece ||
         part?.pieceOf ||
+        part?.split ||
         part?.pattern?.second ||
         part?.pattern?.skipped ||
         part?.pattern?.centered

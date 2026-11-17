@@ -281,6 +281,24 @@ export function parseCadDocument(input: unknown): CadDocument {
       (p.pieceOf !== undefined && (!p.pieceOf || typeof p.pieceOf.partId !== 'string' || typeof p.pieceOf.by !== 'string'))
     )
       throw new Error('Invalid CAD part piece');
+    if (p.split !== undefined) {
+      const split = p.split as unknown as Record<string, unknown> | null;
+      const across = split?.across as Record<string, unknown> | undefined;
+      if (
+        !split ||
+        typeof split.id !== 'string' ||
+        !across ||
+        typeof across !== 'object' ||
+        ('plane' in across ? !['top', 'front', 'right'].includes(across.plane as string) : typeof across.partId !== 'string') ||
+        (split.datum !== undefined && typeof split.datum !== 'string') ||
+        (split.suppressed !== undefined && split.suppressed !== true) ||
+        (split.fromCopy !== undefined && split.fromCopy !== true)
+      )
+        throw new Error('Invalid CAD split');
+      addId(split.id);
+      const line = split.line as Record<string, unknown> | undefined;
+      if (line !== undefined) for (const key of ['x', 'y', 'nx', 'ny'] as const) number(line[key]);
+    }
     if (p.mirrorJoins !== undefined) {
       if (!Array.isArray(p.mirrorJoins) || !p.mirrorJoins.length) throw new Error('Invalid CAD mirror');
       for (const join of p.mirrorJoins) {

@@ -230,3 +230,8 @@
 .cad-static-tabs span[aria-disabled] {
   color: #9aa6b6;
 }
+/** A box that must be filled before the step can be made: red until it is, as the reference marks it. */
+.cad-feature-selection[data-missing]:not([data-active]) {
+  border-color: #d64545;
+  background: #fff1f1;
+}

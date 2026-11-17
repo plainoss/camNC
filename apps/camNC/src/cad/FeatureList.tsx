@@ -27,6 +27,7 @@ const kIcons: Record<DesignStep['kind'] | 'variable' | 'plane', string> = {
   copy: '⧉',
   pattern: '⋯',
   partCut: '⊟',
+  split: '⫼',
 };
 
 /** The eye on a row whose feature shows in the view: a sketch, a plane or the origin. */
