@@ -14,6 +14,7 @@ import {
 } from './board';
 import { dowelClearance, dowelProblem, dowelSpots, sideBSpec, type FlipRegistration } from './flip';
 import type { PartFeatures } from './features';
+import type { Tool } from './toolpathTypes';
 import { postProgram, toGcode } from './gcode';
 import { maxOf, minOf } from './geom';
 import { holdCheck, holdTimeline } from './hold';
@@ -123,6 +124,8 @@ export interface PlanResult {
     diameter: number;
     /** The bit's name, for people: "90° V-bit ⌀6". */
     name?: string;
+    /** A bit that isn't a flat end mill: "v", "ball" or "roundover". */
+    shape?: Tool['shape'];
     gcode: string;
     timeMin: number;
     timing?: ProgramTimeEstimate;
@@ -672,6 +675,7 @@ export function summarize(
       tool: tool.number,
       diameter: tool.diameter,
       ...(tool.name && { name: tool.name }),
+      ...(tool.shape && tool.shape !== 'flat' && { shape: tool.shape }),
       gcode,
       timeMin: timing.estimatedAutomaticSeconds / 60,
       timing,

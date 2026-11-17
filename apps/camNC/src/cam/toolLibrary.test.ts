@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bitKey } from './cuttingData';
-import { kDefaultBit } from './planSettings';
+import { kDefaultBit, kDefaultPlan, kRoundBall, roundBallFor, toCamSettings } from './planSettings';
 import { mergeLibrary, offeredBits, readLibraryFile, useToolLibrary, type StoredBit } from './toolLibrary';
 import { selectToolPreset, type LibraryTool } from '@wbcnc/cam/tools';
 
@@ -57,19 +57,22 @@ async function zip(name: string, text: string): Promise<Uint8Array<ArrayBuffer>>
 }
 
 describe('Fusion tool library import', () => {
-  it('reads Library.json: flat end mills, and what was skipped', async () => {
+  it('reads Library.json: flat and ball end mills, and what was skipped', async () => {
     const r = await readLibraryFile(new File([library], 'Library.json'));
     expect(r).toMatchObject({
       ok: true,
       file: 'Library.json',
-      tools: [{ number: 1, diameter: 3.175, name: '1/8 mill v1', flutes: 1, feed: 1800, plungeFeed: 480, rpm: 15000 }],
-      skipped: { 'ball end mill': 1, 'chamfer mill': 1 },
+      tools: [
+        { number: 1, diameter: 3.175, name: '1/8 mill v1', flutes: 1, feed: 1800, plungeFeed: 480, rpm: 15000 },
+        { number: 3, diameter: 6, name: '6mm radius', shape: 'ball' },
+      ],
+      skipped: { 'chamfer mill': 1 },
     });
   });
 
   it('reads a zipped .tools export', async () => {
     const r = await readLibraryFile(new File([await zip('tools.json', library)], 'My bits.tools'));
-    expect(r.ok && r.tools.map(t => t.name)).toEqual(['1/8 mill v1']);
+    expect(r.ok && r.tools.map(t => t.name)).toEqual(['1/8 mill v1', '6mm radius']);
   });
 
   it('says what is wrong with other files', async () => {
@@ -188,7 +191,31 @@ describe('stored bits', () => {
   it('offers the built-in bits first, the default among them', () => {
     const bits = offeredBits([]);
     expect(bits[0]).toEqual(kDefaultBit);
-    expect(bits.map(b => b.diameter)).toEqual([3.175, 3.175, 6, 8]);
+    expect(bits.map(b => [b.diameter, b.shape ?? 'flat'])).toEqual([
+      [3.175, 'flat'],
+      [3.175, 'flat'],
+      [6, 'flat'],
+      [8, 'flat'],
+      [6, 'ball'],
+    ]);
     expect(new Set(bits.map(bitKey)).size).toBe(bits.length);
+  });
+});
+
+describe('the ball end for rounded edges', () => {
+  const imported = { number: 3, diameter: 6, name: '6mm radius', shape: 'ball' as const, feed: 2000, rpm: 30000 };
+  const small = { number: 4, diameter: 3, name: 'VHM-Radiusfräser 3', shape: 'ball' as const };
+
+  it('is the largest of your ball bits, else the built-in, unless the job picks one', () => {
+    expect(roundBallFor({}, offeredBits([]))).toBe(kRoundBall);
+    expect(roundBallFor({}, offeredBits([small]))).toBe(small);
+    expect(roundBallFor({}, offeredBits([small, imported]))).toBe(imported);
+    expect(roundBallFor({ roundBall: small }, offeredBits([small, imported]))).toBe(small);
+  });
+
+  it('cuts with its own feeds and a tool number apart from the flat bits', () => {
+    const settings = toCamSettings({ ...kDefaultPlan, bit: { number: 3, diameter: 6, name: '6 mm flat' }, roundBall: imported });
+    expect(settings.roundBall).toMatchObject({ shape: 'ball', diameter: 6, feed: 2000, rpm: 30000, name: '6mm radius' });
+    expect(settings.roundBall!.number).not.toBe(3);
   });
 });

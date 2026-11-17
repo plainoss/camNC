@@ -682,12 +682,15 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
 
   warnings.push(...ops.flatMap(op => op.warnings ?? []), ...fluteWarnings(ops, top));
 
-  // Stable sort: smallest tool first, keeps pockets -> holes -> outline within a tool. Roundovers come last, after
-  // every wall they need is cut.
-  const last = (op: Operation) => (op.tool.shape === 'roundover' || op.tool.shape === 'ball' ? 1 : 0);
+  // Stable sort: smallest tool first, keeps pockets -> holes -> outline within a tool. Rounded edges come once every
+  // pocket is cut (the ball never plunges into solid stock where a pocket goes), and before the outline cuts the part
+  // loose.
+  const rounding = (op: Operation) => op.tool.shape === 'roundover' || op.tool.shape === 'ball';
+  const rounds = ops.some(rounding);
+  const stage = (op: Operation) => (rounding(op) ? 1 : rounds && op.feature === 'outline' ? 2 : 0);
   const operations = ops
     .map((op, i) => ({ op, i }))
-    .sort((a, b) => last(a.op) - last(b.op) || a.op.tool.diameter - b.op.tool.diameter || a.i - b.i)
+    .sort((a, b) => stage(a.op) - stage(b.op) || a.op.tool.diameter - b.op.tool.diameter || a.i - b.i)
     .map(x => x.op);
   return finalizePlan(
     {

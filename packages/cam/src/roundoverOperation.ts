@@ -53,7 +53,7 @@ export function roundoverOperation(name: string, round: PartRound, bit: Tool, se
 }
 
 /** The scallop a ball end leaves between its laps over a round, mm: finer than the wood's grain shows. */
-const kRoundScallop = 0.02;
+const kRoundScallop = 0.01;
 
 /**
  * A round finished with a ball end mill, as a 3D finishing pass: laps around the edge, each one a step of the quarter
@@ -67,13 +67,15 @@ export function ballRoundOperation(name: string, round: PartRound, bit: Tool, se
     ball = bit.diameter / 2;
   // Out of the material, into the waste: outside an outline, inside an opening.
   const outward = round.material === 'inside' ? 1 : -1;
-  // Steps along the round's surface that leave a scallop no higher than kRoundScallop.
-  const along = 2 * Math.sqrt(Math.max(1e-9, 2 * ball * kRoundScallop - kRoundScallop * kRoundScallop));
+  // Steps along the round's surface that leave a scallop no higher than kRoundScallop: a ball on a convex round leaves
+  // about step² / 8 · (1 / ball + 1 / r).
+  const along = Math.sqrt((8 * kRoundScallop) / (1 / ball + 1 / r));
   const laps = Math.max(4, Math.min(90, Math.ceil(((Math.PI / 2) * r) / along)));
   const climbCcw = (round.material === 'outside') === s.climb;
   const feed = s.finishFeed ?? s.feed;
   const passes: Operation['passes'] = [];
-  for (let k = 0; k <= laps; k++) {
+  // From the face down the round to the wall, each lap a little deeper: the ball never dives beside the wall.
+  for (let k = laps; k >= 0; k--) {
     const angle = ((Math.PI / 2) * k) / laps;
     // The ball's centre stays r + ball from the round's axis, which runs r in from the edge and r below it.
     const out = (r + ball) * Math.cos(angle) - r;

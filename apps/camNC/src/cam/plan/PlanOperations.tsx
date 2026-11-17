@@ -108,7 +108,20 @@ export function PlanOperations({
 /** The bits this board uses, in order, and the pause between them. */
 function BitsLine({ plan }: { plan: PlanResult }) {
   // A V-bit by its name: its diameter alone reads like a flat bit's.
-  const named = plan.programs.length === plan.bits.length ? plan.programs.map(p => (p.name && /V-bit/.test(p.name) ? p.name : null)) : [];
+  // A ball end or roundover bit by its kind, for the same reason.
+  const named =
+    plan.programs.length === plan.bits.length
+      ? plan.programs.map(p =>
+          p.name && /V-bit/.test(p.name)
+            ? p.name
+            : p.shape === 'ball'
+              ? `${p.diameter} mm ball end`
+              : p.shape === 'roundover'
+                ? (p.name ?? `${p.diameter} mm roundover bit`)
+                : null
+        )
+      : [];
+  const rounds = plan.programs.some(p => p.shape === 'ball' || p.shape === 'roundover');
   return (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted/40 px-3 py-2 text-[13px]">
       {plan.bits.map((d, i) => (
@@ -121,7 +134,10 @@ function BitsLine({ plan }: { plan: PlanResult }) {
         </span>
       ))}
       <span className="text-muted-foreground">
-        {named.some(Boolean) ? '· flat bottoms first, then the V-bit' : '· smallest bit first, inner features before outlines'}
+        {plan.programs.some(p => p.name && /V-bit/.test(p.name))
+          ? '· flat bottoms first, then the V-bit'
+          : '· smallest bit first, inner features before outlines'}
+        {rounds && ', rounded edges last'}
       </span>
     </p>
   );

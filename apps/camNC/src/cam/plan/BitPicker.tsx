@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { bitKey } from '../cuttingData';
 import { Hint } from '../Hint';
 import { numberProblem, parseDecimal } from '../numberFormat';
-import { type PlanSettingsV1 } from '../planSettings';
+import { isBallBit, roundBallFor, type PlanSettingsV1 } from '../planSettings';
 import { useBits, useToolLibrary, type StoredBit } from '../toolLibrary';
 import { ImportToolLibrary } from './ImportToolLibrary';
 
@@ -35,7 +35,9 @@ function BitOption({ bit }: { bit: LibraryTool }) {
     <SelectItem value={bitKey(bit)} className="py-2">
       <span className="flex min-w-0 flex-col items-start gap-0.5">
         <span className="whitespace-normal break-words">{bitLabel(bit)}</span>
-        <span className="text-xs text-muted-foreground">{bitSpecs(bit) || 'Flat end mill'}</span>
+        <span className="text-xs text-muted-foreground">
+          {[isBallBit(bit) ? 'Ball end' : '', bitSpecs(bit)].filter(Boolean).join(' · ') || 'Flat end mill'}
+        </span>
       </span>
     </SelectItem>
   );
@@ -92,7 +94,7 @@ function CuttingPreset({
 }
 
 /** A bit that's in no library: diameter, flutes and a name. */
-function CustomBitForm({ onAdd }: { onAdd: (bit: StoredBit) => void }) {
+function CustomBitForm({ onAdd, ball = false }: { onAdd: (bit: StoredBit) => void; ball?: boolean }) {
   const [d, setD] = useState('');
   const [flutes, setFlutes] = useState('2');
   const [name, setName] = useState('');
@@ -101,13 +103,16 @@ function CustomBitForm({ onAdd }: { onAdd: (bit: StoredBit) => void }) {
   const flutesProblem = flutes.trim() ? numberProblem(flutes, { min: 1, max: 12, integer: true }) : null;
   const ok = !!d.trim() && !dProblem && !flutesProblem;
   const add = () => {
-    useToolLibrary
-      .getState()
-      .addCustom({ diameter, flutes: parseDecimal(flutes) || undefined, name: name.trim() || `${diameter} mm flat` });
+    useToolLibrary.getState().addCustom({
+      diameter,
+      flutes: parseDecimal(flutes) || undefined,
+      name: name.trim() || `${diameter} mm ${ball ? 'ball end' : 'flat'}`,
+      ...(ball ? { shape: 'ball' as const } : {}),
+    });
     onAdd(useToolLibrary.getState().bits.at(-1)!);
   };
   return (
-    <div className="flex flex-col gap-2 rounded-md border p-2.5" role="group" aria-label="Custom bit">
+    <div className="flex flex-col gap-2 rounded-md border p-2.5" role="group" aria-label={ball ? 'Custom ball bit' : 'Custom bit'}>
       <div className="grid grid-cols-[1fr_1fr] gap-2">
         <div className="flex flex-col gap-1">
           <Label htmlFor="custom-bit-d" className="text-xs font-normal text-muted-foreground">
@@ -157,7 +162,7 @@ function CustomBitForm({ onAdd }: { onAdd: (bit: StoredBit) => void }) {
         <Input
           id="custom-bit-name"
           className="h-8"
-          placeholder={ok ? `${diameter} mm flat` : 'e.g. 6 mm 2-flute'}
+          placeholder={ok ? `${diameter} mm ${ball ? 'ball end' : 'flat'}` : 'e.g. 6 mm 2-flute'}
           value={name}
           onChange={e => setName(e.target.value)}
         />
@@ -171,7 +176,12 @@ function CustomBitForm({ onAdd }: { onAdd: (bit: StoredBit) => void }) {
 
 /** Main bit, optional second smaller bit, and where bits come from: the job's bit choices. */
 export function BitSettings({ value, onChange }: { value: PlanSettingsV1; onChange: (v: PlanSettingsV1) => void }) {
-  const bits = useBits([value.bit, ...(value.smallBit ? [value.smallBit] : [])]);
+  const offered = useBits([value.bit, ...(value.smallBit ? [value.smallBit] : []), ...(value.roundBall ? [value.roundBall] : [])]);
+  // Flat bits cut the parts; ball bits only finish rounded edges, so each has its own list.
+  const bits = offered.filter(b => !isBallBit(b));
+  const balls = offered.filter(isBallBit);
+  const roundBall = roundBallFor(value, offered);
+  const [customBall, setCustomBall] = useState(false);
   const importLibrary = useToolLibrary(s => s.importLibrary);
   const [custom, setCustom] = useState(false);
   const [howOpen, setHowOpen] = useState(false);
@@ -264,6 +274,36 @@ export function BitSettings({ value, onChange }: { value: PlanSettingsV1; onChan
             <li>For now you can’t pick the bit for one pocket or part.</li>
             <li>Inside corners the main bit can’t reach are only flagged, not cleaned up with the smaller bit afterwards.</li>
           </ul>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-1.5">
+        <Label htmlFor="plan-round-ball">Ball end for rounded edges</Label>
+        <Select value={bitKey(roundBall)} onValueChange={k => set({ roundBall: balls.find(b => bitKey(b) === k) })}>
+          <SelectTrigger id="plan-round-ball" className="w-full">
+            <BitValue bit={roundBall} />
+          </SelectTrigger>
+          <SelectContent className="max-w-[min(26rem,calc(100vw-2rem))]">
+            {balls.map(b => (
+              <BitOption key={bitKey(b)} bit={b} />
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Finishes edges the design rounds over, last on each board.{' '}
+          {value.roundBall ? sourceOf(roundBall) : 'Unless you pick one, the largest ball bit you added or imported.'}
+        </p>
+        <Button size="sm" variant="outline" className="self-start" aria-expanded={customBall} onClick={() => setCustomBall(c => !c)}>
+          Custom ball bit…
+        </Button>
+        {customBall && (
+          <CustomBitForm
+            ball
+            onAdd={roundBall => {
+              setCustomBall(false);
+              set({ roundBall });
+            }}
+          />
         )}
       </section>
     </div>

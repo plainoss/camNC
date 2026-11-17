@@ -217,7 +217,7 @@ function hashOf(program: { gcode: string }) {
 }
 
 /** The program of an entry, if it has one. Never the program of another entry. */
-export function entryProgram(e: QueueEntry): { gcode: string; diameter: number; tool: number; name?: string } | undefined {
+export function entryProgram(e: QueueEntry): { gcode: string; diameter: number; tool: number; name?: string; shape?: string } | undefined {
   if (!e.plan || e.kind === 'flip') return undefined;
   return e.release ?? e.plan.programs[e.program];
 }
