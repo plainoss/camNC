@@ -49,7 +49,6 @@ export function CamQueueCard() {
     active,
     setActive,
     markDone,
-    rotation,
     leave,
     setOverlay,
     pauseEachTab,
@@ -85,10 +84,10 @@ export function CamQueueCard() {
       ? {
           w: e.plan.size[0],
           h: e.plan.size[1],
-          rotationDeg: entryRotation(e, rotation),
+          rotationDeg: entryRotation(e),
           ...(gcode && { tabs: e.release?.tabs, tabsPerPart: !!e.release?.perPart, freeParts: e.release?.parts }),
           ...entryHolds(e),
-          ...entryGhost(e, parts, entryRotation(e, rotation)),
+          ...entryGhost(e, parts, entryRotation(e)),
         }
       : null;
     setOverlay(overlay);
@@ -124,7 +123,6 @@ export function CamQueueCard() {
   const midBoard = !!current && !current.firstOfBoard;
   useEffect(() => setMidBoard(midBoard), [midBoard, setMidBoard]);
   const gcode = current ? gcodeOf(current) : undefined;
-  const shownDeg = current ? entryRotation(current, rotation) : 0;
   const busy = useMachineBusy();
   const setupLocked = useMachineSetupLocked();
   const loadedGcode = useStore(s => s.toolpath?.gcode);
@@ -143,7 +141,7 @@ export function CamQueueCard() {
     if (current.key !== active && current.kind !== 'pending') setActive(current.key);
     show(current, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, active, current?.key, current?.plan, current?.blocked, gcode, shownDeg, loading, setupLocked, parts, setupKey]);
+  }, [jobId, active, current?.key, current?.plan, current?.blocked, gcode, loading, setupLocked, parts, setupKey]);
   if (!jobId) return null;
   const next = async () => {
     if (!current || busy || reviewing || recoveryPending.value || (runReview && runReview !== 'finished')) return;

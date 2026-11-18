@@ -9,10 +9,10 @@ import {
   currentTab,
   entryProgram,
   entryRotation,
+  entrySide,
   entryTitle,
   machineQueue,
   nextEntry,
-  rotationKey,
   takeOutAt,
   useCamMachine,
   type BoardOverlay,
@@ -319,11 +319,11 @@ describe('machine queue', () => {
     });
 
     it('taking the same job again keeps what’s done, forgets what was loaded; another job starts over', () => {
-      useCamMachine.setState({ jobId: 'j', done: ['x'], active: 'A:bit:0', rotation: { A: 1 }, overlay: { w: 1, h: 1, rotationDeg: 0 } });
+      useCamMachine.setState({ jobId: 'j', done: ['x'], active: 'A:bit:0', overlay: { w: 1, h: 1, rotationDeg: 0 } });
       useCamMachine.getState().start('j');
-      expect(useCamMachine.getState()).toMatchObject({ done: ['x'], active: null, overlay: null, rotation: { A: 1 } });
+      expect(useCamMachine.getState()).toMatchObject({ done: ['x'], active: null, overlay: null });
       useCamMachine.getState().start('k');
-      expect(useCamMachine.getState()).toMatchObject({ jobId: 'k', done: [], rotation: {} });
+      expect(useCamMachine.getState()).toMatchObject({ jobId: 'k', done: [] });
       useCamMachine.setState(useCamMachine.getInitialState(), true);
     });
 
@@ -343,13 +343,19 @@ describe('machine queue', () => {
 
   it('side B has a rotation of its own; until corrected, as side A; a guided program turned over goes with it', () => {
     const a = ready([3.175], { sideB: ready([3.175]), flip: { registration: 'camera' }, release: [{ ...release('tabs'), turned: true }] });
-    const [first, flip, sideB, tabs] = machineQueue([onBoard('A')], [a], context);
-    expect([first, flip, sideB, tabs].map(rotationKey)).toEqual(['A', 'A:b', 'A:b', 'A:b']);
-    expect(entryRotation(sideB, { A: 2 })).toBe(2);
-    expect(entryRotation(sideB, { A: 2, 'A:b': -1 })).toBe(-1);
-    expect(entryRotation(sideB, { A: 2, 'A:b': 0 })).toBe(0);
-    expect(entryRotation(first, { A: 2, 'A:b': -1 })).toBe(2);
-    expect(entryRotation(first, {})).toBe(0);
+    const lying = (bed?: JobBoard['board']['bed']) => {
+      const b = onBoard('A');
+      return machineQueue([{ ...b, board: { ...b.board, bed } }], [a], context);
+    };
+    const [first, flip, sideB, tabs] = lying();
+    expect([first, flip, sideB, tabs].map(entrySide)).toEqual(['a', 'b', 'b', 'b']);
+    expect(entryRotation(first)).toBe(0);
+    const at = (x: number, y: number, deg?: number) => ({ x, y, ...(deg !== undefined && { deg }) });
+    expect(entryRotation(lying({ a: at(0, 0, 2) })[2])).toBe(2);
+    // Placed on side B, not turned there yet.
+    expect(entryRotation(lying({ a: at(0, 0, 2), b: at(5, 5) })[2])).toBe(2);
+    expect(lying({ a: at(0, 0, 2), b: at(5, 5, -1) }).map(entryRotation)).toEqual([2, -1, -1, -1]);
+    expect(entryRotation(lying({ a: at(0, 0, 2), b: at(5, 5, 0) })[2])).toBe(0);
   });
 
   it('tab removal pauses once per part by default', async () => {
@@ -404,10 +410,9 @@ describe('the job remembers the bed and what’s cut', () => {
     return { ...b, board: { ...b.board, bed, cut } } as JobBoard;
   };
 
-  it('a board turned on another visit lies at the angle saved with the job, until turned here', () => {
+  it('a board lies at the angle saved with the job', () => {
     const [a] = machineQueue([withBed({ a: { x: 10, y: 20, deg: 2.5 } })], [plan([6])]);
-    expect(entryRotation(a, {})).toBe(2.5);
-    expect(entryRotation(a, { A: -1 })).toBe(-1);
+    expect(entryRotation(a)).toBe(2.5);
   });
 
   it('entries the job records as cut count as done here too; new ones are recorded once', () => {

@@ -62,7 +62,7 @@ const forgivingLocalStorage: StateStorage = {
   removeItem: name => demoStorage.removeItem(name),
 };
 
-/** The CAM job being cut at the machine: which program is loaded, what's done, how each board lies on the bed. */
+/** The CAM job being cut at the machine: which program is loaded and what's done. How each board lies on the bed is kept with the job (`board.bed`). */
 export const useCamMachine = create(
   persist(
     combine(
@@ -72,8 +72,6 @@ export const useCamMachine = create(
         done: [] as string[],
         /** The entry loaded into the machine view. */
         active: null as string | null,
-        /** `rotationKey` -> rotation in degrees (counterclockwise), for boards lying askew. */
-        rotation: {} as Record<string, number>,
         /** What the top view draws for the loaded program: the board outline and, for tab removal, the tabs. */
         overlay: null as BoardOverlay | null,
         /** Guided tab removal stops before every tab (hold the part), or once per part (take it out). */
@@ -100,7 +98,7 @@ export const useCamMachine = create(
               ? s
               : s.jobId === jobId
                 ? { active: null, overlay: null, midBoard: false, loadedSnapshot: null, runSnapshot: null }
-                : { jobId, done: [], active: null, rotation: {}, overlay: null, midBoard: false, loadedSnapshot: null, runSnapshot: null }
+                : { jobId, done: [], active: null, overlay: null, midBoard: false, loadedSnapshot: null, runSnapshot: null }
           ),
         leave: () => {
           if (!isManufacturingLocked())
@@ -108,7 +106,6 @@ export const useCamMachine = create(
               jobId: null,
               done: [],
               active: null,
-              rotation: {},
               overlay: null,
               midBoard: false,
               loadedSnapshot: null,
@@ -125,9 +122,6 @@ export const useCamMachine = create(
           if (!isManufacturingLocked()) set({ active });
         },
         markDone: (doneId: string) => set(s => ({ done: s.done.includes(doneId) ? s.done : [...s.done, doneId] })),
-        setRotation: (key: string, deg: number) => {
-          if (!isManufacturingLocked()) set(s => ({ rotation: { ...s.rotation, [key]: deg } }));
-        },
         setOverlay: (overlay: BoardOverlay | null) => {
           if (!isManufacturingLocked()) set({ overlay });
         },
@@ -340,18 +334,13 @@ export function nextEntry(queue: QueueEntry[], current: QueueEntry, done: string
   return queue.slice(i + 1).find(toCut) ?? queue.slice(0, i).find(toCut) ?? null;
 }
 
-/** Which rotation an entry's program lies at: side B has its own, from turning the board over on. */
-export const rotationKey = (e: QueueEntry) =>
-  e.sideB || e.kind === 'flip' || e.release?.turned ? `${e.board.board.id}:b` : e.board.board.id;
-
 /**
- * The angle of an entry's program: as turned here, else as saved with the job (the board's spot on the bed). Until
- * side B is corrected it lies like side A.
+ * The angle of an entry's program, in degrees counterclockwise: as saved with the job (the board's spot on the bed).
+ * Side B has its own, from turning the board over on; until it is corrected it lies like side A.
  */
-export const entryRotation = (e: QueueEntry, rotation: Record<string, number>) => {
-  const { id, bed } = e.board.board;
-  const own = rotationKey(e) === id ? (rotation[id] ?? bed?.a?.deg) : (rotation[`${id}:b`] ?? bed?.b?.deg);
-  return own ?? rotation[id] ?? bed?.a?.deg ?? 0;
+export const entryRotation = (e: QueueEntry) => {
+  const { bed } = e.board.board;
+  return (entrySide(e) === 'b' ? bed?.b?.deg : undefined) ?? bed?.a?.deg ?? 0;
 };
 
 /**
@@ -413,7 +402,7 @@ export function pinManufacturingRun(gcode: string): ManufacturingSnapshot | unde
           ...entry.board.board.bed?.[side],
           x,
           y,
-          deg: state.overlay?.rotationDeg ?? entryRotation(activeEntry, state.rotation),
+          deg: state.overlay?.rotationDeg ?? entryRotation(activeEntry),
         },
       };
     }
@@ -475,7 +464,7 @@ export function takeOutAt(gcode: string, percent: number): { part: number; pause
 }
 
 /** Which side of its board an entry's program is for: side B once the board is turned over. */
-export const entrySide = (e: QueueEntry): 'a' | 'b' => (rotationKey(e).endsWith(':b') ? 'b' : 'a');
+export const entrySide = (e: QueueEntry): 'a' | 'b' => (e.sideB || e.kind === 'flip' || e.release?.turned ? 'b' : 'a');
 
 /**
  * What the top view shows of an entry's board besides its outline: which board and side, and on side A its screws or

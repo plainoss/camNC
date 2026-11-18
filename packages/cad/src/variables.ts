@@ -1,10 +1,10 @@
 import { resolveDatumPlanes } from './datumPlanes';
 import { newCadId } from './document';
-import { copyTransformValue, editCopyTransformExpressions } from './copyTransformValues';
 import { partCutVariableErrors } from './partCutVariables';
 import {
   mapTypedExpressions,
   mapTypedValues,
+  typedValueProblem,
   usesVariables,
   visitTypedValues,
   workOutTypedValue,
@@ -171,18 +171,8 @@ export function applyCadVariables(document: CadDocument): CadDocument {
       return outcome && 'pattern' in outcome && JSON.stringify(outcome.pattern) !== JSON.stringify(pattern) ? outcome.pattern : pattern;
     },
   });
-  const moved = withCopyTransformValues(next, scope);
   // What's drawn on a plane that moved goes with it.
-  return moved.planes === document.planes ? moved : resolveDatumPlanes(moved);
-}
-
-/** Copy moves keep their last good values, like other typed values; their operation IDs never change. */
-function withCopyTransformValues(document: CadDocument, scope: ReturnType<typeof cadVariableValues>['scope']): CadDocument {
-  const copyTransforms = document.copyTransforms?.map(move => {
-    const value = copyTransformValue(move, scope);
-    return 'move' in value ? value.move : move;
-  });
-  return copyTransforms?.some((move, index) => move !== document.copyTransforms![index]) ? { ...document, copyTransforms } : document;
+  return next.planes === document.planes ? next : resolveDatumPlanes(next);
 }
 
 /** Variables that can't be worked out, and values on parts that can't follow their variables. */
@@ -199,11 +189,14 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
       ...(owner.constraintId && { constraintIds: [owner.constraintId] }),
       message,
     });
+  // A move that's switched off moves nothing, so its values don't matter until it's back on.
+  const switchedOff = new Set(document.copyTransforms?.filter(move => move.suppressed).map(move => move.id));
   visitTypedValues(document, {
     value(typed, kind, owner) {
       if (kind.driven || kind.quiet || !usesVariables(typed.expression)) return;
+      if (owner.operationId && switchedOff.has(owner.operationId)) return;
       const outcome = workOutTypedValue(typed.expression, kind, scope);
-      if ('error' in outcome) problem(owner, `${kind.label ? `${kind.label} ` : ''}${typed.expression}: ${outcome.error}`);
+      if ('error' in outcome) problem(owner, typedValueProblem(typed.expression, kind, outcome.error));
     },
     pattern(pattern, owner) {
       const outcome = linearPatternOutcome(pattern, scope);
@@ -216,22 +209,13 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
   // On each part the step joins, so its row shows why; a step whose parts are all gone still says so once.
   for (const { partIds, message } of partCutVariableErrors(document, scope, covered))
     for (const partId of partIds.length ? partIds : [undefined]) problem({ partId }, message);
-  for (const move of document.copyTransforms ?? []) {
-    if (move.suppressed) continue;
-    const value = copyTransformValue(move, scope);
-    if ('error' in value) problem({ partId: move.partId }, value.error);
-  }
   return problems;
 }
 
 /** Every expression in the document, the variables' own included, rewritten by `edit`. */
 function mapExpressions(document: CadDocument, edit: (expression: string) => string): CadDocument {
   return mapTypedExpressions(
-    {
-      ...document,
-      variables: document.variables?.map(variable => ({ ...variable, expression: edit(variable.expression) })),
-      ...(document.copyTransforms && { copyTransforms: document.copyTransforms.map(move => editCopyTransformExpressions(move, edit)) }),
-    },
+    { ...document, variables: document.variables?.map(variable => ({ ...variable, expression: edit(variable.expression) })) },
     expression => edit(expression)
   );
 }
@@ -244,8 +228,6 @@ export function cadVariableUses(document: CadDocument, name: string): number {
     value: typed => void (count += uses(typed.expression)),
     pattern: pattern => void Object.values(pattern.expressions).forEach(expression => (count += uses(expression))),
   });
-  for (const move of document.copyTransforms ?? [])
-    for (const expression of [...(move.byExpressions ?? []), move.turn?.degreesExpression]) count += uses(expression ?? undefined);
   return count;
 }
 
@@ -308,8 +290,9 @@ export function cadPartsMissingVariables(document: CadDocument): Set<string> {
   const check = (expression: string | undefined, partId?: string) => {
     if (partId && expression && cadExpressionNames(expression).some(name => !known.has(name))) missing.add(partId);
   };
+  // A copy's move that names a missing variable fails on its own, as the evaluation reports; the part is still built.
   visitTypedValues(document, {
-    value: (typed, _kind, owner) => check(typed.expression, owner.partId),
+    value: (typed, _kind, owner) => !owner.operationId && check(typed.expression, owner.partId),
     pattern: (pattern, owner) => Object.values(pattern.expressions).forEach(expression => check(expression, owner.partId)),
   });
   return missing;

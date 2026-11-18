@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { addCopyTransform } from './copyTransforms';
+import { addPartCopy } from './copies';
 import { createPlateDocument } from './document';
 import { designSteps } from './designSteps';
 import { migrateDesignUnitNumbers, withCadLengthUnit } from './lengthUnits';
@@ -201,6 +203,32 @@ describe('designs saved in another unit before plain numbers took it', () => {
     document = withCadLengthUnit(document, 'in');
     expect(document.parts[0]!.thicknessExpression).toBe('t + 2 mm');
     expect(applyCadVariables(document).parts[0]!.thickness).toBe(20);
+  });
+
+  it('writes the mm out in an ordered move’s distances and leaves its angle alone', () => {
+    const plate = createPlateDocument({ width: 100, height: 60, thickness: 18 });
+    const part = plate.parts[0]!;
+    part.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+    const copied = addPartCopy(plate, part.id, { offset: { position: [200, 0, 0], rotation: [0, 0, 0, 1] } });
+    const moved = addCopyTransform(withVariable(copied.document, 't', '18mm'), part.id, copied.id, {
+      by: [18.125, 0, 0],
+      byExpressions: ['t + 0.125', null, null],
+      turn: { about: [0, 0, 0], axis: [0, 0, 1], degrees: 30, degreesExpression: '15 * 2' },
+    }).document;
+    const inches = withCadLengthUnit(moved, 'in');
+    expect(inches.copyTransforms![0]).toMatchObject({
+      by: [18.125, 0, 0],
+      byExpressions: ['t + 0.125 mm', null, null],
+      turn: { degrees: 30, degreesExpression: '15 * 2' },
+    });
+    expect(applyCadVariables(inches).copyTransforms![0]!.by).toEqual([18.125, 0, 0]);
+    // A design saved in inches with the bare number is read the same way.
+    expect(migrateDesignUnitNumbers({ ...moved, lengthUnit: 'in' }).copyTransforms![0]!.byExpressions).toEqual([
+      't + 0.125 mm',
+      null,
+      null,
+    ]);
+    expect(migrateDesignUnitNumbers(moved)).toBe(moved);
   });
 });
 

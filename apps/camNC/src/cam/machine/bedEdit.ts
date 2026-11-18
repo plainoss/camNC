@@ -78,9 +78,9 @@ export interface BedContext {
   drop: (item: string, at: PartPosition) => 'exact' | 'moved' | 'none';
   /**
    * The board turned to `deg` about its middle (its XY zero moves), or with its XY zero at `at` when the caller moved
-   * it already (the knob, while dragging).
+   * it already (the knob, while dragging). False when the job didn't take the turn: the board lies as it did.
    */
-  rotate: (deg: number, at?: { x: number; y: number }) => void;
+  rotate: (deg: number, at?: { x: number; y: number }) => boolean;
   /** The selected item's board in the CAM job: its layout (Boards step) or its toolpaths (Plan step). */
   openInCam: (where: 'layout' | 'toolpaths') => void;
 }

@@ -1,4 +1,5 @@
 import { useStore } from '@/store/store';
+import { settled } from '@/test/settled';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@wbcnc/ui/components/tooltip';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -59,6 +60,12 @@ const entry = (name: RegExp) => {
   return within(screen.getByRole('list', { name: 'Board queue' })).findByRole('button', { name }, { timeout: 60_000 });
 };
 const loadButton = () => card().getByRole('button', { name: 'Load program' });
+/** The angles (side A) the job's boards were asked to be planned at, other than lying straight. */
+const plannedAngles = (client: QueryClient) =>
+  client
+    .getQueryCache()
+    .findAll({ queryKey: ['cam', 'board-plan'] })
+    .flatMap(query => [...JSON.stringify(query.queryKey).matchAll(/"rotationDeg":(-?[\d.]+)/g)].map(match => Number(match[1])));
 
 describe('the machine queue with a real plan', () => {
   it('load; turn the board: checked as turned, loaded again; make a board fail a check on Boards: blocked and unloaded', async () => {
@@ -68,8 +75,11 @@ describe('the machine queue with a real plan', () => {
     const straight = useStore.getState().toolpath?.gcode;
 
     // Turned, the plan fails no check of its own: the rectangle turned with it. It's loaded again by itself.
-    useCamMachine.getState().setRotation(boards.find(b => b.name === 'A')!.id, 0.1);
-    expect(useCamMachine.getState().rotation[boards.find(b => b.name === 'A')!.id]).toBe(0.1);
+    const boardA = boards.find(b => b.name === 'A')!.id;
+    await waitFor(() => expect(useBedEdit.getState().bed?.boardId).toBe(boardA));
+    expect(plannedAngles(client)).toEqual([]);
+    expect(useBedEdit.getState().bed!.rotate(0.1)).toBe(true);
+    expect(client.getQueryData<CamJobV1>(camKeys.job(job.id))?.boards?.find(b => b.id === boardA)?.bed?.a?.deg).toBe(0.1);
     await waitFor(
       () => {
         expect(useStore.getState().toolpath?.gcode).toBeTruthy();
@@ -79,6 +89,7 @@ describe('the machine queue with a real plan', () => {
     );
     expect(card().queryByRole('alert')).toBeNull();
     expect(useCamMachine.getState().overlay?.rotationDeg).toBe(0.1);
+    expect(plannedAngles(client)).toContain(0.1);
 
     // Back on Boards: a gap too narrow for the bit.
     const moved: CamJobV1 = { ...job, boards: boards.map(b => (b.name === 'A' ? { ...b, gap: 1 } : b)) };
@@ -88,6 +99,42 @@ describe('the machine queue with a real plan', () => {
     });
     expect(useStore.getState().toolpath).toBeNull();
     expect(loadButton()).toHaveProperty('disabled', true);
+  }, 120_000);
+
+  it('a turn the job refuses (the sheet was started over since this render): not saved, the zero stays, nothing planned at it', async () => {
+    const { job, client, boards } = await takeJob(all => all.map(b => (b.name === 'A' ? { ...b, bed: { a: { x: 212, y: 98 } } } : b)));
+    fireEvent.click(await entry(/Board A/));
+    await waitFor(() => expect(useStore.getState().toolpath?.gcode).toBeTruthy(), { timeout: 60_000 });
+    const boardA = boards.find(b => b.name === 'A')!.id;
+    await waitFor(() => expect(useBedEdit.getState().bed?.boardId).toBe(boardA));
+    await settled({ timeout: 60_000 });
+    const straight = useStore.getState().toolpath?.gcode;
+    const offset = useStore.getState().toolpathOffset.clone();
+    expect([offset.x, offset.y]).toEqual([212, 98]);
+    const cachedA = () => client.getQueryData<CamJobV1>(camKeys.job(job.id))?.boards?.find(b => b.id === boardA);
+
+    // Another piece of stock was started for board A (Start over) and the top view hasn't rendered with it yet: the
+    // turn is for the sheet that was on the bed, so the job doesn't take it.
+    const rendered = client.getQueryData<CamJobV1>(camKeys.job(job.id))!;
+    client.setQueryData<CamJobV1>(camKeys.job(job.id), {
+      ...rendered,
+      boards: rendered.boards!.map(b => (b.id === boardA ? { ...b, physicalSheetId: 'another-sheet' } : b)),
+    });
+    const bed = useBedEdit.getState().bed!;
+    // About the middle, and as the knob turns it (with where its zero ends up).
+    expect(bed.rotate(0.1)).toBe(false);
+    expect(bed.rotate(0.1, { x: offset.x + 5, y: offset.y + 5 })).toBe(false);
+    expect(cachedA()?.physicalSheetId).toBe('another-sheet');
+    expect(cachedA()?.bed?.a).toEqual({ x: 212, y: 98 });
+    expect(useStore.getState().toolpathOffset.toArray()).toEqual(offset.toArray());
+
+    await settled({ timeout: 60_000 });
+    expect(cachedA()?.bed?.a).toEqual({ x: 212, y: 98 });
+    expect((await getJob(job.id))?.boards?.find(b => b.id === boardA)?.bed?.a).toEqual({ x: 212, y: 98 });
+    expect(useStore.getState().toolpathOffset.toArray()).toEqual(offset.toArray());
+    expect(plannedAngles(client)).toEqual([]);
+    expect(useCamMachine.getState().overlay?.rotationDeg ?? 0).toBe(0);
+    expect(useStore.getState().toolpath?.gcode).toBe(straight);
   }, 120_000);
 
   it('a hold moved in the top view: saved with the job, planned again, still loadable; Undo brings it back', async () => {

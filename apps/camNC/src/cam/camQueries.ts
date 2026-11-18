@@ -289,10 +289,14 @@ export function useSaveCamJob(rendered?: CamJobV1 | null) {
     ...mutation,
     mutate: (job: CamJobV1) => mutation.mutate(edit(job)),
     mutateAsync: (job: CamJobV1) => mutation.mutateAsync(edit(job)),
-    /** Apply an action to the latest cached job, including boards just derived by an earlier action. */
+    /**
+     * Apply an action to the latest cached job, including boards just derived by an earlier action. False when the
+     * action declined it (it returned null) or there is no job to apply it to.
+     */
     mutateCurrent: (update: (current: CamJobV1) => CamJobV1 | null) => {
       const next = editCurrent(update);
       if (next) mutation.mutate(next);
+      return !!next;
     },
   };
 }

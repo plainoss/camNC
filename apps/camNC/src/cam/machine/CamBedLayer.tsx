@@ -274,14 +274,17 @@ export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverla
   const onKnobDown = (e: ThreeEvent<PointerEvent>) => {
     const from = deg;
     const c = turn(mid, deg);
-    const center = { x: offset.x + c.x, y: offset.y + c.y };
+    const start = { x: offset.x, y: offset.y };
+    const center = { x: start.x + c.x, y: start.y + c.y };
     let to = from;
     const show = (d: number) => {
       const m = useCamMachine.getState();
       if (m.overlay) m.setOverlay({ ...m.overlay, rotationDeg: d });
       const k = turn(mid, d);
       const s = useStore.getState();
-      s.setToolpathOffset(new Vector3(center.x - k.x, center.y - k.y, s.toolpathOffset.z));
+      // Back at the angle it started from, the zero is exactly where it was, not where the sums round to.
+      const at = d === from ? start : { x: center.x - k.x, y: center.y - k.y };
+      s.setToolpathOffset(new Vector3(at.x, at.y, s.toolpathOffset.z));
     };
     drag(e, {
       move: (p, _start, ev) => {
@@ -295,8 +298,8 @@ export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverla
       },
       end: () => {
         setTurning(null);
-        if (to !== from) bed.rotate(to, useStore.getState().toolpathOffset);
-        else show(from);
+        // Not turned after all, or the job refused the turn: back as it lay.
+        if (to === from || !bed.rotate(to, useStore.getState().toolpathOffset)) show(from);
       },
     });
   };
