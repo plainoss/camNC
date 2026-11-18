@@ -23,6 +23,12 @@ const viewport = () => vi.mocked(ModelViewport).mock.lastCall![0];
 const geometry = () => viewport().meshes.map(mesh => Array.from(mesh.positions));
 const content = (document: CadDocument) => ({ ...document, revision: 0 });
 const label = (kind: Kind) => `${kind === 'linear' ? 'Linear' : 'Circular'} pattern`;
+/** A circular pattern's dialog is named as its row is, numbered; a linear one by its part. */
+const dialogName = (kind: Kind, partName = 'Plate') => (kind === 'circular' ? 'Circular pattern 1' : `Linear pattern · ${partName}`);
+/** A new circular pattern waits for its axis: the main Z axis is chosen, as before the pick was asked for. */
+async function chooseZ(dialog: HTMLElement) {
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Axis direction' }), 'z');
+}
 function plate() {
   const document = createPlateDocument({ width: 60, height: 40 });
   document.parts[0]!.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
@@ -60,7 +66,9 @@ async function choose(kind: Kind, ctrl = false, partName = 'Plate') {
   expect(document.activeElement).toBe(input);
   await userEvent.keyboard(ctrl ? '{Control>}{Enter}{/Control}' : '{Enter}');
   expect(screen.queryByRole('combobox', { name: 'Search tools' })).toBeNull();
-  return screen.findByRole('dialog', { name: `${label(kind)} · ${partName}` });
+  const dialog = await screen.findByRole('dialog', { name: dialogName(kind, partName) });
+  if (kind === 'circular' && within(dialog).queryByRole('option', { name: 'Pick an axis' })) await chooseZ(dialog);
+  return dialog;
 }
 const count = (dialog: HTMLElement, kind: Kind) =>
   within(dialog).getByRole('textbox', { name: kind === 'linear' ? 'How many' : 'Instance count' });
@@ -96,7 +104,8 @@ it.each(['linear', 'circular'] as const)(
     let generic = await screen.findByRole('dialog', { name: 'Linear pattern · Plate' });
     if (kind === 'circular') {
       await userEvent.selectOptions(within(generic).getByRole('combobox', { name: 'Pattern type' }), 'circular');
-      generic = await screen.findByRole('dialog', { name: 'Circular pattern · Plate' });
+      generic = await screen.findByRole('dialog', { name: 'Circular pattern 1' });
+      await chooseZ(generic);
     }
     defaults(generic, kind);
     await waitFor(() => expect(geometry()).toEqual(preview));
@@ -173,9 +182,9 @@ it.each(['linear', 'circular'] as const)(
     expect(content(latest())).toEqual(content(before));
     expect(session.past).toHaveLength(0);
     await userEvent.click(await studioCommand('Pattern'));
-    dialog = await screen.findByRole('dialog', { name: `${label(kind)} · Plate` });
+    dialog = await screen.findByRole('dialog', { name: dialogName(kind) });
     await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Pattern type' }), other);
-    dialog = await screen.findByRole('dialog', { name: `${label(other)} · Plate` });
+    dialog = await screen.findByRole('dialog', { name: dialogName(other) });
     await waitFor(() => expect(geometry()).toEqual(converted));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(content(latest())).toEqual(content(before));

@@ -8,6 +8,7 @@ import { HoleDialog } from './HoleDialog';
 import { MirrorDialog } from './MirrorDialog';
 import { PartCutDialog } from './PartCutDialog';
 import { PlaneDialog } from './PlaneDialog';
+import { SplitDialog } from './SplitDialog';
 import { StudioPatternDialog } from './StudioPatternDialog';
 import { TransformDialog } from './TransformDialog';
 import { VariableDialog } from './VariableDialog';
@@ -196,6 +197,22 @@ export function StudioDialogHost({
           variableId={dialog.id}
           onPreview={onPreview}
           onSave={save}
+          onCancel={close}
+        />
+      );
+    case 'split':
+      return (
+        <SplitDialog
+          key={dialogKey(dialog)}
+          document={document}
+          partId={dialog.partId}
+          pick={partPicks?.pick}
+          pickPlane={setDirectionPicker}
+          onPreview={onPreview}
+          onSave={made => {
+            change(() => made);
+            close();
+          }}
           onCancel={close}
         />
       );

@@ -17,7 +17,7 @@ afterEach(() => {
 const settled = () =>
   waitFor(() => expect(document.querySelector('.cad-editor')!.getAttribute('aria-busy')).toBe('false'), { timeout: 20_000 });
 
-it('rounds the edges through a part picked in the view, and refuses a top edge', async () => {
+it('rounds the edges through a part picked in the view, and an edge along its top', async () => {
   const source = createPlateDocument({ width: 100, height: 60 });
   source.parts[0]!.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
   sessions.push(source.id);
@@ -35,18 +35,19 @@ it('rounds the edges through a part picked in the view, and refuses a top edge',
   const dialog = await screen.findByRole('dialog', { name: /^Fillet \d/ });
   const click = (a: [number, number, number], b: [number, number, number]) =>
     act(() => props().onSelect(source.parts[0]!.id, 0, { point: a, normal: [1, 0, 0], edge: { a, b } } as never));
-  // An edge along the top can't be rounded with a straight bit.
+  // An edge along the top rounds the whole outline's top edge over.
   await click([0, 60, 18], [100, 60, 18]);
-  expect(within(dialog).getByRole('alert').textContent).toMatch(/roundover/);
+  expect(within(dialog).queryByRole('alert')).toBeNull();
   // The edges through the board at two corners.
   await click([100, 60, 0], [100, 60, 18]);
   await click([0, 0, 18], [0, 0, 0]);
-  expect(within(dialog).getAllByText('Edge of Extrude · Plate')).toHaveLength(2);
+  expect(within(dialog).getAllByText('Edge of Extrude · Plate')).toHaveLength(3);
   await userEvent.clear(within(dialog).getByRole('textbox', { name: 'Radius' }));
   await userEvent.type(within(dialog).getByRole('textbox', { name: 'Radius' }), '10');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest().parts[0]!.fillets).toMatchObject([{ radius: 10 }]));
   expect(latest().parts[0]!.fillets![0]!.corners).toHaveLength(2);
+  expect(latest().parts[0]!.fillets![0]!.rims).toEqual([{ side: 'top', loops: ['outline'] }]);
   expect(Math.abs(polygonArea(evaluateCadPart(latest().parts[0]!).part!.outline))).toBeCloseTo(6000 - 2 * (100 - 25 * Math.PI), 0);
   expect(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Fillet 1/ })).toBeDefined();
 });

@@ -19,8 +19,13 @@ export function CircularPartPatternField({
   onChange,
   onDone,
   onValidityChange,
+  axisPending = false,
+  onAxisPicked,
 }: {
   pattern: CadPartPattern & { circular: Circular };
+  /** A new pattern with no axis picked yet: the box is empty, nothing is copied, and OK waits for the pick. */
+  axisPending?: boolean;
+  onAxisPicked?: () => void;
   variables?: CadValueScope;
   pickPoint?: (picked: ((pick: CadConnectorPick) => void) | null) => void;
   onChange: (pattern: Pattern) => void;
@@ -89,15 +94,21 @@ export function CircularPartPatternField({
     };
   };
   const parsed = parse();
-  const problem = typeof parsed === 'string' ? parsed : pickProblem;
+  const problem =
+    typeof parsed === 'string' ? parsed : (pickProblem ?? (axisPending ? 'Pick an edge or a face for the axis of pattern.' : null));
   useEffect(() => onValidityChange?.(problem), [problem, onValidityChange]);
   useEffect(() => () => onValidityChange?.(null), [onValidityChange]);
 
-  const apply = (change: Partial<Circular> = {}, originText = origin) => {
+  const apply = (change: Partial<Circular> = {}, originText = origin, picked = false) => {
     const next = parse(originText, change.axis ?? draftAxis);
     if (typeof next === 'string') return;
     dirty.current = false;
     setPickProblem(null);
+    // The first axis picked lets the copies show.
+    if (picked && axisPending) {
+      delete next.suppressed;
+      onAxisPicked?.();
+    }
     onChange({ ...next, circular: { ...next.circular!, ...change } });
   };
   // Viewport picks arrive later, after a count or angle may have changed.
@@ -164,14 +175,16 @@ export function CircularPartPatternField({
               dirty.current = true;
               setDraftAxis(axis);
               setOrigin(originText);
-              latestApply.current({ origin: point, axis }, originText);
+              latestApply.current({ origin: point, axis }, originText, true);
             });
           }}>
           <small>Axis of pattern</small>
           <span>
             {picking
               ? 'Pick an edge or a face'
-              : `${selectedAxis?.toUpperCase() ?? `(${coordinates(draftAxis)})`} through (${origin.join(', ')})`}
+              : axisPending
+                ? ''
+                : `${selectedAxis?.toUpperCase() ?? `(${coordinates(draftAxis)})`} through (${origin.join(', ')})`}
           </span>
         </button>
       )}
@@ -180,15 +193,21 @@ export function CircularPartPatternField({
         <span>
           <select
             id={`${id}-axis`}
-            value={selectedAxis ?? 'picked'}
+            value={axisPending ? '' : (selectedAxis ?? 'picked')}
             onChange={event => {
               cancelPick();
               const axis = axes[event.currentTarget.value as CadPartPattern['axis']];
               dirty.current = true;
               setDraftAxis(axis);
-              apply({ axis });
+              // Choosing one of the main axes is choosing the axis, as picking an edge is.
+              apply({ axis }, origin, true);
             }}>
-            {!selectedAxis && <option value="picked">Picked axis</option>}
+            {axisPending && (
+              <option value="" disabled>
+                Pick an axis
+              </option>
+            )}
+            {!axisPending && !selectedAxis && <option value="picked">Picked axis</option>}
             <option value="x">X</option>
             <option value="y">Y</option>
             <option value="z">Z</option>
@@ -239,6 +258,14 @@ export function CircularPartPatternField({
         <input type="checkbox" checked={!!circular.opposite} onChange={event => apply({ opposite: event.currentTarget.checked })} />
         Opposite direction
       </label>
+      <label className="cad-circular-pattern-option" title="Not available yet">
+        <input type="checkbox" disabled />
+        Centered
+      </label>
+      <label className="cad-circular-pattern-option" title="Not available yet">
+        <input type="checkbox" disabled />
+        Skip instances
+      </label>
       <p className="cad-feature-hint">
         {circular.equalSpacing !== false
           ? 'Spread instances within the angle. A full circle has no duplicate at 360°.'
@@ -267,7 +294,8 @@ export function CircularPartPatternField({
           </label>
         ))}
       </details>
-      {problem && (
+      {/* An axis not yet picked isn't an error: its box waits for the pick, and OK says why it waits. */}
+      {problem && !(axisPending && typeof parsed !== 'string' && !pickProblem) && (
         <p role="alert" className="cad-thickness-error">
           {problem}
         </p>

@@ -53,6 +53,32 @@ describe('Fusion tool library', () => {
     ]);
   });
 
+  it('reads ball end mills as ball bits', () => {
+    const withBall = {
+      data: [
+        ...library.data,
+        {
+          type: 'ball end mill',
+          guid: 'b-1',
+          unit: 'millimeters',
+          description: '6mm radius',
+          geometry: { DC: 6, NOF: 2, LCF: 33 },
+          'post-process': { number: 3 },
+          'start-values': { presets: [{ v_f: 2000, n: 30000 }] },
+        },
+      ],
+    };
+    expect(parseFusionToolLibrary(withBall).at(-1)).toMatchObject({
+      number: 3,
+      diameter: 6,
+      name: '6mm radius',
+      shape: 'ball',
+      feed: 2000,
+      rpm: 30000,
+    });
+    expect(readFusionToolLibrary(withBall).skipped).toEqual({ 'chamfer mill': 1 });
+  });
+
   it('says what it skipped', () => {
     expect(readFusionToolLibrary(library).skipped).toEqual({ 'chamfer mill': 1 });
   });

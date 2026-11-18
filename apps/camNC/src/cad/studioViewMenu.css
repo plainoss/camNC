@@ -1,0 +1,79 @@
+/** The view cube's menu, just under the cube. */
+.cad-view-menu {
+  position: absolute;
+  z-index: 6;
+  top: 150px;
+  right: 54px;
+}
+.cad-view-menu > button {
+  width: 20px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid #c3cedb;
+  border-radius: 3px;
+  background: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
+.cad-view-menu [role='menu'] {
+  position: absolute;
+  right: 0;
+  top: 20px;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 4px 0;
+  border: 1px solid #c3cedb;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 4px 16px #24324722;
+}
+.cad-view-menu [role='menu'] button {
+  display: flex;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.cad-view-menu [role='menu'] button span {
+  width: 12px;
+}
+.cad-view-menu [role='menu'] button:disabled {
+  color: #a0aec0;
+}
+.cad-view-menu [role='menu'] button:not(:disabled):hover {
+  background: #eef5fd;
+}
+/** The Named views panel, beside the feature list. */
+.cad-named-views {
+  position: absolute;
+  z-index: 6;
+  top: 12px;
+  left: 12px;
+  display: grid;
+  gap: 6px;
+  width: 15rem;
+  padding: 8px 10px;
+  border: 1px solid #c3cedb;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 4px 16px #24324722;
+  font-size: 13px;
+}
+.cad-named-views header,
+.cad-named-views-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.cad-named-views-row input,
+.cad-named-views-row select {
+  flex: 1;
+  min-width: 0;
+}
+.cad-named-views p {
+  margin: 0;
+  color: #62758f;
+}

@@ -26,7 +26,9 @@ export interface Wall {
 export function stackedWalls(
   slabs: readonly { low: number; high: number; region: Pt[][] }[],
   circles: readonly Circle[],
-  vertex: (x: number, y: number, z: number) => number
+  vertex: (x: number, y: number, z: number) => number,
+  /** A run starting at this height that's a face of its own, never continuing the one below: a slice of a round. */
+  apart: (low: number, along: Pt[]) => boolean = () => false
 ): Wall[] {
   const walls: Wall[] = [];
   const key = (wall: { circle?: Circle; ccw: boolean }, ids: number[]) =>
@@ -55,7 +57,7 @@ export function stackedWalls(
         const along = run.points,
           bottom = along.map(p => vertex(p.x, p.y, low)),
           top = along.map(p => vertex(p.x, p.y, high));
-        const below = open.get(key(run, bottom));
+        const below = apart(low, along) ? undefined : open.get(key(run, bottom));
         if (below) {
           below.first.push(below.top[0]!);
           below.last.push(below.top.at(-1)!);

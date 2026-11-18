@@ -85,7 +85,20 @@ export interface CadFullSketch {
 export interface CadFullFeature {
   /** The step's own ID in the document. */
   id: string;
-  kind: 'variable' | 'plane' | 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'fillet' | 'mirror' | 'copy' | 'pattern' | 'partCut';
+  kind:
+    | 'variable'
+    | 'plane'
+    | 'sketch'
+    | 'extrude'
+    | 'move'
+    | 'faceSketch'
+    | 'cut'
+    | 'fillet'
+    | 'mirror'
+    | 'copy'
+    | 'pattern'
+    | 'partCut'
+    | 'split';
   /** As the feature list names it. */
   label: string;
   part?: string;

@@ -18,6 +18,7 @@ import {
   parseCadDocument,
   parseCadValue,
   removeCadVariable,
+  cadPartsMissingVariables,
   setCadVariable,
   solveCadDocument,
   type CadDimension,
@@ -178,7 +179,7 @@ describe('design variables', () => {
     expect(span(solved.document.parts[1]!)).toBeCloseTo(200, 6);
   });
 
-  it('renames through every expression, and won’t remove a variable that’s in use', () => {
+  it('renames through every expression, and removes a variable that’s in use, failing what names it', () => {
     let document: CadDocument = { ...createCadDocument(), parts: [plate('Side', '#width - 1mm')] };
     document.parts[0]!.thicknessExpression = 'width / 30';
     document = variable(document, 'width', '600mm');
@@ -188,7 +189,10 @@ describe('design variables', () => {
     expect(document.variables!.map(v => v.expression)).toEqual(['600mm', 'carcass/2']);
     expect(document.parts[0]!.thicknessExpression).toBe('carcass / 30');
     expect(dimension(document.parts[0]!, 'Width').expression).toBe('#carcass - 1mm');
-    expect(removeCadVariable(document, id)).toEqual({ error: 'carcass is used in 3 places. Change those first.' });
+    // Removed while in use, the variable is gone and what names it fails, as in the reference; the uses stay as typed.
+    const gone = removeCadVariable(document, id);
+    expect('document' in gone && gone.document.variables!.map(v => v.name)).toEqual(['half']);
+    expect('document' in gone && cadPartsMissingVariables(gone.document).has(document.parts[0]!.id)).toBe(true);
     const half = document.variables![1]!.id;
     const removed = removeCadVariable(document, half);
     expect('document' in removed && removed.document.variables!.map(v => v.name)).toEqual(['carcass']);

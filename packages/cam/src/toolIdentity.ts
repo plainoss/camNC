@@ -12,6 +12,7 @@ export function toolIdentityKey(tool: Tool): string {
   ];
   // Appended only for V-bits, so a flat bit keeps the key that saved runs recorded.
   if (tool.shape === 'v') key.push('v', tool.angle ?? null, tool.tipDiameter ?? 0);
+  if (tool.shape === 'roundover') key.push('roundover', tool.radius ?? null, tool.tipDiameter ?? 0);
   return JSON.stringify(key);
 }
 

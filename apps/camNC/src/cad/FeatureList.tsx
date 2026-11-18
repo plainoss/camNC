@@ -1,4 +1,6 @@
 import { useDesignUnits } from './designUnits';
+import { filteredFeatureRows, useFeatureFilter } from './featureFilter';
+import { FeatureDependenciesPanel, FeatureFilterBox } from './FeatureListTools';
 import { cadFolderSteps, cadVariableValues, designSteps, moveCadFolder, type CadDocument } from '@wbcnc/cad';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
 import { pendingProblemNow, subscribePendingProblem } from './pendingProblem';
@@ -25,6 +27,7 @@ const kIcons: Record<DesignStep['kind'] | 'variable' | 'plane', string> = {
   copy: '⧉',
   pattern: '⋯',
   partCut: '⊟',
+  split: '⫼',
 };
 
 /** The eye on a row whose feature shows in the view: a sketch, a plane or the origin. */
@@ -63,6 +66,7 @@ export type FeatureAction =
   | 'export'
   | 'addToFolder'
   | 'toggleShown'
+  | 'dependencies'
   | 'unavailable';
 
 /** A menu item the reference offers that camNC has nothing behind yet: listed, but greyed with the reason. */
@@ -138,7 +142,7 @@ function menuItems(
     unavailable('Add comment'),
     unavailable('Zoom to selection'),
     ...(sketch ? [unavailable('View normal to')] : []),
-    unavailable('Show dependencies…'),
+    { action: 'dependencies', label: 'Show dependencies…' },
     // The last step has nothing after it to roll back from.
     ...(sketch || !last ? [{ action: 'rollTo' as const, label: 'Roll to here' }] : []),
     sketch ? unavailable('Edit sketch appearance…') : unavailable('Add appearance to feature…'),
@@ -240,6 +244,7 @@ export function FeatureList({
   const [planeMenu, setPlaneMenu] = useState<{ plane: string; name: string; x: number; y: number } | null>(null);
   const closePlaneMenu = useCallback(() => setPlaneMenu(null), []);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [dependenciesOf, setDependenciesOf] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!menu) return;
@@ -309,13 +314,38 @@ export function FeatureList({
     stepDrop.drop?.error && stepDrop.drop.onto === rowKey && 'cad-feature-drop-refused',
   ];
   const brokenCount = entries.filter(entry => entry.kind === 'step' && entry.step.broken).length;
+  // What the filter above the list keeps; null keeps everything. Rows it drops are shown as "…".
+  const filterText = useFeatureFilter();
+  const visible = filteredFeatureRows(
+    document,
+    entries.map(entry => ({
+      key: key(entry),
+      kind: entry.kind,
+      label: label(entry),
+      ...(entry.kind === 'step' && { step: entry.step }),
+      ...(entry.kind === 'variable' && { variable: document.variables!.find(candidate => candidate.id === entry.id)!.name }),
+      ...(entry.kind !== 'folder' && {
+        folder: document.folders?.find(folder => folder.id === folderOfFeature(document, entry))?.name,
+        shown: visibilityId(entry) ? shown?.(visibilityId(entry)!) !== false : undefined,
+      }),
+    })),
+    filterText
+  );
+  const labelOf = (rowKey: string) => {
+    const entry = entries.find(candidate => key(candidate) === rowKey);
+    return entry ? label(entry) : rowKey;
+  };
   // The count takes in the default geometry listed above the features: the origin, when shown, and the base planes.
   const defaultRows = onPickPlane || onToggleShown ? (onToggleShown ? 1 : 0) + kBasePlanes.length : 0;
   return (
     <section className="cad-studio-features" aria-label="Features" tabIndex={-1}>
       <div className="cad-panel-heading">
         <h2>
-          Features ({defaultRows + entries.filter(entry => entry.kind !== 'folder').length})
+          Features (
+          {visible
+            ? `${entries.filter(entry => entry.kind !== 'folder' && visible.has(key(entry))).length} of ${defaultRows + entries.filter(entry => entry.kind !== 'folder').length}`
+            : defaultRows + entries.filter(entry => entry.kind !== 'folder').length}
+          )
           {brokenCount > 0 && (
             <span
               className="cad-feature-error-badge"
@@ -336,8 +366,14 @@ export function FeatureList({
           </button>
         )}
       </div>
+      <FeatureFilterBox />
+      {visible && (onPickPlane || onToggleShown) && (
+        <ul className="cad-default-geometry" aria-label="Default geometry">
+          <li className="cad-feature-elided">…</li>
+        </ul>
+      )}
       {/* Listed in a sketch too, as in the reference, to show or hide; a plane is picked to sketch on from the studio. */}
-      {(onPickPlane || onToggleShown) && (
+      {!visible && (onPickPlane || onToggleShown) && (
         <ul className="cad-default-geometry" aria-label="Default geometry">
           {onToggleShown && (
             <li className={shown?.('origin') === false ? 'cad-feature-hidden' : undefined}>
@@ -373,6 +409,13 @@ export function FeatureList({
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) stepDrop.leave();
         }}>
         {entries.map((entry, index) => {
+          // A run of rows the filter drops is one "…".
+          if (visible && !visible.has(key(entry)))
+            return index === 0 || visible.has(key(entries[index - 1]!)) ? (
+              <li key={`elided:${key(entry)}`} className="cad-feature-elided">
+                …
+              </li>
+            ) : null;
           if (entry.kind === 'folder') {
             const folder = document.folders!.find(folder => folder.id === entry.id)!;
             const contained = cadFolderSteps(document, folder.id);
@@ -664,12 +707,22 @@ export function FeatureList({
                 // A new folder starts with the row's part.
                 else if (item.action === 'addToFolder') folders.newFolder(entry.kind === 'step' ? entry.step.partId : undefined);
                 else if (item.action === 'toggleShown') onToggleShown?.(visibilityId(entry)!);
+                else if (item.action === 'dependencies') setDependenciesOf(key(entry));
                 else onAction(entry, item.action);
               }}>
               {item.label}
             </button>
           ))}
         </div>
+      )}
+      {dependenciesOf && entries.some(entry => key(entry) === dependenciesOf) && (
+        <FeatureDependenciesPanel
+          document={document}
+          entryKey={dependenciesOf}
+          label={labelOf}
+          order={entries.map(key)}
+          onClose={() => setDependenciesOf(null)}
+        />
       )}
       {planeMenu && (
         <PartRowMenu

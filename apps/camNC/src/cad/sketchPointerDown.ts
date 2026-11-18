@@ -125,9 +125,12 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
     else {
       // An edge of the face the sketch is drawn on is taken into the drawing where it is, with its ends.
       const hit = (event.target as Element).closest('[data-entity-id]')?.getAttribute('data-entity-id');
-      const edge = sketch.entities.find(entity => entity.id === hit && entity.faceEdge && entity.type === 'line');
-      if (edge?.type === 'line' && !edge.taken) {
-        const ends = new Set([edge.id, edge.startId, edge.endId]);
+      const edge = sketch.entities.find(
+        entity => entity.id === hit && entity.faceEdge && (entity.type === 'line' || entity.type === 'circle')
+      );
+      if ((edge?.type === 'line' || edge?.type === 'circle') && !edge.taken) {
+        // A line with its ends; a circle, such as a round part's edge, with its centre.
+        const ends = new Set(edge.type === 'line' ? [edge.id, edge.startId, edge.endId] : [edge.id, edge.centerId]);
         changeSketch({
           ...sketch,
           entities: sketch.entities.map(entity =>

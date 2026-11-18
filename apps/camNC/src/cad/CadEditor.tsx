@@ -26,10 +26,8 @@ import {
   sketchContextAction,
 } from './sketchModifyActions';
 import { cadFieldText, DesignUnitContext, useDesignUnits } from './designUnits';
-import { SketchSlotWidthHandle } from './SketchSlotControls';
 import { useSketchCommandPreviews } from './useSketchCommandPreviews';
 import { SketchCommandControls } from './SketchCommandControls';
-import { SketchCircularPatternManipulator } from './SketchCircularPatternControls';
 import { initialCircularPatternParameters, circularPatternParameters } from './circularPatternParameters';
 import {
   withCadLengthUnit,
@@ -52,7 +50,6 @@ import {
   drawnOnOutline,
   cadSketchFrame,
   resolveExtrudeSteps,
-  renamePartCopy,
 } from '@wbcnc/cad';
 import {
   useEffect,
@@ -64,7 +61,6 @@ import {
   useCallback,
   useRef,
   useState,
-  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
 } from 'react';
@@ -82,8 +78,6 @@ import {
   type CadCommandCheckpoint,
   type CadHistoryMark,
 } from '@wbcnc/cad-editor/session';
-import { DimensionGraphics } from './DimensionGraphics';
-import { draftLabelAt } from './draftLabelAt';
 import {
   idleDimensionWorkflow,
   transitionDimensionWorkflow,
@@ -94,27 +88,16 @@ import { idleDrawingGesture, type DrawingGesture } from '@wbcnc/cad-editor/drawi
 import { advanceCreationValue, creationValueAnchor, creationValueAt, type CreationValues } from './creationValues';
 import { CreationValueControls } from './CreationValueControls';
 import { SketchConicRhoForm, SketchDimensionEditor, SketchPolygonForm, SketchShapeSizeForm } from './SketchValueForms';
-import { SketchLinearPatternManipulator } from './SketchLinearPatternControls';
-import { openPatternField } from './openPatternField';
 import {
   initialLinearPatternParameters,
   linearPatternParameters,
   editablePatternSources,
   type LinearPatternParameters,
 } from './linearPatternParameters';
-import { SketchTransformManipulator } from './SketchTransformControls';
 import { initialTransformParameters } from './transformParameters';
 import { SelectionReadout } from './SelectionReadout';
 import { SketchPartProperties } from './SketchPartProperties';
-import {
-  SketchChamferHandles,
-  SketchCornerErrors,
-  SketchExtendEndpoint,
-  SketchRemoveCurveLabel,
-  SketchSelectionBox,
-  SketchSnapCue,
-  SketchSplitMark,
-} from './SketchCanvasMarks';
+import { SketchDrawing } from './SketchDrawing';
 import { CadVariablesPanel } from './CadVariablesPanel';
 import { drawnOnName, nextSketchLabel, pendingRow, sketchPlaneName } from './drawnOnName';
 import { SketchContextMenu } from './SketchContextMenu';
@@ -131,36 +114,22 @@ import { dimensionAnchor } from '@wbcnc/cad-editor/dimensionGeometry';
 import { type CadSnapResult } from '@wbcnc/cad-editor/picking';
 import { type CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
 import { addDrawingRelations } from '@wbcnc/cad-editor/drawingCommit';
-import { DrawingInferencePreview } from './DrawingInferencePreview';
 import { type InferredLineAxis } from './lineInference';
 import { cadViewState, saveCadViewState } from '@wbcnc/cad-editor/viewState';
 import { loadShownState, saveShownState } from './shownState';
 import { type CadSelectionBox } from './boxSelection';
-import {
-  chainGeometry,
-  type AnnotationGesture,
-  type BoxGesture,
-  type ChainAnchor,
-  type DragGesture,
-  type HandleDrag,
-} from './editorGestures';
+import { type AnnotationGesture, type BoxGesture, type ChainAnchor, type DragGesture, type HandleDrag } from './editorGestures';
 import { constraintColorNotice, isEmptyDesign, isEmptySketch, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
 import { failedCheckProblems, noSketchProblems } from './sketchProblemLists';
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { CommandSearch, type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
 import { withRegionDepth, type CutRegion } from './cutRegions';
-import { CutOverlay } from './CutOverlay';
 import { RegionDepthField } from './RegionDepthField';
 import { sketchTools as tools, type SketchTool } from './sketchTools';
-import { SketchGeometry } from './SketchGeometry';
-import { SketchRegion } from './SketchRegion';
-import { SketchToolPreview } from './SketchToolPreview';
 import { ModificationControls } from './ModificationControls';
-import { ModificationPreview } from './ModificationPreview';
 import { idleModificationWorkflow, transitionModification, type ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
 import { useSvgPixelScale, sketchStrokeColor } from './sketchAppearance';
-import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import {
@@ -179,13 +148,14 @@ import { StudioCommandSearch } from './StudioCommandSearch';
 import type { PatternOpening } from './partPatternKind';
 import { featureRowParts, picksFeatureRows, selectStudioFeature } from './studioFeatureSelection';
 import { startExtrude } from './studioExtrude';
-import { builtStudioParts, disabledStudioCommands, isBlankDesign, listedStudioParts } from './studioParts';
+import { builtStudioParts, disabledStudioCommands, isBlankDesign, listedStudioParts, studioListSource } from './studioParts';
 import { applyFramed } from './insertFraming';
 import { usePartCutSelection } from './usePartCutSelection';
 import { usePartIsolation } from './usePartIsolation';
 import { SketchPlaneDialog, StudioSketchDialog } from './StudioSketchDialog';
 import { openSketchFinishReason, sketchPendingFinishReason } from './sketchPendingFinishReason';
 import { PartsList } from './PartsList';
+import { renamedStudioPart } from './renamedStudioPart';
 import { toggledKey } from './toggledKey';
 import { usePointPicker } from './pointPicker';
 import { ShortcutList } from './ShortcutList';
@@ -208,15 +178,14 @@ import { studioKeyActions } from './studioKeyActions';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
 import { designStepLabel, trimCadFolders } from '@wbcnc/cad';
 import type { PartEdge } from './partEdges';
-import { drawingMatrix, straightOn, type SketchTurn } from './sketchOrbit';
+import { straightOn, type SketchTurn } from './sketchOrbit';
 import { useEditorCameras } from './studioCamera';
 import { sketchBackdropView } from './sketchBackdropView';
 import { initialFaceSketchView, assemblyCameraFromPart } from './faceSketchScene';
 import { useFaceSketchCamera } from './useFaceSketchCamera';
 import { fitSketchView } from './fitSketchView';
-import { sketchValuePosition, projectSketchPoint, focusSketchCanvas, creationEditorPositions, sketchPointAtClient } from './sketchViewport';
+import { sketchValuePosition, projectSketchPoint, focusSketchCanvas, creationEditorPositions } from './sketchViewport';
 import { addUsedPartEdges } from './partEdgeUse';
-import { PartReferenceGeometry } from './PartReferenceGeometry';
 import { faceSketchHost } from './faceSketchHost';
 import { useExtrudeDepth } from './useExtrudeDepth';
 import { bindPartCorners } from './partCornerInference';
@@ -226,7 +195,7 @@ import { dialogCommand, featureDialog, picksParts, previewOwner, sameDialogShown
 import { usePatternVariableCommit } from './studioPatternVariableSource';
 import { useStudioPreview } from './useStudioPreview';
 import { useEditorDocumentKeys } from './useEditorDocumentKeys';
-import { useEditorVariableFields } from './useEditorVariableFields';
+import { editedStep, useEditorVariableFields } from './useEditorVariableFields';
 import { useFeatureShown, withMadeSketchHidden } from './useFeatureShown';
 import './cad.css';
 
@@ -548,7 +517,7 @@ export function CadEditor({
   const { commit: variableCommit, normalized: normalizePatternVariableSource } = usePatternVariableCommit(dialog, documentRef, next =>
     commit(next)
   );
-  const variableScope = useEditorVariableFields(doc, documentRef, variableCommit);
+  const variableScope = useEditorVariableFields(doc, documentRef, variableCommit, editedStep(dialog, !showWorkspace && part?.id));
   const blankDesign = studioSession && isBlankDesign(doc);
   const extrusionDepth = useExtrudeDepth(doc, dialog?.kind === 'extrude' ? dialog.partId : undefined, next => commit(next));
   const studioPreview = useStudioPreview(doc, previewOwner(dialog));
@@ -1359,12 +1328,8 @@ export function CadEditor({
           -14
         )
       : undefined;
-  const canEditCanvasDimensions =
-    !constraintMode && !fixMode && dimensionFlow.phase === 'idle' && (tool === 'select' || tool === 'dimension');
   const activeSketchStatus = sketchStatuses[part?.id ?? ''];
   const variableProblems = cadVariableProblems(doc);
-  // The face a part is drawn on, outlined on its drawing so it can be traced and lined up with.
-  const drawnOnFace = part ? drawnOnOutline(doc, part) : null;
   // A dimension that can't follow its variables shows like a conflicting one.
   const shownConflicts = [...conflictedConstraints, ...variableProblems.flatMap(problem => problem.constraintIds ?? [])];
   /** Why a part can't take its current values, for the mark beside it in the list. */
@@ -1392,7 +1357,6 @@ export function CadEditor({
       : undefined;
   const stroke = sketchStrokeColor(activeSketchStatus, currentSolverResult);
   const grid = Math.max(1, 10 ** Math.floor(Math.log10(view.w / 20)));
-  const chainPreview = sketch && chainGeometry(sketch, chain);
   const acceptanceNotice = notice ?? useNotice ?? finishError;
   // Read when a region is picked, after this render has worked out which features show.
   const shownNow = useRef<(id: string) => boolean>(() => true);
@@ -1407,9 +1371,6 @@ export function CadEditor({
   useEffect(() => {
     setPickedEdges([]);
   }, [part?.id, showWorkspace]);
-  // The parts' edges the drawing shows: all of them looking straight at the plane, and once turned, those in it, the
-  // only ones that still line up with what's seen.
-  const shownEdges = sketchBackdrop ? partEdges.filter(edge => edge.onPlane || sketchTurn === straightOn) : [];
   /** `u`: the picked edges become the sketch's own, fixed where they are, to draw and constrain against. */
   const takeEdges = (keys = pickedEdges) => {
     if (!sketch) return;
@@ -1437,7 +1398,7 @@ export function CadEditor({
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   // A tool used up by its cut isn't a part of its own any more.
   // A part whose extrude wasn't built isn't a part yet.
-  const listed = dialog?.kind === 'transform' ? studioPreview.document : dialog?.kind === 'extrude' ? shownDocument : doc;
+  const listed = studioListSource(dialog?.kind, studioPreview.document, shownDocument, doc);
   const builtParts = studioSession
     ? listedStudioParts(listed, dialog, rolledBack).filter(p => !unbuiltParts?.includes(p.id))
     : builtStudioParts(doc);
@@ -1445,14 +1406,8 @@ export function CadEditor({
   const physicalPartCount = builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0);
   // An open sketch turned with its parts behind it, about the middle of the view.
   const turned = !!sketchBackdrop && sketchTurn !== straightOn;
-  const [ta, tb, tc, td] = drawingMatrix(sketchTurn);
-  const middle = { x: view.x + view.w / 2, y: view.y + view.h / 2 };
-  const turnTransform = `translate(${middle.x + sketchCameraShift[0]} ${middle.y + sketchCameraShift[1]}) matrix(${ta} ${tb} ${tc} ${td} 0 0) translate(${-middle.x} ${-middle.y})`;
-  const turnDet = ta * td - tb * tc || 1;
-  // Labels and points are turned back where they stand, to read and look the same from any side.
-  const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
   const studioDisabled = disabledStudioCommands(part, partHasOutline, builtParts.length);
-  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback, unbuiltParts);
+  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback, unbuiltParts, featureProblems);
   shownNow.current = featureShown;
   const partsPanel = (
     <>
@@ -1494,6 +1449,7 @@ export function CadEditor({
         ])}
         selectedKey={cutSelection.selectedKey}
         hiddenParts={hiddenParts}
+        transparent={studioSession ? [transparentParts, setTransparentParts] : undefined}
         onToggleHidden={key => setHiddenParts(previous => toggledKey(previous, key))}
         trouble={partTrouble}
         onPick={(partId, copyId) => {
@@ -1503,19 +1459,8 @@ export function CadEditor({
           setSelected([]);
           chooseTool('select');
         }}
-        onRename={(partId, copyId, name) =>
-          commit(
-            copyId
-              ? renamePartCopy(documentRef.current, partId, copyId, name)
-              : replacePart(documentRef.current, partId, current => ({
-                  ...current,
-                  // The features keep the names they had: renaming a part never renames them.
-                  sketchName: current.sketchName ?? designStepLabel(documentRef.current, `${partId}:sketch`),
-                  extrudeName: current.extrudeName ?? designStepLabel(documentRef.current, `${partId}:extrude`),
-                  name,
-                }))
-          )
-        }
+        onRename={(partId, copyId, name) => commit(renamedStudioPart(documentRef.current, partId, copyId, name))}
+        onEdit={change => commit(change(documentRef.current))}
       />
     </>
   );
@@ -1964,288 +1909,92 @@ export function CadEditor({
               event.preventDefault();
               if (event.button !== 2) keyboardContext();
             }}>
-            {/*
-             * A turned sketch is turned inside the drawing, not as a whole, so its lines keep their width and its labels
-             * and points their shape, however far it's turned.
-             */}
-            <g
-              ref={drawingGroup}
-              data-testid="cad-drawing"
-              className={turned ? 'cad-drawing-turned' : undefined}
-              transform={turned ? turnTransform : undefined}
-              style={turned ? ({ '--unturn': unturn } as CSSProperties) : undefined}>
-              <defs>
-                <pattern id={`cad-grid-${doc.id}`} width={grid} height={grid} patternUnits="userSpaceOnUse">
-                  <circle cx="0" cy="0" r={grid * 0.025} fill="#ccd5df" />
-                </pattern>
-              </defs>
-              <rect x={view.x - view.w} y={view.y - view.h} width={view.w * 3} height={view.h * 3} fill={`url(#cad-grid-${doc.id})`} />
-              {shownEdges.length > 0 && <PartReferenceGeometry edges={shownEdges} picked={pickedEdges} pixelScale={markerScale} />}
-              <SketchRegion
-                document={doc}
-                partId={part?.id}
-                verified={
-                  !solving &&
-                  !splitFirst &&
-                  !(
-                    (tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') &&
-                    selected.length
-                  ) &&
-                  !((tool === 'slot' || tool === 'fillet' || tool === 'chamfer' || tool === 'transform') && selected.length) &&
-                  activeSketchStatus?.status === 'solved' &&
-                  lastCheckedRevision.current === `${doc.id}:${doc.revision}`
-                }
-              />
-              {faceSketch && (
-                <path
-                  data-face-outline
-                  className="cad-face-outline"
-                  d={faceSketch.outline.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
-                  pointerEvents="none"
-                />
-              )}
-              {!faceSketch && drawnOnFace && (
-                <path
-                  data-drawn-on-face
-                  className="cad-face-outline"
-                  d={drawnOnFace.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
-                  pointerEvents="none"
-                />
-              )}
-              {faceSketch?.floor && (
-                <path
-                  data-face-floor
-                  d={faceSketch.floor.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
-                  fill="#c99a5b"
-                  fillOpacity={0.25}
-                  stroke="#7a5526"
-                  strokeWidth={1 / markerScale}
-                  pointerEvents="none"
-                />
-              )}
-              {!faceSketch && <CutOverlay part={part} millimetresPerPixel={1 / markerScale} />}
-              <line
-                x1={view.x - view.w}
-                x2={view.x + view.w * 2}
-                y1="0"
-                y2="0"
-                pointerEvents="none"
-                stroke="#db9d9d"
-                strokeWidth="1"
-                vectorEffect="non-scaling-stroke"
-              />
-              <line
-                x1="0"
-                x2="0"
-                y1={view.y - view.h}
-                y2={view.y + view.h * 2}
-                pointerEvents="none"
-                stroke="#92bfa2"
-                strokeWidth="1"
-                vectorEffect="non-scaling-stroke"
-              />
-              {shownSketch && (
-                <SketchGeometry
-                  entities={shownSketch.entities}
-                  selectedIds={[
-                    ...dimensionSelection,
-                    ...hoveredConstraintEntities,
-                    ...selectedConstraints.flatMap(id => associatedEntityIds(sketch, id)),
-                  ]}
-                  stroke={cornerPreview?.ok || transformPreview?.ok || linearPreview?.ok || slotPreview?.ok ? '#858d96' : stroke}
-                  entityStatus={entityStatus}
-                  pixelScale={markerScale}
-                  hoveredPointId={hoveredPoint}
-                  interactive={tool === 'select' && !constraintMode && !fixMode && !placingDimension}
-                  onEditConic={id => {
-                    const curve = sketch?.entities.find(entity => entity.id === id);
-                    if (curve?.type === 'conic') {
-                      setRho(String(curve.rho));
-                      setConicEditing(id);
-                    }
-                  }}
-                />
-              )}
-              {tool === 'slot' && slotWidthCircle?.type === 'circle' && slotWidthCenter?.type === 'point' && (
-                <SketchSlotWidthHandle
-                  center={slotWidthCenter}
-                  radius={slotWidthCircle.radius}
-                  pixelScale={markerScale}
-                  onStart={event => {
-                    startHandleDrag(event, { tool: 'slot', center: slotWidthCenter, width: slotWidth });
-                    svg.current?.focus();
-                  }}
-                />
-              )}
-              {tool === 'circularPattern' && selected.length > 0 && parsedCircular.ok && linearPreview?.ok && (
-                <SketchCircularPatternManipulator
-                  center={parsedCircular.center}
-                  anchor={patternAnchor}
-                  count={parsedCircular.count}
-                  angle={parsedCircular.angle}
-                  closed={parsedCircular.closed}
-                  pixelScale={markerScale}
-                  onEdit={field => {
-                    circularFields.current[field]?.focus();
-                    circularFields.current[field]?.select();
-                  }}
-                  onStart={(kind, event) => {
-                    const start = sketchPointAtClient(event, drawingGroup.current ?? svg.current);
-                    if (!start) return;
-                    startHandleDrag(event, {
-                      tool: 'circularPattern',
-                      kind,
-                      start,
-                      parameters: circularParameters,
-                      last: Math.atan2(start.y - parsedCircular.center.y, start.x - parsedCircular.center.x),
-                      sweep:
-                        ((parsedCircular.angle * Math.PI) / 180) *
-                        (parsedCircular.closed ? (parsedCircular.count - 1) / parsedCircular.count : 1),
-                    });
-                    svg.current?.focus();
-                  }}
-                />
-              )}
-              {tool === 'linearPattern' && selected.length > 0 && parsedLinear.ok && (
-                <SketchLinearPatternManipulator
-                  anchor={patternAnchor}
-                  steps={[parsedLinear.stepX, parsedLinear.stepY]}
-                  counts={[parsedLinear.countX, linearParameters.secondDirection ? parsedLinear.countY : 1]}
-                  bound={[!!parsedLinear.expressions?.countX, !!parsedLinear.expressions?.countY]}
-                  pixelScale={markerScale}
-                  onStart={(index, event) =>
-                    startHandleDrag(event, { tool: 'linearPattern', index, anchor: patternAnchor, parameters: linearParameters })
-                  }
-                  onEdit={(field, chip) => openPatternField(patternFields.current[field], chip)}
-                />
-              )}
-              {tool === 'transform' && selected.length > 0 && parsedTransform.ok && (
-                <SketchTransformManipulator
-                  pivot={{
-                    x: parsedTransform.pivot.x + parsedTransform.translation.x,
-                    y: parsedTransform.pivot.y + parsedTransform.translation.y,
-                  }}
-                  pixelScale={markerScale}
-                  onStart={(kind, event) => {
-                    const start = sketchPointAtClient(event, drawingGroup.current ?? svg.current);
-                    if (start) startHandleDrag(event, { tool: 'transform', kind, start, parameters: transformParameters });
-                  }}
-                />
-              )}
-              {tool === 'split' && splitFirst && <SketchSplitMark point={splitFirst.point} pixelScale={markerScale} />}
-              {tool === 'chamfer' && chamferPreview?.ok && (
-                <SketchChamferHandles
-                  preview={chamferPreview}
-                  distances={chamferDistances}
-                  pixelScale={markerScale}
-                  onStart={startHandleDrag}
-                />
-              )}
-              {(tool === 'fillet' || tool === 'chamfer') && cornerPreview && !cornerPreview.ok && (
-                <SketchCornerErrors sketch={sketch} cornerPointIds={cornerPreview.cornerPointIds} pixelScale={markerScale} />
-              )}
-              {annotationSketch && showConstraints && (
-                <InlineConstraints
-                  sketch={annotationSketch}
-                  scale={markerScale}
-                  selectedConstraintIds={selectedConstraints}
-                  conflictedConstraintIds={shownConflicts}
-                  interactive={tool === 'select' && !constraintMode && !fixMode && !placingDimension}
-                  onSelect={(id, additive) => {
-                    setSelectedConstraints(previous =>
-                      additive ? (previous.includes(id) ? previous.filter(existing => existing !== id) : [...previous, id]) : [id]
-                    );
-                    if (!additive) setSelected([]);
-                    setDimension(null);
-                    setMessage('Constraint selected. Press Delete to remove it; Undo restores it.');
-                    svg.current?.focus();
-                  }}
-                  onHover={(_id, ids) => setHoveredConstraintEntities(ids)}
-                  onEdit={editPattern}
-                />
-              )}
-              {annotationSketch &&
-                annotationSketch.constraints
-                  .filter(numeric)
-                  .map(c => (
-                    <DimensionGraphics
-                      key={c.id}
-                      constraint={c}
-                      sketch={annotationSketch}
-                      pixelScale={markerScale}
-                      selected={
-                        selectedConstraints.includes(c.id) ||
-                        (dimensionFlow.phase === 'placing' && dimensionFlow.existingConstraintId === c.id)
-                      }
-                      conflicted={shownConflicts.includes(c.id)}
-                      interactive={canEditCanvasDimensions}
-                      onSelect={additive => selectDimension(c.id, additive)}
-                      onEdit={() => editDimension(c.id)}
-                      onLabelPointerDown={event => startAnnotationDrag(c.id, event)}
-                    />
-                  ))}
-              {sketch && dimensionDraft && (
-                <DimensionGraphics
-                  constraint={dimensionDraft}
-                  sketch={sketch}
-                  pixelScale={markerScale}
-                  position={draftLabelAt(dimensionDraft, cursor, markerScale)}
-                  selected
-                  interactive={false}
-                />
-              )}
-              {snapCue && <SketchSnapCue cue={snapCue} pixelScale={markerScale} />}
-              {modificationPreview && (
-                <ModificationPreview
-                  sketch={modificationPreview.sketch}
-                  curveIds={
-                    offsetPreview?.ok
-                      ? offsetPreview.entityIds
-                      : extendPreview?.ok
-                        ? [extendPreview.entityId]
-                        : mirrorPreview?.ok
-                          ? mirrorPreview.createdEntityIds
-                          : []
-                  }
-                  pixelScale={markerScale}
-                />
-              )}
-              {offsetDimension && offsetPreview?.ok && (
-                <DimensionGraphics
-                  constraint={offsetDimension}
-                  sketch={offsetPreview.sketch}
-                  pixelScale={markerScale}
-                  interactive={false}
-                  showLabel={false}
-                />
-              )}
-              {modification.phase === 'extend' && modification.entityId && sketch && (
-                <SketchExtendEndpoint sketch={sketch} entityId={modification.entityId} end={modification.end} pixelScale={markerScale} />
-              )}
-              {extendPreview?.ok && extendPreview.kind === 'delete' && <SketchRemoveCurveLabel cursor={cursor} pixelScale={markerScale} />}
-              <SketchToolPreview
-                tool={tool}
-                pending={pending}
-                cursor={cursor}
-                curvePreview={curvePreview}
-                tangent={chainPreview?.tangent}
-                polygonSides={Number(polygonSides)}
-                sweepIntent={centerArcSweep.current?.sweep}
-                pixelScale={markerScale}
-                construction={construction}
-              />
-              {sketch && drawingCue && (
-                <DrawingInferencePreview
-                  inference={drawingCue}
-                  orientation={inference.current}
-                  axis={tangentAxis.current}
-                  start={chainPreview?.point ?? pending[0]}
-                  sketch={sketch}
-                  pixelScale={markerScale}
-                />
-              )}
-              {selectionBox && <SketchSelectionBox box={selectionBox} />}
-            </g>
+            <SketchDrawing
+              activeSketchStatus={activeSketchStatus}
+              annotationSketch={annotationSketch}
+              centerArcSweep={centerArcSweep}
+              chain={chain}
+              chamferDistances={chamferDistances}
+              chamferPreview={chamferPreview}
+              circularFields={circularFields}
+              circularParameters={circularParameters}
+              constraintMode={constraintMode}
+              construction={construction}
+              cornerPreview={cornerPreview}
+              cursor={cursor}
+              curvePreview={curvePreview}
+              dimensionDraft={dimensionDraft}
+              dimensionFlow={dimensionFlow}
+              dimensionSelection={dimensionSelection}
+              doc={doc}
+              drawingCue={drawingCue}
+              drawingGroup={drawingGroup}
+              editDimension={editDimension}
+              editPattern={editPattern}
+              entityStatus={entityStatus}
+              extendPreview={extendPreview}
+              faceSketch={faceSketch}
+              fixMode={fixMode}
+              grid={grid}
+              hoveredConstraintEntities={hoveredConstraintEntities}
+              hoveredPoint={hoveredPoint}
+              inference={inference}
+              lastCheckedRevision={lastCheckedRevision}
+              linearParameters={linearParameters}
+              linearPreview={linearPreview}
+              markerScale={markerScale}
+              mirrorPreview={mirrorPreview}
+              modification={modification}
+              modificationPreview={modificationPreview}
+              offsetDimension={offsetDimension}
+              offsetPreview={offsetPreview}
+              parsedCircular={parsedCircular}
+              parsedLinear={parsedLinear}
+              parsedTransform={parsedTransform}
+              part={part}
+              partEdges={partEdges}
+              patternAnchor={patternAnchor}
+              patternFields={patternFields}
+              pending={pending}
+              pickedEdges={pickedEdges}
+              placingDimension={placingDimension}
+              polygonSides={polygonSides}
+              selectDimension={selectDimension}
+              selected={selected}
+              selectedConstraints={selectedConstraints}
+              selectionBox={selectionBox}
+              setConicEditing={setConicEditing}
+              setDimension={setDimension}
+              setHoveredConstraintEntities={setHoveredConstraintEntities}
+              setMessage={setMessage}
+              setRho={setRho}
+              setSelected={setSelected}
+              setSelectedConstraints={setSelectedConstraints}
+              showConstraints={showConstraints}
+              shownConflicts={shownConflicts}
+              shownSketch={shownSketch}
+              sketch={sketch}
+              sketchBackdrop={sketchBackdrop}
+              sketchCameraShift={sketchCameraShift}
+              sketchTurn={sketchTurn}
+              slotPreview={slotPreview}
+              slotWidth={slotWidth}
+              slotWidthCenter={slotWidthCenter}
+              slotWidthCircle={slotWidthCircle}
+              snapCue={snapCue}
+              solving={solving}
+              splitFirst={splitFirst}
+              startAnnotationDrag={startAnnotationDrag}
+              startHandleDrag={startHandleDrag}
+              stroke={stroke}
+              svg={svg}
+              tangentAxis={tangentAxis}
+              tool={tool}
+              transformParameters={transformParameters}
+              transformPreview={transformPreview}
+              turned={turned}
+              view={view}
+            />
           </svg>
           <ModificationControls
             state={modification}

@@ -108,7 +108,20 @@ export function PlanOperations({
 /** The bits this board uses, in order, and the pause between them. */
 function BitsLine({ plan }: { plan: PlanResult }) {
   // A V-bit by its name: its diameter alone reads like a flat bit's.
-  const named = plan.programs.length === plan.bits.length ? plan.programs.map(p => (p.name && /V-bit/.test(p.name) ? p.name : null)) : [];
+  // A ball end or roundover bit by its kind, for the same reason.
+  const named =
+    plan.programs.length === plan.bits.length
+      ? plan.programs.map(p =>
+          p.name && /V-bit/.test(p.name)
+            ? p.name
+            : p.shape === 'ball'
+              ? `${p.diameter} mm ball end`
+              : p.shape === 'roundover'
+                ? (p.name ?? `${p.diameter} mm roundover bit`)
+                : null
+        )
+      : [];
+  const rounds = plan.programs.some(p => p.shape === 'ball' || p.shape === 'roundover');
   return (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted/40 px-3 py-2 text-[13px]">
       {plan.bits.map((d, i) => (
@@ -121,7 +134,10 @@ function BitsLine({ plan }: { plan: PlanResult }) {
         </span>
       ))}
       <span className="text-muted-foreground">
-        {named.some(Boolean) ? '· flat bottoms first, then the V-bit' : '· smallest bit first, inner features before outlines'}
+        {plan.programs.some(p => p.name && /V-bit/.test(p.name))
+          ? '· flat bottoms first, then the V-bit'
+          : '· smallest bit first, inner features before outlines'}
+        {rounds && ', rounded edges last'}
       </span>
     </p>
   );
@@ -252,6 +268,14 @@ function CuttingValue({ edit, field, children }: { edit: EditProps; field: Cutti
   );
 }
 
+/** A bit as people name it: "6 mm ball end", "90° V-bit ⌀6", "6 mm flat". */
+function bitName(tool: OpSummary['tool']) {
+  if (tool.shape === 'ball') return `${tool.diameter} mm ball end`;
+  if (tool.shape === 'v') return `${tool.angle ?? 90}° V-bit ⌀${tool.diameter}`;
+  if (tool.shape === 'roundover') return tool.name ?? `${tool.diameter} mm roundover bit`;
+  return `${tool.diameter} mm flat`;
+}
+
 /** Every op's numbers side by side; a row selects its op, in the 3D view too. Wide: it scrolls sideways in its box. */
 function OperationsTable({
   label,
@@ -275,7 +299,10 @@ function OperationsTable({
       className={cn('cursor-pointer border-b', sub && 'text-muted-foreground', selected === n ? 'bg-muted' : 'hover:bg-muted/40')}>
       <td className={cn(cell, 'pl-1.5')}>{num}</td>
       <td className={cn('min-w-44 py-2 pr-3', sub && 'pl-6')}>{label}</td>
-      <td className={cell}>⌀{op.tool.diameter}</td>
+      <td className={cell}>
+        ⌀{op.tool.diameter}
+        {op.tool.shape === 'ball' ? ' ball' : op.tool.shape === 'v' ? ' V' : op.tool.shape === 'roundover' ? ' roundover' : ''}
+      </td>
       <td className={cell}>
         {fmtZ(op.zTop)} → {fmtZ(op.zBottom)}
       </td>
@@ -357,7 +384,19 @@ function OperationsTable({
                 {n + 1}
               </span>
             );
+            const before = n > 0 ? model.groups[n - 1]!.op.tool : undefined;
+            const swap = before && (before.number !== g.op.tool.number || before.shape !== g.op.tool.shape);
             return [
+              // Where the bit changes, the program ends: swap the bit and zero Z before the next.
+              ...(swap
+                ? [
+                    <tr key={`swap:${g.key}`} className="border-b bg-amber-50/60 text-xs dark:bg-amber-950/30">
+                      <td colSpan={9} className="py-1.5 pl-1.5 font-medium">
+                        Swap to {bitName(g.op.tool)} · zero Z
+                      </td>
+                    </tr>,
+                  ]
+                : []),
               // A grouped row's numbers are per op; a guided program's time is the whole program.
               row(n, g.op, label, num, g.note ? seconds : seconds / g.count, g.key),
               ...(open.has(g.key)

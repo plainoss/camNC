@@ -192,7 +192,7 @@
   {
    "id": "stool:leg:pattern",
    "kind": "pattern",
-   "label": "Circular pattern · Leg × 4",
+   "label": "Circular pattern 1",
    "part": "Leg",
    "settings": {
     "count": {

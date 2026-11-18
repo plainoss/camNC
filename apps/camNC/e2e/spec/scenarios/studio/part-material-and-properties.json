@@ -1,0 +1,113 @@
+[
+ {
+  "id": "studio/material/oak-on-part-1",
+  "title": "Assign a library material to a part and read it back in its Properties",
+  "evidence": "design workflow parity spec",
+  "steps": [
+   "dialogcancel",
+   "view top",
+   "selectfeature Top",
+   "key Shift+s",
+   "key g",
+   "rect 0,0 100,60",
+   "closesketch",
+   "key Shift+e",
+   "viewpick 50,30,0",
+   "dialogfill Thickness = 40",
+   "key Enter",
+   "key Enter",
+   "key p",
+   "key p",
+   "key Shift+7",
+   "searchtool Circular pattern",
+   "selectpart Part 1",
+   "dialogfocus Axis of pattern",
+   "viewpick 100,0,20",
+   "dialogfill Instance count = 3",
+   "key Tab",
+   "dialogconfirm",
+   "searchtool Split",
+   "selectpart Part 1 2",
+   "dialogfocus Entity to split with",
+   "selectfeature Front",
+   "dialogconfirm",
+   {
+    "spec": "1 select"
+   },
+   "partmenu Part 1",
+   {
+    "spec": "2 select"
+   },
+   "menuitem Assign material…",
+   {
+    "expect": {
+     "pageText": "No material assigned"
+    }
+   },
+   {
+    "spec": "3 select"
+   },
+   "dialogfocus - None -",
+   {
+    "expect": {
+     "pageText": "300 Series Stainless Steel"
+    }
+   },
+   {
+    "spec": "4 field"
+   },
+   "dialogfill Search by material or category = plywood",
+   {
+    "spec": "5 field"
+   },
+   "dialogfill Search by material or category = oak",
+   {
+    "expect": {
+     "pageText": "Oak, Red"
+    }
+   },
+   {
+    "spec": "6 select"
+   },
+   "dialogoption Oak, White",
+   {
+    "expect": {
+     "pageText": "Density \\(kg/m³\\)"
+    }
+   },
+   {
+    "spec": "7 confirm"
+   },
+   "dialogconfirm",
+   {
+    "spec": "8 select"
+   },
+   "partmenu Part 1",
+   {
+    "spec": "9 select"
+   },
+   "menuitem Properties…",
+   {
+    "expect": {
+     "pageText": "Mass: 0\\.185 kg"
+    }
+   },
+   {
+    "spec": "10 cancel"
+   },
+   "dialogcancel",
+   {
+    "expect": {
+     "studio": {
+      "dialog": null
+     }
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Parts \\(4\\)"
+    }
+   }
+  ]
+ }
+]

@@ -144,7 +144,7 @@ const kManualOff = 'Manual spindle: off now';
 
 // A V-bit's TAPER is half its angle, as tool tables write it: the machine view's simulation reads it.
 const toolLine = (t: Tool, zMin: number) =>
-  `(  T${t.number} D=${fmt(t.diameter)} CR=0${t.shape === 'v' ? ` TAPER=${fmt((t.angle ?? 90) / 2)}deg` : ''} - ZMIN=${fmt(zMin)} - ${commentText(t.name ?? (t.shape === 'v' ? 'V-bit' : 'flat end mill'), 60)} )`;
+  `(  T${t.number} D=${fmt(t.diameter)} CR=${t.shape === 'ball' ? fmt(t.diameter / 2) : '0'}${t.shape === 'v' ? ` TAPER=${fmt((t.angle ?? 90) / 2)}deg` : t.shape === 'roundover' ? ` ROUNDOVER R=${fmt(t.radius ?? 0)}` : ''} - ZMIN=${fmt(zMin)} - ${commentText(t.name ?? (t.shape === 'v' ? 'V-bit' : t.shape === 'roundover' ? 'roundover bit' : t.shape === 'ball' ? 'ball end mill' : 'flat end mill'), 60)} )`;
 
 /**
  * Machine Z a finished program lifts to, out of the way of taking the parts out: just below the Z switches of the

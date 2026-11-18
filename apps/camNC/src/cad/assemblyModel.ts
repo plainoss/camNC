@@ -4,6 +4,7 @@ import {
   evaluatedPartCopy,
   CAD_IDENTITY_PLACEMENT,
   placementMatrix,
+  withEdgeRounds,
   withPartCuts,
   cadDrawnOnSupports,
   cadCopyName,
@@ -82,7 +83,7 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
         const profile = geometry.parts ? undefined : evaluateCadPart(part).part;
         const evaluated =
           geometry.parts?.find(shape => shape.partId === part.id) ??
-          (profile && withPartCuts(document, evaluateCadPartFamily(part, profile).part));
+          (profile && withEdgeRounds(part, withPartCuts(document, evaluateCadPartFamily(part, profile).part)).part);
         if (!evaluated) return { part, problem: 'Its sketch needs fixing first.' };
         const shape = nativePart(evaluated);
         // A copy is meshed on its own only when it's mirrored or cut differently; the rest share the part's mesh.

@@ -1,9 +1,23 @@
-import { useMemo, type RefObject } from 'react';
+import { useMemo, useRef, type RefObject } from 'react';
 import { cadFieldVariableExpression, cadVariableScope, formatCadValue, setCadVariable, type CadDocument } from '@wbcnc/cad';
 import { useDesignUnits } from './designUnits';
 import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
 
-export function useEditorVariableFields(document: CadDocument, current: RefObject<CadDocument>, commit: (document: CadDocument) => void) {
+/** The step a dialog or an open sketch edits, as the feature list names it: an Extrude's, or the sketch's. */
+export function editedStep(dialog: { kind: string; partId?: string } | null, sketching?: string | false): string | null {
+  if (dialog?.kind === 'extrude' && dialog.partId) return `${dialog.partId}:extrude`;
+  return sketching ? `${sketching}:sketch` : null;
+}
+
+export function useEditorVariableFields(
+  document: CadDocument,
+  current: RefObject<CadDocument>,
+  commit: (document: CadDocument) => void,
+  /** The step being edited: a variable made in one of its fields is listed before it. */
+  editingStep: string | null = null
+) {
+  const editing = useRef<string | null>(null);
+  editing.current = editingStep;
   const scope = useMemo(() => cadVariableScope(document), [document]);
   const { lengthUnit, formatLength } = useDesignUnits(document.lengthUnit ?? 'mm');
   const fields = useMemo<CadVariableFields>(
@@ -23,7 +37,12 @@ export function useEditorVariableFields(document: CadDocument, current: RefObjec
         const typed = cadFieldVariableExpression(expression, unit, variables, source.lengthUnit, existing && variables[name]?.kind);
         const result = setCadVariable(source, { ...(existing && { id: existing.id }), name, expression: typed });
         if ('error' in result) return result.error;
-        commit(result.document);
+        const before = !existing && editing.current;
+        commit(
+          before
+            ? { ...result.document, variables: result.document.variables?.map(v => (v.name === name ? { ...v, before } : v)) }
+            : result.document
+        );
         return null;
       },
     }),

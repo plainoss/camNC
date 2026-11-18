@@ -1,6 +1,6 @@
 import { smallestCornerRelief, solveCadDocument, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
 import { studioCutParts } from '@/cad/studioGeometry';
-import { profileFeatures, summarizePart, type FlatPart, type PartFeatures } from '@wbcnc/cam';
+import { profileFeatures, summarizePart, type FlatPart, type MeshRound, type PartFeatures } from '@wbcnc/cam';
 import { ExtrudeGeometry, Path, Shape, Vector2 } from 'three';
 import type { BodyMesh, CamPartInfo, ModelImport, Outline2D } from './camTypes';
 import { cutPartMesh } from './cutPartMesh';
@@ -13,6 +13,8 @@ export interface NativeCadEntry {
   flipped?: { x?: PartFeatures; y?: PartFeatures };
   /** The bit diameter the design relieved its inside corners for. */
   cornerRelief?: number;
+  /** Edges Fillet steps round over, in the features' frame: the mesh and a STEP solid curve them over. */
+  rounds?: MeshRound[];
 }
 
 /** Native curves are tessellated once by CAD, then go straight to CAM's polygon feature seam. */
@@ -28,7 +30,17 @@ export function nativePart(source: EvaluatedCadPart): {
   const outer = features.outlines[0]!;
   const holeLoops = source.loops.filter(loop => loop.kind === 'hole').map(loop => loop.id);
   let positions: Float64Array, indices: Uint32Array;
-  if (source.cuts?.length) ({ positions, indices } = cutPartMesh(features, below ?? undefined));
+  // Edges rounded over by Fillet steps, in the features' frame, which starts at the outline's corner.
+  const rounds = (source.rounds ?? []).map(
+    (round): MeshRound => ({
+      points: round.points.map(p => ({ x: p.x - offset.x, y: p.y - offset.y })),
+      z: round.side === 'top' ? source.thickness - round.at : round.at,
+      down: round.side === 'top',
+      radius: round.radius,
+      material: round.material,
+    })
+  );
+  if (source.cuts?.length || rounds.length) ({ positions, indices } = cutPartMesh(features, below ?? undefined, rounds));
   else {
     const shape = new Shape(outer.map(p => new Vector2(p.x, p.y)));
     shape.holes.push(...features.throughHoles.map(h => new Path(h.map(p => new Vector2(p.x, p.y)))));
@@ -37,6 +49,8 @@ export function nativePart(source: EvaluatedCadPart): {
     indices = geometry.index ? Uint32Array.from(geometry.index.array) : Uint32Array.from({ length: positions.length / 3 }, (_, i) => i);
     geometry.dispose();
   }
+  // CAM runs a roundover bit around each, where one of its radius is in the job.
+  if (rounds.length) features.rounds = rounds.map(({ points, ...round }) => ({ loop: points, ...round }));
   const part: FlatPart = {
     name: source.name,
     size,
@@ -58,7 +72,7 @@ export function nativePart(source: EvaluatedCadPart): {
   const paths = (loops: { x: number; y: number }[][]): Outline2D => loops.map(loop => loop.map(p => [p.x, p.y]));
   return {
     ...(below && { below }),
-    entry: { part, features, ...(turned && { flipped: { x: turned('x'), y: turned('y') } }) },
+    entry: { part, features, ...(turned && { flipped: { x: turned('x'), y: turned('y') } }), ...(rounds.length && { rounds }) },
     info: {
       id: source.partId,
       holeIds: holeSources ? holeSources.map(from => ('hole' in from ? holeLoops[from.hole]! : from.cut)) : holeLoops,

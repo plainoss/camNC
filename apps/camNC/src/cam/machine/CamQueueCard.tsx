@@ -178,7 +178,15 @@ export function CamQueueCard() {
   const bit = program?.diameter;
   // The previous entry in the queue left another bit in the collet, on any kind of entry.
   // A V-bit is named: its diameter alone would read like a flat bit's. After another tool of its diameter, it's a swap too.
-  const vBit = program?.name && /V-bit/.test(program.name) ? program.name : undefined;
+  // A ball end, likewise: "⌀6 mm ball end".
+  const vBit =
+    program?.name && /V-bit/.test(program.name)
+      ? program.name
+      : program?.shape === 'ball'
+        ? `⌀${program.diameter} mm ball end`
+        : program?.shape === 'roundover'
+          ? (program.name ?? `⌀${program.diameter} mm roundover bit`)
+          : undefined;
   const swap =
     bit !== undefined &&
     (bit !== current?.bitBefore || (!!vBit && current?.toolBefore !== undefined && program?.tool !== current.toolBefore));

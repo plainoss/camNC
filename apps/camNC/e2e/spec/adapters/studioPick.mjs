@@ -63,7 +63,7 @@ export async function viewPick(page, text) {
 export function regionCount(selection) {
   if (/^No (region|face) picked/.test(selection ?? '')) return 0;
   // One entry, of one face or of a circle's faces picked together.
-  if (/^(A region|A face|Face|Faces) of /.test(selection ?? '')) return 1;
+  if (/^(A region|A face|Face|Faces|Edge) of /.test(selection ?? '')) return 1;
   const count = /^(\d+) (regions|faces) of /.exec(selection ?? '')?.[1];
   return count ? Number(count) : null;
 }

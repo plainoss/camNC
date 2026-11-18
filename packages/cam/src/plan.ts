@@ -14,6 +14,7 @@ import {
 } from './board';
 import { dowelClearance, dowelProblem, dowelSpots, sideBSpec, type FlipRegistration } from './flip';
 import type { PartFeatures } from './features';
+import type { Tool } from './toolpathTypes';
 import { postProgram, toGcode } from './gcode';
 import { maxOf, minOf } from './geom';
 import { holdCheck, holdTimeline } from './hold';
@@ -56,7 +57,7 @@ export interface OpSummary {
   /** For people: "Pocket 4.2 deep", "Outline: rough + final pass". */
   label: string;
   kind: Operation['kind'];
-  tool: { number: number; diameter: number; shape?: 'flat' | 'v'; angle?: number };
+  tool: { number: number; diameter: number; shape?: 'flat' | 'v' | 'ball' | 'roundover'; angle?: number; name?: string };
   zTop: number;
   zBottom: number;
   /** Distinct depths the operation cuts at (pocket stepdowns, outline roughing + final). */
@@ -123,6 +124,8 @@ export interface PlanResult {
     diameter: number;
     /** The bit's name, for people: "90° V-bit ⌀6". */
     name?: string;
+    /** A bit that isn't a flat end mill: "v", "ball" or "roundover". */
+    shape?: Tool['shape'];
     gcode: string;
     timeMin: number;
     timing?: ProgramTimeEstimate;
@@ -672,6 +675,7 @@ export function summarize(
       tool: tool.number,
       diameter: tool.diameter,
       ...(tool.name && { name: tool.name }),
+      ...(tool.shape && tool.shape !== 'flat' && { shape: tool.shape }),
       gcode,
       timeMin: timing.estimatedAutomaticSeconds / 60,
       timing,
@@ -728,6 +732,8 @@ function opSummaries(cam: PartCam, partTop: number): OpSummary[] {
         number: op.tool.number,
         diameter: op.tool.diameter,
         ...(op.tool.shape === 'v' && { shape: 'v' as const, angle: op.tool.angle }),
+        ...((op.tool.shape === 'ball' || op.tool.shape === 'roundover') && { shape: op.tool.shape }),
+        ...(op.tool.name && { name: op.tool.name }),
       },
       zTop,
       zBottom: minOf(zs),

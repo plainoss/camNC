@@ -53,6 +53,18 @@ export interface PartFeatures {
   bottomFaces: { z: number; area: number }[];
   /** Up-facing area that is neither horizontal nor vertical (not 2.5D machinable with a flat end mill). */
   slopedArea: number;
+  /** Edges the design rounds over, for a roundover bit; the levels and pockets above are as if they were sharp. */
+  rounds?: PartRound[];
+}
+
+/** An edge rounded over: its loop at height `z`, the round going down from it on the top, or up on the underside. */
+export interface PartRound {
+  loop: PathD;
+  z: number;
+  down: boolean;
+  radius: number;
+  /** Where the part's material is: inside the loop for an outline, outside it for a hole or a pocket's opening. */
+  material: 'inside' | 'outside';
 }
 
 const HORIZONTAL = 1 - 1e-6;

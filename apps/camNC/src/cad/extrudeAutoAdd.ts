@@ -1,4 +1,4 @@
-import { copyFaceOperationProblem, overlappedParts, partIsBuiltOn, type CadDocument } from '@wbcnc/cad';
+import { copyFaceOperationProblem, meetingParts, partIsBuiltOn, type CadDocument } from '@wbcnc/cad';
 
 /**
  * The part a New extrude's picked regions run into, for Add to merge with: the one earlier part extruded along the same
@@ -9,8 +9,8 @@ export function autoAddTarget(document: CadDocument, partId: string): string | n
   const part = document.parts.find(p => p.id === partId);
   if (!part || part.addTo !== undefined || part.mergeAll || part.remove || part.thin || part.faceProfile || !part.regions?.length)
     return null;
-  // Standing against a part side by side is running into it too, as the reference goes to Add for it.
-  const touched = overlappedParts(document, partId, true);
+  // Standing against a part side by side, or on its face, is running into it too, as the reference goes to Add for it.
+  const touched = meetingParts(document, partId);
   const into = touched.length === 1 ? document.parts.find(p => p.id === touched[0]) : undefined;
   // A part other steps build on, or one that can't join that part, stays a part of its own.
   return into && !partIsBuiltOn(document, part, into) && !copyFaceOperationProblem(part) ? into.id : null;

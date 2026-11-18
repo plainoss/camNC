@@ -52,9 +52,23 @@ export function compareParts(
 ): Comparison {
   const failures: string[] = [];
   if (expected.length !== actual.length) failures.push(`Expected ${expected.length} parts, got ${actual.length}.`);
+  // Nearest volume first; parts of the same volume, such as a board's equal slabs, by where their boxes are.
+  const boxGap = (e: FingerprintedPart, a: FingerprintedPart) =>
+    (['min', 'max'] as const).reduce(
+      (most, corner) =>
+        Math.max(most, ...[0, 1, 2].map(axis => Math.abs(e.fingerprint.bbox[corner][axis]! - a.fingerprint.bbox[corner][axis]!))),
+      0
+    );
   const pairs = expected
-    .flatMap((e, i) => actual.map((a, j) => ({ i, j, gap: Math.abs(e.fingerprint.volume - a.fingerprint.volume) })))
-    .sort((x, y) => x.gap - y.gap);
+    .flatMap((e, i) =>
+      actual.map((a, j) => {
+        const gap = Math.abs(e.fingerprint.volume - a.fingerprint.volume);
+        // Volumes within the volume tolerance of each other are a tie, settled by the boxes.
+        const step = (Math.max(1, Math.abs(e.fingerprint.volume)) * tolerances.volumePercent) / 100;
+        return { i, j, gap: Math.floor(gap / step), box: boxGap(e, a) };
+      })
+    )
+    .sort((x, y) => x.gap - y.gap || x.box - y.box);
   const usedExpected = new Set<number>(),
     usedActual = new Set<number>(),
     matched: [number, number][] = [];

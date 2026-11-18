@@ -19,7 +19,8 @@ export function designGeometryFingerprint(part: EvaluatedCadPart) {
   };
   const plain = [part.thickness, ring(part.outline), part.holes.map(ring).sort()];
   const cuts = (part.cuts ?? []).map(cut => [cut.side, cut.from, cut.to, cut.through, ring(cut.outline), cut.islands.map(ring).sort()]);
-  return JSON.stringify([...plain, cuts]);
+  const rounds = (part.rounds ?? []).map(round => [round.side, round.at, round.radius, round.material, ring(round.points)]);
+  return JSON.stringify([...plain, cuts, rounds]);
 }
 
 /** Content identity for physical stock. */

@@ -504,7 +504,14 @@ it('renames a part from its row in the Parts list, leaving its features named as
   const parts = screen.getByRole('region', { name: 'Parts panel' });
   fireEvent.contextMenu(within(parts).getByRole('button', { name: new RegExp(`^${before}$`) }));
   const menu = screen.getByRole('menu', { name: `${before} actions` });
-  expect([...menu.querySelectorAll('[role=menuitem]')].map(item => item.textContent)).toEqual(['Rename', 'Hide', 'Export…']);
+  expect([...menu.querySelectorAll('[role=menuitem]')].map(item => item.textContent)).toEqual([
+    'Rename',
+    'Properties…',
+    'Assign material…',
+    'Hide',
+    'Make transparent…',
+    'Export…',
+  ]);
   await userEvent.click(within(menu).getByRole('menuitem', { name: 'Rename' }));
   const name = within(parts).getByRole('textbox', { name: `New name for ${before}` });
   await userEvent.clear(name);
@@ -629,7 +636,7 @@ it('greys out the features after the one being edited, and shows them again once
   expect(rolledBack()).toEqual([]);
 });
 
-it('says why a variable in use can’t be deleted, and edits a variable from an open sketch in the studio', async () => {
+it('deletes a variable in use, brought back by one Undo, and edits a variable from an open sketch in the studio', async () => {
   const source: CadDocument = {
     ...createPlateDocument({ width: 200, height: 100 }),
     variables: [
@@ -647,7 +654,10 @@ it('says why a variable in use can’t be deleted, and edits a variable from an 
   const features = await screen.findByRole('region', { name: 'Features' });
   fireEvent.contextMenu(within(features).getByRole('button', { name: /#a = 10 mm/ }));
   await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Delete' }));
-  expect((await screen.findByRole('alert')).textContent).toMatch(/a is used in one place/);
+  // Gone without asking, as in the reference: what names it fails instead, and Undo brings it back.
+  await waitFor(() => expect(within(features).queryByRole('button', { name: /#a = 10 mm/ })).toBeNull());
+  await userEvent.click(screen.getByRole('button', { name: /^Undo/ }));
+  await waitFor(() => expect(within(features).getByRole('button', { name: /#a = 10 mm/ })).toBeDefined());
 
   await userEvent.dblClick(within(features).getByRole('button', { name: /Sketch · Plate/ }));
   await screen.findByRole('dialog', { name: 'Sketch · Plate' });
@@ -932,7 +942,11 @@ it('adds regions to a part made from the same sketch with Extrude → Add', asyn
   const dialog = await screen.findByRole('dialog', { name: 'Extrude 2' });
   await userEvent.click(within(operation(dialog)).getByRole('tab', { name: 'Add' }));
   await waitFor(() => expect(latest().parts[1]!.addTo).toBe(latest().parts[0]!.id));
-  expect((within(dialog).getByRole('combobox', { name: 'Merge scope' }) as HTMLSelectElement).value).toBe(latest().parts[0]!.id);
+  expect(
+    within(within(dialog).getByRole('group', { name: 'Merge scope' })).getByRole('button', {
+      name: `Take ${latest().parts[0]!.name} out of merge scope`,
+    })
+  ).toBeTruthy();
   await waitFor(() => expect(latest().parts[0]!.addedRegions).toEqual([narrow]));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude 2' })).toBeNull());

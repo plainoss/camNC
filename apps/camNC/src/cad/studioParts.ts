@@ -50,3 +50,10 @@ export function disabledStudioCommands(part: CadPart | undefined, partHasOutline
   if (studioDisabled.pattern) studioDisabled.mirror = studioDisabled.pattern;
   return studioDisabled;
 }
+
+/**
+ * The design the Parts list shows while a dialog is open: a Transform's, a Pattern's or a Split's preview, with its moved
+ * parts, copies or pieces; an Extrude's shown design; otherwise the saved one.
+ */
+export const studioListSource = (kind: string | undefined, preview: CadDocument, shown: CadDocument, saved: CadDocument) =>
+  kind === 'transform' || kind === 'pattern' || kind === 'split' ? preview : kind === 'extrude' ? shown : saved;

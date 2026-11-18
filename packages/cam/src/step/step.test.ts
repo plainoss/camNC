@@ -324,3 +324,43 @@ describe('part STEP export with random cuts', () => {
     expect(meshVolume(bodies[0]!.mesh) / expected).toBeCloseTo(1, 2);
   });
 });
+
+describe('a part with edges rounded over', () => {
+  // A cup: a Ø77.8 × 20 cylinder with a Ø67.2 pocket 16 deep, and both edges of its 5.3 mm rim rounded to 1 mm.
+  const outline = circle(38.9, 38.9, 38.9),
+    opening = circle(38.9, 38.9, 33.6);
+  const { features, offset } = profileFeatures({
+    thickness: 20,
+    outline,
+    holes: [],
+    cuts: [{ id: 'pocket', side: 'top', from: 0, to: 16, through: false, outline: opening, islands: [] }],
+  });
+  // In the features' frame, which starts at the outline's corner.
+  const moved = (points: Pt[]) => points.map(p => ({ x: p.x - offset.x, y: p.y - offset.y }));
+  const rounds = [
+    { points: moved(outline), z: 20, down: true, radius: 1, material: 'inside' as const },
+    { points: moved(opening), z: 20, down: true, radius: 1, material: 'outside' as const },
+  ];
+
+  it('closes the shell with planar faces over the rounds, and reads back with what the rounds take away', async () => {
+    const brep = partBrep(features, null, rounds);
+    expect(brepProblems(brep)).toEqual([]);
+    for (const face of brep.faces) {
+      if (face.surface.kind !== 'plane') continue;
+      const { origin, normal } = face.surface;
+      for (const loop of face.loops)
+        for (const { edge } of loop) {
+          const p = brep.points[brep.edges[edge]!.start]!;
+          const off = Math.abs((p[0] - origin[0]) * normal[0] + (p[1] - origin[1]) * normal[1] + (p[2] - origin[2]) * normal[2]);
+          expect(off).toBeLessThan(1e-6);
+        }
+    }
+    const { bodies } = await loadStep(new TextEncoder().encode(writeStep([{ name: 'Cup', solids: [{ brep }] }])));
+    expect(bodies).toHaveLength(1);
+    expect(openEdges(bodies[0]!.mesh)).toBe(0);
+    const sharp = Math.PI * (38.9 ** 2 * 20 - 33.6 ** 2 * 16);
+    // The two rounds take away about 98 mm³ (Pappus): 38 233 mm³ is left, within 0.1 %.
+    expect(meshVolume(bodies[0]!.mesh) / 38233).toBeCloseTo(1, 3);
+    expect(sharp - meshVolume(bodies[0]!.mesh)).toBeGreaterThan(90);
+  });
+});

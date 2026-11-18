@@ -150,7 +150,9 @@ export function readFusionToolLibrary(
   const tools: LibraryTool[] = [];
   const skipped: Record<string, number> = {};
   for (const t of lib.data) {
-    if (t.type !== 'flat end mill' || !t.geometry?.DC) {
+    // Flat end mills cut everything; ball end mills finish rounded edges.
+    const ball = t.type === 'ball end mill';
+    if ((t.type !== 'flat end mill' && !ball) || !t.geometry?.DC) {
       // Holders and the like have no type worth listing.
       if (t.type && t.type !== 'holder') skipped[t.type] = (skipped[t.type] ?? 0) + 1;
       continue;
@@ -161,7 +163,8 @@ export function readFusionToolLibrary(
     const tool: LibraryTool = {
       number: t['post-process']?.number ?? tools.length + 1,
       diameter: +(t.geometry.DC * mm).toFixed(4),
-      name: t.description || `flat ${t.geometry.DC * mm} mm`,
+      name: t.description || `${ball ? 'ball' : 'flat'} ${t.geometry.DC * mm} mm`,
+      ...(ball ? { shape: 'ball' as const } : {}),
       guid: t.guid,
       flutes: t.geometry.NOF,
       fluteLength: t.geometry.LCF ? +(t.geometry.LCF * mm).toFixed(2) : undefined,

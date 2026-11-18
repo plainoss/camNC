@@ -26,7 +26,9 @@ export type StudioDialog =
   /** A variable being added, or the one being changed. */
   | { kind: 'variable'; id?: string }
   /** A "cut parts" or Boolean step being added, or the one being changed. */
-  | { kind: 'partCut'; id?: string; boolean?: true };
+  | { kind: 'partCut'; id?: string; boolean?: true }
+  /** A part being split with a plane, or the Split of `partId` being changed. */
+  | { kind: 'split'; partId?: string };
 
 /** The toolbar command each dialog belongs to, which shows as active while it is open. */
 export const dialogCommand: Record<StudioDialog['kind'], StudioCommand> = {
@@ -39,6 +41,7 @@ export const dialogCommand: Record<StudioDialog['kind'], StudioCommand> = {
   plane: 'plane',
   variable: 'variable',
   partCut: 'cutParts',
+  split: 'split',
 };
 
 /**
@@ -62,6 +65,8 @@ export function dialogKey(dialog: StudioDialog): string | null {
     case 'variable':
     case 'partCut':
       return dialog.id ?? 'new';
+    case 'split':
+      return dialog.partId ?? 'new';
   }
 }
 
@@ -77,7 +82,14 @@ export function featureDialog(dialog: StudioDialog | null): StudioFeatureDialog 
 
 /** Whether a part clicked in the view or the Parts list goes to the dialog rather than the selection. */
 export function picksParts(dialog: StudioDialog | null): boolean {
-  return !!dialog && (dialog.kind === 'partCut' || dialog.kind === 'mirror' || dialog.kind === 'transform' || dialog.kind === 'pattern');
+  return (
+    !!dialog &&
+    (dialog.kind === 'partCut' ||
+      dialog.kind === 'mirror' ||
+      dialog.kind === 'transform' ||
+      dialog.kind === 'pattern' ||
+      dialog.kind === 'split')
+  );
 }
 
 /**
@@ -104,6 +116,8 @@ export function editedStepId(document: CadDocument, dialog: StudioDialog | null)
       return dialog.joinId ?? dialog.copyId ?? null;
     case 'fillet':
       return dialog.filletId ?? null;
+    case 'split':
+      return (dialog.partId && document.parts.find(part => part.id === dialog.partId)?.split?.id) || null;
     default:
       return null;
   }

@@ -1,0 +1,132 @@
+[
+ {
+  "id": "studio/dependencies-and-filter/extrude-dependencies-and-filters",
+  "title": "Show dependencies lists what Extrude 1 builds on and what builds on it; the Feature list filter narrows by name, type or variable",
+  "evidence": "design workflow parity spec",
+  "steps": [
+   "uncheck Snap",
+   "dialogcancel",
+   "view top",
+   "selectfeature Top",
+   "key Shift+s",
+   "fitview 0,0 150,70",
+   "key g",
+   "rect 0,0 150,70",
+   "key Escape",
+   "key d",
+   "viewpick 75,70,0",
+   "viewpick 75,60,0",
+   "field Length 150",
+   "key Escape",
+   "key d",
+   "viewpick 150,35,0",
+   "viewpick 140,35,0",
+   "field Length 70",
+   "key Escape",
+   "closesketch",
+   "key Shift+e",
+   "viewpick 75,35,0",
+   "dialogfill Thickness = 20",
+   "key Enter",
+   "dialogconfirm",
+   "viewpick 75,35,20",
+   "key Shift+s",
+   "key l",
+   "line 12,0 12,70",
+   "key Escape",
+   "tool Linear pattern",
+   "click 12,35",
+   "patterncount 1",
+   "type 4",
+   "key Enter",
+   "patternspacing 1",
+   "type 40",
+   "key Enter",
+   "patterncount 1",
+   "type #test",
+   "key Enter",
+   "key Enter",
+   "closesketch",
+   "view top",
+   "key f",
+   "key Shift+e",
+   "dialogtab Thin",
+   "dialogtab Remove",
+   "viewpick 12,35,20",
+   "viewpick 52,35,20",
+   "viewpick 92,35,20",
+   "viewpick 132,35,20",
+   "dialogcheck Mid plane = true",
+   "dialogfill Thickness 1 = 5",
+   "dialogfill Cut depth = 25",
+   "dialogconfirm",
+   "feature Extrude 1",
+   "dialogfill Thickness = #thick",
+   "key Enter",
+   "key Enter",
+   "dialogconfirm",
+   "feature #thick = 20 mm",
+   "dialogfill Value = 30",
+   "dialogconfirm",
+   {
+    "spec": "1 select"
+   },
+   "featuremenu Extrude 1",
+   {
+    "spec": "2 select"
+   },
+   "menuitem Show dependencies…",
+   {
+    "expect": {
+     "pageText": "Dependencies of Extrude 1"
+    }
+   },
+   {
+    "spec": "3 select"
+   },
+   "panelclose Dependencies of Extrude 1",
+   {
+    "spec": "5 field"
+   },
+   "featurefilter Extrude",
+   {
+    "expect": {
+     "pageText": "Features \\(2 of 10\\)"
+    }
+   },
+   {
+    "expect": {
+     "pageText": ":variable name"
+    }
+   },
+   {
+    "spec": "6 field"
+   },
+   "featurefilter :variable thick",
+   {
+    "expect": {
+     "pageText": "Features \\(2 of 10\\)"
+    }
+   },
+   {
+    "spec": "7 field"
+   },
+   "featurefilter ",
+   {
+    "expect": {
+     "pageText": "Features \\(10\\)"
+    }
+   },
+   {
+    "expect": {
+     "studio": {
+      "dialog": null,
+      "parts": [
+       "Part 1"
+      ]
+     }
+    }
+   }
+  ]
+ }
+]

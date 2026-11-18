@@ -18,9 +18,15 @@ export function FeatureDialog({
   autoFocus = true,
   acceptFromPartsList,
   className,
+  failing,
   children,
 }: {
   title: string;
+  /**
+   * Why the step fails, or what it still needs: its title turns red, as its row does, and the reason shows on hovering
+   * the dialog, as the reference words it, rather than as a line of text in it.
+   */
+  failing?: string | null;
   okLabel?: string;
   okDisabled?: boolean;
   /** Why OK can't be used yet, shown on it while it's disabled. */
@@ -113,7 +119,11 @@ export function FeatureDialog({
         }
       }}>
       <div className="cad-feature-dialog-head">
-        <h3>{title}</h3>
+        <h3
+          className={failing ? 'cad-feature-dialog-failing' : undefined}
+          title={failing ? `${title} did not regenerate properly: ${failing}` : undefined}>
+          {title}
+        </h3>
         {final && (
           <button
             type="button"

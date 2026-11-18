@@ -1,6 +1,8 @@
+import { cadPartsMissingVariables, kVariableMissing } from './variables';
+import { cadCuts } from './featureModel';
 import { mergedWithAll } from './unionParts';
 import { evaluateCadPart } from './geometry';
-import { edgeFilletProblems } from './edgeFillets';
+import { filletProblems } from './filletProblems';
 import { resolveExtrudeSteps } from './extrudeSteps';
 import { cadFaceSketches, faceIsUnderside } from './featureModel';
 import { cadCopyName } from './partPatterns';
@@ -17,7 +19,7 @@ import { missingRegionMessage, missingRegionProblem } from './regionProfile';
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
   id: string;
-  kind: 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'fillet' | 'mirror' | 'copy' | 'pattern' | 'partCut';
+  kind: 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'fillet' | 'mirror' | 'copy' | 'pattern' | 'partCut' | 'split';
   label: string;
   /** A short reading of the step's main value, such as a thickness or depth. */
   detail?: string;
@@ -152,20 +154,27 @@ export function designSteps(document: CadDocument): DesignStep[] {
           : step.kind === 'extrude'
             ? own
             : // A sketch is fine when only its extrude is missing the regions to extrude, as when it was emptied.
-              step.kind === 'sketch' && !(part && own === missingRegionProblem(part))
+              step.kind === 'sketch' && !(part && own === missingRegionProblem(part)) && own !== kVariableMissing
               ? own
               : null;
-    const reason = lost ?? regions ?? onFace;
+    // A Remove whose depth comes to nothing, as a variable can set it, fails as the reference says; its part is kept.
+    const nothing =
+      step.kind === 'extrude' && part?.remove && part.remove.depth === 0 && !step.suppressed
+        ? 'Failed to extrude selections, check input.'
+        : null;
+    const reason = lost ?? regions ?? nothing ?? onFace;
     // A Cut parts step whose typed values can't be followed keeps its last good ones, and says why on its row.
     const values = step.kind === 'partCut' ? partCutProblems.get(step.id) : undefined;
     // A Fillet step that can't round some of its corners leaves them sharp, and says so on its row. A part that's
     // switched off, itself or by its folder, isn't made, so neither is its fillet.
     const sharp =
       step.kind === 'fillet' && part && !step.suppressed && !part.suppressed && !masked.has(part.id)
-        ? edgeFilletProblems(part).some(problem => problem.filletId === step.id)
-          ? // As the reference says it; the Fillet dialog and the part say which corners and why.
-            'Failed to fillet selections.'
-          : undefined
+        ? // A part that can't be built has nothing to round. Rounds that run into each other say so, as the reference does.
+          (() => {
+            const problems = filletProblems(document, part).filter(problem => problem.filletId === step.id);
+            if (!own && !problems.length) return undefined;
+            return problems.some(problem => /overlap/.test(problem.message)) ? 'Overlapping fillets.' : 'Failed to fillet selections.';
+          })()
         : undefined;
     // An Extrude › Intersect that keeps nothing says so on its row.
     if (step.kind === 'extrude' && part?.intersect && !step.suppressed) {
@@ -189,7 +198,9 @@ export function designSteps(document: CadDocument): DesignStep[] {
 export function brokenParts(document: CadDocument): Map<string, string> {
   const byId = new Map(document.parts.map(part => [part.id, part]));
   const masked = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partIds));
-  const broken = new Map<string, string>();
+  // A part naming a variable that's gone can't be built, and what's built on it fails in turn.
+  const naming = cadPartsMissingVariables(document);
+  const broken = new Map<string, string>([...naming].map(id => [id, kVariableMissing]));
   const missing = (id: string): string | null => {
     const host = byId.get(id);
     if (!host) return 'a deleted part';
@@ -202,7 +213,8 @@ export function brokenParts(document: CadDocument): Map<string, string> {
   for (let changed = true; changed; ) {
     changed = false;
     for (const part of document.parts) {
-      if (broken.has(part.id)) continue;
+      // What it's built on being gone comes first, even for a part that names a missing variable itself.
+      if (broken.has(part.id) && !naming.has(part.id)) continue;
       const on = part.drawnOn?.on;
       const face =
         on && 'partId' in on
@@ -226,6 +238,7 @@ export function brokenParts(document: CadDocument): Map<string, string> {
       const reason = face ? `It’s drawn on a face of ${face}.` : adds ? `It adds to ${adds}.` : null;
       if (reason) {
         broken.set(part.id, reason);
+        naming.delete(part.id);
         changed = true;
       }
     }
@@ -258,128 +271,143 @@ function listedSteps(document: CadDocument): DesignStep[] {
   const madeWith = (part: CadPart) => !!part.extrudedWith && !!byId.get(part.extrudedWith) && !byId.get(part.extrudedWith)!.extrudedWith;
   return numberedSteps(
     document,
-    document.parts.flatMap((part, partIndex) => {
-      const steps: DesignStep[] = [
-        // A part extruding another's sketch has none of its own.
-        ...(part.sketchOf || part.faceProfile
-          ? []
-          : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: sketchStepLabel(part), partId: part.id }]),
-        // A sketch not yet extruded is only its sketch, and a part made by another's extrude is listed in that one.
-        ...(part.extrude === false || madeWith(part)
-          ? []
-          : [
-              {
-                id: `${part.id}:extrude`,
-                kind: 'extrude' as const,
-                label: part.extrudeName ?? `${part.hole ? 'Hole' : 'Extrude'} · ${part.name}`,
-                detail: withPartCount(
-                  extrudeDetail(document, part),
-                  1 + (part.extrudedWith ? 0 : document.parts.filter(other => other.extrudedWith === part.id).length)
-                ),
-                partId: part.id,
-                suppressed: !!part.suppressed,
-              },
-            ]),
-        // Moved without copying, by a Transform of its own.
-        ...(part.moved
-          ? [
-              {
-                id: `${part.id}:move`,
-                kind: 'move' as const,
-                label: `Transform · ${part.name}`,
-                detail:
-                  'by' in part.moved
-                    ? `${part.moved.turn ? `turned ${+part.moved.turn.degrees.toFixed(3)}°, ` : ''}moved ${part.moved.by.map(value => +value.toFixed(3)).join(', ')} mm`
-                    : `moved ${+part.moved.distance.toFixed(3)} mm`,
-                partId: part.id,
-              },
-            ]
-          : []),
-      ];
-      let cut = 0;
-      const featureName = (copyId?: string) => {
-        if (!copyId) return part.name;
-        const index = part.copies?.findIndex(copy => copy.id === copyId) ?? -1;
-        return index >= 0 ? cadCopyName(part, index) : `${part.name} · absent copy`;
-      };
-      const absent = (copyId?: string) =>
-        copyId && !part.copies?.some(copy => copy.id === copyId)
-          ? 'This copy is absent. Restore its pattern count to build these features.'
-          : undefined;
-      for (const feature of part.features ?? []) {
-        // What an Extrude → Remove cuts is that step's, listed where it is.
-        if (feature.removedBy) continue;
-        if (feature.type === 'sketch')
-          steps.push({
-            id: feature.id,
-            kind: 'faceSketch',
-            label: `Sketch on ${faceName(part, feature.on)} · ${featureName(feature.copyId)}`,
-            partId: part.id,
-            sketchId: feature.sketch.id,
-            ...(feature.copyId && { copyId: feature.copyId }),
-            broken: absent(feature.copyId),
-          });
-        else {
-          cut++;
-          steps.push({
-            id: feature.id,
-            kind: 'cut',
-            label: `Cut ${cut} · ${featureName(feature.copyId)}`,
-            detail: feature.suppressed
-              ? 'off'
-              : feature.depth === 'through'
-                ? 'through'
-                : typed(feature.depthExpression, feature.depth, document.lengthUnit),
-            partId: part.id,
-            suppressed: !!feature.suppressed,
-            cutId: feature.id,
-            sketchId: feature.sketchId,
-            ...(feature.copyId && { copyId: feature.copyId }),
-            broken: absent(feature.copyId),
-          });
+    filletsAfterTheirCuts(
+      document,
+      document.parts.flatMap((part, partIndex) => {
+        // A piece a through cut split off a part is a part, not a step of the design.
+        if (part.pieceOf) return [];
+        const steps: DesignStep[] = [
+          // A part extruding another's sketch has none of its own, nor has a copy taken out of its pattern to be split.
+          ...(part.sketchOf || part.faceProfile || part.split?.fromCopy
+            ? []
+            : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: sketchStepLabel(part), partId: part.id }]),
+          // A sketch not yet extruded is only its sketch, and a part made by another's extrude is listed in that one.
+          ...(part.extrude === false || madeWith(part) || part.split?.fromCopy
+            ? []
+            : [
+                {
+                  id: `${part.id}:extrude`,
+                  kind: 'extrude' as const,
+                  label: part.extrudeName ?? `${part.hole ? 'Hole' : 'Extrude'} · ${part.name}`,
+                  detail: withPartCount(
+                    extrudeDetail(document, part),
+                    1 + (part.extrudedWith ? 0 : document.parts.filter(other => other.extrudedWith === part.id).length)
+                  ),
+                  partId: part.id,
+                  suppressed: !!part.suppressed,
+                },
+              ]),
+          // Moved without copying, by a Transform of its own.
+          ...(part.moved
+            ? [
+                {
+                  id: `${part.id}:move`,
+                  kind: 'move' as const,
+                  label: `Transform · ${part.name}`,
+                  detail:
+                    'by' in part.moved
+                      ? `${part.moved.turn ? `turned ${+part.moved.turn.degrees.toFixed(3)}°, ` : ''}moved ${part.moved.by.map(value => +value.toFixed(3)).join(', ')} mm`
+                      : `moved ${+part.moved.distance.toFixed(3)} mm`,
+                  partId: part.id,
+                },
+              ]
+            : []),
+        ];
+        let cut = 0;
+        const featureName = (copyId?: string) => {
+          if (!copyId) return part.name;
+          const index = part.copies?.findIndex(copy => copy.id === copyId) ?? -1;
+          return index >= 0 ? cadCopyName(part, index) : `${part.name} · absent copy`;
+        };
+        const absent = (copyId?: string) =>
+          copyId && !part.copies?.some(copy => copy.id === copyId)
+            ? 'This copy is absent. Restore its pattern count to build these features.'
+            : undefined;
+        for (const feature of part.features ?? []) {
+          // What an Extrude → Remove cuts is that step's, listed where it is.
+          if (feature.removedBy) continue;
+          if (feature.type === 'sketch')
+            steps.push({
+              id: feature.id,
+              kind: 'faceSketch',
+              label: `Sketch on ${faceName(part, feature.on)} · ${featureName(feature.copyId)}`,
+              partId: part.id,
+              sketchId: feature.sketch.id,
+              ...(feature.copyId && { copyId: feature.copyId }),
+              broken: absent(feature.copyId),
+            });
+          else {
+            cut++;
+            steps.push({
+              id: feature.id,
+              kind: 'cut',
+              label: `Cut ${cut} · ${featureName(feature.copyId)}`,
+              detail: feature.suppressed
+                ? 'off'
+                : feature.depth === 'through'
+                  ? 'through'
+                  : typed(feature.depthExpression, feature.depth, document.lengthUnit),
+              partId: part.id,
+              suppressed: !!feature.suppressed,
+              cutId: feature.id,
+              sketchId: feature.sketchId,
+              ...(feature.copyId && { copyId: feature.copyId }),
+              broken: absent(feature.copyId),
+            });
+          }
         }
-      }
-      for (const fillet of part.fillets ?? [])
-        steps.push({
-          id: fillet.id,
-          kind: 'fillet',
-          label: `Fillet · ${part.name}`,
-          detail: fillet.suppressed ? 'off' : `r ${typed(fillet.radiusExpression, fillet.radius, document.lengthUnit)}`,
-          partId: part.id,
-          suppressed: !!fillet.suppressed,
-        });
-      for (const join of part.mirrorJoins ?? [])
-        steps.push({ id: join.id, kind: 'mirror', label: `Mirror · ${part.name}`, partId: part.id, suppressed: !!join.suppressed });
-      (part.copies ?? []).forEach((copy, index) => {
-        if (!copy.pattern)
+        for (const fillet of part.fillets ?? [])
           steps.push({
-            id: copy.id,
-            kind: 'copy',
-            label: `${copy.offset ? 'Transform' : copy.mirrored ? 'Mirrored copy' : 'Copy'} · ${cadCopyName(part, index)}`,
+            id: fillet.id,
+            kind: 'fillet',
+            label: `Fillet · ${part.name}`,
+            detail: fillet.suppressed ? 'off' : `r ${typed(fillet.radiusExpression, fillet.radius, document.lengthUnit)}`,
             partId: part.id,
-            copyId: copy.id,
-            suppressed: !!copy.suppressed,
+            suppressed: !!fillet.suppressed,
           });
-      });
-      if (part.pattern)
-        steps.push({
-          id: part.pattern.id,
-          kind: 'pattern',
-          // A Remove's pattern repeats its cuts: a feature pattern, numbered among them.
-          label:
-            part.remove && !part.pattern.circular
-              ? `Linear pattern ${document.parts.filter(other => other.remove && other.pattern && !other.pattern.circular).indexOf(part) + 1}`
-              : part.pattern.circular
-                ? `Circular pattern · ${part.name} × ${part.pattern.count}`
-                : `Pattern · ${part.name} × ${part.pattern.count} along ${part.pattern.axis}`,
-          detail: part.pattern.circular
-            ? `angle ${part.pattern.circular.angleExpression ? `${part.pattern.circular.angleExpression} = ` : ''}${+part.pattern.circular.angle.toFixed(3)}°`
-            : `spacing ${typed(part.pattern.spacingExpression, part.pattern.spacing, document.lengthUnit)}`,
-          partId: part.id,
-          suppressed: !!part.pattern.suppressed,
+        for (const join of part.mirrorJoins ?? [])
+          steps.push({ id: join.id, kind: 'mirror', label: `Mirror · ${part.name}`, partId: part.id, suppressed: !!join.suppressed });
+        (part.copies ?? []).forEach((copy, index) => {
+          if (!copy.pattern)
+            steps.push({
+              id: copy.id,
+              kind: 'copy',
+              label: `${copy.offset ? 'Transform' : copy.mirrored ? 'Mirrored copy' : 'Copy'} · ${cadCopyName(part, index)}`,
+              partId: part.id,
+              copyId: copy.id,
+              suppressed: !!copy.suppressed,
+            });
         });
-      return [...steps, ...(after.get(partIndex) ?? [])];
-    })
+        if (part.pattern)
+          steps.push({
+            id: part.pattern.id,
+            kind: 'pattern',
+            // A Remove's pattern repeats its cuts: a feature pattern, numbered among them.
+            label:
+              part.remove && !part.pattern.circular
+                ? `Linear pattern ${document.parts.filter(other => other.remove && other.pattern && !other.pattern.circular).indexOf(part) + 1}`
+                : part.pattern.circular
+                  ? // Numbered among the circular patterns, as the reference numbers features.
+                    `Circular pattern ${document.parts.filter(other => other.pattern?.circular).indexOf(part) + 1}`
+                  : `Pattern · ${part.name} × ${part.pattern.count} along ${part.pattern.axis}`,
+            detail: part.pattern.circular
+              ? `angle ${part.pattern.circular.angleExpression ? `${part.pattern.circular.angleExpression} = ` : ''}${+part.pattern.circular.angle.toFixed(3)}°`
+              : `spacing ${typed(part.pattern.spacingExpression, part.pattern.spacing, document.lengthUnit)}`,
+            partId: part.id,
+            suppressed: !!part.pattern.suppressed,
+          });
+        // A Split, numbered among them as the reference numbers features.
+        if (part.split)
+          steps.push({
+            id: part.split.id,
+            kind: 'split',
+            label: `Split ${document.parts.filter(other => other.split).indexOf(part) + 1}`,
+            partId: part.id,
+            suppressed: !!part.split.suppressed,
+          });
+        return [...steps, ...(after.get(partIndex) ?? [])];
+      })
+    )
   );
 }
 
@@ -427,4 +455,34 @@ export function rolledBackTo(document: CadDocument, stepId: string): CadDocument
   else delete next.partCuts;
   // Add and Remove steps kept still add and cut; shared sketches go to the first part left that uses them.
   return resolveExtrudeSteps(trimCadFolders(next));
+}
+
+/**
+ * A Fillet that rounds the edges of cuts later steps made, as a cup's rim made by Extrude › Remove, comes after those
+ * steps, where it was made: the steps are listed part by part otherwise, and its part's come first.
+ */
+function filletsAfterTheirCuts(document: CadDocument, steps: DesignStep[]): DesignStep[] {
+  const fillets = new Map(document.parts.flatMap(part => (part.fillets ?? []).map(fillet => [fillet.id, { part, fillet }] as const)));
+  let ordered = steps;
+  for (const step of steps) {
+    if (step.kind !== 'fillet') continue;
+    const found = fillets.get(step.id);
+    if (!found) continue;
+    const cuts = new Map(cadCuts(found.part).map(cut => [cut.id, cut.removedBy]));
+    // A cut's id names the Remove that makes it, so the order holds while that Remove cuts nothing, as at no depth.
+    const after = new Set(
+      (found.fillet.rims ?? []).flatMap(rim =>
+        rim.loops.flatMap(loop => {
+          const by = cuts.get(loop) ?? (loop.includes(':cut:') ? loop.split(':cut:')[0] : undefined);
+          return by ? [`${by}:extrude`] : [];
+        })
+      )
+    );
+    if (!after.size) continue;
+    const last = Math.max(...ordered.flatMap((candidate, index) => (after.has(candidate.id) ? [index] : [])));
+    const at = ordered.indexOf(step);
+    if (last < 0 || last < at) continue;
+    ordered = [...ordered.slice(0, at), ...ordered.slice(at + 1, last + 1), step, ...ordered.slice(last + 1)];
+  }
+  return ordered;
 }

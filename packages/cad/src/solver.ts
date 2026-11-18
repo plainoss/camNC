@@ -296,6 +296,10 @@ function* solveCadSteps(document: CadDocument, options: CadSolveOptions): Genera
                 : { id: `${e.id}:arc-rules`, type: 'arc_rules', a_id: e.id }
             );
           }
+        // A circle edge of the face the sketch is on is fixed with it: its radius is the face's, not the solver's to change.
+        for (const e of ordered)
+          if (e.type === 'circle' && e.faceEdge)
+            primitives.push({ id: `${e.id}:face-radius`, type: 'circle_radius', c_id: e.id, radius: e.radius });
         const coincident = pointEquivalence(part.sketch.constraints);
         const topology = compilePatternTopology(part.sketch);
         primitives.push(...topology.primitives);

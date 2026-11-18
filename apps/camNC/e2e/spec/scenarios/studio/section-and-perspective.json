@@ -1,0 +1,87 @@
+[
+ {
+  "id": "studio/section-and-perspective/view-only-settings",
+  "title": "Perspective view and Section view change only the display; the geometry is untouched",
+  "evidence": "design workflow parity spec",
+  "steps": [
+   "dialogcancel",
+   "view top",
+   "selectfeature Top",
+   "key Shift+s",
+   "key g",
+   "rect 0,0 100,60",
+   "closesketch",
+   "key Shift+e",
+   "viewpick 50,30,0",
+   "dialogfill Thickness = 40",
+   "key Enter",
+   "key Enter",
+   "key p",
+   "key p",
+   "key Shift+7",
+   {
+    "spec": "1 select"
+   },
+   "viewmenu",
+   {
+    "expect": {
+     "pageText": "Perspective view"
+    }
+   },
+   {
+    "spec": "2 select"
+   },
+   "menuitem Perspective view",
+   {
+    "spec": "3 select"
+   },
+   "viewmenu Perspective view",
+   {
+    "spec": "4 select"
+   },
+   "viewmenu Section view…",
+   {
+    "expect": {
+     "pageText": "Select a plane, planar face, cylinder, cone, or mate connector\\."
+    }
+   },
+   {
+    "spec": "5 select"
+   },
+   "selectfeature Front",
+   {
+    "expect": {
+     "pageText": "Section plane 1 \\(Front\\)"
+    }
+   },
+   {
+    "spec": "6 field"
+   },
+   "dialogfill Offset = -20",
+   "key Tab",
+   {
+    "expect": {
+     "pageText": "Section plane 1 \\(Back\\)"
+    }
+   },
+   {
+    "spec": "7 confirm"
+   },
+   "dialogconfirm",
+   {
+    "spec": "8 select"
+   },
+   "viewmenu Turn off section view",
+   {
+    "expect": {
+     "studio": {
+      "dialog": null,
+      "parts": [
+       "Part 1"
+      ]
+     }
+    }
+   }
+  ]
+ }
+]
