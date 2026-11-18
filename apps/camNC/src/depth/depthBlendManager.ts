@@ -154,7 +154,7 @@ export class DepthBlendManager {
     if (!this.applied) {
       console.log('initialising depth blend worker');
       this.localStream = await this.deps.createStream(source);
-      await proxy.init(transferStream(this.localStream), params);
+      await proxy.init(transferStream(this.localStream), { mode: 'depth', params });
       this.applied = { source, params, settings: null };
     }
     await this.pushChanges(proxy, this.applied);

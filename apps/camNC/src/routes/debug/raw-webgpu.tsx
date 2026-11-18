@@ -1,6 +1,6 @@
 import { PageHeader } from '@/components/page-header';
 import { RemapStepParams } from '@/depth/remapPipeline';
-import type { VideoPipelineWorkerAPI } from '@/depth/videoPipeline.worker';
+import type { Config, VideoPipelineWorkerAPI } from '@/depth/videoPipeline.worker';
 import { useAutoScanMarkers } from '@/hooks/useAutoScanMarkers';
 import { useCalibrationData, useCameraExtrinsics, useCamResolution, useMachineBoundsOrNull, useVideoUrl } from '@/store/store';
 import { createFileRoute } from '@tanstack/react-router';
@@ -59,10 +59,11 @@ function RawWebGPURoute() {
       };
 
       params.outputSize = camRes;
+      const cfg: Config = { mode: 'depth', params };
 
       setDisplaySize(camRes);
 
-      await proxy.init(Comlink.transfer(stream as any, [stream as any]), params);
+      await proxy.init(Comlink.transfer(stream as any, [stream as any]), cfg);
 
       await proxy.start(
         Comlink.proxy((result: { bg: ImageBitmap }) => {
