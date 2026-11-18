@@ -1,6 +1,6 @@
 import type { CadDocument, CadDrawnOn } from '@wbcnc/cad';
 import type { CadHistoryMark } from '@wbcnc/cad-editor/session';
-import type { PartPatternKind } from './partPatternKind';
+import type { PatternOpening } from './partPatternKind';
 import type { StudioCommand } from './studioCommands';
 
 /** A part's step set in its own dialog, which commits as it is edited. */
@@ -9,7 +9,7 @@ export interface StudioFeatureDialog {
   partId: string;
   /** The design and its undo history as the dialog found them, for Cancel to go back to. */
   before: CadHistoryMark;
-  initialPatternKind?: PartPatternKind;
+  initialPatternKind?: PatternOpening;
 }
 
 /**
@@ -20,13 +20,15 @@ export type StudioDialog =
   | StudioFeatureDialog
   /** A part being copied by a transform, the transformed copy being changed, or the part's own move. */
   | { kind: 'transform'; partId: string; copyId?: string; move?: boolean }
-  | { kind: 'mirror'; partId: string; copyId?: string }
+  | { kind: 'mirror'; partId: string; copyId?: string; joinId?: string }
   | { kind: 'fillet'; partId?: string; filletId?: string }
   | { kind: 'plane'; id?: string; preselected?: CadDrawnOn['on'] }
   /** A variable being added, or the one being changed. */
   | { kind: 'variable'; id?: string }
-  /** A "cut parts" step being added, or the one being changed. */
-  | { kind: 'partCut'; id?: string };
+  /** A "cut parts" or Boolean step being added, or the one being changed. */
+  | { kind: 'partCut'; id?: string; boolean?: true }
+  /** A part being split with a plane, or the Split of `partId` being changed. */
+  | { kind: 'split'; partId?: string };
 
 /** The toolbar command each dialog belongs to, which shows as active while it is open. */
 export const dialogCommand: Record<StudioDialog['kind'], StudioCommand> = {
@@ -39,6 +41,7 @@ export const dialogCommand: Record<StudioDialog['kind'], StudioCommand> = {
   plane: 'plane',
   variable: 'variable',
   partCut: 'cutParts',
+  split: 'split',
 };
 
 /**
@@ -55,13 +58,15 @@ export function dialogKey(dialog: StudioDialog): string | null {
     case 'transform':
       return `${dialog.partId}:${dialog.copyId ?? 'new'}`;
     case 'mirror':
-      return dialog.copyId ?? dialog.partId;
+      return dialog.joinId ?? dialog.copyId ?? dialog.partId;
     case 'fillet':
       return dialog.filletId ?? 'new';
     case 'plane':
     case 'variable':
     case 'partCut':
       return dialog.id ?? 'new';
+    case 'split':
+      return dialog.partId ?? 'new';
   }
 }
 
@@ -77,7 +82,14 @@ export function featureDialog(dialog: StudioDialog | null): StudioFeatureDialog 
 
 /** Whether a part clicked in the view or the Parts list goes to the dialog rather than the selection. */
 export function picksParts(dialog: StudioDialog | null): boolean {
-  return !!dialog && (dialog.kind === 'partCut' || dialog.kind === 'mirror' || dialog.kind === 'transform' || dialog.kind === 'pattern');
+  return (
+    !!dialog &&
+    (dialog.kind === 'partCut' ||
+      dialog.kind === 'mirror' ||
+      dialog.kind === 'transform' ||
+      dialog.kind === 'pattern' ||
+      dialog.kind === 'split')
+  );
 }
 
 /**
@@ -101,7 +113,11 @@ export function editedStepId(document: CadDocument, dialog: StudioDialog | null)
     case 'transform':
       return dialog.copyId ?? (dialog.move ? `${dialog.partId}:move` : null);
     case 'mirror':
-      return dialog.copyId ?? null;
+      return dialog.joinId ?? dialog.copyId ?? null;
+    case 'fillet':
+      return dialog.filletId ?? null;
+    case 'split':
+      return (dialog.partId && document.parts.find(part => part.id === dialog.partId)?.split?.id) || null;
     default:
       return null;
   }

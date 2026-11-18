@@ -9,7 +9,7 @@ import {
   type CadDocument,
   type CadDrawnOn,
 } from '@wbcnc/cad';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { page, userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
@@ -75,6 +75,12 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
     await userEvent.clear(field);
     await userEvent.type(field, value);
     await userEvent.keyboard('{Tab}');
+    await settled();
+  };
+  // A confirmed sketch's Extrude starts with nothing picked: its region is picked in the view.
+  const pickRegion = async () => {
+    const view = studioProps().regions!.find(region => !region.picked)!;
+    act(() => studioProps().onPickRegion!(view.id));
     await settled();
   };
   const ok = async () => {
@@ -153,6 +159,7 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   await drawRect([0, 0], [57, 63]);
   await unchanged(initial);
   await command('Extrude');
+  await pickRegion();
   await thickness('25');
   await ok();
   await unchanged(initial);
@@ -163,6 +170,7 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   await drawRect([0, 48], [57, 63]);
   await unchanged(initial);
   await command('Extrude');
+  await pickRegion();
   // Add has its own depth and end condition when it joins another sketch's body.
   expect(screen.getByRole('tab', { name: 'Add' }).getAttribute('aria-selected')).toBe('true');
   await thickness('65.7');
@@ -177,7 +185,9 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   await drawRect([0, 25], [63, 90.7]);
   await unchanged(secondView);
   await command('Extrude');
-  expect((screen.getByRole('combobox', { name: 'Merge scope' }) as HTMLSelectElement).value).toBe(latest.parts[1]!.id);
+  await pickRegion();
+  // Drawn on one part's side and standing against another, it stays a new part: which to add to is picked by hand.
+  expect(screen.getByRole('tab', { name: 'New' }).getAttribute('aria-selected')).toBe('true');
   await thickness('3');
   await userEvent.click(screen.getByRole('button', { name: 'Flip direction' }));
   await userEvent.click(screen.getByRole('button', { name: 'Flip direction' }));
@@ -201,7 +211,14 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   await clickFace({ partId: first, face: 'underside' }, -28.5, 31.5);
   await waitFor(() => expect(latest.parts[3]!.thickness).toBeCloseTo(25, 3));
   await userEvent.click(screen.getByRole('tab', { name: 'Add' }));
-  expect(screen.getByRole('alert').textContent).toMatch(/merge scope/);
+  // The step still needs its part: the title turns red and says why on hovering, with no line of text in the dialog.
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(
+    screen
+      .getByRole('dialog', { name: /^Extrude/ })
+      .querySelector('h3')
+      ?.getAttribute('title')
+  ).toMatch(/merge scope/);
   expect(latest.parts.filter(isCadPart)).toHaveLength(3);
   expect(screen.getByRole('button', { name: 'OK' })).toHaveProperty('disabled', true);
   await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Merge scope' }), side);

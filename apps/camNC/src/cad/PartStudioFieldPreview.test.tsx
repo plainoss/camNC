@@ -46,7 +46,7 @@ it('previews extrusion offsets as soon as valid text is entered', () => {
   const part = { ...document.parts[0]!, drawnOn: { on: { plane: 'top' as const }, offset: 0 } };
   const change = vi.fn();
   render(<CadDrawnOnField livePreview document={document} part={part} onChange={change} />);
-  edit('Offset', '12');
+  edit('Starting offset', '12');
   expect(change).toHaveBeenLastCalledWith({ on: { plane: 'top' }, offset: 12 });
 });
 

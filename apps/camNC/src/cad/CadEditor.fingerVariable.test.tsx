@@ -45,6 +45,8 @@ it('says on the joined parts and the Cut parts row why a finger count of 1 isnâ€
   for (const name of ['Leg A', 'Leg B'])
     expect(within(parts().getByRole('button', { name: new RegExp(`^â–±?\\s*${name}`) })).queryByRole('img')).toBeNull();
   const step = within(features).getByRole('button', { name: /^Cut Side with Front/ });
-  expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(message);
+  expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(
+    `Cut Side with Front did not regenerate properly: ${message}`
+  );
   expect(within(features).getByRole('status', { name: '1 with errors' })).toBeDefined();
 });

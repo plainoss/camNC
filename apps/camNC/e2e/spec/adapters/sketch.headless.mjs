@@ -89,8 +89,8 @@ export function createAdapter() {
     const fail = (name, want, got) => failures.push(`${name}: wanted ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
     const part = await solvedPart();
     if (SKETCH_KEYS.some(key => key in expect)) checkSketch(expect, canonical(part), fail);
-    // The editor fills every closed region with one shape, so the page shows one region shape or none.
-    const regions = sketchRegions(part.sketch).length ? 1 : 0;
+    // The editor shades each closed region with a shape of its own.
+    const regions = sketchRegions(part.sketch).length;
     if ('regions' in expect && regions !== expect.regions) fail('regions', expect.regions, regions);
     const tool = editor.state().tool;
     if ('tool' in expect && !tool.toLowerCase().startsWith(expect.tool.toLowerCase())) fail('tool', expect.tool, [tool]);

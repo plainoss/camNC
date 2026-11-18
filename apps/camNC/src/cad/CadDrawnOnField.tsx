@@ -54,7 +54,7 @@ export function CadDrawnOnField({
     <div className="cad-drawn-on-field">
       <p className="cad-thickness-hint">Drawn on {drawnOnName(document, part.drawnOn.on)}.</p>
       <label htmlFor={id} className="cad-number-field">
-        Offset
+        Starting offset
         <span>
           <CadValueInput
             bare

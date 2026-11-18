@@ -1,5 +1,4 @@
 import type { CadSketch } from '@wbcnc/cad';
-import { isEmptySketch } from '@wbcnc/cad-editor/sketchFeedback';
 import type { ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
 import type { SketchTool } from './sketchTools';
 
@@ -24,8 +23,8 @@ export function sketchPendingFinishReason({
   cornerReady?: boolean;
 }): string | null {
   if (tool === 'slot' && selected) return 'Create the slot or press Escape before finishing the sketch.';
-  if ((tool === 'linearPattern' || tool === 'circularPattern') && selected)
-    return 'Apply the pattern or press Escape before finishing the sketch.';
+  // A linear pattern being set up is applied as the sketch is confirmed, as it's edited in place.
+  if (tool === 'circularPattern' && selected) return 'Apply the pattern or press Escape before finishing the sketch.';
   if (tool === 'transform' && selected) return 'Apply the transform or press Escape before finishing the sketch.';
   if (splitting) return 'Choose the second split point or press Escape before finishing the sketch.';
   if ((tool === 'fillet' || tool === 'chamfer') && selected && !cornerReady)
@@ -51,6 +50,8 @@ export function openSketchFinishReason(
   if (state.pending || state.edgeOnBoard) return state.pending;
   if (!state.face && !state.thickness) return 'Enter a valid part thickness before finishing the sketch.';
   if (problems.length) return problems.join(' ');
-  const drawn = state.studio ? !isEmptySketch(sketch) : !!sketch?.entities.some(e => e.type !== 'point' && !e.construction);
+  // A Part Studio sketch confirms even when it's empty, as the reference's does: a feature using it then fails instead.
+  if (state.studio) return null;
+  const drawn = !!sketch?.entities.some(e => e.type !== 'point' && !e.construction);
   return state.face || drawn ? null : 'Draw an outline before finishing the sketch.';
 }

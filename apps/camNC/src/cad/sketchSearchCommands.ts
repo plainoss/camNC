@@ -33,6 +33,9 @@ export const sketchSearchCommands: SearchCommand[] = [
       'perpendicular',
       'equal',
       'tangent',
+      'normal',
+      'pierce',
+      'curvature',
     ] as const
   ).map(id => ({ id, label: id[0]!.toUpperCase() + id.slice(1), description: constraintPrompt(id) })),
   { id: 'construction', label: 'Construction geometry', key: 'Q' },

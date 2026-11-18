@@ -63,9 +63,24 @@ function wantedFaceEdges(document: CadDocument, part: CadPart): CadEntity[] {
     };
     const drawn = lines.filter(e => points.has(e.startId) && points.has(e.endId));
     const ends = drawn.map(e => [cornerOf(e.startId), cornerOf(e.endId)] as const);
+    // Its circles too, each with its centre: a round part's edge is one to use and dimension to.
+    const circles = support.sketch.entities.filter(
+      (e): e is Extract<CadEntity, { type: 'circle' }> => e.type === 'circle' && !e.construction && !e.faceEdge && points.has(e.centerId)
+    );
     return [
       ...[...corners.values()].map(id => point(id, points.get(id)!.x * flip, points.get(id)!.y)),
       ...drawn.flatMap((e, i) => (ends[i]![0] === ends[i]![1] ? [] : [line(e.id, ...ends[i]!)])),
+      ...circles.flatMap(e => [
+        point(`${e.id}:center`, points.get(e.centerId)!.x * flip, points.get(e.centerId)!.y),
+        {
+          id: faceEdgeId(sketch, e.id),
+          type: 'circle' as const,
+          centerId: faceEdgeId(sketch, `${e.id}:center`),
+          radius: e.radius,
+          construction: true,
+          faceEdge: true,
+        },
+      ]),
     ];
   }
   const outline = drawnOnOutline(document, part);
@@ -83,6 +98,9 @@ function wantedFaceEdges(document: CadDocument, part: CadPart): CadEntity[] {
  */
 export function withFaceEdges(document: CadDocument, part: CadPart): CadSketch {
   const sketch = part.sketch;
+  // Solved on its own, as a dimension is checked, the face isn't in the document: its edges stay as they are.
+  const on = part.drawnOn?.on;
+  if (on && 'partId' in on && !document.parts.some(candidate => candidate.id === on.partId)) return sketch;
   const wanted = new Map(wantedFaceEdges(document, part).map(e => [e.id, e]));
   if (!wanted.size && !sketch.entities.some(isFaceEdge)) return sketch;
   // What the drawing itself uses: its relations, and its own curves' points.
@@ -101,8 +119,10 @@ export function withFaceEdges(document: CadDocument, part: CadPart): CadSketch {
     const next = wanted.get(e.id);
     wanted.delete(e.id);
     if (next) {
-      if (JSON.stringify(next) !== JSON.stringify(e)) changed = true;
-      entities.push(next);
+      // An edge taken in with Use stays in the drawing as the face moves.
+      const kept = e.taken ? { ...next, construction: false, taken: true as const } : next;
+      if (JSON.stringify(kept) !== JSON.stringify(e)) changed = true;
+      entities.push(kept);
     } else {
       changed = true;
       if (!used.has(e.id)) continue;

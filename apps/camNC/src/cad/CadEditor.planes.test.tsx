@@ -38,12 +38,12 @@ it('makes a plane offset from a base plane, sketches on it, and what’s drawn o
   const geometry = within(features).getByRole('list', { name: 'Default geometry' });
 
   await userEvent.click(await studioCommand(/^Plane/));
-  const dialog = screen.getByRole('dialog', { name: 'Plane' });
+  const dialog = screen.getByRole('dialog', { name: /^Plane \d/ });
   // The selection box starts active, so the plane clicked next is what it's offset from.
-  expect(within(dialog).getByRole('button', { name: 'Plane on' }).hasAttribute('data-active')).toBe(true);
+  expect(within(dialog).getByRole('button', { name: 'Entities' }).hasAttribute('data-active')).toBe(true);
   await userEvent.click(within(geometry).getByRole('button', { name: /Top/ }));
-  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Plane on' }).textContent).toContain('top plane'));
-  const offset = within(dialog).getByRole('textbox', { name: 'Offset' });
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Entities' }).textContent).toContain('Top plane'));
+  const offset = within(dialog).getByRole('textbox', { name: 'Offset distance' });
   await userEvent.clear(offset);
   await userEvent.type(offset, '120');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
@@ -61,7 +61,7 @@ it('makes a plane offset from a base plane, sketches on it, and what’s drawn o
     expect(latest().parts.at(-1)!.drawnOn).toMatchObject({ on: { plane: 'top' }, offset: 120, datum: latest().planes![0]!.id })
   );
   // Nothing drawn yet, the sketch is cancelled and goes again.
-  await userEvent.click(within(await screen.findByRole('dialog', { name: /^Sketch · / })).getByRole('button', { name: 'Cancel' }));
+  await userEvent.click(within(await screen.findByRole('dialog', { name: /^Sketch( · | \d)/ })).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(latest().parts).toHaveLength(1));
 });
 
@@ -75,8 +75,8 @@ it('moves what’s drawn on a plane with it, and leaves it there when the plane 
   const features = screen.getByRole('region', { name: 'Features' });
   await userEvent.dblClick(await within(features).findByRole('button', { name: /Plane 1/ }));
   const dialog = screen.getByRole('dialog', { name: 'Plane 1' });
-  await userEvent.clear(within(dialog).getByRole('textbox', { name: 'Offset' }));
-  await userEvent.type(within(dialog).getByRole('textbox', { name: 'Offset' }), '200');
+  await userEvent.clear(within(dialog).getByRole('textbox', { name: 'Offset distance' }));
+  await userEvent.type(within(dialog).getByRole('textbox', { name: 'Offset distance' }), '200');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest().parts.find(part => part.id === 'shelf')!.drawnOn!.offset).toBe(200));
 
@@ -94,11 +94,11 @@ it('keeps waiting for the plane to offset from when Plane is clicked again befor
 
   await userEvent.click(await studioCommand(/^Plane/));
   await userEvent.click(await studioCommand(/^Plane/));
-  const dialog = screen.getByRole('dialog', { name: 'Plane' });
-  expect(within(dialog).getByRole('button', { name: 'Plane on' }).hasAttribute('data-active')).toBe(true);
+  const dialog = screen.getByRole('dialog', { name: /^Plane \d/ });
+  expect(within(dialog).getByRole('button', { name: 'Entities' }).hasAttribute('data-active')).toBe(true);
   // The plane clicked next still goes to the dialog.
   await userEvent.click(within(geometry).getByRole('button', { name: /Front/ }));
-  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Plane on' }).textContent).toContain('front plane'));
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Entities' }).textContent).toContain('Front plane'));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest().planes).toMatchObject([{ on: { plane: 'front' } }]));
 });

@@ -144,7 +144,9 @@ export function existingDesignEdit(ctx: EditContext, scope?: ExistingScope): Exi
       copy: ['suppressed'],
       pattern: ['count', 'spacing', 'axis', 'suppressed'],
       partCut: ['tools', 'targets', 'clearance', 'suppressed'],
+      mirror: ['suppressed'],
       fillet: ['radius', 'suppressed'],
+      split: ['suppressed'],
     };
     const circularPattern = step.kind === 'pattern' && !!getPart(step.partId).pattern?.circular;
     const allowed = circularPattern ? ['count', 'suppressed'] : fields[step.kind];

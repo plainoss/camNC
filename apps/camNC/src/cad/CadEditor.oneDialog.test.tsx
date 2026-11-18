@@ -41,16 +41,16 @@ async function start(command: RegExp, dialog: string | RegExp) {
 
 it('replaces an open Fillet dialog with the Transform started next, and the other way round', async () => {
   await studio();
-  await start(/^Fillet/, 'Fillet');
+  await start(/^Fillet/, /^Fillet \d/);
   await start(/^Transform/, /^Transform/);
   expect(screen.getAllByRole('dialog')).toHaveLength(1);
-  await start(/^Fillet/, 'Fillet');
+  await start(/^Fillet/, /^Fillet \d/);
   expect(screen.getAllByRole('dialog')).toHaveLength(1);
 });
 
 it.each([
-  [/^Mirror/, 'Mirror'],
-  [/^Fillet/, 'Fillet'],
+  [/^Mirror/, /^Mirror \d/],
+  [/^Fillet/, /^Fillet \d/],
 ] as const)('holds Done back while the %s dialog is open', async (command, name) => {
   const { done } = await studio();
   expect(done()).toHaveProperty('disabled', false);

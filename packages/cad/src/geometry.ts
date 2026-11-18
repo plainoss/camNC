@@ -1,3 +1,5 @@
+import { thinWallShape } from './thinWall';
+import { withMirrorJoins } from './mirrorJoins';
 import { slotIssue } from './slot';
 import { linearPatternIssue } from './pattern';
 import { constraintEntityIds, entityPointIds, originId } from './document';
@@ -45,7 +47,7 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
   const operationIssue = copyOperationSourceIssue(document);
   if (operationIssue) diagnostics.push({ code: 'invalid-copy-operations', message: operationIssue, severity: 'error' });
   for (const move of document.copyTransforms ?? []) addId(move.id, move.partId);
-  if (![1, 2, 3, 4, 5, 6].includes(document.version) || !Number.isSafeInteger(document.revision) || document.revision < 0)
+  if (![1, 2, 3, 4, 5, 6, 7].includes(document.version) || !Number.isSafeInteger(document.revision) || document.revision < 0)
     diagnostics.push({ code: 'invalid-document', message: 'Unsupported or invalid CAD document.', severity: 'error' });
   if (!document.parts.length) diagnostics.push({ code: 'no-parts', message: 'Add a part before preparing a cut.', severity: 'error' });
   const constructionIssue = constructionShapeIssue(document.constructions);
@@ -98,7 +100,15 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
       if (e.type === 'line') {
         const a = entities.get(e.startId),
           b = entities.get(e.endId);
-        if (!isOwnedSplineHandle(e) && a?.type === 'point' && b?.type === 'point' && distance(a, b) < CAD_GEOMETRY_TOLERANCE)
+        // A sketch extruded by the regions picked in it can hold a line collapsed to a point, as by a dimension of zero:
+        // it bounds no region, and the extrude that wanted one says so.
+        if (
+          !part.regions &&
+          !isOwnedSplineHandle(e) &&
+          a?.type === 'point' &&
+          b?.type === 'point' &&
+          distance(a, b) < CAD_GEOMETRY_TOLERANCE
+        )
           error('zero-length', 'Remove or redraw this zero-length line.', [e.id]);
       }
       if (e.type === 'ellipse' && (!Number.isFinite(e.radius) || e.radius <= CAD_GEOMETRY_TOLERANCE))
@@ -435,6 +445,11 @@ export function cadThinLine(part: CadPart): { a: CadPoint; b: CadPoint; id: stri
 }
 
 export function evaluateCadPart(part: CadPart): { part?: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
+  // Mirror › Add steps come after everything else on the part: what's made, rounded, is joined with its mirror image.
+  if (part.mirrorJoins?.length) {
+    const { mirrorJoins: _joins, ...plain } = part;
+    return withMirrorJoins(part, evaluateCadPart(plain));
+  }
   // Fillet steps round the part's corners where it's made, leaving its sketch as drawn.
   if (part.fillets?.length) {
     const filleted = withEdgeFillets(part);
@@ -465,7 +480,12 @@ export function evaluateCadPart(part: CadPart): { part?: EvaluatedCadPart; diagn
       diagnostics: [],
     };
   }
-  if (part.regions) return regionProfile(part as CadPart & { regions: string[] });
+  if (part.regions) {
+    const made = regionProfile(part as CadPart & { regions: string[] });
+    if (!part.thinWall || !made.part) return made;
+    const walled = thinWallShape(part, made.part);
+    return { part: walled.part, diagnostics: [...made.diagnostics, ...walled.diagnostics] };
+  }
   const diagnostics: CadDiagnostic[] = [];
   const error = (code: string, message: string, entityIds?: string[]) =>
     diagnostics.push({ code, message, severity: 'error', partId: part.id, entityIds });

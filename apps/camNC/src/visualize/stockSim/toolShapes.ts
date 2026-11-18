@@ -25,6 +25,8 @@ export const kToolShapeChoices: { value: ToolShapeChoice; label: string }[] = [
 export function shapeFromToolInfo(info: ToolInfo): ToolShape {
   const radius = info.diameter / 2;
   if (info.taper !== undefined && info.taper > 0 && info.taper < 90) return { kind: 'vbit', radius, halfAngle: info.taper };
+  // A corner radius of half the diameter is a ball end, whatever its name.
+  if (info.cornerRadius !== undefined && info.cornerRadius >= radius * 0.99) return { kind: 'ball', radius };
   if (/ball|bull ?nose|radius/i.test(info.name) && !info.isFlat) return { kind: 'ball', radius };
   return { kind: 'flat', radius };
 }

@@ -1,5 +1,6 @@
 import { PageHeader } from '@/components/page-header';
 import { ImportToolLibrary } from '@/cam/plan/ImportToolLibrary';
+import { isBallBit, kBuiltInBits } from '@/cam/planSettings';
 import { useToolLibrary, type StoredBit } from '@/cam/toolLibrary';
 import { createFileRoute } from '@tanstack/react-router';
 import { Button } from '@wbcnc/ui/components/button';
@@ -21,21 +22,29 @@ function BitForm({
   onCancel,
 }: {
   bit?: StoredBit;
-  onSave: (b: Pick<StoredBit, 'diameter' | 'flutes' | 'name'>) => void;
+  onSave: (b: Pick<StoredBit, 'diameter' | 'flutes' | 'name' | 'shape'>) => void;
   onCancel: () => void;
 }) {
   const [d, setD] = useState(bit ? String(bit.diameter) : '');
   const [flutes, setFlutes] = useState(bit?.flutes ? String(bit.flutes) : '2');
   const [name, setName] = useState(bit?.name ?? '');
+  const [ball, setBall] = useState(!!bit && isBallBit(bit));
   const diameter = parseFloat(d);
   const ok = Number.isFinite(diameter) && diameter > 0 && diameter <= 25;
   return (
     <form
-      className="grid grid-cols-[90px_70px_1fr_auto_auto] items-center gap-2"
+      className="grid grid-cols-[90px_70px_80px_1fr_auto_auto] items-center gap-2"
       aria-label={bit ? `Edit ${bit.name}` : 'New bit'}
       onSubmit={e => {
         e.preventDefault();
-        if (ok) onSave({ diameter, flutes: parseInt(flutes) || undefined, name: name.trim() || `${diameter} mm flat` });
+        if (ok)
+          onSave({
+            diameter,
+            flutes: parseInt(flutes) || undefined,
+            name: name.trim() || `${diameter} mm ${ball ? 'ball end' : 'flat'}`,
+            // Ball bits finish rounded edges; flat ones cut everything else.
+            shape: ball ? 'ball' : undefined,
+          });
       }}>
       <Input
         aria-label="Diameter (mm)"
@@ -56,6 +65,14 @@ function BitForm({
         value={flutes}
         onChange={e => setFlutes(e.target.value)}
       />
+      <select
+        aria-label="Shape"
+        className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+        value={ball ? 'ball' : 'flat'}
+        onChange={e => setBall(e.target.value === 'ball')}>
+        <option value="flat">Flat</option>
+        <option value="ball">Ball end</option>
+      </select>
       <Input aria-label="Name" placeholder="Name" className="h-8" value={name} onChange={e => setName(e.target.value)} />
       <Button size="sm" type="submit" disabled={!ok}>
         Save
@@ -94,8 +111,9 @@ function BitsPage() {
             <CardHeader>
               <CardTitle>Your bits</CardTitle>
               <CardDescription>
-                Offered in every CAM job, with the built-in 1/8″ flat, 1/8″ compression, 6 mm and 8 mm. Importing a Fusion library again
-                updates its bits and adds new ones. A job keeps its own copy of its bit, so removing one here doesn’t change existing jobs.
+                Offered in every CAM job, with the built-in bits below. Flat end mills cut the parts; ball end mills finish rounded edges.
+                Importing a Fusion library again updates its bits and adds new ones. A job keeps its own copy of its bit, so removing one
+                here doesn’t change existing jobs.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
@@ -114,6 +132,30 @@ function BitsPage() {
                   onCancel={() => setEditing(null)}
                 />
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Built in</CardTitle>
+              <CardDescription>Always offered. Add your own bit of the same kind to use it instead.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="flex flex-col divide-y text-[13px]" aria-label="Built in">
+                {kBuiltInBits.map(b => (
+                  <li key={`${b.number}|${b.name}`} className="flex items-center gap-2 py-2">
+                    <span className="w-16 font-mono">⌀{b.diameter}</span>
+                    <span className="grow">
+                      {b.name}
+                      <span className="text-muted-foreground">
+                        {isBallBit(b) ? ' · ball end' : ''}
+                        {b.flutes ? ` · ${b.flutes} flutes` : ''}
+                        {b.feed ? ` · F${b.feed}` : ''} · T{b.number}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </CardContent>
           </Card>
 
@@ -144,6 +186,7 @@ function BitsPage() {
                             <span className="grow">
                               {b.name}
                               <span className="text-muted-foreground">
+                                {isBallBit(b) ? ' · ball end' : ''}
                                 {b.flutes ? ` · ${b.flutes} flutes` : ''}
                                 {b.feed ? ` · F${b.feed}` : ''} · T{b.number}
                               </span>

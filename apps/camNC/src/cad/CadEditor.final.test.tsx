@@ -53,8 +53,8 @@ it('shows the whole design with Final while a step before the last is edited', a
 });
 
 it.each([
-  ['Transform · Plate', 1],
-  ['Transform · Plate 2', 2],
+  ['Transform 1', 1],
+  ['Transform 2', 2],
   ['Mirrored copy · Plate 3', 3],
 ] as const)('rolls back while editing %s and resets Final for the next edit', async (label, count) => {
   const source = createPlateDocument({ width: 200, height: 100 });
@@ -123,10 +123,12 @@ it.each(['Extrude', 'Transform'])('switches directly from %s to an earlier Mirro
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   await waitFor(() => expect(props().meshes).toHaveLength(3));
   const features = screen.getByRole('region', { name: 'Features' });
-  await userEvent.dblClick(within(features).getByRole('button', { name: new RegExp(`${kind} · Second`) }));
+  await userEvent.dblClick(
+    within(features).getByRole('button', { name: kind === 'Transform' ? /^Transform \d/ : new RegExp(`${kind} · Second`) })
+  );
   await screen.findByRole('dialog', { name: new RegExp(`^${kind}`) });
   await userEvent.dblClick(within(features).getByRole('button', { name: /Mirrored copy · Plate 2/ }));
-  const mirror = await screen.findByRole('dialog', { name: 'Mirror' });
+  const mirror = await screen.findByRole('dialog', { name: /^Mirror \d/ });
   expect(screen.getAllByRole('dialog')).toHaveLength(1);
   await waitFor(() => expect(props().meshes).toHaveLength(2));
   await userEvent.click(within(mirror).getByRole('button', { name: 'Final' }));

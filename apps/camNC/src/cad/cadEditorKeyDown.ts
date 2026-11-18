@@ -36,13 +36,18 @@ export type CadEditorKeyDownInput = SketchEditorInput & {
   setHiddenParts: Dispatch<SetStateAction<ReadonlySet<string>>>;
   setSearchMode: Dispatch<SetStateAction<boolean>>;
   setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
-  setShowPlanes: Dispatch<SetStateAction<boolean>>;
   setSketchCameraShift: Dispatch<SetStateAction<[number, number]>>;
   setTransparentParts: Dispatch<SetStateAction<ReadonlySet<string>>>;
   setViewRequest: Dispatch<SetStateAction<ViewRequest | undefined>>;
   shortcutsOpen: boolean;
   showWorkspace: boolean;
   studioCommand: (command: StudioCommand) => void;
+  /** P: hides every plane, or shows them all again. */
+  togglePlanes: () => void;
+  /** Shift+H: hides every sketch, or shows them all again. */
+  toggleSketches: () => void;
+  /** The up and down arrows: the rollback bar one step up or down. */
+  moveRollback: (by: -1 | 1) => void;
   studioSession: boolean;
   toggleCommandSearch: () => void;
   toggleConstruction: () => void;
@@ -112,7 +117,6 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     setSelectedConstraints,
     setSelectionBox,
     setShortcutsOpen,
-    setShowPlanes,
     setSketchCameraShift,
     setSketchTurn,
     setSnapCue,
@@ -130,6 +134,9 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     toggleCommandSearch,
     toggleConstruction,
     toggleFix,
+    togglePlanes,
+    toggleSketches,
+    moveRollback,
     tool,
     transformSelectionCenter,
     usingEdges,
@@ -192,7 +199,17 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     }
     if (!event.shiftKey && event.key.toLowerCase() === 'p') {
       event.preventDefault();
-      if (!event.repeat) setShowPlanes(previous => !previous);
+      if (!event.repeat) togglePlanes();
+      return;
+    }
+    if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === 'h') {
+      event.preventDefault();
+      if (!event.repeat) toggleSketches();
+      return;
+    }
+    if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      event.preventDefault();
+      moveRollback(event.key === 'ArrowUp' ? -1 : 1);
       return;
     }
     // N looks straight at the picked plane or face, or the selected part's sketch plane; again, from its other side.
@@ -218,6 +235,20 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     event.preventDefault();
     // A held key, as Shift+E pressed in a sketch closing into this Extrude, doesn't start another.
     if (!event.repeat && !busy && part && (partHasOutline || part.extrude === false)) studioCommand('extrude');
+    return;
+  }
+  // Shift+F rounds edges with Fillet, as in the reference.
+  if (
+    studioSession &&
+    showWorkspace &&
+    event.shiftKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    event.key.toLowerCase() === 'f'
+  ) {
+    event.preventDefault();
+    if (!event.repeat && !busy) studioCommand('fillet');
     return;
   }
   // Shift+S starts a sketch, on the plane or face picked if there is one, as in the reference.
@@ -386,27 +417,23 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     toggleFix();
     return;
   }
-  // Normal, Pierce and Equal curvature have their keys reserved, so they never start the unshifted tool.
-  if (event.shiftKey && (key === 'k' || key === 'g' || key === 'u')) {
-    event.preventDefault();
-    setMessage(`The ${key === 'k' ? 'Normal' : key === 'g' ? 'Pierce' : 'Equal curvature'} constraint isn’t available yet.`);
-    return;
-  }
   const constraintKey =
     event.shiftKey && key === 'q'
       ? 'symmetric'
-      : event.shiftKey && key === 'o'
-        ? 'concentric'
-        : event.shiftKey && key === 'l'
-          ? 'perpendicular'
-          : !event.shiftKey
-            ? (
-                { h: 'horizontal', v: 'vertical', i: 'coincident', e: 'equal', b: 'parallel', t: 'tangent' } as Record<
-                  string,
-                  ConstraintTool
-                >
-              )[key]
-            : undefined;
+      : event.shiftKey && (key === 'k' || key === 'g' || key === 'u')
+        ? ({ k: 'normal', g: 'pierce', u: 'curvature' } as const)[key]
+        : event.shiftKey && key === 'o'
+          ? 'concentric'
+          : event.shiftKey && key === 'l'
+            ? 'perpendicular'
+            : !event.shiftKey
+              ? (
+                  { h: 'horizontal', v: 'vertical', i: 'coincident', e: 'equal', b: 'parallel', t: 'tangent' } as Record<
+                    string,
+                    ConstraintTool
+                  >
+                )[key]
+              : undefined;
   if (constraintKey) {
     event.preventDefault();
     constrain(constraintKey);

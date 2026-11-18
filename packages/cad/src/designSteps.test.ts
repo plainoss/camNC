@@ -49,16 +49,23 @@ describe('the design’s steps', () => {
     const document: CadDocument = { ...createCadDocument(), parts: [base, boss, knob] };
     expect(flagged(document)).toEqual([]);
     expect(flagged({ ...document, parts: [{ ...base, suppressed: true }, boss, knob] })).toEqual([
-      ['Sketch · Boss', `It’s drawn on a face of ${base.name}, which is suppressed.`],
-      ['Extrude · Boss', `It’s drawn on a face of ${base.name}, which is suppressed.`],
-      ['Sketch · Knob', 'It’s drawn on a face of Boss, which can’t be built.'],
-      ['Extrude · Knob', 'It’s drawn on a face of Boss, which can’t be built.'],
+      // Each has lost the face it stands on, and says what's missing.
+      ['Sketch · Boss', 'Select a sketch plane. 1 missing selection'],
+      ['Extrude · Boss', 'Select face or sketch region to extrude. 1 missing selection'],
+      ['Sketch · Knob', 'Select a sketch plane. 1 missing selection'],
+      ['Extrude · Knob', 'Select face or sketch region to extrude. 1 missing selection'],
     ]);
     expect(flagged({ ...document, parts: [{ ...base, extrude: false }, boss] })[0]).toEqual([
       'Sketch · Boss',
-      `It’s drawn on a face of ${base.name}, which isn’t extruded.`,
+      'Select a sketch plane. 1 missing selection',
     ]);
-    expect(flagged({ ...document, parts: [boss] })[0]).toEqual(['Sketch · Boss', 'It’s drawn on a face of a deleted part.']);
+    expect(flagged({ ...document, parts: [boss] })[0]).toEqual(['Sketch · Boss', 'Select a sketch plane. 1 missing selection']);
+    // A pocket also misses the part it removes from.
+    const pocket = { ...boss, remove: { depth: 5 } };
+    expect(flagged({ ...document, parts: [pocket] })[1]).toEqual([
+      'Extrude · Boss',
+      'Select face or sketch region to extrude. 2 missing selections',
+    ]);
   });
 
   it('flags an Extrude whose picked region an edit of its sketch took away, and not its sketch', () => {
@@ -71,12 +78,10 @@ describe('the design’s steps', () => {
     const opened = { ...part, sketch: { ...part.sketch, entities: part.sketch.entities.filter(entity => entity !== side) } };
     const steps = designSteps({ ...document, parts: [opened] });
     expect(steps.find(step => step.kind === 'sketch')?.broken).toBeUndefined();
-    expect(steps.find(step => step.kind === 'extrude')?.broken).toBe(
-      'A region picked for Plate is no longer in its sketch. Pick its regions again.'
-    );
+    expect(steps.find(step => step.kind === 'extrude')?.broken).toBe('Select face or sketch region to extrude. 1 missing selection');
     const boss = { ...createCadPart('Boss', 6), drawnOn: { on: { partId: part.id, face: 'top' as const }, offset: 0 } };
     const built = designSteps({ ...document, parts: [opened, boss] }).filter(step => step.partId === boss.id);
-    expect(built.find(step => step.kind === 'extrude')?.broken).toBe('It’s drawn on a face of Plate, which can’t be built.');
+    expect(built.find(step => step.kind === 'extrude')?.broken).toBe('Select face or sketch region to extrude. 1 missing selection');
   });
 
   it('puts a step cutting parts after the last part it uses', () => {

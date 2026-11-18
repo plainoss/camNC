@@ -1,6 +1,9 @@
 import { useDesignUnits } from './designUnits';
-import { cadFolderSteps, cadVariableValues, moveCadFolder, type CadDocument } from '@wbcnc/cad';
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
+import { filteredFeatureRows, useFeatureFilter } from './featureFilter';
+import { FeatureDependenciesPanel, FeatureFilterBox } from './FeatureListTools';
+import { cadFolderSteps, cadVariableValues, designSteps, moveCadFolder, type CadDocument } from '@wbcnc/cad';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
+import { pendingProblemNow, subscribePendingProblem } from './pendingProblem';
 import { kBasePlanes } from './basePlanes';
 import type { DesignStep } from '@wbcnc/cad';
 import { PartRowMenu } from './PartRowMenu';
@@ -20,9 +23,11 @@ const kIcons: Record<DesignStep['kind'] | 'variable' | 'plane', string> = {
   faceSketch: '✎',
   cut: '⌴',
   fillet: '◜',
+  mirror: '⧎',
   copy: '⧉',
   pattern: '⋯',
   partCut: '⊟',
+  split: '⫼',
 };
 
 /** The eye on a row whose feature shows in the view: a sketch, a plane or the origin. */
@@ -49,10 +54,42 @@ function Eye({ name, shown, onToggle }: { name: string; shown: boolean; onToggle
 
 /** A row of the list: a design variable, a plane made to sketch on, or a step of how the design is built. */
 export type FeatureEntry = { kind: 'variable'; id: string } | { kind: 'plane'; id: string } | { kind: 'step'; step: DesignStep };
-export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'rollToEnd' | 'delete' | 'newSketch' | 'export';
+export type FeatureAction =
+  | 'edit'
+  | 'editSketch'
+  | 'rename'
+  | 'suppress'
+  | 'rollTo'
+  | 'rollToEnd'
+  | 'delete'
+  | 'newSketch'
+  | 'export'
+  | 'addToFolder'
+  | 'toggleShown'
+  | 'dependencies'
+  | 'unavailable';
 
-/** What each row's menu offers, and why an item isn't there for it. */
-function menuItems(entry: FeatureEntry, rolledBack = false): { action: FeatureAction; label: string; disabled?: boolean }[] {
+/** A menu item the reference offers that camNC has nothing behind yet: listed, but greyed with the reason. */
+const unavailable = (label: string) => ({ action: 'unavailable' as const, label, disabled: true, title: 'Not available yet' });
+
+/** What each row's menu offers, in the reference's order, and why an item isn't there for it. */
+function menuItems(
+  entry: FeatureEntry,
+  {
+    rolledBack = false,
+    last = false,
+    sketchName = 'sketch',
+    shown,
+    folders = false,
+  }: {
+    rolledBack?: boolean;
+    last?: boolean;
+    sketchName?: string;
+    /** Whether a sketch row shows, when its eye can be switched from here. */
+    shown?: boolean;
+    folders?: boolean;
+  } = {}
+): { action: FeatureAction; label: string; disabled?: boolean; title?: string }[] {
   if (entry.kind === 'variable' || entry.kind === 'plane')
     return [
       ...(entry.kind === 'plane' ? [{ action: 'newSketch' as const, label: 'New sketch' }] : []),
@@ -60,19 +97,56 @@ function menuItems(entry: FeatureEntry, rolledBack = false): { action: FeatureAc
       { action: 'delete', label: 'Delete' },
     ];
   const { kind } = entry.step;
+  const sketch = kind === 'sketch' || kind === 'faceSketch';
+  const rename = kind === 'sketch' || kind === 'extrude' ? [{ action: 'rename' as const, label: 'Rename' }] : [];
+  // A part is in one folder at most, so one already in a folder has nothing to add.
+  const folder = {
+    action: 'addToFolder' as const,
+    label: 'Add selection to folder…',
+    disabled: !folders,
+    title: 'Its part is already in a folder.',
+  };
+  const suppress = sketch
+    ? { action: 'unavailable' as const, label: 'Suppress', disabled: true, title: 'A sketch is suppressed with the extrude made from it.' }
+    : {
+        action: 'suppress' as const,
+        label: entry.step.suppressed ? 'Unsuppress' : 'Suppress',
+        disabled: kind === 'move',
+        title: 'A move is undone by deleting it.',
+      };
+  const remove = { action: 'delete' as const, label: 'Delete', disabled: kind === 'faceSketch' || kind === 'copy' };
+  // A step past the bar can only be named, grouped, switched off, rolled to or deleted until the design reaches it.
+  if (rolledBack)
+    return [
+      ...rename,
+      folder,
+      suppress,
+      unavailable('Dynamic suppression'),
+      unavailable('Add comment'),
+      { action: 'rollTo', label: 'Roll to here' },
+      { action: 'rollToEnd', label: 'Roll to end' },
+      remove,
+    ];
   return [
-    ...(kind === 'sketch' || kind === 'extrude' ? [{ action: 'rename' as const, label: 'Rename' }] : []),
+    ...rename,
     { action: 'edit', label: 'Edit…' },
-    ...(kind === 'extrude' ? [{ action: 'editSketch' as const, label: 'Edit sketch…' }] : []),
-    // Sketches aren't suppressed on their own: their extrude is.
-    ...(kind === 'sketch' || kind === 'faceSketch' || kind === 'move'
-      ? []
-      : [{ action: 'suppress' as const, label: entry.step.suppressed ? 'Unsuppress' : 'Suppress' }]),
-    { action: 'rollTo', label: 'Roll to here' },
-    ...(kind === 'sketch' || kind === 'faceSketch' ? [{ action: 'export' as const, label: 'Export as DXF/SVG…' }] : []),
-    // A step past the bar also takes the design back to its end, as the reference's menu does.
-    ...(rolledBack ? [{ action: 'rollToEnd' as const, label: 'Roll to end' }] : []),
-    { action: 'delete', label: 'Delete', disabled: kind === 'faceSketch' || kind === 'copy' },
+    // Named for the sketch it opens, as Edit Sketch 1….
+    ...(kind === 'extrude' ? [{ action: 'editSketch' as const, label: `Edit ${sketchName}…` }] : []),
+    ...(sketch ? [unavailable('Copy sketch')] : []),
+    unavailable('Show dimensions'),
+    folder,
+    ...(kind === 'sketch' && shown !== undefined ? [{ action: 'toggleShown' as const, label: shown ? 'Hide' : 'Show' }] : []),
+    ...(sketch ? [unavailable(`Create Drawing of ${entry.step.label}…`), { action: 'export' as const, label: 'Export as DXF/SVG…' }] : []),
+    suppress,
+    unavailable('Dynamic suppression'),
+    unavailable('Add comment'),
+    unavailable('Zoom to selection'),
+    ...(sketch ? [unavailable('View normal to')] : []),
+    { action: 'dependencies', label: 'Show dependencies…' },
+    // The last step has nothing after it to roll back from.
+    ...(sketch || !last ? [{ action: 'rollTo' as const, label: 'Roll to here' }] : []),
+    sketch ? unavailable('Edit sketch appearance…') : unavailable('Add appearance to feature…'),
+    remove,
   ];
 }
 
@@ -99,6 +173,8 @@ export function FeatureList({
   featureProblems,
   onNewSketch,
   onChange,
+  preview,
+  pending,
 }: {
   document: CadDocument;
   selectedPartId: string | null;
@@ -135,18 +211,29 @@ export function FeatureList({
   /** New sketch, from a base plane's right-click menu, as the reference's. */
   onNewSketch?: (plane: string) => void;
   onChange?: (document: CadDocument) => void;
+  /** The design as the open dialog would make it: a row that couldn't be made so shows as broken while it's open. */
+  preview?: CadDocument;
+  /** A new feature's row while its dialog is open and it isn't made yet, as Sketch 2 before its plane is picked. */
+  pending?: { kind: 'sketch' | 'fillet' | 'copy'; label: string };
 }) {
   const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);
-  const entries = folderFeatureEntries(document).map(entry =>
-    entry.kind === 'step' &&
-    entry.step.kind === 'extrude' &&
-    !entry.step.broken &&
-    !entry.step.suppressed &&
-    featureProblems?.[entry.step.partId]
-      ? { ...entry, step: { ...entry.step, broken: featureProblems[entry.step.partId] } }
-      : entry
-  );
+  const pendingProblem = useSyncExternalStore(subscribePendingProblem, pendingProblemNow);
+  const previewed = useMemo(() => (preview && preview !== document ? designSteps(preview) : null), [preview, document]);
+  const entries = folderFeatureEntries(document).map(entry => {
+    if (entry.kind !== 'step' || entry.step.broken || entry.step.suppressed) return entry;
+    const failing = previewed?.find(step => step.id === entry.step.id)?.broken;
+    if (failing) return { ...entry, step: { ...entry.step, broken: failing } };
+    // An extrude that wasn't built says why, and its sketch says when it isn't fully defined.
+    const problem =
+      entry.step.kind === 'extrude'
+        ? featureProblems?.[entry.step.partId]
+        : entry.step.kind === 'sketch' && featureProblems?.[entry.step.id];
+    return problem ? { ...entry, step: { ...entry.step, broken: problem } } : entry;
+  });
+  /** What hovering a broken row says, as the reference does: the feature by its name, then why. */
+  const brokenMessage = (step: DesignStep) =>
+    step.broken === 'is not fully defined' ? `${step.label} ${step.broken}` : `${step.label} did not regenerate properly: ${step.broken}`;
   const [selectedEntry, setSelectedEntry] = useState<string | null>(initialSelection ?? null);
   const folders = useFolderControls({ document, onChange, onRollTo, selectedPartId });
   const select = (entry: FeatureEntry) => {
@@ -157,6 +244,7 @@ export function FeatureList({
   const [planeMenu, setPlaneMenu] = useState<{ plane: string; name: string; x: number; y: number } | null>(null);
   const closePlaneMenu = useCallback(() => setPlaneMenu(null), []);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [dependenciesOf, setDependenciesOf] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!menu) return;
@@ -181,6 +269,15 @@ export function FeatureList({
     entry.kind === 'plane' ? entry.id : entry.kind === 'step' && entry.step.kind === 'sketch' ? entry.step.id : null;
   const key = (entry: ListedFeatureEntry) => (entry.kind === 'step' ? entry.step.id : entry.id);
   const rollbackAt = rollback ? entries.findIndex(entry => key(entry) === rollback) : -1;
+  const inFolder = (entry: FeatureEntry) =>
+    entry.kind === 'step' && !!document.folders?.some(folder => folder.partIds.includes(entry.step.partId));
+  /** The name of the sketch an extrude row is made from, its own or the one it shares. */
+  const sketchOf = (entry: FeatureEntry) => {
+    if (entry.kind !== 'step') return undefined;
+    const owner = document.parts.find(part => part.id === entry.step.partId)?.sketchOf ?? entry.step.partId;
+    const row = entries.find(other => other.kind === 'step' && other.step.kind === 'sketch' && other.step.partId === owner);
+    return row?.kind === 'step' ? row.step.label : undefined;
+  };
   // With the bar movable it's always there: after the step it's rolled to, or at the end.
   const barAt = rollbackAt;
   const [barMenu, setBarMenu] = useState<{ x: number; y: number } | null>(null);
@@ -217,11 +314,38 @@ export function FeatureList({
     stepDrop.drop?.error && stepDrop.drop.onto === rowKey && 'cad-feature-drop-refused',
   ];
   const brokenCount = entries.filter(entry => entry.kind === 'step' && entry.step.broken).length;
+  // What the filter above the list keeps; null keeps everything. Rows it drops are shown as "…".
+  const filterText = useFeatureFilter();
+  const visible = filteredFeatureRows(
+    document,
+    entries.map(entry => ({
+      key: key(entry),
+      kind: entry.kind,
+      label: label(entry),
+      ...(entry.kind === 'step' && { step: entry.step }),
+      ...(entry.kind === 'variable' && { variable: document.variables!.find(candidate => candidate.id === entry.id)!.name }),
+      ...(entry.kind !== 'folder' && {
+        folder: document.folders?.find(folder => folder.id === folderOfFeature(document, entry))?.name,
+        shown: visibilityId(entry) ? shown?.(visibilityId(entry)!) !== false : undefined,
+      }),
+    })),
+    filterText
+  );
+  const labelOf = (rowKey: string) => {
+    const entry = entries.find(candidate => key(candidate) === rowKey);
+    return entry ? label(entry) : rowKey;
+  };
+  // The count takes in the default geometry listed above the features: the origin, when shown, and the base planes.
+  const defaultRows = onPickPlane || onToggleShown ? (onToggleShown ? 1 : 0) + kBasePlanes.length : 0;
   return (
     <section className="cad-studio-features" aria-label="Features" tabIndex={-1}>
       <div className="cad-panel-heading">
         <h2>
-          Features ({entries.filter(entry => entry.kind !== 'folder').length})
+          Features (
+          {visible
+            ? `${entries.filter(entry => entry.kind !== 'folder' && visible.has(key(entry))).length} of ${defaultRows + entries.filter(entry => entry.kind !== 'folder').length}`
+            : defaultRows + entries.filter(entry => entry.kind !== 'folder').length}
+          )
           {brokenCount > 0 && (
             <span
               className="cad-feature-error-badge"
@@ -233,13 +357,23 @@ export function FeatureList({
           )}
         </h2>
         {onChange && (
-          <button type="button" aria-label="New folder" title="Group neighbouring parts and planes in a folder" onClick={folders.newFolder}>
+          <button
+            type="button"
+            aria-label="New folder"
+            title="Group neighbouring parts and planes in a folder"
+            onClick={() => folders.newFolder()}>
             ＋
           </button>
         )}
       </div>
+      <FeatureFilterBox />
+      {visible && (onPickPlane || onToggleShown) && (
+        <ul className="cad-default-geometry" aria-label="Default geometry">
+          <li className="cad-feature-elided">…</li>
+        </ul>
+      )}
       {/* Listed in a sketch too, as in the reference, to show or hide; a plane is picked to sketch on from the studio. */}
-      {(onPickPlane || onToggleShown) && (
+      {!visible && (onPickPlane || onToggleShown) && (
         <ul className="cad-default-geometry" aria-label="Default geometry">
           {onToggleShown && (
             <li className={shown?.('origin') === false ? 'cad-feature-hidden' : undefined}>
@@ -275,6 +409,13 @@ export function FeatureList({
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) stepDrop.leave();
         }}>
         {entries.map((entry, index) => {
+          // A run of rows the filter drops is one "…".
+          if (visible && !visible.has(key(entry)))
+            return index === 0 || visible.has(key(entries[index - 1]!)) ? (
+              <li key={`elided:${key(entry)}`} className="cad-feature-elided">
+                …
+              </li>
+            ) : null;
           if (entry.kind === 'folder') {
             const folder = document.folders!.find(folder => folder.id === entry.id)!;
             const contained = cadFolderSteps(document, folder.id);
@@ -361,7 +502,11 @@ export function FeatureList({
                   }}
                   onKeyDown={event => {
                     event.stopPropagation();
-                    if (event.key === 'Enter') event.currentTarget.blur();
+                    // Ctrl+A selects the whole name on every platform, as Cmd+A does on a Mac.
+                    if (event.ctrlKey && !event.altKey && event.key.toLowerCase() === 'a') {
+                      event.preventDefault();
+                      event.currentTarget.select();
+                    } else if (event.key === 'Enter') event.currentTarget.blur();
                     else if (event.key === 'Escape') {
                       event.currentTarget.value = step.label;
                       event.currentTarget.blur();
@@ -420,7 +565,7 @@ export function FeatureList({
                 aria-current={key(entry) === selectedEntry ? 'true' : undefined}
                 aria-pressed={entry.kind === 'plane' ? selectedPlane === entry.id : undefined}
                 aria-haspopup="menu"
-                aria-description={step?.broken}
+                aria-description={step?.broken && brokenMessage(step)}
                 onClick={() => {
                   // A plane is picked to sketch on, as a base plane is.
                   if (entry.kind === 'plane') onPickPlane?.(entry.id);
@@ -461,7 +606,7 @@ export function FeatureList({
                 <span>{label(entry)}</span>
                 {step?.detail && <small>{step.detail}</small>}
                 {step?.broken && (
-                  <span className="cad-feature-warning" role="img" aria-label="Error" title={step.broken}>
+                  <span className="cad-feature-warning" role="img" aria-label="Error" title={brokenMessage(step)}>
                     ⚠
                   </span>
                 )}
@@ -485,6 +630,25 @@ export function FeatureList({
             </li>
           );
         })}
+        {pending && (
+          <li className={pendingProblem ? 'cad-feature-pending cad-feature-broken' : 'cad-feature-pending'}>
+            <button
+              type="button"
+              aria-description={pendingProblem ? `${pending.label} did not regenerate properly: ${pendingProblem}` : undefined}>
+              <span aria-hidden="true">{kIcons[pending.kind]}</span>
+              <span>{pending.label}</span>
+              {pendingProblem && (
+                <span
+                  className="cad-feature-warning"
+                  role="img"
+                  aria-label="Error"
+                  title={`${pending.label} did not regenerate properly: ${pendingProblem}`}>
+                  ⚠
+                </span>
+              )}
+            </button>
+          </li>
+        )}
       </ol>
       {onRollTo && rollbackAt < 0 && (
         <RollbackBar stepId={null} stepIds={stepIds} onRollTo={onRollTo} onMenu={(x, y) => setBarMenu({ x, y })} />
@@ -522,23 +686,43 @@ export function FeatureList({
               items[(at + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
             }
           }}>
-          {menuItems(menu.entry, rollbackAt >= 0 && entries.findIndex(entry => key(entry) === key(menu.entry)) > rollbackAt).map(item => (
+          {menuItems(menu.entry, {
+            rolledBack: rollbackAt >= 0 && entries.findIndex(entry => key(entry) === key(menu.entry)) > rollbackAt,
+            last: key(entries.at(-1)!) === key(menu.entry),
+            sketchName: sketchOf(menu.entry),
+            shown: onToggleShown && visibilityId(menu.entry) ? shown?.(visibilityId(menu.entry)!) !== false : undefined,
+            folders: !!onChange && !inFolder(menu.entry),
+          }).map(item => (
             <button
-              key={item.action}
+              key={item.label}
               type="button"
               role="menuitem"
               aria-disabled={item.disabled || undefined}
+              title={item.disabled ? item.title : undefined}
               onClick={() => {
                 if (item.disabled) return;
                 const { entry } = menu;
                 setMenu(null);
                 if (item.action === 'rename' && entry.kind === 'step') setRenaming(entry.step.id);
+                // A new folder starts with the row's part.
+                else if (item.action === 'addToFolder') folders.newFolder(entry.kind === 'step' ? entry.step.partId : undefined);
+                else if (item.action === 'toggleShown') onToggleShown?.(visibilityId(entry)!);
+                else if (item.action === 'dependencies') setDependenciesOf(key(entry));
                 else onAction(entry, item.action);
               }}>
               {item.label}
             </button>
           ))}
         </div>
+      )}
+      {dependenciesOf && entries.some(entry => key(entry) === dependenciesOf) && (
+        <FeatureDependenciesPanel
+          document={document}
+          entryKey={dependenciesOf}
+          label={labelOf}
+          order={entries.map(key)}
+          onClose={() => setDependenciesOf(null)}
+        />
       )}
       {planeMenu && (
         <PartRowMenu

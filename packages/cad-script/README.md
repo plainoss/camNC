@@ -414,6 +414,31 @@ pass misses, with `short` the worst miss in mm. A miss adds `corner-unreachable`
 the opening and the part: the tool's square corners wouldn't seat. Blind openings cut
 from the underside, and openings only a copy has, aren't checked yet.
 
+## Comparing two STEP exports
+
+`fingerprint` reads a STEP file and prints each solid's volume, area, bounding box, genus
+(through holes) and triangle count, meshed at a fixed 0.01 mm chord error. It compares
+the same part exported from two programs without either one's own data:
+
+```sh
+pnpm --silent --filter @wbcnc/cad-script fingerprint plate.step
+pnpm --silent --filter @wbcnc/cad-script fingerprint --compare expected.step actual.step
+```
+
+`--compare` pairs the solids by volume and checks each pair's volume (within 0.1 %), every
+bounding box coordinate (0.01 mm), genus, and how far each surface lies from the other,
+from 20 000 points sampled on each (0.05 mm). It prints `equal`, the measures of each pair
+and a readable `failures` list, and exits 0 when the files match, 1 when they don't and 2
+on bad input (`pnpm --filter` turns every failing exit into 1; run it with
+`pnpm --silent -C packages/cad-script fingerprint` to keep 2 apart). `--volume-tol`, `--bbox-tol`, `--distance-tol` and `--samples` change the
+limits. The expected side can be a saved fingerprint `.json` instead; it has no surface, so
+only volume, bounding box and genus are checked then.
+
+Both files are taken as they are, in millimetres with the Top plane as XY and Z up: nothing
+is aligned, so a part that sits elsewhere, or a pocket that moved, is a difference. A file
+in inches is read in millimetres. `toFingerprintFrame` in `src/fingerprint/stepFingerprint.ts`
+is the one place a transform would go.
+
 ## What the report doesn't cover
 
 It never writes or prints G-code, and it doesn't say a program is safe to run. The app

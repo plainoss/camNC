@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { sketchOwnerId, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
+import { autoAddTarget } from './extrudeAutoAdd';
 import { extrudeRegionViews, withRegionToggled } from './extrudeRegionViews';
 import { replaceExtrudeProfile } from './profileSelection';
 
@@ -7,7 +8,9 @@ export function useProfileSelection(
   document: CadDocument,
   feature: { kind: string; partId: string } | null,
   commit: (doc: CadDocument) => void,
-  refuse: (message: string) => void
+  refuse: (message: string) => void,
+  /** Whether a feature list row's feature shows in the view, as a sketch row by its id. */
+  shown: (id: string) => boolean = () => true
 ) {
   const [enabled, setEnabled] = useState(true);
   const [picked, setPicked] = useState<{ sketch: string; region?: string } | null>(null);
@@ -36,7 +39,15 @@ export function useProfileSelection(
         : part,
     pickFace: (face: Extract<CadDrawnOn['on'], { partId: string }>) => replace({ face }),
     pickRegion: (id: string) => {
-      if (target) commit(withRegionToggled(document, target.id, id));
+      if (!target) return;
+      // A hidden sketch's regions can't be picked by another extrude of it, as in the reference, until it's shown again.
+      const owner = sketchOwnerId(target);
+      if (owner !== target.id && !shown(`${owner}:sketch`)) return;
+      const next = withRegionToggled(document, target.id, id);
+      // A New extrude's first region, picked into an empty selection, that runs into a part switches it to Add with
+      // that part, as an Extrude does. A whole sketch is left as it was chosen.
+      const into = target.regions?.length === 0 && autoAddTarget(next, target.id);
+      commit(into ? { ...next, parts: next.parts.map(p => (p.id === target.id ? { ...p, addTo: into } : p)) } : next);
     },
   };
 }

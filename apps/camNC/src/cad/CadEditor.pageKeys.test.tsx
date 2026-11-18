@@ -72,11 +72,11 @@ async function deleteBoth(latest: () => CadDocument) {
 
 async function openFillet(source: CadDocument) {
   await userEvent.click(await studioCommand(/^Fillet/));
-  const dialog = await screen.findByRole('dialog', { name: 'Fillet' });
+  const dialog = await screen.findByRole('dialog', { name: /^Fillet \d/ });
   const a: [number, number, number] = [100, 60, 0];
   const b: [number, number, number] = [100, 60, 18];
   act(() => props().onSelect!(source.parts[0]!.id, 0, { point: a, normal: [1, 0, 0], edge: { a, b } } as never));
-  await waitFor(() => expect(within(dialog).getByText(/1 edge of Plate/)).toBeDefined());
+  await waitFor(() => expect(within(dialog).getAllByText('Edge of Extrude · Plate')).toHaveLength(1));
   return dialog;
 }
 const placedPlate = () => {
@@ -89,7 +89,7 @@ it('takes studio shortcuts, undo and redo after the page loads with focus on the
   const { latest } = await studio();
   focusPage();
   await userEvent.keyboard('p');
-  await waitFor(() => expect(props().planes).toBeUndefined());
+  await waitFor(() => expect(props().planes ?? []).toHaveLength(0));
   await userEvent.keyboard('p');
   await waitFor(() => expect(props().planes).toHaveLength(3));
   await deleteBoth(latest);
@@ -125,7 +125,7 @@ it("takes undo and redo after a dialog's OK", async () => {
   const dialog = await openFillet(source);
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest().parts[0]!.fillets).toHaveLength(1));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Fillet' })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Fillet \d/ })).toBeNull());
   await settled();
   // A closed step dialog hands the keyboard to the view, which takes these keys where OK left them.
   await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('workspace-3d')));
@@ -141,7 +141,7 @@ it('cancels an open step dialog with Escape while focus is on the page', async (
   await openFillet(source);
   focusPage();
   await userEvent.keyboard('{Escape}');
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Fillet' })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Fillet \d/ })).toBeNull());
   expect(latest().parts[0]!.fillets ?? []).toHaveLength(0);
 }, 60_000);
 
@@ -178,7 +178,7 @@ it('leaves keys typed in a text field outside the editor to that field', async (
   expect((field as HTMLInputElement).value).toBe('p');
   focusPage();
   await userEvent.keyboard('p');
-  await waitFor(() => expect(props().planes).toBeUndefined());
+  await waitFor(() => expect(props().planes ?? []).toHaveLength(0));
 });
 
 it('leaves keys to an open menu, even once focus has fallen to the page', async () => {
@@ -194,7 +194,7 @@ it('leaves keys to an open menu, even once focus has fallen to the page', async 
   await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
   focusPage();
   await userEvent.keyboard('p');
-  await waitFor(() => expect(props().planes).toBeUndefined());
+  await waitFor(() => expect(props().planes ?? []).toHaveLength(0));
 });
 
 it('leaves keys to a modal dialog outside the editor', async () => {
@@ -203,7 +203,7 @@ it('leaves keys to a modal dialog outside the editor', async () => {
   await userEvent.keyboard('p');
   screen.getByRole('dialog', { name: 'Outside modal' }).hidden = true;
   await userEvent.keyboard('p');
-  await waitFor(() => expect(props().planes).toBeUndefined());
+  await waitFor(() => expect(props().planes ?? []).toHaveLength(0));
 });
 
 it('takes sketch shortcuts in a sketch editor while focus is on the page', async () => {

@@ -1,4 +1,6 @@
 import { addPartCut, removePartCut, updatePartCut, type CadDocument, type CadDrawnOn, type CadValueScope } from '@wbcnc/cad';
+import { BooleanDialog, type BooleanChange } from './BooleanDialog';
+import { LinearPatternDialog } from './LinearPatternDialog';
 import { useRef, type ComponentProps } from 'react';
 import { ExtrudeDialog, type CadConnectorPick } from './PartFeatureDialogs';
 import { FilletDialog } from './FilletDialog';
@@ -6,6 +8,7 @@ import { HoleDialog } from './HoleDialog';
 import { MirrorDialog } from './MirrorDialog';
 import { PartCutDialog } from './PartCutDialog';
 import { PlaneDialog } from './PlaneDialog';
+import { SplitDialog } from './SplitDialog';
 import { StudioPatternDialog } from './StudioPatternDialog';
 import { TransformDialog } from './TransformDialog';
 import { VariableDialog } from './VariableDialog';
@@ -22,6 +25,12 @@ function withPartCut(document: CadDocument, id: string | undefined, change: Part
     ? { document: updatePartCut(document, id, change), id }
     : addPartCut(document, tools, targets, { value: clearance, expression: clearanceExpression }, split);
   return updatePartCut(made.document, made.id, { consumeTools, cornerRelief });
+}
+
+/** The design with a Boolean step added, or the step `id` changed. */
+function withBoolean(document: CadDocument, id: string | undefined, change: BooleanChange): CadDocument {
+  const made = id ? { document, id } : addPartCut(document, change.tools, change.targets, { value: 0 });
+  return updatePartCut(made.document, made.id, change);
 }
 
 /**
@@ -101,6 +110,9 @@ export function StudioDialogHost({
             pickFace={setDirectionPicker}
           />
         );
+      // The Linear pattern command, and a pattern of a Remove's cuts, use the Linear pattern dialog.
+      if (dialog.initialPatternKind === 'linearPattern' || target.remove)
+        return <LinearPatternDialog key={dialogKey(dialog)} {...props} onPreview={onPreview} pickPoint={pickPoint} partPicks={partPicks} />;
       return (
         <StudioPatternDialog
           key={`${target.id}:${opening.current.generation}`}
@@ -140,6 +152,7 @@ export function StudioDialogHost({
           key={dialogKey(dialog)}
           document={document}
           partId={dialog.partId}
+          joinId={dialog.joinId}
           copyId={dialog.copyId}
           onPreview={onPreview}
           partPicks={partPicks}
@@ -187,8 +200,48 @@ export function StudioDialogHost({
           onCancel={close}
         />
       );
+    case 'split':
+      return (
+        <SplitDialog
+          key={dialogKey(dialog)}
+          document={document}
+          partId={dialog.partId}
+          pick={partPicks?.pick}
+          pickPlane={setDirectionPicker}
+          onPreview={onPreview}
+          onSave={made => {
+            change(() => made);
+            close();
+          }}
+          onCancel={close}
+        />
+      );
     case 'partCut': {
       const { id } = dialog;
+      const saved = document.partCuts?.find(step => step.id === id);
+      const remove = id
+        ? () => {
+            change(current => removePartCut(current, id));
+            close();
+          }
+        : undefined;
+      if (dialog.boolean || saved?.operation)
+        return (
+          <BooleanDialog
+            key={dialogKey(dialog)}
+            document={document}
+            onPreview={onPreview}
+            step={saved}
+            pick={partPicks?.pick}
+            onPicked={onCutPicked}
+            onClose={close}
+            onRemove={remove}
+            onSave={made => {
+              change(current => prepareStudioPreview(withBoolean(current, id, made)));
+              close();
+            }}
+          />
+        );
       return (
         <PartCutDialog
           key={dialogKey(dialog)}

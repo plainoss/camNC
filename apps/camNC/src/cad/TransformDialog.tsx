@@ -1,6 +1,7 @@
 import { useDesignUnits } from './designUnits';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  designSteps,
   newCadId,
   numberedCadCopy,
   mateMove,
@@ -14,6 +15,7 @@ import {
   type CadValueScope,
 } from '@wbcnc/cad';
 import { FeatureDialog } from './FeatureDialog';
+import { setPendingProblem } from './pendingProblem';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
 import { DialogPartField } from './DialogPartField';
@@ -36,6 +38,8 @@ const kKindPicks: Partial<Record<TransformKind, PickEnd[]>> = { mate: ['from', '
 export interface CadConnectorPick {
   partId: string;
   point: [number, number, number];
+  /** Where the click landed on the face, before snapping to its corners or middle. */
+  surfacePoint?: [number, number, number];
   /** The way the face picked looks: a connector's axis. */
   normal: [number, number, number];
   /** Picked on a copy of the part rather than the part itself. */
@@ -112,7 +116,8 @@ export function TransformDialog({
   // Copy part, as in the reference: off by default, so a transform moves the part itself.
   const [copyPart, setCopyPart] = useState(!!copy);
   // By X, Y and Z, or by a distance along a picked plane's or face's normal, as the reference's Translate types.
-  const [kind, setKind] = useState<TransformKind>(alongNow ? 'distance' : 'xyz');
+  // A new transform starts as Translate by line, as the reference's does.
+  const [kind, setKind] = useState<TransformKind>(alongNow ? 'distance' : !editing && pickPoint ? 'line' : 'xyz');
   const [direction, setDirection] = useState<CadDrawnOn['on'] | null>(alongNow?.along ?? null);
   const [flip, setFlip] = useState(!!alongNow?.flip);
   const [distanceText, setDistanceText] = useState(
@@ -180,7 +185,14 @@ export function TransformDialog({
               : {
                   ...candidate,
                   // The next free number, so the part's other copies keep theirs.
-                  copies: [...(candidate.copies ?? []), numberedCadCopy(candidate, { id: newCopyId })],
+                  // A copy of a part still called Part N is the next part, as Part 2.
+                  copies: [
+                    ...(candidate.copies ?? []),
+                    {
+                      ...numberedCadCopy(candidate, { id: newCopyId }),
+                      ...(/^Part \d+$/.test(candidate.name) && { name: nextPartName(document) }),
+                    },
+                  ],
                 }
           ),
         },
@@ -356,11 +368,22 @@ export function TransformDialog({
     if ('error' in candidate) return setError(candidate.error);
     onSave(candidate);
   };
+  // Nothing picked yet, its row in the feature list shows red, as a dialog missing its selection does.
+  const missing = !editing && !partPick.picked;
+  useEffect(() => {
+    setPendingProblem(missing ? 'Select entities to transform or copy. 1 missing selection' : null);
+    return () => setPendingProblem(null);
+  }, [missing]);
   return (
-    <FeatureDialog title={`Transform · ${part.name}`} onOk={save} onCancel={onCancel}>
+    <FeatureDialog
+      title={transformTitle(document, part.id, copyId, move)}
+      okDisabled={!editing && !partPick.picked}
+      onOk={save}
+      onCancel={onCancel}>
       <DialogPartField
-        label={copyPart ? 'Part to copy' : 'Part to move'}
-        name={part.name}
+        label="Entities to transform or copy"
+        // A new transform starts with nothing picked, as the reference's does.
+        name={editing || partPick.picked ? part.name : ''}
         pick={editing ? null : partPick}
         onActivate={() => {
           setPicking(false);
@@ -384,11 +407,17 @@ export function TransformDialog({
               pickPoint?.(null);
             }
           }}>
-          <option value="xyz">Translate by XYZ</option>
+          {pickPoint && <option value="line">Translate by line</option>}
           <option value="distance">Translate by distance</option>
+          <option value="xyz">Translate by XYZ</option>
           {pickPoint && <option value="mate">Transform by mate connectors</option>}
           {pickPoint && <option value="rotate">Rotate</option>}
-          {pickPoint && <option value="line">Translate by line</option>}
+          <option value="copyInPlace" disabled>
+            Copy in place
+          </option>
+          <option value="scale" disabled>
+            Scale
+          </option>
         </select>
       </label>
       {kind === 'distance' && (
@@ -494,5 +523,26 @@ export function TransformDialog({
         </p>
       )}
     </FeatureDialog>
+  );
+}
+
+/** The next part's name, after every Part N there is, copies and all: Part 2 for a design of one. */
+function nextPartName(document: CadDocument): string {
+  const numbers = document.parts
+    .flatMap(part => [part.name, ...(part.copies ?? []).map(copy => copy.name ?? '')])
+    .flatMap(name => {
+      const n = /^Part (\d+)$/.exec(name)?.[1];
+      return n ? [Number(n)] : [];
+    });
+  return `Part ${Math.max(1, ...numbers) + 1}`;
+}
+
+/** The dialog's name: the step's own when it's edited, or the next Transform's. */
+function transformTitle(document: CadDocument, partId: string, copyId?: string, move?: boolean): string {
+  const steps = designSteps(document);
+  const own = copyId ?? (move ? `${partId}:move` : undefined);
+  return (
+    (own && steps.find(step => step.id === own)?.label) ||
+    `Transform ${steps.filter(step => step.label.startsWith('Transform')).length + 1}`
   );
 }

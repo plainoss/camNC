@@ -22,12 +22,13 @@ import type { ApartPartIds } from './apartExtrudePreview';
 import type { Tool, View } from './cadEditorShared';
 import type { CadEditorProps } from './CadEditor.types';
 import { drawnOnName } from './drawnOnName';
+import { keepStepNames } from './keepStepNames';
 import { featureLeadId, hasOutline, ownsItsSketch, replacePart, withoutExtrude, withoutPartsMadeWith } from './editorHelpers';
 import type { faceSketchHost } from './faceSketchHost';
 import type { FeatureAction, FeatureEntry } from './FeatureList';
 import { startHole } from './holeSource';
 import { newSketchPart } from './newSketchPart';
-import type { PartPatternKind } from './partPatternKind';
+import type { PatternOpening } from './partPatternKind';
 import { pickedPlane, planeOffsetFrom } from './basePlanes';
 import { straightOn, type SketchTurn } from './sketchOrbit';
 import { focusSketchCanvas } from './sketchViewport';
@@ -105,12 +106,13 @@ export function openStudioFeature(
   kind: 'extrude' | 'pattern' | 'hole',
   partId: string,
   before = markCadSession(editor.session),
-  initialPatternKind?: PartPatternKind
+  initialPatternKind?: PatternOpening
 ) {
   const { chooseTool, cutSelection, documentRef, openDialog, setSelected, setSelectedFace, setShowWorkspace } = editor;
   partId = featureLeadId(documentRef.current, kind, partId);
   setSelectedFace(null);
-  cutSelection.selectPart(partId);
+  // Opened on, not chosen: a dialog opened next starts with nothing picked.
+  cutSelection.selectPart(partId, undefined, undefined, false);
   setSelected([]);
   chooseTool('select');
   setShowWorkspace(true);
@@ -171,7 +173,8 @@ export function openStudioSketch(editor: StudioNavigationInput, stepPartId: stri
   // An Extrude dialog the sketch was opened from is dropped, not cancelled: its extrude stays.
   closeDialog();
   setChoosingFace(false);
-  cutSelection.selectPart(partId);
+  // Opened on, not chosen: a dialog opened next starts with nothing picked.
+  cutSelection.selectPart(partId, undefined, undefined, false);
   setSelected([]);
   setShowWorkspace(false);
   setShow3D(false);
@@ -250,6 +253,7 @@ export function openDesignStep(editor: StudioNavigationInput, step: DesignStep) 
     return openStudioFeature(editor, documentRef.current.parts.find(p => p.id === step.partId)?.hole ? 'hole' : 'extrude', step.partId);
   if (studioSession && step.kind === 'move') return openStudioTransform(editor, step.partId, undefined, true);
   if (studioSession && step.kind === 'fillet') return openDialog({ kind: 'fillet', partId: step.partId, filletId: step.id });
+  if (studioSession && step.kind === 'mirror') return openDialog({ kind: 'mirror', partId: step.partId, joinId: step.id });
   if (studioSession && step.kind === 'copy') {
     const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
     if (copy?.offset) return openStudioTransform(editor, step.partId, copy.id);
@@ -269,6 +273,9 @@ export function openDesignStep(editor: StudioNavigationInput, step: DesignStep) 
   } else if (step.kind === 'partCut') {
     setShowWorkspace(true);
     openDialog({ kind: 'partCut', id: step.partCutId });
+  } else if (step.kind === 'split') {
+    setShowWorkspace(true);
+    openDialog({ kind: 'split', partId: step.partId });
   } else if (step.kind === 'cut' || step.kind === 'extrude') {
     setShowWorkspace(false);
     setShow3D(hasOutline(documentRef.current, step.partId));
@@ -339,19 +346,30 @@ export function studioFeatureAction(editor: StudioNavigationInput, entry: Featur
   if (action === 'rollToEnd') return setRolledTo(null);
   if (action !== 'delete') return;
   if (feature) closeDialog();
-  if (step.kind === 'fillet') return commit(removeEdgeFillet(current, step.partId, step.id));
-  if (step.kind === 'move') return commit(replacePart(current, step.partId, ({ moved: _moved, ...p }) => p));
+  const commitKept = (next: CadDocument) => commit(keepStepNames(current, next));
+  if (step.kind === 'fillet') return commitKept(removeEdgeFillet(current, step.partId, step.id));
+  if (step.kind === 'mirror')
+    return commitKept(
+      replacePart(current, step.partId, part => {
+        const { mirrorJoins, ...rest } = part;
+        const left = mirrorJoins?.filter(join => join.id !== step.id);
+        return left?.length ? { ...rest, mirrorJoins: left } : rest;
+      })
+    );
+  if (step.kind === 'move') return commitKept(replacePart(current, step.partId, ({ moved: _moved, ...p }) => p));
   // In the studio a sketch stands on its own, as in the reference: deleting its Extrude leaves the sketch.
   if (step.kind === 'extrude' && studioSession && ownsItsSketch(current, step.partId))
-    commit(replacePart(withoutPartsMadeWith(current, step.partId), step.partId, withoutExtrude));
+    commitKept(replacePart(withoutPartsMadeWith(current, step.partId), step.partId, withoutExtrude));
   else if (step.kind === 'sketch' || step.kind === 'extrude') {
     // A part is its sketch pushed out, so deleting either deletes the part, and the parts its extrude made with it.
     const parts = withoutPartsMadeWith(current, step.partId).parts.filter(candidate => candidate.id !== step.partId);
-    commit(withFeatureVersion({ ...current, parts }));
+    commitKept(withFeatureVersion({ ...current, parts }));
     setPartId(parts[0]?.id ?? '');
-  } else if (step.kind === 'pattern') commit(setPartPattern(current, step.partId, null));
-  else if (step.kind === 'partCut' && step.partCutId) commit(removePartCut(current, step.partCutId));
-  else if (step.kind === 'cut' && step.cutId) commit(removeCadFeature(current, step.partId, step.cutId));
+  } else if (step.kind === 'pattern') commitKept(setPartPattern(current, step.partId, null));
+  else if (step.kind === 'partCut' && step.partCutId) commitKept(removePartCut(current, step.partCutId));
+  // The part is whole again; one taken out of a pattern to be split stays a part of its own.
+  else if (step.kind === 'split') commitKept(replacePart(current, step.partId, ({ split: _split, ...p }) => p));
+  else if (step.kind === 'cut' && step.cutId) commitKept(removeCadFeature(current, step.partId, step.cutId));
 }
 
 export function openStudioTransform(editor: StudioNavigationInput, partId: string, copyId?: string, move?: boolean) {
@@ -431,7 +449,7 @@ export function pickStudioPlane(editor: StudioNavigationInput, plane: string) {
   setSelectedPlane(picked => (picked === plane ? null : plane));
 }
 
-export function runStudioCommand(editor: StudioNavigationInput, command: StudioCommand, initialPatternKind?: PartPatternKind) {
+export function runStudioCommand(editor: StudioNavigationInput, command: StudioCommand, initialPatternKind?: PatternOpening) {
   const {
     choosingFace,
     closeDialog,
@@ -452,8 +470,13 @@ export function runStudioCommand(editor: StudioNavigationInput, command: StudioC
     sketchRowPicked,
     userRollback,
   } = editor;
-  const openFeature = (kind: 'extrude' | 'pattern' | 'hole', partId: string, before?: CadHistoryMark, patternKind?: PartPatternKind) =>
+  const openFeature = (kind: 'extrude' | 'pattern' | 'hole', partId: string, before?: CadHistoryMark, patternKind?: PatternOpening) =>
     openStudioFeature(editor, kind, partId, before, patternKind);
+  // The Linear pattern command opens its own dialog, with nothing picked yet, whatever is selected.
+  if (command === 'linearPattern') {
+    const on = part ?? documentRef.current.parts.find(candidate => candidate.extrude !== false) ?? documentRef.current.parts[0];
+    return on && openFeature('pattern', on.id, undefined, 'linearPattern');
+  }
   setStudioRefusal(null);
   if (command === 'sketch') {
     closeDialog();
@@ -486,12 +509,14 @@ export function runStudioCommand(editor: StudioNavigationInput, command: StudioC
   } else if (command === 'plane') {
     const preselected = planeOffsetFrom(documentRef.current, selectedPlane, selectedFace);
     openDialog({ kind: 'plane', ...(preselected && { preselected }) });
-  } else if (command === 'cutParts') openDialog({ kind: 'partCut' });
+  } else if (command === 'split') openDialog({ kind: 'split' });
+  else if (command === 'cutParts' || command === 'boolean')
+    openDialog({ kind: 'partCut', ...(command === 'boolean' && { boolean: true as const }) });
   else if (command === 'extrude' && (selectedFace || part)) {
-    const mark = markCadSession(session),
-      before = mark.document;
+    const mark = markCadSession(session);
     const from = selectedFace ? { face: selectedFace } : { part: part! };
-    const started = startExtrude(before, from, part?.extrude === false && sketchRowPicked === part.id, profiles.pickedProfile);
+    // From its row, a sketch starts with all of it; otherwise with nothing picked.
+    const started = startExtrude(mark.document, from, sketchRowPicked === part?.id, profiles.pickedProfile);
     if ('refusal' in started) return setStudioRefusal(started.refusal);
     commit(started.document);
     openFeature('extrude', started.partId, mark);

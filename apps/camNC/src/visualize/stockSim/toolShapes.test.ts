@@ -9,6 +9,11 @@ describe('tool shapes', () => {
   it('guesses shapes from the tool table', () => {
     expect(shapeFromToolInfo({ tool: 1, diameter: 6, name: 'flat end mill', isFlat: true })).toEqual({ kind: 'flat', radius: 3 });
     expect(shapeFromToolInfo({ tool: 2, diameter: 6, name: 'ball end mill', isFlat: false })).toEqual({ kind: 'ball', radius: 3 });
+    // A corner radius of half the diameter is a ball end, whatever its name: camNC's own programs say CR=.
+    expect(shapeFromToolInfo({ tool: 3, diameter: 6, cornerRadius: 3, name: '6mm sorotec', isFlat: false })).toEqual({
+      kind: 'ball',
+      radius: 3,
+    });
     expect(shapeFromToolInfo({ tool: 3, diameter: 6, taper: 30, name: 'engrave', isFlat: false })).toEqual({
       kind: 'vbit',
       radius: 3,

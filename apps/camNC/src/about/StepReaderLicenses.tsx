@@ -1,5 +1,5 @@
 import { FullText, LicenseCard, linkClass } from './licenseParts';
-import { stepReaderDistribution, stepReaderLicenses } from './stepReaderLicenses';
+import { stepReaderDistribution, stepReaderLicenses } from './stepReaderLicenseData';
 
 /** Notices, source and licenses for the STEP reader, which ships as its own LGPL WebAssembly module. */
 export function StepReaderLicenses() {

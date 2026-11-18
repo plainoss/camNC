@@ -5,7 +5,8 @@ import type { CamWorkerAPI } from '../workers/cam.worker';
 import type { BoardRequest, ModelImport, PlanResult } from './camTypes';
 import { useStore } from '@/store/store';
 import { useCamMachine } from './machine/camMachine';
-import { kDefaultPlan, toCamSettings } from './planSettings';
+import { kDefaultPlan, roundBallFor, toCamSettings } from './planSettings';
+import { offeredBits, useToolLibrary } from './toolLibrary';
 import { rebaseJob } from './rebaseJob';
 import { useCuttingData } from './cuttingData';
 import { getJob, getModelBytes, listJobs, modelKey, saveJob, updateJobForModel, type CamJobV1 } from './jobDb';
@@ -166,7 +167,9 @@ export function useCamModel(job: CamJobV1 | null | undefined) {
 export function useCamPlan(job: CamJobV1 | null | undefined, partId: string | undefined, modelReady: boolean) {
   const saved = useCuttingData(s => s.saved);
   const spindle = useStore(s => s.machinePrefs.spindleSwitch ?? 'hand');
-  const settings = { ...toCamSettings(job?.plan ?? kDefaultPlan, undefined, saved), spindle };
+  const stored = useToolLibrary(s => s.bits);
+  const plan = job?.plan ?? kDefaultPlan;
+  const settings = { ...toCamSettings({ ...plan, roundBall: roundBallFor(plan, offeredBits(stored)) }, undefined, saved), spindle };
   return useQuery({
     queryKey: camKeys.plan(job ? modelKey(job) : '', partId ?? '', settings),
     enabled: !!job && !!partId && modelReady,
@@ -188,7 +191,10 @@ export function useBoardPlans(
   modelReady: boolean,
   { keepShown = false } = {}
 ) {
-  const plan = job?.plan ?? kDefaultPlan;
+  const stored = useToolLibrary(s => s.bits);
+  const jobPlan = job?.plan ?? kDefaultPlan;
+  // Rounded edges are finished with the job's ball bit, else the largest one offered.
+  const plan = { ...jobPlan, roundBall: roundBallFor(jobPlan, offeredBits(stored)) };
   const saved = useCuttingData(s => s.saved);
   const pauseEachTab = useCamMachine(s => s.pauseEachTab);
   const spindle = useStore(s => s.machinePrefs.spindleSwitch ?? 'hand');

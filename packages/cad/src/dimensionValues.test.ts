@@ -2,27 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { createPlateDocument, dimensionValueError, parseCadDocument, updateDimension, validateCadDocument } from './index';
 
 describe('owned line dimension value domains', () => {
-  it.each(['distanceX', 'distanceY'] as const)(
-    'rejects a zero driving %s line size while retaining valid signed dimensions and references',
-    type => {
-      const owned = { type, sourceEntityId: 'line' };
-      for (const value of [0, -0, 1e-7, -1e-7]) expect(dimensionValueError(owned, value)).not.toBeNull();
-      expect(dimensionValueError(owned, -20)).toBeNull();
-      expect(dimensionValueError({ ...owned, driven: true }, 0)).toBeNull();
-      expect(dimensionValueError({ type }, 0)).toBeNull();
-    }
-  );
-  it('rejects zero owned width during source validation without imposing the rule on zero point coordinates or normal gaps', () => {
+  it.each(['distanceX', 'distanceY'] as const)('takes a zero %s line size, as a line can collapse to a point', type => {
+    const owned = { type, sourceEntityId: 'line' };
+    for (const value of [0, -0, 1e-7, -1e-7, -20]) expect(dimensionValueError(owned, value)).toBeNull();
+    expect(dimensionValueError({ ...owned, driven: true }, 0)).toBeNull();
+    expect(dimensionValueError({ type }, 0)).toBeNull();
+  });
+  it('keeps a zero owned width through source validation, and takes zero for point coordinates and normal gaps', () => {
     const document = createPlateDocument(),
       width = document.parts[0]!.sketch.constraints.find(constraint => constraint.label === 'Width')!;
-    const invalid = updateDimension(document, width.id, 0);
-    expect(
-      validateCadDocument(invalid).some(
-        diagnostic => diagnostic.code === 'invalid-dimension' && diagnostic.constraintIds?.includes(width.id)
-      )
-    ).toBe(true);
-    const portable = parseCadDocument(JSON.parse(JSON.stringify(invalid)));
-    expect(validateCadDocument(portable).some(diagnostic => diagnostic.code === 'invalid-dimension')).toBe(true);
+    const collapsed = updateDimension(document, width.id, 0);
+    expect(validateCadDocument(collapsed).some(diagnostic => diagnostic.code === 'invalid-dimension')).toBe(false);
+    const portable = parseCadDocument(JSON.parse(JSON.stringify(collapsed)));
+    expect(portable.parts[0]!.sketch.constraints.find(constraint => constraint.id === width.id)).toHaveProperty('value', 0);
     for (const type of [
       'positionX',
       'positionY',

@@ -16,8 +16,8 @@
           "angleExpression": null, "equalSpacing": true, "opposite": false
         } } }
       } } },
-      "feature Circular pattern · Leg",
-      { "expect": { "studio": { "dialog": "Circular pattern · Leg" } } },
+      "feature Circular pattern 1",
+      { "expect": { "studio": { "dialog": "Circular pattern 1" } } },
       "dialogfill Angle = 90deg",
       "dialogcheck Equal spacing = false",
       "dialogfill Instance count = 5",
@@ -42,7 +42,7 @@
         "sameFeatureIdsSince": "assembled",
         "addedCopyIdsSince": { "checkpoint": "assembled", "part": "Leg", "count": 2 }
       } } },
-      "feature Circular pattern · Leg",
+      "feature Circular pattern 1",
       "dialogfill Angle = 180deg",
       "dialogcheck Opposite direction = true",
       "dialogconfirm",
@@ -55,7 +55,7 @@
         } } }
       } } },
       "reload",
-      "feature Circular pattern · Leg",
+      "feature Circular pattern 1",
       "dialogfill Angle = 30deg",
       "dialogcheck Equal spacing = false",
       "dialogconfirm",
@@ -67,9 +67,9 @@
           "angleExpression": null, "equalSpacing": false, "opposite": true
         } } }
       } } },
-      "featureaction Circular pattern · Leg = Suppress",
+      "featureaction Circular pattern 1 = Suppress",
       { "expect": { "studio": { "workspacePartCount": 2, "sameIdsSince": "grown" } } },
-      "featureaction Circular pattern · Leg = Unsuppress",
+      "featureaction Circular pattern 1 = Unsuppress",
       "reload",
       { "expect": { "studio": {
         "workspacePartCount": 7,

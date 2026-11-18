@@ -21,7 +21,12 @@ export function folderFeatureEntries(document: CadDocument): ListedFeatureEntry[
     .filter(step => !blank.has(step.partId))
     .map(step => ({ kind: 'step', step }));
   const entries: ListedFeatureEntry[] = [
-    ...(document.variables ?? []).filter(variable => !variable.folderId).map(variable => ({ kind: 'variable' as const, id: variable.id })),
+    ...(document.variables ?? [])
+      .filter(
+        variable =>
+          !variable.folderId && !(variable.before && steps.some(entry => entry.kind === 'step' && entry.step.id === variable.before))
+      )
+      .map(variable => ({ kind: 'variable' as const, id: variable.id })),
     ...(document.planes ?? [])
       .filter(plane => !document.folders?.some(folder => folder.planeIds?.includes(plane.id)))
       .map(plane => ({ kind: 'plane' as const, id: plane.id })),
@@ -38,6 +43,10 @@ export function folderFeatureEntries(document: CadDocument): ListedFeatureEntry[
   for (const entry of steps) {
     const folderId = folderOfFeature(document, entry);
     if (folderId) emitFolder(folderId);
+    // A variable made while this step was edited comes just before it, as it was made at that point of the design.
+    if (entry.kind === 'step')
+      for (const variable of document.variables ?? [])
+        if (!variable.folderId && variable.before === entry.step.id) entries.push({ kind: 'variable', id: variable.id });
     entries.push(entry);
   }
   for (const folder of document.folders ?? []) emitFolder(folder.id);

@@ -21,7 +21,7 @@ describe('where a drawn part starts', () => {
       />
     );
     expect(screen.getByText('Drawn on the top of Side.')).toBeTruthy();
-    const offset = screen.getByRole('textbox', { name: /Offset/ });
+    const offset = screen.getByRole('textbox', { name: /Starting offset/ });
     fireEvent.change(offset, { target: { value: '-inset' } });
     fireEvent.keyDown(offset, { key: 'Enter' });
     expect(change).toHaveBeenLastCalledWith({ on: { partId: side.id, face: 'top' }, offset: -10, offsetExpression: '-inset' });

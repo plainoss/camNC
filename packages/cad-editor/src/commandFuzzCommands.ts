@@ -170,6 +170,12 @@ function constraintSelection(random: FuzzRandom, sketch: CadSketch, tool: Constr
       return random.chance(0.5) ? take(2, 'line') : take(2, 'circle', 'arc');
     case 'tangent':
       return [...take(1, 'line', 'arc'), ...take(1, 'circle', 'arc')];
+    case 'normal':
+      return random.chance(0.5) ? [...take(1, 'line'), ...take(1, 'circle', 'arc')] : take(2, 'line');
+    case 'pierce':
+      return [...take(1, 'point'), ...take(1, ...curves)];
+    case 'curvature':
+      return take(2, 'spline', 'bezier');
   }
 }
 

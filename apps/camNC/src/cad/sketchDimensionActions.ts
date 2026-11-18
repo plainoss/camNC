@@ -30,7 +30,6 @@ export async function placeSketchDimension(editor: SketchEditorInput, placed: Ca
     setDimension,
     setMessage,
     setSelectedConstraints,
-    svg,
   } = editor;
   if (!part || busy || preparingDimension.current) return;
   const source = documentRef.current;
@@ -50,10 +49,10 @@ export async function placeSketchDimension(editor: SketchEditorInput, placed: Ca
     }
     commit(replacePart(source, part.id, () => result.part));
     setSelectedConstraints([placed.id]);
+    // A reference dimension opens with the length it measures, and Enter takes it as it is.
     if (result.driven) {
-      setDimension(null);
+      setDimension(placed.id);
       setMessage('Reference dimension created. Existing constraints already determine this measurement.');
-      svg.current?.focus();
     } else {
       newDimensionCommand.current = { id: placed.id, checkpoint: cadCommandCheckpoint(session) };
       setDimension(placed.id);
@@ -84,6 +83,12 @@ export function applySketchDimensionValue(editor: SketchEditorInput): string | n
     variableScope,
   } = editor;
   if (!currentDimension || !numeric(currentDimension)) return null;
+  if (currentDimension.driven) {
+    setDimension(null);
+    setMessage('Reference dimension kept. It follows the geometry.');
+    svg.current?.focus();
+    return null;
+  }
   const input = dimensionInput.current;
   if (!input?.value.trim()) return rejectValue('Enter a dimension value.', input);
   const parsed = parseCadValue(input.value, { unit: currentDimension.type === 'angle' ? 'deg' : 'mm', variables: variableScope });

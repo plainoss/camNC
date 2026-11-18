@@ -45,7 +45,7 @@ it('opens with the studio toolbar and cancels a new extrude without changing the
   const { latest, toolbar } = await studio();
   expect(screen.queryByRole('toolbar', { name: 'Sketch toolbar' })).toBeNull();
   await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
-  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 2' });
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude 2' });
   await settled();
   expect(latest().parts[1]).toMatchObject({ sketchOf: latest().parts[0]!.id, regions: [] });
   expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', true);

@@ -4,6 +4,7 @@ import type { CadPart } from './types';
 export function validateExtrudeSettings(p: CadPart, number: (value: unknown) => void, reference: (value: unknown) => void) {
   for (const key of ['thicknessExpression', 'sketchName', 'extrudeName'] as const)
     if (p[key] !== undefined && typeof p[key] !== 'string') throw new Error('Invalid CAD part');
+  for (const key of ['mergeAll', 'intersect'] as const) if (p[key] !== undefined && p[key] !== true) throw new Error('Invalid CAD extrude');
   if (p.thin !== undefined) {
     if (!p.thin || typeof p.thin !== 'object') throw new Error('Invalid thin extrude');
     number(p.thin.depth);

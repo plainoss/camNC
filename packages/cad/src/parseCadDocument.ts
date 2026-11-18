@@ -22,7 +22,7 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (!input || typeof input !== 'object' || nestedDeeperThan(input, 64)) throw new Error('Invalid CAD document');
   const d = input as CadDocument;
   if (
-    ![1, 2, 3, 4, 5, 6].includes(d.version) ||
+    ![1, 2, 3, 4, 5, 6, 7].includes(d.version) ||
     typeof d.id !== 'string' ||
     typeof d.name !== 'string' ||
     (d.lengthUnit !== undefined && !['mm', 'cm', 'm', 'in', 'ft'].includes(d.lengthUnit)) ||
@@ -55,6 +55,7 @@ export function parseCadDocument(input: unknown): CadDocument {
       if (typeof variable.name !== 'string' || cadVariableNameError(variable.name) || names.has(variable.name))
         throw new Error('Invalid CAD variable name');
       if (typeof variable.expression !== 'string') throw new Error('Invalid CAD variable');
+      if (variable.before !== undefined && typeof variable.before !== 'string') throw new Error('Invalid CAD variable');
       names.add(variable.name);
     }
   }
@@ -114,6 +115,8 @@ export function parseCadDocument(input: unknown): CadDocument {
       if (!validPartCutSplit(step.split)) throw new Error('Invalid CAD part cut');
       if (step.clearanceExpression !== undefined && typeof step.clearanceExpression !== 'string') throw new Error('Invalid CAD part cut');
       if (step.consumeTools !== undefined && step.consumeTools !== true) throw new Error('Invalid CAD part cut');
+      if (step.operation !== undefined && !['union', 'subtract', 'intersect'].includes(step.operation))
+        throw new Error('Invalid CAD part cut');
       const reliefIssue = partCutReliefIssue(step.cornerRelief);
       if (reliefIssue) throw new Error(reliefIssue);
     }
@@ -168,6 +171,24 @@ export function parseCadDocument(input: unknown): CadDocument {
         !(Array.isArray(vector) && vector.length === 3 && vector.every(Number.isFinite) && Math.hypot(...vector) > 0)
       )
         throw new Error('Invalid CAD pattern vector');
+      const { second, skipped, centered } = p.pattern ?? {};
+      const unit = (v: unknown) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite) && Math.hypot(...(v as number[])) > 0;
+      if (
+        (centered !== undefined && centered !== true) ||
+        (second !== undefined &&
+          (!second ||
+            !unit(second.vector) ||
+            !Number.isInteger(second.count) ||
+            second.count < 1 ||
+            second.count > 200 ||
+            !Number.isFinite(second.spacing) ||
+            (second.spacingExpression !== undefined && typeof second.spacingExpression !== 'string') ||
+            (second.countExpression !== undefined && typeof second.countExpression !== 'string') ||
+            (second.centered !== undefined && second.centered !== true))) ||
+        (skipped !== undefined &&
+          (!Array.isArray(skipped) || skipped.some(at => !Array.isArray(at) || at.length !== 2 || !at.every(Number.isInteger))))
+      )
+        throw new Error('Invalid CAD pattern grid');
       const { id, axis, count, spacing, countExpression, spacingExpression } = p.pattern ?? ({} as NonNullable<CadPart['pattern']>);
       if (
         typeof id !== 'string' ||
@@ -218,6 +239,82 @@ export function parseCadDocument(input: unknown): CadDocument {
         number(fillet.radius);
         if (fillet.radiusExpression !== undefined && typeof fillet.radiusExpression !== 'string') throw new Error('Invalid CAD fillet');
         if (fillet.suppressed !== undefined && typeof fillet.suppressed !== 'boolean') throw new Error('Invalid CAD fillet');
+        if (fillet.rims !== undefined) {
+          if (!Array.isArray(fillet.rims)) throw new Error('Invalid CAD fillet');
+          for (const rim of fillet.rims)
+            if (
+              !rim ||
+              typeof rim !== 'object' ||
+              (rim.side !== 'top' && rim.side !== 'underside') ||
+              !Array.isArray(rim.loops) ||
+              !rim.loops.length ||
+              rim.loops.some((loop: unknown) => typeof loop !== 'string' || !loop) ||
+              (rim.face !== undefined && rim.face !== true)
+            )
+              throw new Error('Invalid CAD fillet');
+        }
+      }
+    }
+    if (p.thinWall !== undefined) {
+      const wall = p.thinWall;
+      if (!wall || typeof wall !== 'object') throw new Error('Invalid CAD thin wall');
+      number(wall.thickness1);
+      number(wall.thickness2);
+      if (wall.thickness1 < 0 || wall.thickness2 < 0 || wall.thickness1 + wall.thickness2 <= 0) throw new Error('Invalid CAD thin wall');
+      for (const key of ['thickness1Expression', 'thickness2Expression'] as const)
+        if (wall[key] !== undefined && typeof wall[key] !== 'string') throw new Error('Invalid CAD thin wall');
+      if (wall.midPlane !== undefined && wall.midPlane !== true) throw new Error('Invalid CAD thin wall');
+    }
+    if (
+      p.thinEdges !== undefined &&
+      (!p.thinWall ||
+        !Array.isArray(p.thinEdges) ||
+        !p.thinEdges.length ||
+        p.thinEdges.some(id => typeof id !== 'string' || !p.sketch.entities.some(entity => entity.id === id && entity.type === 'line')))
+    )
+      throw new Error('Invalid CAD thin edges');
+    if (
+      (p.piece !== undefined &&
+        (!p.piece ||
+          typeof p.piece !== 'object' ||
+          !['sketchId', 'regionId', 'by'].every(key => typeof (p.piece as unknown as Record<string, unknown>)[key] === 'string'))) ||
+      (p.pieceOf !== undefined && (!p.pieceOf || typeof p.pieceOf.partId !== 'string' || typeof p.pieceOf.by !== 'string'))
+    )
+      throw new Error('Invalid CAD part piece');
+    if (p.material !== undefined) {
+      const material = p.material as unknown as Record<string, unknown> | null;
+      if (!material || typeof material.name !== 'string' || !material.name) throw new Error('Invalid CAD material');
+      number(material.density);
+    }
+    if (p.split !== undefined) {
+      const split = p.split as unknown as Record<string, unknown> | null;
+      const across = split?.across as Record<string, unknown> | undefined;
+      if (
+        !split ||
+        typeof split.id !== 'string' ||
+        !across ||
+        typeof across !== 'object' ||
+        ('plane' in across ? !['top', 'front', 'right'].includes(across.plane as string) : typeof across.partId !== 'string') ||
+        (split.datum !== undefined && typeof split.datum !== 'string') ||
+        (split.suppressed !== undefined && split.suppressed !== true) ||
+        (split.fromCopy !== undefined && split.fromCopy !== true)
+      )
+        throw new Error('Invalid CAD split');
+      addId(split.id);
+      const line = split.line as Record<string, unknown> | undefined;
+      if (line !== undefined) for (const key of ['x', 'y', 'nx', 'ny'] as const) number(line[key]);
+    }
+    if (p.mirrorJoins !== undefined) {
+      if (!Array.isArray(p.mirrorJoins) || !p.mirrorJoins.length) throw new Error('Invalid CAD mirror');
+      for (const join of p.mirrorJoins) {
+        if (!join || typeof join !== 'object' || !join.across || typeof join.across !== 'object') throw new Error('Invalid CAD mirror');
+        addId(join.id);
+        const across = join.across as Record<string, unknown>;
+        if ('plane' in across ? !['top', 'front', 'right'].includes(across.plane as string) : typeof across.partId !== 'string')
+          throw new Error('Invalid CAD mirror');
+        if (join.datum !== undefined && typeof join.datum !== 'string') throw new Error('Invalid CAD mirror');
+        if (join.suppressed !== undefined && typeof join.suppressed !== 'boolean') throw new Error('Invalid CAD mirror');
+        if (join.line !== undefined) for (const key of ['x', 'y', 'nx', 'ny'] as const) number(join.line[key]);
       }
     }
     if (p.drawnOn !== undefined) {
@@ -276,6 +373,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (!['point', 'line', 'circle', 'ellipse', 'arc', 'conic', 'bezier', 'spline'].includes(e.type))
           throw new Error('Unknown CAD entity');
         if (e.construction !== undefined && typeof e.construction !== 'boolean') throw new Error('Invalid construction flag');
+        if (e.taken !== undefined && (e.taken !== true || !e.faceEdge)) throw new Error('Invalid taken face edge');
         if (e.type === 'point') {
           number(e.x);
           number(e.y);
@@ -484,7 +582,11 @@ export function parseCadDocument(input: unknown): CadDocument {
           c.radiusSide !== 'far'
         )
           throw new Error('Invalid circular witness side');
-        if (c.type === 'circleCircleDistance' && ![c.radiusASign, c.radiusBSign, c.direction].every(value => value === 1 || value === -1))
+        if (
+          c.type === 'circleCircleDistance' &&
+          (![c.radiusASign, c.radiusBSign, c.direction].every(value => value === 1 || value === -1) ||
+            (c.angle !== undefined && !Number.isFinite(c.angle)))
+        )
           throw new Error('Invalid circular dimension direction');
         if ('expression' in c && c.expression !== undefined && (!('value' in c) || typeof c.expression !== 'string'))
           throw new Error('Invalid dimension expression');
@@ -526,7 +628,7 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (folderIssue) throw new Error(folderIssue);
   // The derived version walks feature arrays, so their shapes must be validated before it runs.
   const requiredVersion = cadDocumentVersion(d);
-  if ((d.version === 3 || d.version === 5 || d.version === 6) && requiredVersion !== d.version) throw new Error('Invalid CAD document');
+  if ((d.version === 3 || d.version >= 5) && requiredVersion !== d.version) throw new Error('Invalid CAD document');
   if (d.version < requiredVersion) throw new Error(`These CAD source settings require document version ${requiredVersion}`);
   for (const folder of d.folders ?? []) addId(folder.id);
   for (const plan of d.constructions ?? []) {

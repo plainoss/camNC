@@ -2,6 +2,8 @@ export type ToolInfo = {
   tool: number;
   diameter: number;
   taper?: number;
+  /** Corner radius (CR=): half the diameter on a ball end mill. */
+  cornerRadius?: number;
   name: string;
   isFlat: boolean;
 };
@@ -25,19 +27,21 @@ export function parseToolInfo(gcode: string): ToolInfo[] {
   //  - Group 4: the tool name (after the final "-" delimiter)
   // It handles lines starting with either '(' or ';' and accepts either a closing parenthesis or end-of-line.
   const toolRegex =
-    /[;(]\s*T(\d+)\s+D=(\d+(?:\.\d*)?)(?:\s+CR=\d*(?:\.\d*)?)?(?:\s+TAPER=(\d+(?:\.\d*)?)deg)?(?:\s+-\s+ZMIN=-?\d*(?:\.\d*)?)?\s+-\s+(.+?)(?:\s*\)|\s*$)/gm;
+    /[;(]\s*T(\d+)\s+D=(\d+(?:\.\d*)?)(?:\s+CR=(\d*(?:\.\d*)?))?(?:\s+TAPER=(\d+(?:\.\d*)?)deg)?(?:\s+ROUNDOVER R=\d*(?:\.\d*)?)?(?:\s+-\s+ZMIN=-?\d*(?:\.\d*)?)?\s+-\s+(.+?)(?:\s*\)|\s*$)/gm;
 
   let match: RegExpExecArray | null;
   while ((match = toolRegex.exec(searchLines)) !== null) {
     const toolNumber = parseInt(match[1], 10);
     const diameter = parseFloat(match[2]);
-    const taper = match[3] ? parseFloat(match[3]) : undefined;
-    const name = match[4].trim();
+    const cornerRadius = match[3] ? parseFloat(match[3]) : undefined;
+    const taper = match[4] ? parseFloat(match[4]) : undefined;
+    const name = match[5].trim();
     const isFlat = name.toLowerCase().includes('flat');
     toolInfo.push({
       tool: toolNumber,
       diameter,
       ...(taper !== undefined && { taper }),
+      ...(cornerRadius && { cornerRadius }),
       name,
       isFlat,
     });

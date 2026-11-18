@@ -2,7 +2,8 @@ export { loadStep, detectFlat, flipPart, flatMatrix, groupIdentical, analyzeFace
 export type { StepBody, FlatPart, LoadStepOptions } from './import';
 export { maxOf, minOf } from './geom';
 export { extractFeatures } from './features';
-export type { PartFeatures, PocketFeature, Level } from './features';
+export type { PartFeatures, PartRound, PocketFeature, Level } from './features';
+export { ballRoundOperation, roundoverBitFor, roundoverOperation } from './roundoverOperation';
 export { cutsMeet, featuresFromCuts, flippedProfile, profileFeatures } from './cutFeatures';
 export { union as unionPaths, intersect as intersectPaths } from './geom';
 export type { FlatCut, FlatProfile, HoleSource, SidedCut } from './cutFeatures';
@@ -132,6 +133,7 @@ export { cutoutPastBoard, cutoutSilhouette } from './cutout';
 export { simplifyLoop } from './simplifyLoop';
 export type { BoardCutout, CutoutShape } from './cutout';
 export { partBrep, brepProblems } from './step/brep';
+export { roundMover, roundOver, roundSlices, type MeshRound } from './roundOver';
 export type { Brep } from './step/brep';
 export { writeStep } from './step/writer';
 export type { StepLengthUnit, StepOptions, StepProduct } from './step/writer';

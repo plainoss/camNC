@@ -1,4 +1,4 @@
-import { newCadId, setCadVariable, type CadDocument } from '@wbcnc/cad';
+import { cadFieldVariableExpression, cadVariableScope, newCadId, setCadVariable, type CadDocument } from '@wbcnc/cad';
 import { useId, useMemo, useState } from 'react';
 import { CadValueInput } from './CadValueInput';
 import { FeatureDialog } from './FeatureDialog';
@@ -28,10 +28,16 @@ export function VariableDialog({
   const [expression, setExpression] = useState(variable?.expression ?? '');
   const [error, setError] = useState<string | null>(null);
   const [featureId] = useState(() => variable?.id ?? newCadId());
-  const result = useMemo(
-    () => setCadVariable(document, { id: featureId, name: name.trim(), expression: expression.trim() }),
-    [document, featureId, name, expression]
-  );
+  const result = useMemo(() => {
+    // A length or an angle typed as a bare number stays one, in the design's unit, as its uses expect a length.
+    const scope = cadVariableScope(document);
+    const kind = variable && scope[variable.name]?.kind;
+    const typed =
+      kind === 'length' || kind === 'angle'
+        ? cadFieldVariableExpression(expression.trim(), 'scalar', scope, document.lengthUnit, kind)
+        : expression.trim();
+    return setCadVariable(document, { id: featureId, name: name.trim(), expression: typed });
+  }, [document, featureId, name, expression, variable]);
   useDialogPreview('error' in result ? null : result.document, onPreview);
   const save = () => {
     if ('error' in result) return setError(result.error);

@@ -88,7 +88,7 @@ describe('pure dimension selection and placement workflow', () => {
     expect('preview' in placed.state).toBe(false);
   });
 
-  it('defers existing-dimension reuse until placement so a second reference can still change the measurement', () => {
+  it('places a new dimension on an already dimensioned measurement, while a second reference can still change it', () => {
     const { sketch: source, horizontal, point } = fixture();
     const sketch = addConstraint(source, {
       id: 'width',
@@ -108,7 +108,8 @@ describe('pure dimension selection and placement workflow', () => {
     expect(pair.state.preview.type).toBe('pointLineDistance');
     expect(pair.state.existingConstraintId).toBeUndefined();
     const placed = transitionDimensionWorkflow(sketch, active.state, { type: 'place', position: { x: 70, y: 50 } });
-    expect(placed.effect).toEqual({ type: 'edit-existing', constraintId: 'width' });
+    expect(placed.effect?.type).toBe('create');
+    expect(placed.effect?.type === 'create' && placed.effect.constraint.id).not.toBe('width');
   });
 
   it('copies reference pick hints and reevaluates the angular wedge on hover and final placement', () => {

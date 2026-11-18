@@ -43,7 +43,7 @@ it('extrudes a sketch of overlapping shapes, all its regions picked, into one pa
   await userEvent.keyboard('{Shift>}E{/Shift}');
   const dialog = await screen.findByRole('dialog', { name: /^Extrude/ });
   expect(within(dialog).queryByRole('alert')).toBeNull();
-  expect(within(dialog).getByText(/3 regions/)).toBeDefined();
+  expect(within(dialog).getAllByText(/^Face of /)).toHaveLength(3);
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest().parts.filter(isCadPart)).toHaveLength(2));
   expect(screen.queryByText('Finish is blocked')).toBeNull();
@@ -89,7 +89,11 @@ it('adds a sketch on a part’s face to that part by default, joined as one part
   await userEvent.keyboard('{Shift>}E{/Shift}');
   const dialog = await screen.findByRole('dialog', { name: /^Extrude/ });
   expect(within(dialog).getByRole('tab', { name: 'Add' }).getAttribute('aria-selected')).toBe('true');
-  expect((within(dialog).getByRole('combobox', { name: 'Merge scope' }) as HTMLSelectElement).value).toBe(block.id);
+  expect(
+    within(within(dialog).getByRole('group', { name: 'Merge scope' })).getByRole('button', {
+      name: `Take ${block.name} out of merge scope`,
+    })
+  ).toBeTruthy();
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Extrude/ })).toBeNull());
   expect(latest().parts.find(part => part.id === boss.id)!.addTo).toBe(block.id);

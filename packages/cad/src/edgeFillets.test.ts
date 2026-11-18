@@ -81,7 +81,7 @@ describe('a Fillet step whose radius uses up a side', () => {
       const unresolved = made.diagnostics.filter(d => d.code === 'fillet-unresolved');
       expect(unresolved).toEqual([expect.objectContaining({ partId: part.id, message, entityIds: [corners[1], corners[2]] })]);
       expect(edgeFilletProblems(part)).toEqual([{ filletId: 'f', message, corners: [corners[1], corners[2]] }]);
-      expect(designSteps(document).find(step => step.id === 'f')?.broken).toBe(message);
+      expect(designSteps(document).find(step => step.id === 'f')?.broken).toBe('Failed to fillet selections.');
       // The corner whose sides can each take the radius is rounded; the two sharing the side used up stay sharp.
       expect(Math.abs(polygonArea(made.part!.outline))).toBeCloseTo(400 * height - radius ** 2 * (1 - Math.PI / 4), -1);
     });

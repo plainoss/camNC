@@ -302,3 +302,97 @@
   top: auto;
   bottom: 100%;
 }
+/* The filter above the list, and the syntax it takes while it has the keyboard. */
+.cad-feature-filter {
+  position: relative;
+  padding: 0 7px 6px;
+}
+.cad-feature-filter input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cfd8e3;
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-size: 12px;
+}
+.cad-feature-filter-help {
+  position: absolute;
+  z-index: 20;
+  inset-inline: 7px;
+  top: 100%;
+  border: 1px solid #cfd8e3;
+  border-radius: 4px;
+  padding: 6px 8px;
+  background: #fff;
+  color: #2d3a4d;
+  font-size: 11px;
+  box-shadow: 0 3px 12px #24324720;
+}
+.cad-feature-filter-help p {
+  margin: 0 0 4px;
+}
+.cad-feature-filter-help dl {
+  margin: 0;
+}
+.cad-feature-filter-help dl div {
+  display: flex;
+  gap: 6px;
+}
+.cad-feature-filter-help dt {
+  flex: 0 0 104px;
+  font-family: ui-monospace, monospace;
+}
+.cad-feature-filter-help dd {
+  margin: 0;
+  color: #66768c;
+}
+/* Rows the filter drops, as one mark. */
+.cad-feature-elided {
+  padding: 1px 8px;
+  color: #8592a5;
+  list-style: none;
+}
+/* What a feature builds on, the feature, and what builds on it. */
+.cad-feature-dependencies {
+  margin: 6px 7px 0;
+  border: 1px solid #cfd8e3;
+  border-radius: 5px;
+  padding: 6px 8px;
+  background: #fff;
+  font-size: 12px;
+}
+.cad-feature-dependencies header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cad-feature-dependencies h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.cad-feature-dependencies header button {
+  border: 0;
+  background: none;
+  font-size: 14px;
+  cursor: pointer;
+}
+.cad-feature-dependencies ul {
+  margin: 4px 0;
+  padding: 0;
+  list-style: none;
+}
+.cad-feature-dependencies-arrow {
+  margin: 0;
+  color: #8592a5;
+  text-align: center;
+}
+.cad-feature-dependencies-self {
+  margin: 2px 0;
+  border-radius: 3px;
+  padding: 2px 6px;
+  background: #e3eefb;
+}
+.cad-feature-dependencies-none {
+  color: #8592a5;
+}

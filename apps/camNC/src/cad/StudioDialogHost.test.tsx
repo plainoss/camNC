@@ -35,7 +35,7 @@ it('forwards a mirror plane pick into its live candidate', async () => {
   const pick = setDirectionPicker.mock.calls.at(-1)?.[0];
   expect(pick).toBeTypeOf('function');
   act(() => pick?.({ plane: 'front' }));
-  await waitFor(() => expect(onPreview.mock.calls.at(-1)?.[0]?.parts[0]?.copies?.[0]?.mirror).toEqual({ across: { plane: 'front' } }));
+  await waitFor(() => expect(onPreview.mock.calls.at(-1)?.[0]?.parts[0]?.mirrorJoins?.[0]?.across).toEqual({ plane: 'front' }));
   expect(change).not.toHaveBeenCalled();
 });
 

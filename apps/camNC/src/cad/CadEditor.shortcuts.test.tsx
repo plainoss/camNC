@@ -58,19 +58,24 @@ it('starts Fix with nothing selected, fixes each point clicked, and stays on unt
   expect(constraints().getAttribute('aria-pressed')).toBe('false');
 });
 
-it('never starts the unshifted tool for Shift+K, Shift+G or Shift+U', async () => {
+it('starts the Normal, Pierce and Curvature tools on Shift+K, Shift+G and Shift+U with nothing selected', async () => {
   await setup();
   for (const [letter, name] of [
     ['K', 'Normal'],
     ['G', 'Pierce'],
-    ['U', 'Equal curvature'],
+    ['U', 'Curvature'],
   ] as const) {
     key(letter, { shiftKey: true });
-    expect(screen.getByText(`The ${name} constraint isn’t available yet.`)).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Select (Esc)' }).getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByRole('button', { name: 'Constraints' }).getAttribute('aria-pressed')).toBe('true');
+    expect(
+      screen.getByText(
+        new RegExp(name === 'Normal' ? 'make them normal' : name === 'Pierce' ? 'crosses the sketch plane' : 'match their curvature')
+      )
+    ).toBeDefined();
+    key('Escape');
     expect(screen.getByRole('button', { name: 'Select (Esc)' }).getAttribute('aria-pressed')).toBe('true');
   }
-  key('g');
-  expect(screen.getByRole('button', { name: 'Select (Esc)' }).getAttribute('aria-pressed')).toBe('false');
 });
 
 it('lists the sketch shortcuts on ?, and closes the list with Escape', async () => {

@@ -1,4 +1,4 @@
-import type { CamSettings, HoleChoice, LibraryTool } from '@wbcnc/cam';
+import type { CamSettings, HoleChoice, LibraryTool, Tool } from '@wbcnc/cam';
 import { DEFAULT_TABS, MATERIALS } from '@wbcnc/cam/settings';
 import { savedCuttingFor, resolveCutting, type CuttingData } from '@wbcnc/cam-settings';
 import type { HoleChoices } from './holeChoices';
@@ -10,6 +10,8 @@ export interface PlanSettingsV1 {
   bit: LibraryTool;
   /** Optional smaller bit for features the main bit can't reach; boards then pause once to swap. */
   smallBit?: LibraryTool;
+  /** The ball end mill that finishes rounded edges; unset: the largest ball bit offered (see `roundBallFor`). */
+  roundBall?: LibraryTool;
   material: MaterialKey;
   /** How far the final pass cuts below the board into the spoilboard, mm. */
   cutBelow: number;
@@ -37,11 +39,38 @@ export function withHoleChoice(p: PlanSettingsV1, partId: string, hole: string |
 export const kDefaultBit: LibraryTool = { number: 1, diameter: 3.175, name: '1/8″ flat' };
 
 /** The bits offered without importing anything: the default, and common flat end mills with feeds that have proven themselves. */
+/** The ball end mill rounded edges are finished with when none is imported: ⌀6, cautious cutting data for hardwood. */
+export const kRoundBall: LibraryTool = {
+  number: 21,
+  diameter: 6,
+  shape: 'ball',
+  name: '6 mm ball end',
+  flutes: 2,
+  feed: 1200,
+  plungeFeed: 300,
+  rpm: 18000,
+  stepdown: 1,
+};
+
+/** Whether a bit is a ball end mill, which only finishes rounded edges. */
+export const isBallBit = (b: Pick<LibraryTool, 'shape'>) => b.shape === 'ball';
+
+/**
+ * The ball end mill that finishes rounded edges: the job's choice, else the largest of the user's own ball bits among
+ * `offered` (imported or added by hand), else the built-in one.
+ */
+export function roundBallFor(p: Pick<PlanSettingsV1, 'roundBall'>, offered: LibraryTool[]): LibraryTool {
+  if (p.roundBall) return p.roundBall;
+  const balls = offered.filter(isBallBit).filter(b => b !== kRoundBall);
+  return balls.reduce<LibraryTool | undefined>((best, b) => (!best || b.diameter > best.diameter ? b : best), undefined) ?? kRoundBall;
+}
+
 export const kBuiltInBits: LibraryTool[] = [
   kDefaultBit,
   { number: 2, diameter: 3.175, name: '1/8″ compression', flutes: 2, fluteLength: 25, feed: 2400, plungeFeed: 360, rpm: 15000 },
   { number: 3, diameter: 6, name: '6 mm flat', flutes: 2, fluteLength: 32, feed: 1800, plungeFeed: 330, rpm: 30000 },
   { number: 4, diameter: 8, name: '8 mm flat', flutes: 2, fluteLength: 32, feed: 3000, plungeFeed: 480, rpm: 30000 },
+  kRoundBall,
 ];
 
 export const kDefaultPlan: PlanSettingsV1 = {
@@ -68,6 +97,25 @@ const kMaxOutlineSkim = 0.2;
  * each bit cuts by its own. The settings' own feeds and speed are the main bit's: it cuts the outlines, and what follows
  * them (freeing the parts, removing tabs).
  */
+/** A ball bit as CAM cuts with it: its library feeds, else the built-in ball's cautious ones. */
+function roundBallTool(b: LibraryTool, taken: number[]): Tool {
+  return {
+    // Its own number in the program's tools table, apart from the job's flat bits.
+    number: taken.includes(b.number) ? Math.max(...taken) + 1 : b.number,
+    diameter: b.diameter,
+    shape: 'ball',
+    name: b.name,
+    guid: b.guid,
+    flutes: b.flutes,
+    fluteLength: b.fluteLength,
+    stickout: b.stickout,
+    feed: b.feed ?? kRoundBall.feed,
+    plungeFeed: b.plungeFeed ?? kRoundBall.plungeFeed,
+    rpm: b.rpm ?? kRoundBall.rpm,
+    stepdown: b.stepdown ?? kRoundBall.stepdown,
+  };
+}
+
 export function toCamSettings(
   p: PlanSettingsV1,
   material: MaterialKey = p.material,
@@ -103,6 +151,11 @@ export function toCamSettings(
       finalFeedFactor: cut[i].finalFeedFactor,
       fluteLength: b.fluteLength,
     })),
+    // Edges a design rounds over are finished with a ball end where no roundover bit of their radius is set up.
+    roundBall: roundBallTool(
+      p.roundBall ?? kRoundBall,
+      bits.map((b, i) => (i === 0 ? b.number : Math.max(b.number, p.bit.number + 1)))
+    ),
     material: MATERIALS[material],
     feed: main.feed,
     plungeFeed: main.plungeFeed,

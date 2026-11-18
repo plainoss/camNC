@@ -1,0 +1,40 @@
+import {
+  addRectangle,
+  CAD_CHORD_TOLERANCE,
+  createCadDocument,
+  createCadPart,
+  sketchRegions,
+  type CadDocument,
+  type CadPart,
+} from '@wbcnc/cad';
+import { expect, it } from 'vitest';
+import { autoAddTarget } from './extrudeAutoAdd';
+
+const board = (name: string, x: number, y: number, width: number, height: number, thickness: number): CadPart => {
+  const part = { ...createCadPart(name, thickness), drawnOn: { on: { plane: 'top' as const }, offset: 0 } };
+  part.sketch = addRectangle(part.sketch, { x, y, width, height });
+  return { ...part, regions: sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).map(region => region.id) };
+};
+
+it('switches a New extrude to Add with the part its picked region runs into or stands against, and not one above it', () => {
+  const first = board('Part 1', 0, 0, 100, 40, 10);
+  const design = (second: CadPart): CadDocument => ({ ...createCadDocument(), parts: [first, second] });
+  const across = board('Part 2', 0, 0, 40, 80, 30);
+  expect(autoAddTarget(design(across), across.id)).toBe(first.id);
+  // Side by side along an edge, as the reference joins it too.
+  const beside = board('Part 2', 100, 0, 40, 40, 10);
+  expect(autoAddTarget(design(beside), beside.id)).toBe(first.id);
+  // Meeting only at a corner isn't standing against it.
+  const corner = board('Part 2', 100, 40, 40, 40, 10);
+  expect(autoAddTarget(design(corner), corner.id)).toBeNull();
+  const above = { ...board('Part 2', 0, 0, 40, 40, 10), drawnOn: { on: { plane: 'top' as const }, offset: 10 } };
+  expect(autoAddTarget(design(above), above.id)).toBeNull();
+  // A region in a board's hole isn't in its material.
+  const ring = { ...first, regions: undefined };
+  ring.sketch = addRectangle(ring.sketch, { x: 10, y: 10, width: 20, height: 20 });
+  const dowel = board('Part 2', 15, 15, 10, 10, 30);
+  expect(autoAddTarget({ ...createCadDocument(), parts: [ring, dowel] }, dowel.id)).toBeNull();
+  // Nothing picked, or chosen already, it stays as it is.
+  const unpicked = { ...board('Part 2', 0, 0, 40, 80, 30), regions: [] };
+  expect(autoAddTarget(design(unpicked), unpicked.id)).toBeNull();
+});

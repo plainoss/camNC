@@ -14,9 +14,9 @@ export interface LinearPatternParameters {
 }
 export const initialLinearPatternParameters = (lengthUnit: CadLengthUnit = 'mm'): LinearPatternParameters => ({
   countX: '3',
-  countY: '2',
-  spacingX: lengthText(40, lengthUnit),
-  spacingY: lengthText(40, lengthUnit),
+  countY: '1',
+  spacingX: lengthText(25, lengthUnit),
+  spacingY: lengthText(25, lengthUnit),
   angleX: '0',
   angleY: '90',
   secondDirection: false,
@@ -24,7 +24,7 @@ export const initialLinearPatternParameters = (lengthUnit: CadLengthUnit = 'mm')
 export function linearPatternParameters(pattern: CadLinearPattern, lengthUnit: CadLengthUnit = 'mm'): LinearPatternParameters {
   return {
     countX: pattern.expressions?.countX ?? String(pattern.countX),
-    countY: pattern.expressions?.countY ?? String(pattern.countY > 1 ? pattern.countY : 2),
+    countY: pattern.expressions?.countY ?? String(pattern.countY),
     spacingX: pattern.expressions?.spacingX ?? lengthText(Math.hypot(pattern.stepX.x, pattern.stepX.y), lengthUnit),
     spacingY: pattern.expressions?.spacingY ?? lengthText(Math.hypot(pattern.stepY.x, pattern.stepY.y), lengthUnit),
     angleX: String((Math.atan2(pattern.stepX.y, pattern.stepX.x) * 180) / Math.PI),
@@ -82,6 +82,7 @@ export function linearPatternAnchor(sketch: CadSketch, ids: readonly string[]): 
   const points = sketch.entities.filter(e => e.type === 'point' && wanted.has(e.id));
   const xs = points.flatMap(e => (e.type === 'point' ? [e.x] : [])),
     ys = points.flatMap(e => (e.type === 'point' ? [e.y] : []));
-  return xs.length ? { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 } : { x: 0, y: 0 };
+  // The pattern's guide starts where the seed does, at the lower left of what's picked, as a line's start on an edge.
+  return xs.length ? { x: Math.min(...xs), y: Math.min(...ys) } : { x: 0, y: 0 };
 }
 export const editablePatternSources = (pattern: CadSketchPattern) => patternSourceIds(pattern);

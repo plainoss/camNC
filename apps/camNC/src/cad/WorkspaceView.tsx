@@ -27,6 +27,7 @@ import { sketchLinesInModel } from './sketchLines';
 import { featureShownByDefault } from './sketchShown';
 import { sketchSelectionRegions } from './profileSelection';
 import type { StudioCameraRef } from './studioCamera';
+import { StudioViewMenu } from './StudioViewMenu';
 import type { CadConnectorPick } from './TransformDialog';
 import type { ExtrudeDepthControl } from './extrudeDepth';
 import { useStudioMeasure } from './useStudioMeasure';
@@ -131,6 +132,7 @@ export default function WorkspaceView({
   onPickPoint?: (pick: {
     partId: string;
     point: [number, number, number];
+    surfacePoint?: [number, number, number];
     normal: [number, number, number];
     copy: boolean;
     edge?: { a: [number, number, number]; b: [number, number, number] };
@@ -197,6 +199,8 @@ export default function WorkspaceView({
   const setChoosing = (value: boolean) => (controlled ? onChoosingChange?.(value) : setOwnChoosing(value));
   // Feature pickers must own the first render, before an effect has closed the section's old picker state.
   const sectionEnabled = measurementEnabled && !choosing && !pickingMirrorPlane && !onPickPoint && !(onPickRegion && regions?.length);
+  // A view setting, not a design change: the view draws in perspective until it's switched back.
+  const [perspective, setPerspective] = useState(false);
   const section = useStudioSection(document, assembly, frame, sectionEnabled, onViewRequest, selectedPlane, selectedFace);
   const sectionEditing = sectionEnabled && section.editing;
   const sectionPicking = sectionEnabled && section.picking;
@@ -379,6 +383,17 @@ export default function WorkspaceView({
           </button>
         )}
       </div>
+      {/* The studio's view menu under the cube, with its Named views. */}
+      {controlled && onViewRequest && (
+        <StudioViewMenu
+          designId={document.id}
+          camera={cameraState}
+          onViewRequest={onViewRequest}
+          perspective={perspective}
+          onPerspective={setPerspective}
+          section={{ active: section.active, enabled: sectionEnabled, start: section.start, edit: section.edit, turnOff: section.turnOff }}
+        />
+      )}
       <ModelViewport
         cameraState={cameraState}
         extrusionDepth={extrusionDepth}
@@ -413,6 +428,7 @@ export default function WorkspaceView({
         // The studio shows parts as the reference does, and says in its status line when two overlap rather than colouring them.
         warnIds={controlled ? undefined : clashes.flatMap(clash => clash.partIds)}
         palette={controlled ? 'studio' : undefined}
+        perspective={perspective}
         highlightIds={hoverIds ? [...hoverIds] : undefined}
         milled={always}
         onPickFace={pickingMirrorPlane ? pickMirrorFace : sectionPicking ? section.pickFace : choosing ? pickFace : undefined}
@@ -429,7 +445,8 @@ export default function WorkspaceView({
         measureWitness={measure.witness}
         onMissed={measure.clear}
         onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}
-        planes={onNewPart && showPlanes ? planes : undefined}
+        // While a dialog picks a point or an edge on a part, the planes don't take the click.
+        planes={onNewPart && showPlanes && !onPickPoint ? planes : undefined}
         sketchLines={sketchLines}
         onPickSketch={
           !sectionEditing && !measure.expanded && onPickSketch
@@ -473,6 +490,7 @@ export default function WorkspaceView({
             return onPickPoint({
               partId,
               point: pick.point as [number, number, number],
+              ...(pick.surfacePoint && { surfacePoint: pick.surfacePoint as [number, number, number] }),
               normal: pick.normal as [number, number, number],
               copy: !!model.instances[index]!.copyId,
               ...(pick.edge && { edge: pick.edge }),
