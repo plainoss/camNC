@@ -54,7 +54,6 @@ describe('setting a cut depth on the drawing', () => {
     fireEvent.change(await depthField(), { target: { value: '6' } });
     fireEvent.keyDown(await depthField(), { key: 'Enter' });
     await waitFor(() => expect(lastDocument(change).parts[0]!.features).toHaveLength(1));
-    expect(lastDocument(change).version).toBe(2);
     expect(screen.queryByLabelText('Depth in mm')).toBeNull();
     await waitFor(() => expect(container.querySelector('[data-cut-depth="6"]')).not.toBeNull());
     // The label stays a readable size on screen, whatever the zoom.
@@ -68,12 +67,11 @@ describe('setting a cut depth on the drawing', () => {
     clickWorld(60, 45);
     fireEvent.change(await depthField(), { target: { value: '6' } });
     fireEvent.keyDown(await depthField(), { key: 'Enter' });
-    await waitFor(() => expect(lastDocument(change).version).toBe(2));
+    await waitFor(() => expect(lastDocument(change).parts[0]!.features).toHaveLength(1));
     clickWorld(60, 45);
     expect(((await depthField()) as HTMLInputElement).value).toBe('6');
     fireEvent.click(screen.getByRole('button', { name: 'Through' }));
-    await waitFor(() => expect(lastDocument(change).version).toBe(1));
-    expect('features' in lastDocument(change).parts[0]!).toBe(false);
+    await waitFor(() => expect('features' in lastDocument(change).parts[0]!).toBe(false));
   });
 
   it('treats a depth past the board’s thickness as through', async () => {
@@ -93,7 +91,7 @@ describe('setting a cut depth on the drawing', () => {
     await waitFor(() => expect(container.querySelector('[data-cut-depth="0"]')).not.toBeNull());
     expect((lastDocument(change).parts[0]!.features![0] as { depth: number }).depth).toBe(0);
     fireEvent.click(screen.getByRole('button', { name: 'Remove cut 1' }));
-    await waitFor(() => expect(lastDocument(change).version).toBe(1));
+    await waitFor(() => expect('features' in lastDocument(change).parts[0]!).toBe(false));
   });
 
   it('leaves the design alone on Escape, and rejects a depth that isn’t a number', async () => {

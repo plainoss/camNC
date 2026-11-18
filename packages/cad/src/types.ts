@@ -605,11 +605,13 @@ export interface CadCut {
 export type CadFeature = CadFaceSketch | CadCut;
 export type CadLengthUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 
+/** The one saved document format. */
+export const CAD_DOCUMENT_VERSION = 1;
+
 export interface CadDocument {
   /** Display/input unit only. Geometry and persisted expressions remain in millimeters. */
   lengthUnit?: CadLengthUnit;
-  /** Minimum supported reader: 2 features, 3 folders, 4 ordered operations, 5 step relief, 6 construction intent. */
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  version: typeof CAD_DOCUMENT_VERSION;
   id: string;
   name: string;
   /** Increases on source edits; solving preserves the source revision. */
@@ -620,7 +622,7 @@ export interface CadDocument {
   partCuts?: CadPartCut[];
   /** Explicit physical moves remain source records even when their target is temporarily unavailable. */
   copyTransforms?: CadPhysicalTransform[];
-  /** Version 4: ordered union of part-cut and copy-transform IDs. Generation features retain their existing semantics. */
+  /** Ordered union of part-cut and copy-transform IDs. Generation features retain their existing semantics. */
   operationOrder?: string[];
   /** Source-ID prefix evaluated with legacy fixed-tool semantics when upgrading an existing design. */
   legacyPartCutIds?: string[];

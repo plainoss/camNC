@@ -105,7 +105,6 @@ describe('part patterns', () => {
     expect(document.parts[0]!.copies![0]!.id).toBe(made.id);
     expect(document.parts[0]!.copies![0]!.placement!.position[2]).toBeCloseTo(1638, 6);
     expect(document.parts.find(part => part.id === detached.partId)!.placement!.position).toEqual([0, 0, 300]);
-    expect(document.version).toBe(3);
     expect(resolvePartPatterns(document)).toEqual(document);
   });
 });

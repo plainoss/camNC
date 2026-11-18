@@ -1,4 +1,4 @@
-export interface CryptoHelper {
+interface CryptoHelper {
   encrypt: (data: string) => Promise<string>;
   decrypt: (data: string) => Promise<string>;
   hash: string;

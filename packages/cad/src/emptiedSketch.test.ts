@@ -10,7 +10,6 @@ it('fails only the extrude of a sketch emptied after its regions were picked, ad
   const emptied = { ...drawn, sketch: createCadPart().sketch, regions, mergeAll: true as const, addTo: 'base' };
   const document = {
     ...createCadDocument(),
-    version: 7 as const,
     parts: [{ ...base, regions: sketchRegions(base.sketch).map(region => region.id) }, emptied],
   };
   const rows = designSteps(document).map(step => [step.label, step.broken ?? null]);

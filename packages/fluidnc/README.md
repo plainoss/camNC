@@ -11,7 +11,7 @@ runs in Node for tests.
   overrides) bypass the queue. On connect it sends `$Report/Interval=200`, `$I`, `$G`, `$#`, and polls
   `?` only when auto-reports go quiet.
 - `config.ts` (`$Config/Dump` → axis bounds), `files.ts` (`$SD/ListJSON`, run, delete, `no-cors` upload
-  verified by listing), `xmodem.ts` (`$Xmodem/Receive` fallback with progress).
+  verified by listing).
 - `testing/FakeFluidnc`: scripted controller speaking either transport, seeded from transcripts in
   `src/testing/transcripts`.
 

@@ -9,14 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WebtorrentRouteImport } from './routes/webtorrent'
 import { Route as WebrtcCustomRouteImport } from './routes/webrtc-custom'
 
-const WebtorrentRoute = WebtorrentRouteImport.update({
-  id: '/webtorrent',
-  path: '/webtorrent',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const WebrtcCustomRoute = WebrtcCustomRouteImport.update({
   id: '/webrtc-custom',
   path: '/webrtc-custom',
@@ -25,39 +19,28 @@ const WebrtcCustomRoute = WebrtcCustomRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/webrtc-custom': typeof WebrtcCustomRoute
-  '/webtorrent': typeof WebtorrentRoute
 }
 export interface FileRoutesByTo {
   '/webrtc-custom': typeof WebrtcCustomRoute
-  '/webtorrent': typeof WebtorrentRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/webrtc-custom': typeof WebrtcCustomRoute
-  '/webtorrent': typeof WebtorrentRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/webrtc-custom' | '/webtorrent'
+  fullPaths: '/webrtc-custom'
   fileRoutesByTo: FileRoutesByTo
-  to: '/webrtc-custom' | '/webtorrent'
-  id: '__root__' | '/webrtc-custom' | '/webtorrent'
+  to: '/webrtc-custom'
+  id: '__root__' | '/webrtc-custom'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   WebrtcCustomRoute: typeof WebrtcCustomRoute
-  WebtorrentRoute: typeof WebtorrentRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/webtorrent': {
-      id: '/webtorrent'
-      path: '/webtorrent'
-      fullPath: '/webtorrent'
-      preLoaderRoute: typeof WebtorrentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/webrtc-custom': {
       id: '/webrtc-custom'
       path: '/webrtc-custom'
@@ -70,7 +53,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   WebrtcCustomRoute: WebrtcCustomRoute,
-  WebtorrentRoute: WebtorrentRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

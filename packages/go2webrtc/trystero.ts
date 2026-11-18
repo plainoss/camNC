@@ -24,7 +24,6 @@ export enum ClientState {
 export interface ServerOptions {
   accessToken: string;
   streamFactory: () => Promise<MediaStream>;
-  multipleStreams?: boolean;
   onStateChange?: (state: ServerState) => void;
 }
 

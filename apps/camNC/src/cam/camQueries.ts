@@ -40,7 +40,6 @@ export const camKeys = {
   jobs: ['cam', 'jobs'] as const,
   job: (id: string) => ['cam', 'job', id] as const,
   model: (key: string) => ['cam', 'model', key] as const,
-  plan: (key: string, partId: string, settings: unknown) => ['cam', 'plan', key, partId, settings] as const,
 };
 
 export const useCamJobs = () => useQuery({ queryKey: camKeys.jobs, queryFn: listJobs });
@@ -160,23 +159,6 @@ export function useCamModel(job: CamJobV1 | null | undefined) {
       });
       return model;
     },
-  });
-}
-
-/** Toolpaths + G-code of one part with the job's plan settings; recomputed (~0.3s) when they change. */
-export function useCamPlan(job: CamJobV1 | null | undefined, partId: string | undefined, modelReady: boolean) {
-  const saved = useCuttingData(s => s.saved);
-  const spindle = useStore(s => s.machinePrefs.spindleSwitch ?? 'hand');
-  const stored = useToolLibrary(s => s.bits);
-  const plan = job?.plan ?? kDefaultPlan;
-  const settings = { ...toCamSettings({ ...plan, roundBall: roundBallFor(plan, offeredBits(stored)) }, undefined, saved), spindle };
-  return useQuery({
-    queryKey: camKeys.plan(job ? modelKey(job) : '', partId ?? '', settings),
-    enabled: !!job && !!partId && modelReady,
-    staleTime: Infinity,
-    gcTime: 60_000,
-    placeholderData: prev => prev,
-    queryFn: (): Promise<PlanResult> => camWorker().generate(modelKey(job!), partId!, settings),
   });
 }
 

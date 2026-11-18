@@ -1,5 +1,5 @@
 import { newCadId } from './document';
-import { addFaceSketch, setCutDepth, withFeatureVersion } from './features';
+import { addFaceSketch, setCutDepth } from './features';
 import { resolveDrawnPlacements } from './drawnOn';
 import { cadCopyName, resolvePartPatterns } from './partPatterns';
 import { detachedMirroredPart } from './detachedMirror';
@@ -49,7 +49,7 @@ export function addCopyFaceSketch(
   const added = addFaceSketch(document, partId, on);
   return {
     sketchId: added.sketchId,
-    document: withFeatureVersion({
+    document: {
       ...added.document,
       parts: added.document.parts.map(part =>
         part.id !== partId
@@ -61,7 +61,7 @@ export function addCopyFaceSketch(
               ),
             }
       ),
-    }),
+    },
   };
 }
 
@@ -84,7 +84,7 @@ export function setCopyCutDepth(
     feature => feature.type === 'cut' && feature.copyId === copyId && feature.sketchId === sketchId && feature.regionId === regionId
   );
   if (existing)
-    return withFeatureVersion({
+    return {
       ...document,
       parts: document.parts.map(candidate =>
         candidate.id !== partId
@@ -98,7 +98,7 @@ export function setCopyCutDepth(
               }),
             }
       ),
-    });
+    };
   // Let the normal cut API keep its validation and ordering, then give only the new feature its explicit target.
   const before = new Set(part.features?.map(feature => feature.id));
   const withoutFamilyCut: CadDocument = {
@@ -122,7 +122,7 @@ export function setCopyCutDepth(
       feature => feature.type === 'cut' && !feature.copyId && feature.sketchId === sketchId && feature.regionId === regionId
     ) ?? -1;
   const insertAt = familyAt < 0 ? (part.features?.length ?? 0) : familyAt + 1;
-  return withFeatureVersion({
+  return {
     ...document,
     parts: document.parts.map(candidate =>
       candidate.id !== partId
@@ -136,7 +136,7 @@ export function setCopyCutDepth(
             ],
           }
     ),
-  });
+  };
 }
 
 /** Detach snapshots the current local sketch and placement; it carries no link back to the family. */
@@ -226,7 +226,7 @@ export function detachPartCopy(
   });
   const at = parts.findIndex(candidate => candidate.id === partId);
   parts = [...parts.slice(0, at + 1), part, ...parts.slice(at + 1)];
-  const next = withFeatureVersion({
+  const next = {
     ...document,
     revision: given.revision + 1,
     parts,
@@ -252,7 +252,7 @@ export function detachPartCopy(
             }
       ),
     }),
-  });
+  };
   const rebound = rebindDetachedCopyReferences(next, partId, copyId, part, ids, !!copy.mirrored);
   return 'error' in rebound ? rebound : { document: rebound.document, partId: part.id };
 }

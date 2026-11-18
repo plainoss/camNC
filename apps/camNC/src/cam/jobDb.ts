@@ -34,10 +34,8 @@ export interface CamJobV1 {
     draft: CadDocument;
     accepted?: CadDocument;
     acceptedRevision: number;
-    /** Geometry revisions by permanent part ID, used to regenerate only affected boards. */
-    partRevisions: Record<string, number>;
-    /** Evaluated geometry content, independent of monotonic revision numbers and source annotations. */
-    partGeometryKeys?: Record<string, string>;
+    /** Evaluated geometry content of each accepted part by permanent part ID, independent of source annotations. */
+    partGeometryKeys: Record<string, string>;
     /** Removed hole targets retain their choices for Undo, but never apply to another hole. */
     holeChoiceIssues?: import('./holeChoices').MissingHoleChoice[];
   };
@@ -275,7 +273,7 @@ export async function createDesignJob(name = 'Untitled design'): Promise<CamJobV
   return newJob(currentStore(), name, title => {
     const draft = { ...createCadDocument(title), lengthUnit: 'cm' as const };
     draft.parts.push(createCadPart('Part 1'));
-    return { fileName: title, design: { draft, acceptedRevision: 0, partRevisions: {} } };
+    return { fileName: title, design: { draft, acceptedRevision: 0, partGeometryKeys: {} } };
   });
 }
 
@@ -308,7 +306,7 @@ export async function importDesignJob(document: CadDocument, fileName: string): 
   return newJob(currentStore(), document.name.trim() || fileName.replace(kDesignFile, ''), title => ({
     origin: { kind: 'designFile', fileName },
     fileName,
-    design: { draft: { ...structuredClone(document), name: title }, acceptedRevision: 0, partRevisions: {} },
+    design: { draft: { ...structuredClone(document), name: title }, acceptedRevision: 0, partGeometryKeys: {} },
   }));
 }
 

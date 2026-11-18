@@ -62,7 +62,7 @@ it('splits a board its slots run across into five parts, the board keeping the f
     thinWall: { thickness1: 5, thickness2: 0, midPlane: true },
     thinEdges: sketch.entities.filter(entity => entity.type === 'line').map(entity => entity.id),
   };
-  const document = resolveExtrudeSteps({ ...createCadDocument(), version: 7, parts: [board, slots] });
+  const document = resolveExtrudeSteps({ ...createCadDocument(), parts: [board, slots] });
   const evaluated = evaluateCadDocument(document);
   expect(
     evaluated.diagnostics.filter(d => d.severity === 'error').map(d => [d.partId, d.message, (d as { entityIds?: string[] }).entityIds])

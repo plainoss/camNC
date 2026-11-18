@@ -47,7 +47,6 @@ describe('source folders', () => {
     const before = studio();
     const steps = designSteps(before);
     const document = grouped(before);
-    expect(document.version).toBe(3);
     expect(document.parts).toBe(before.parts);
     expect(designSteps(document)).toEqual(steps);
     expect(cadFolderSteps(document, 'cupboard').map(step => step.id)).toEqual(steps.slice(0, 4).map(step => step.id));
@@ -55,7 +54,6 @@ describe('source folders', () => {
     const renamed = changed(renameCadFolder(document, 'cupboard', 'Bookshelf'));
     const unpacked = dissolveCadFolder(renamed, 'cupboard');
     expect(unpacked.folders).toBeUndefined();
-    expect(unpacked.version).toBe(1);
     for (const edited of [document, renamed, unpacked]) {
       expect(edited.parts).toBe(before.parts);
       expect(evaluateCadDocument(edited)).toEqual(evaluateCadDocument(before));
@@ -76,6 +74,10 @@ describe('source folders', () => {
     expect(parseCadDocument(document)).toEqual(document);
   });
 
+  it('loads an empty folder list', () => {
+    expect(parseCadDocument({ ...studio(), folders: [] }).folders).toEqual([]);
+  });
+
   it('refuses a non-contiguous selection, an overlapping group and invalid source references', () => {
     const before = studio();
     expect(createCadFolder(before, { name: 'Gap', partIds: [before.parts[0]!.id, before.parts[2]!.id] })).toHaveProperty('error');
@@ -84,8 +86,6 @@ describe('source folders', () => {
     expect(() => parseCadDocument({ ...document, folders: [{ ...document.folders![0], partIds: ['gone'] }] })).toThrow('missing part');
     expect(() => parseCadDocument({ ...document, folders: [{ ...document.folders![0], id: before.parts[0]!.id }] })).toThrow('unique');
     expect(() => parseCadDocument({ ...document, folders: [{ ...document.folders![0], suppressed: false }] })).toThrow('folder');
-    expect(() => parseCadDocument({ ...document, version: 1 })).toThrow('Invalid CAD document');
-    expect(() => parseCadDocument({ ...before, version: 3 })).toThrow('Invalid CAD document');
   });
 
   it('suppresses a folder with a mask and restores every individual source flag', () => {
@@ -142,15 +142,13 @@ describe('source folders', () => {
     expect(parseCadDocument(partial)).toEqual(partial);
   });
 
-  it('keeps version 3 when face features are added and removed by normal editing', () => {
+  it('reloads face features added to a part in a folder', () => {
     let document = grouped();
     const first = document.parts[0]!;
     first.sketch = addCircle(first.sketch, { x: 40, y: 40, radius: 5 });
     const region = cadSketchRegions(first, first.sketch.id).find(region => region.curveIds.length === 1)!;
     document = setCutDepth(document, first.id, first.sketch.id, region.id, 5);
-    expect(document.version).toBe(3);
     expect(parseCadDocument(document)).toEqual(document);
-    expect(dissolveCadFolder(document, 'cupboard').version).toBe(2);
   });
 });
 
@@ -188,7 +186,6 @@ describe('folder variables', () => {
     expect(removed.parts.map(part => part.name)).toEqual(['Other']);
     expect(removed.variables).toBeUndefined();
     expect(removed.folders).toBeUndefined();
-    expect(removed.version).toBe(1);
   });
 
   it('unpacks variables into document settings without changing their IDs or values', () => {

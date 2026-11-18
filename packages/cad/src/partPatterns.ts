@@ -1,5 +1,4 @@
 import { newCadId } from './document';
-import { cadDocumentVersion } from './documentVersion';
 import { cadMirrorFaceCopy, cadMirrorPlaneFrame } from './mirrorPlane';
 import { cadPartReference } from './partReferences';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
@@ -154,7 +153,7 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
 
 /** Sets a part's pattern, or removes it with `null`, and lays its copies out. */
 export function setPartPattern(document: CadDocument, partId: string, pattern: Omit<CadPartPattern, 'id'> | null): CadDocument {
-  const next = resolvePartPatterns({
+  return resolvePartPatterns({
     ...document,
     revision: document.revision + 1,
     parts: document.parts.map(part => {
@@ -174,7 +173,6 @@ export function setPartPattern(document: CadDocument, partId: string, pattern: O
       return { ...part, pattern: next };
     }),
   });
-  return { ...next, version: cadDocumentVersion(next) };
 }
 
 /** Names one copy of a part, or gives it back the part's name with a number when `name` is empty. */

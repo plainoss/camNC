@@ -1,8 +1,42 @@
-import { ensureOpenCvIsLoaded } from '@wbcnc/load-opencv';
+import { cv2, ensureOpenCvIsLoaded } from '@wbcnc/load-opencv';
 import { Matrix3 } from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { calculateUndistortionMapsCached } from './rectifyMap';
-import { initUndistortRectifyMapCv, type Matrix3x3 } from './rectifyMapCv';
+
+type Matrix3x3 = [[number, number, number], [number, number, number], [number, number, number]];
+
+/** The maps OpenCV computes for the same camera, as the reference for the plain TypeScript implementation. */
+function initUndistortRectifyMapCv(
+  cameraMatrix: Matrix3x3,
+  distCoeffs: number[],
+  R: Matrix3x3,
+  newCameraMatrix: Matrix3,
+  size: { width: number; height: number }
+): { map1: Float32Array; map2: Float32Array } {
+  const { width, height } = size;
+  const cameraMat = cv2.matFromArray(3, 3, cv2.CV_64F, cameraMatrix.flat());
+  const distCoeffsMat = cv2.matFromArray(distCoeffs.length, 1, cv2.CV_64F, distCoeffs);
+  const rotationMat = cv2.matFromArray(3, 3, cv2.CV_64F, R.flat());
+  // Three.js stores matrices column-major, OpenCV row-major.
+  const newCameraMat = cv2.matFromArray(3, 3, cv2.CV_64F, newCameraMatrix.clone().transpose().elements);
+  const map1 = new cv2.Mat(height, width, cv2.CV_32FC1);
+  const map2 = new cv2.Mat(height, width, cv2.CV_32FC1);
+
+  cv2.initUndistortRectifyMap(cameraMat, distCoeffsMat, rotationMat, newCameraMat, new cv2.Size(width, height), cv2.CV_32FC1, map1, map2);
+
+  const map1Data = new Float32Array(width * height);
+  const map2Data = new Float32Array(width * height);
+  for (let i = 0; i < height; i++) {
+    for (let j = 0; j < width; j++) {
+      const index = i * width + j;
+      map1Data[index] = map1.floatAt(i, j);
+      map2Data[index] = map2.floatAt(i, j);
+    }
+  }
+
+  for (const mat of [cameraMat, distCoeffsMat, rotationMat, newCameraMat, map1, map2]) mat.delete();
+  return { map1: map1Data, map2: map2Data };
+}
 
 describe('calculateUndistortionMapsCached', () => {
   beforeAll(async () => {

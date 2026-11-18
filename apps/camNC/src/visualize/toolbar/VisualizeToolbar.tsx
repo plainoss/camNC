@@ -243,7 +243,6 @@ export function VisualizeToolbar() {
       <BoundsInfoButton />
       <FluidncButton />
       <MachineStatusBar />
-      {/* <CommandsMenu /> */}
     </div>
   );
 }

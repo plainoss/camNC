@@ -72,12 +72,9 @@ describe('saved part history is validated before its feature-list details are fo
     expect(parseCadDocument(document)).toEqual(document);
   });
 
-  it('validates feature containers before deriving the minimum reader version', () => {
+  it('refuses a features container that is not an array', () => {
     const document = createPlateDocument();
-    document.version = 3;
     document.parts[0]!.features = {} as never;
     refusesCleanly(document);
-    const unnecessaryVersion = { ...createPlateDocument(), version: 3 };
-    expect(() => parseCadDocument(unnecessaryVersion)).toThrow('Invalid CAD document');
   });
 });

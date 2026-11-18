@@ -15,6 +15,6 @@ export async function createSampleJob() {
     name: sampleProject.name,
     origin: { kind: 'sample', id: sampleProject.id, revision: sampleProject.revision },
     // Fit one board per thickness instead of constraining a furniture project to the old tray's small stock.
-    plan: { ...kDefaultPlan, material: 'plywood', tabs: true, cutting: defaultCutting(kDefaultBit.diameter, 'plywood') },
+    plan: { ...kDefaultPlan, material: 'plywood', cutting: defaultCutting(kDefaultBit.diameter, 'plywood') },
   });
 }

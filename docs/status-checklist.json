@@ -125,7 +125,7 @@
           "item": "Group neighbouring steps and variables in folders",
           "status": "done",
           "evidence": ["packages/cad/src/folders.test.ts", "apps/camNC/src/cad/FeatureList.folders.test.tsx", "apps/camNC/src/cad/reorderSteps.test.ts"],
-          "note": "Folder metadata preserves step IDs and geometry. Suppression masks child settings, rollback uses real steps, and deletion lists outside variable uses. Documents use version 3."
+          "note": "Folder metadata preserves step IDs and geometry. Suppression masks child settings, rollback uses real steps, and deletion lists outside variable uses."
         },
         {
           "item": "Sketch and cut on one physical copy, or detach it",

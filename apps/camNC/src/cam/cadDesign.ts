@@ -3,7 +3,7 @@ import { studioCutParts } from '../cad/studioGeometry';
 import { solveCadDocument } from '../cad/solveCad';
 import { updateJobForModel, type CamJobV1 } from './jobDb';
 import { carryDesignTabs } from './designTabAnchors';
-import { designGeometryFingerprint, designGeometryKey } from './designGeometry';
+import { designGeometryKey } from './designGeometry';
 import { asMilled } from './millSide';
 import { missingNativeHoleChoices } from './holeChoices';
 
@@ -42,23 +42,13 @@ export async function acceptDesign(base: CamJobV1, document: CadDocument): Promi
   const before = base.design.accepted ? await solveCadDocument(base.design.accepted) : null;
   // Mirrored copies are parts of their own to CAM, and plain copies add to a part's quantity.
   const toCut = studioCutParts(solved),
-    cut = toCut.map(entry => entry.part),
-    cutBefore = before ? studioCutParts(before).map(entry => entry.part) : [];
+    cut = toCut.map(entry => entry.part);
   // Keyed as milled: a part that now lies turned over is another program, so a sheet cut the other way up no longer matches.
   const partGeometryKeys = Object.fromEntries(
     await Promise.all(cut.map(async part => [part.partId, await designGeometryKey(asMilled(part))]))
   );
   const saved = await updateJobForModel(base, current => {
     if (!current.design || !same(current.design.draft, base.design!.draft)) return null;
-    const previous = new Map(cutBefore.map(p => [p.partId, p]));
-    const partRevisions = { ...current.design.partRevisions };
-    for (const part of cut) {
-      const oldPart = previous.get(part.partId);
-      if (!oldPart || designGeometryFingerprint(oldPart) !== designGeometryFingerprint(part))
-        partRevisions[part.partId] = (partRevisions[part.partId] ?? 0) + 1;
-    }
-    const present = new Set(cut.map(p => p.partId));
-    for (const id of previous.keys()) if (!present.has(id)) partRevisions[id] = (partRevisions[id] ?? 0) + 1;
     const known = new Map(current.parts.map(p => [p.id, p]));
     const nativeParts = toCut.map(({ part: p, names }) => ({
       id: p.partId,
@@ -69,7 +59,7 @@ export async function acceptDesign(base: CamJobV1, document: CadDocument): Promi
     // Missing part records remain available to repair existing board references.
     const ids = new Set(nativeParts.map(p => p.id));
     const holeChoiceIssues = missingNativeHoleChoices(cut, current.plan?.holes);
-    const acceptedGeometry = { ...current, design: { ...current.design, partRevisions, partGeometryKeys } };
+    const acceptedGeometry = { ...current, design: { ...current.design, partGeometryKeys } };
     const boardSourceKeys = Object.fromEntries(
       (current.boards ?? []).map(board => [
         board.id,
@@ -91,7 +81,6 @@ export async function acceptDesign(base: CamJobV1, document: CadDocument): Promi
         draft: solved.document,
         accepted: solved.document,
         acceptedRevision: current.design.acceptedRevision + (sameDesignContent(current.design.accepted, solved.document) ? 0 : 1),
-        partRevisions,
         partGeometryKeys,
         ...(holeChoiceIssues.length && { holeChoiceIssues }),
       },
@@ -106,5 +95,5 @@ export const hasDesignDraft = (job: CamJobV1) => !!job.design && !sameDesignCont
 /** Physical stock depends on accepted geometry content, so a true revert can use its original remaining programs. */
 export function boardGeometryKey(job: CamJobV1, partIds: string[]) {
   if (!job.design) return undefined;
-  return `${job.id}:parts:${JSON.stringify([...new Set(partIds)].sort().map(id => [id, job.design!.partGeometryKeys?.[id] ?? `revision:${job.design!.partRevisions[id] ?? 0}`]))}`;
+  return `${job.id}:parts:${JSON.stringify([...new Set(partIds)].sort().map(id => [id, job.design!.partGeometryKeys[id] ?? 'missing']))}`;
 }

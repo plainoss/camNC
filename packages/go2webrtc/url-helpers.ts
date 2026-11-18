@@ -139,12 +139,6 @@ function buildGo2rtcConnectionUrl({ host, src }: Go2rtcConnectionParams) {
   return `go2rtc:?${params.toString()}`;
 }
 
-export function genRandomWebtorrent() {
-  const share = generatePassword(16);
-  const pwd = generatePassword(16);
-  return buildRtcConnectionUrl({ share, pwd, type: 'webtorrent' });
-}
-
 export function genRandomWebrtc() {
   const accessToken = generatePassword(16);
   return buildWebrtcConnectionUrl({ type: 'webrtc', accessToken });

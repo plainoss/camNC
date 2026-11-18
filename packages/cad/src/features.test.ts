@@ -74,18 +74,16 @@ describe('CAD parts without features', () => {
     expect(JSON.stringify(parseCadDocument(JSON.parse(saved)))).toBe(saved);
     const solved = await solveCadDocument(document);
     expect(solved.status).toBe('solved');
-    expect(solved.document.version).toBe(1);
     expect('features' in solved.document.parts[0]!).toBe(false);
     expect('cuts' in solved.parts[0]!).toBe(false);
     expect(solved.parts[0]!.holes).toHaveLength(2);
   });
 
-  it('go back to the old format when the last feature is removed', () => {
+  it('leave no trace when the last feature is removed', () => {
     const document = plate(),
       saved = JSON.stringify(document),
       region = regionAt(document.parts[0]!.sketch, { x: 50, y: 60 }),
       cut = setCutDepth(document, document.parts[0]!.id, document.parts[0]!.sketch.id, region.id, 6);
-    expect(cut.version).toBe(2);
     const removed = removeCadFeature(cut, cut.parts[0]!.id, cut.parts[0]!.features![0]!.id);
     expect(JSON.stringify(removed)).toBe(saved);
   });
@@ -361,11 +359,19 @@ describe('CAD feature format', () => {
     expect(parseCadDocument(saved).parts[0]!.features).toEqual(document.parts[0]!.features);
   });
 
-  it('refuses features in the old version, and broken features', () => {
-    expect(() => parseCadDocument({ ...featured(), version: 1 })).toThrow();
-    expect(() => parseCadDocument({ ...featured(), version: 3 })).toThrow();
-    expect(() => parseCadDocument({ ...plate(), version: 2 })).toThrow();
-    expect(evaluated({ ...featured(), version: 1 }).errors).toContain('invalid-document');
+  it('loads saved reader versions 2 through 7 and normalizes them to the current version', () => {
+    const source = featured();
+    for (const version of [2, 3, 4, 5, 6, 7]) {
+      const saved = { ...source, version, ...(version >= 4 ? { operationOrder: [] } : {}) };
+      const loaded = parseCadDocument(saved);
+      expect(loaded.version).toBe(1);
+      expect(loaded.parts).toEqual(source.parts);
+    }
+  });
+
+  it('refuses another document version, and broken features', () => {
+    expect(() => parseCadDocument({ ...featured(), version: 8 })).toThrow('Invalid CAD document');
+    expect(evaluated({ ...featured(), version: 8 as never }).errors).toContain('invalid-document');
     const brokenDepth = featured();
     (brokenDepth.parts[0]!.features![0] as { depth: unknown }).depth = 'deep';
     expect(() => parseCadDocument(brokenDepth)).toThrow();

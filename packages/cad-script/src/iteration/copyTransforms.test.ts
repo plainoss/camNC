@@ -276,7 +276,7 @@ it.each(['cabinet', 'tray'] as const)(
       recipe === 'cabinet'
         ? (width - 2 * board + 16) * 294 * board - 20 * 30 * board
         : (width - 2 * board) * (80 - board) * board - (width - 2 * board) * 20 * 10;
-    const legacySource = { ...afterConsume.document, version: baseline.document.version };
+    const legacySource = { ...afterConsume.document };
     delete legacySource.operationOrder;
     delete legacySource.copyTransforms;
     delete legacySource.legacyPartCutIds;

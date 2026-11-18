@@ -3,6 +3,7 @@ import { evaluatedPartCopy } from './copies';
 import { evaluateCadDocument, cadSketchRegions, setCutDepth } from './features';
 import { polygonArea, pointInPolygon } from './geometry';
 import { cadCopyName } from './partPatterns';
+import { CAD_DOCUMENT_VERSION } from './types';
 import type { CadDocument, CadFaceSketch, CadPart, CadPartCopy, CadPoint, CadSketch, EvaluatedCadCut } from './types';
 
 function polygonSketch(loops: CadPoint[][]): CadSketch {
@@ -63,7 +64,7 @@ export function detachedMirroredPart(
     );
     if (!region) return { error: 'This mirrored cut could not be converted to an editable sketch.' };
     const next = setCutDepth(
-      { version: 2, id: newCadId(), name: part.name, revision: 0, parts: [part] },
+      { version: CAD_DOCUMENT_VERSION, id: newCadId(), name: part.name, revision: 0, parts: [part] },
       part.id,
       face.sketch.id,
       region.id,

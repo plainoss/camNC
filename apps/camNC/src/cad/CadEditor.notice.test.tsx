@@ -45,7 +45,7 @@ beforeEach(() => {
     createdAt: 0,
     updatedAt: 0,
     parts: [],
-    design: { draft: document, accepted: structuredClone(document), acceptedRevision: 1, partRevisions: {} },
+    design: { draft: document, accepted: structuredClone(document), acceptedRevision: 1, partGeometryKeys: {} },
   };
   state.accept.mockRejectedValue(new Error('Close every cut contour before preparing CAM.'));
 });

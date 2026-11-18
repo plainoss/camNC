@@ -845,7 +845,6 @@ describe('editing a design', () => {
   it('produces a document the app can load', async () => {
     const { default: tray } = await import('../examples/tray.cad');
     const { document } = await editCad(null, tray);
-    expect(document.version).toBe(2);
     expect(parseCadDocument(JSON.parse(JSON.stringify(document)))).toEqual(document);
   });
 

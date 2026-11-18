@@ -1,7 +1,6 @@
 import type { CadConstruction } from './constructionTypes';
 import type { CadDiagnostic, CadDocument } from './types';
 import { constructionShapeIssue } from './constructionShape';
-import { cadDocumentVersion } from './documentVersion';
 import { validateCadDocument } from './geometry';
 
 /** Replace one complete declaration atomically; validation never stores a pass result. */
@@ -11,8 +10,7 @@ export function setCadConstruction(document: CadDocument, construction: CadConst
   const constructions = [...(document.constructions ?? []).filter(p => p.id !== construction.id), structuredClone(construction)];
   const issue = constructionShapeIssue(constructions);
   if (issue) throw new Error(issue);
-  const next = { ...document, constructions, revision: document.revision + 1 };
-  const result = { ...next, version: cadDocumentVersion(next) };
+  const result = { ...document, constructions, revision: document.revision + 1 };
   // Loading refuses a design whose IDs repeat, so a plan reusing a part, folder or other plan's ID could never reopen.
   const duplicates = (value: CadDocument) => validateCadDocument(value).filter(issue => issue.code === 'duplicate-id').length;
   if (duplicates(result) > duplicates(document)) throw new Error('Construction, connection and hardware IDs must be unique in the design.');
@@ -25,7 +23,7 @@ export function removeCadConstruction(document: CadDocument, id: string): CadDoc
   const next = { ...document, revision: document.revision + 1 };
   next.constructions = document.constructions.filter(p => p.id !== id);
   if (!next.constructions.length) delete next.constructions;
-  return { ...next, version: cadDocumentVersion(next) };
+  return next;
 }
 
 /** Run against the solved source, which includes the current physical pattern instances. */

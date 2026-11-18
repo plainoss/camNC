@@ -7,4 +7,3 @@ export * from './parsers/list-json';
 export * from './parsers/stream-parser';
 export * from './protocol';
 export * from './socket';
-export * from './xmodem';

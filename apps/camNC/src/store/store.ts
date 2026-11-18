@@ -33,9 +33,7 @@ export interface DepthSettings {
   thresholdOffset: number; // relative 0-1 offset above table for masking
 }
 
-// Types from atoms.tsx
 export type ITuple = [number, number];
-export type IMachineBounds = [ITuple, ITuple, ITuple, ITuple];
 
 // Should there be a separate type for pending/incomplete source configs?
 export interface ICamSource {
@@ -107,7 +105,6 @@ export const useStore = create(subscribeWithSelector(persist(immer(combine(
     toolDiameter: 3.0, // Default tool diameter in mm
     toolpath: null as ParsedToolpath | null,
     toolpathName: null as string | null,
-    isToolpathSelected: false,
     isToolpathHovered: false,
     isToolpathDragging: false,
     toolpathOffset: new Vector3(0, 0, 0),
@@ -228,9 +225,6 @@ export const useStore = create(subscribeWithSelector(persist(immer(combine(
           cam.arucoTagSize = arucoTagSize;
         }),
     },
-    setIsToolpathSelected: (isSelected: boolean) => set(state => {
-      state.isToolpathSelected = isSelected;
-    }),
     setIsToolpathHovered: (isHovered: boolean) => set(state => {
       state.isToolpathHovered = isHovered;
     }),
@@ -372,7 +366,6 @@ export const useCamResolution = () => {
 
 // Access tool diameter from store
 export const useToolDiameter = () => useStore(state => state.toolDiameter);
-export const useSetToolDiameter = () => useStore(state => state.setToolDiameter);
 export const useToolpathOpacity = () => useStore(state => state.toolpathOpacity);
 export const useSetToolpathOpacity = () => useStore(state => state.setToolpathOpacity);
 export const useSetIsToolpathDragging = () => useStore(state => state.setIsToolpathDragging);
@@ -424,17 +417,10 @@ export const useCameraExtrinsics = () => {
   return camSource?.extrinsics ?? (null as unknown as CameraExtrinsics);
 };
 
-export const useSetCameraExtrinsics = () => useStore(state => state.camSourceSetters.setExtrinsics);
 export const usePnPResult = () => useStore(state => state.pnpResult);
 
 export const useShowStillFrame = () => useStore(state => state.showStillFrame);
 export const useSetShowStillFrame = () => useStore(state => state.setShowStillFrame);
-
-// Hook to access marker positions
-export const useMarkerPositions = () => {
-  const camSource = useCamSource();
-  return camSource?.markerPositions ?? [];
-};
 
 // Hook to set marker positions
 export const useSetMarkerPositions = () => useStore(state => state.camSourceSetters.setMarkerPositions);
@@ -447,8 +433,7 @@ export const useArucoTagSize = () => {
 
 export const useSetArucoTagSize = () => useStore(state => state.camSourceSetters.setArucoTagSize);
 
-export const useToolpath = () => useStore(state => state.toolpath);
-export const useHasToolpath = () => useToolpath() !== null;
+export const useHasToolpath = () => useStore(state => state.toolpath !== null);
 
 // Depth blend feature hooks
 export const useDepthBlendEnabled = () => useStore(state => state.depthBlendEnabled);

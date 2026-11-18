@@ -1,5 +1,5 @@
 import { cv2 } from '@wbcnc/load-opencv';
-import { Matrix3, Vector2, Vector3 } from 'three';
+import { Matrix3, Vector3 } from 'three';
 
 /**
  * Converts a Three.js Matrix3 to an OpenCV Mat.
@@ -94,66 +94,4 @@ export function cvToVector3(cvMat: cv2.Mat): Vector3 {
   }
 
   return new Vector3(data[0], data[1], data[2]);
-}
-
-/**
- * Converts a Three.js Vector2 to an OpenCV Mat, with option for multi-channel format.
- *
- * @param vector - Three.js Vector2 to convert
- * @param type - OpenCV matrix type (cv2.CV_32F or cv2.CV_64F)
- * @param useMultiChannel - If true, creates a 1x1 mat with 2 channels, otherwise a 2x1 mat
- * @returns OpenCV Mat with the same values
- */
-export function vector2ToCV(vector: Vector2, type: number = cv2.CV_64F, useMultiChannel: boolean = false): cv2.Mat {
-  if (useMultiChannel) {
-    // Create a 1x1 matrix with 2 channels
-    const channelType = type === cv2.CV_32F ? cv2.CV_32FC2 : cv2.CV_64FC2;
-    const mat = new cv2.Mat(1, 1, channelType);
-
-    // Set the data for both channels
-    if (type === cv2.CV_32F) {
-      mat.data32F[0] = vector.x;
-      mat.data32F[1] = vector.y;
-    } else {
-      mat.data64F[0] = vector.x;
-      mat.data64F[1] = vector.y;
-    }
-
-    return mat;
-  } else {
-    // Create a 2x1 matrix with the vector components (original behavior)
-    return cv2.matFromArray(2, 1, type, [vector.x, vector.y]);
-  }
-}
-
-/**
- * Converts an OpenCV 2x1 or 1x2 Mat to a Three.js Vector2.
- *
- * @param cvMat - OpenCV Mat to convert (must be 2x1 or 1x2)
- * @returns Three.js Vector2 with the same values
- */
-export function cvToVector2(cvMat: cv2.Mat): Vector2 {
-  // Check dimensions - now supporting 1x1 with 2 channels
-  if (
-    !(
-      (cvMat.rows === 2 && cvMat.cols === 1) ||
-      (cvMat.rows === 1 && cvMat.cols === 2) ||
-      (cvMat.rows === 1 && cvMat.cols === 1 && cvMat.channels() === 2)
-    )
-  ) {
-    throw new Error('OpenCV matrix must be 2x1, 1x2, or 1x1 with 2 channels to convert to Three.js Vector2');
-  }
-
-  let data: Float32Array | Float64Array;
-
-  // Get the appropriate data array based on matrix type
-  if (cvMat.type() === cv2.CV_32F || cvMat.type() === cv2.CV_32FC2) {
-    data = cvMat.data32F;
-  } else if (cvMat.type() === cv2.CV_64F || cvMat.type() === cv2.CV_64FC2) {
-    data = cvMat.data64F;
-  } else {
-    throw new Error('Unsupported OpenCV matrix type. Must be CV_32F, CV_64F, CV_32FC2, or CV_64FC2');
-  }
-
-  return new Vector2(data[0], data[1]);
 }

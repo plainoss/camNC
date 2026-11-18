@@ -1,7 +1,6 @@
 import { faceRemovalDepth } from './faceRemovalDepth';
 import { resolveDrawnPlacements } from './drawnOn';
 import { cadDirectionVector } from './directions';
-import { cadDocumentVersion } from './documentVersion';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { entityPointIds, newCadId } from './document';
 import { faceExtrudeProblem, resolveFaceProfiles } from './faceExtrude';
@@ -372,12 +371,7 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
   parts = withPartPieces({ ...document, parts }, given).parts;
   const changed =
     parts.length !== given.parts.length || parts.some((part, index) => JSON.stringify(part) !== JSON.stringify(given.parts[index]));
-  if (!changed) {
-    // An edit that needs a newer reader, or no longer needs the exact one it named, as switching Merge with all does.
-    const required = cadDocumentVersion(given);
-    return required > given.version || (given.version >= 5 && required !== given.version) ? { ...given, version: required } : given;
-  }
-  return { ...document, parts, version: cadDocumentVersion({ ...document, parts }) };
+  return changed ? { ...document, parts } : given;
 }
 
 /** Why an Extrude → Add or Remove step can't do what it says, or null when it can. */

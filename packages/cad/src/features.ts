@@ -1,12 +1,12 @@
 import { withCadLengthUnit } from './lengthUnits';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
-import { cadDocumentVersion } from './documentVersion';
 import { pieceProfile } from './partPieces';
 import { cadPartsMissingVariables, kVariableMissing } from './variables';
 import { featuresForCopy } from './copyFeatures';
 import { faceRemovalDepth } from './faceRemovalDepth';
 import { newCadId, originId } from './document';
 import { withEdgeRounds } from './edgeRounds';
+import { CAD_DOCUMENT_VERSION } from './types';
 import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
 import { relieveCorners } from './cornerRelief';
@@ -34,16 +34,12 @@ import { isCadBody, resolveExtrudeSteps } from './extrudeSteps';
 /** Whether a part is one, rather than a sketch not yet extruded, a suppressed extrude, or an extrude that adds to or cuts others. */
 export const isCadPart = (part: CadPart): boolean => part.extrude !== false && !part.suppressed && part.addTo === undefined && !part.remove;
 
-/** Features belong to the newer format, so an older build refuses the file instead of silently cutting without them. */
-export function withFeatureVersion(document: CadDocument): CadDocument {
-  return { ...document, version: cadDocumentVersion(document) };
-}
 function editPart(
   document: CadDocument,
   partId: string,
   edit: (features: NonNullable<CadPart['features']>) => CadPart['features']
 ): CadDocument {
-  return withFeatureVersion({
+  return {
     ...document,
     parts: document.parts.map(part => {
       if (part.id !== partId) return part;
@@ -51,7 +47,7 @@ function editPart(
         features = edit(current ?? []);
       return features?.length ? { ...rest, features } : rest;
     }),
-  });
+  };
 }
 
 export function addFaceSketch(document: CadDocument, partId: string, on: CadFaceRef): { document: CadDocument; sketchId: string } {
@@ -109,7 +105,7 @@ export function faceSketchDocument(document: CadDocument, partId: string, sketch
   const folderIds = new Set(document.variables?.map(variable => variable.folderId));
   const folders = document.folders?.filter(folder => folderIds.has(folder.id)).map(({ id, name }) => ({ id, name, partIds: [] }));
   return {
-    version: folders?.length ? 3 : 1,
+    version: CAD_DOCUMENT_VERSION,
     ...(folders?.length && { folders }),
     id: `${document.id}:face:${sketchId}`,
     name: document.name,

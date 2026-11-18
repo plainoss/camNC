@@ -3,6 +3,7 @@ import { dimensionValueError } from './dimensionValues';
 import { measureDimension, refreshDimensionMeasurement } from './dimensions';
 import { validateCadDocument } from './geometry';
 import { solveCadDocument } from './solver';
+import { CAD_DOCUMENT_VERSION } from './types';
 import type { CadDiagnostic, CadDimension, CadDocument, CadPart, CadSolveResult } from './types';
 
 export type CadDimensionCreationResult =
@@ -10,7 +11,7 @@ export type CadDimensionCreationResult =
   | { ok: false; message: string; diagnostics: CadDiagnostic[] };
 
 const documentOf = (part: CadPart): CadDocument => ({
-  version: part.features?.length ? 2 : 1,
+  version: CAD_DOCUMENT_VERSION,
   id: `dimension-creation:${part.id}`,
   name: part.name,
   revision: 0,

@@ -39,8 +39,7 @@ import {
 } from './index';
 
 type CopyTransform = NonNullable<CadDocument['copyTransforms']>[number];
-type OrderedSource = Omit<CadDocument, 'version'> & {
-  version: 4;
+type OrderedSource = CadDocument & {
   copyTransforms: CopyTransform[];
   operationOrder: string[];
   legacyPartCutIds?: string[];
@@ -104,7 +103,7 @@ function fixture() {
   const cutA = addPartCut(document, [a.id], [reference], { value: 0 });
   const cutB = addPartCut(cutA.document, [b.id], [reference], { value: 0 });
   const move: CopyTransform = { id: 'move-selected', partId, copyId: copy.id, by: [100, 0, 0] };
-  const source: OrderedSource = { ...cutB.document, version: 4, copyTransforms: [move], operationOrder: [cutA.id, move.id, cutB.id] };
+  const source: OrderedSource = { ...cutB.document, copyTransforms: [move], operationOrder: [cutA.id, move.id, cutB.id] };
   return { document, source, partId, copyId: copy.id, siblingId: sibling.id, reference, cutA: cutA.id, cutB: cutB.id, move };
 }
 
@@ -169,12 +168,11 @@ describe('ordered physical-copy transforms', () => {
     expect(parseCadDocument(JSON.parse(JSON.stringify(prefix))).operationOrder).toEqual([f.cutA, f.move.id]);
   });
 
-  it('requires reader version 4 and round-trips operation/reference identities', () => {
+  it('round-trips operation/reference identities', () => {
     const f = fixture(),
       loaded = parseCadDocument(JSON.parse(JSON.stringify(f.source))) as unknown as OrderedSource;
     expect(loaded.copyTransforms).toEqual([f.move]);
     expect(loaded.operationOrder).toEqual([f.cutA, f.move.id, f.cutB]);
-    for (const version of [1, 2, 3]) expect(() => parseCadDocument({ ...f.source, version })).toThrow(/version|reader|transform/i);
   });
 });
 

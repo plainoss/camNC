@@ -127,7 +127,7 @@ export { carvingOperations, kVCarveStep, vConeDepth, vSlope } from './vcarve';
 export type { BoardCarving } from './vcarve';
 export { tabRemovalProgram } from './tabRemoval';
 export type { TabStop } from './tabRemoval';
-export { planBoard, summarize as summarizePlan } from './plan';
+export { planBoard } from './plan';
 export type { BoardPartSource, BoardRequest, OpSummary, PlanResult, ReleaseProgram } from './plan';
 export { cutoutPastBoard, cutoutSilhouette } from './cutout';
 export { simplifyLoop } from './simplifyLoop';

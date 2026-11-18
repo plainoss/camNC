@@ -11,7 +11,6 @@
     "@hookform/resolvers": "catalog:",
     "@preact/signals-react": "catalog:",
     "@radix-ui/react-alert-dialog": "catalog:",
-    "@radix-ui/react-avatar": "catalog:",
     "@radix-ui/react-checkbox": "catalog:",
     "@radix-ui/react-collapsible": "catalog:",
     "@radix-ui/react-dialog": "catalog:",

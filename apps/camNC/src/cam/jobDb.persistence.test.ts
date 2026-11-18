@@ -85,7 +85,7 @@ describe.each([false, true])('committed CAM document storage (demo: %s)', demo =
     const accepted = { ...createPlateDocument(), id: empty.design!.draft.id };
     const job = await saveJob({
       ...empty,
-      design: { draft: accepted, accepted, acceptedRevision: 1, partRevisions: { [accepted.parts[0]!.id]: 1 } },
+      design: { draft: accepted, accepted, acceptedRevision: 1, partGeometryKeys: { [accepted.parts[0]!.id]: 'sha256:plate' } },
     });
     const draft = structuredClone(accepted);
     draft.parts[0]!.sketch = addCircle(draft.parts[0]!.sketch, { x: 40, y: 40, radius: 10 });
@@ -106,7 +106,7 @@ it('imports a design as a new draft job and leaves the document untouched', asyn
   const second = await importDesignJob(document, 'plate.json');
   expect(second.name).toBe(`${first.name} (2)`);
   expect(first).toMatchObject({ origin: { kind: 'designFile', fileName: 'plate.json' }, fileName: 'plate.json', parts: [] });
-  expect(first.design).toEqual({ draft: { ...document, name: first.name }, acceptedRevision: 0, partRevisions: {} });
+  expect(first.design).toEqual({ draft: { ...document, name: first.name }, acceptedRevision: 0, partGeometryKeys: {} });
   expect(await getJob(first.id)).toEqual(first);
   expect(document.name).toBe('Imported plate');
 });

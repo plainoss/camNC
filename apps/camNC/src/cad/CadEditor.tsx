@@ -99,7 +99,6 @@ import { SelectionReadout } from './SelectionReadout';
 import { SketchPartProperties } from './SketchPartProperties';
 import { SketchDrawing } from './SketchDrawing';
 import { CadVariablesPanel } from './CadVariablesPanel';
-import { DesignStepsList } from './DesignStepsList';
 import { drawnOnName, nextSketchLabel, pendingRow, sketchPlaneName } from './drawnOnName';
 import { SketchContextMenu } from './SketchContextMenu';
 import {
@@ -138,7 +137,6 @@ import {
   closeStudioSketch,
   newStudioPartOn,
   newStudioSketchOn,
-  openDesignStep,
   openStudioFeature,
   openStudioSketch,
   pickStudioPlane,
@@ -178,7 +176,7 @@ import { useProfileSelection } from './useProfileSelection';
 import { basePlaneViews, pickedPlane } from './basePlanes';
 import { studioKeyActions } from './studioKeyActions';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
-import { designStepLabel, trimCadFolders, type DesignStep } from '@wbcnc/cad';
+import { designStepLabel, trimCadFolders } from '@wbcnc/cad';
 import type { PartEdge } from './partEdges';
 import { straightOn, type SketchTurn } from './sketchOrbit';
 import { useEditorCameras } from './studioCamera';
@@ -1293,7 +1291,6 @@ export function CadEditor({
   };
   const openSketch = (stepPartId: string, before?: CadHistoryMark) => openStudioSketch(studioNavigationInput(), stepPartId, before);
   const closeSketch = (keep: boolean) => closeStudioSketch(studioNavigationInput(), keep);
-  const openStep = (step: DesignStep) => openDesignStep(studioNavigationInput(), step);
   const featureAction = (entry: FeatureEntry, action: FeatureAction) => studioFeatureAction(studioNavigationInput(), entry, action);
   const newPartOn = (on: CadDrawnOn['on'], datum?: string) => newStudioPartOn(studioNavigationInput(), on, datum);
   const newSketchOn = (plane: string) => newStudioSketchOn(studioNavigationInput(), plane);
@@ -1587,7 +1584,6 @@ export function CadEditor({
             />
           )}
           {!faceSketch && !studioSession && <CadVariablesPanel document={doc} onChange={commit} />}
-          {!faceSketch && !studioSession && <DesignStepsList document={doc} selectedPartId={part?.id ?? null} onStep={openStep} />}
           {!studioSession && partsPanel}
           {part && !faceSketch && !(studioSession && showWorkspace) && (
             <SketchPartProperties

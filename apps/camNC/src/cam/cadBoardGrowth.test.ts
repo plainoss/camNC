@@ -51,7 +51,6 @@ async function nativeFittedJob(name: string) {
         bit: { number: 7, diameter: 6, name: '6 mm flat' },
         material: 'mdf',
         cutBelow: 0.6,
-        tabs: true,
         cutting: { feed: 1400, rpm: 14_000 },
       },
       stock: [{ id: 'workshop-stock', thickness: 18, w: 2440, h: 1220, quantity: 2 }],
@@ -140,7 +139,7 @@ describe('accepted native source through the persisted CAM board pipeline', () =
     document.parts.push(added);
     document.revision++;
     const accepted = await acceptDesign(await saveDesignDraft(grown, document), document);
-    expect(accepted.design!.partRevisions[initial.partId]).toBe(grown.design!.partRevisions[initial.partId]);
+    expect(accepted.design!.partGeometryKeys[initial.partId]).toBe(grown.design!.partGeometryKeys[initial.partId]);
     const { model } = await nativeCadModel(accepted.design!.accepted!);
     expect(model.parts.map(part => ({ id: part.id, size: part.size }))).toEqual([
       { id: initial.partId, size: [500, 100, 18] },

@@ -47,7 +47,6 @@ it('keeps legacy inheritance but applies Off and Dogbone only to their own openi
   const legacy = evaluateCadDocument(document).parts[0]!;
   let changed = updatePartCut(document, document.partCuts![1]!.id, { cornerRelief: null });
   changed = updatePartCut(changed, document.partCuts![2]!.id, { cornerRelief: { diameter: 4 } });
-  expect(changed.version).toBe(5);
   const evaluated = evaluateCadDocument(changed);
   expect(evaluated.diagnostics).toEqual([]);
   const part = evaluated.parts[0]!;
@@ -71,14 +70,12 @@ it.each([false, true])('keeps an ordered physical-copy design valid with a relie
   const { document } = source();
   const relieve = (value: CadDocument) => updatePartCut(value, value.partCuts![1]!.id, { cornerRelief: { diameter: 4 } });
   const changed = orderedFirst ? relieve(orderedCadDocument(document)) : orderedCadDocument(relieve(document));
-  expect(changed.version).toBe(5);
   expect(changed.operationOrder).toEqual(document.partCuts!.map(step => step.id));
   const evaluated = evaluateCadDocument(changed);
   expect(evaluated.diagnostics).toEqual([]);
   expect(evaluated.parts[0]!.cuts![1]!.outline.length).toBeGreaterThan(4);
   expect(evaluateCadDocument(parseCadDocument(JSON.parse(JSON.stringify(changed))))).toEqual(evaluated);
   const inherited = updatePartCut(changed, changed.partCuts![1]!.id, { cornerRelief: undefined });
-  expect(inherited.version).toBe(4);
   expect(evaluateCadDocument(parseCadDocument(JSON.parse(JSON.stringify(inherited)))).diagnostics).toEqual([]);
 });
 
@@ -91,7 +88,10 @@ it('resolves, renames and tracks a step diameter variable without changing clear
   expect(changed.document.partCuts![0]!.cornerRelief).toEqual({ diameter: 8, diameterExpression: 'selectedCutter' });
   expect(changed.document.partCuts![0]!.clearance).toBe(0);
   expect(changed.document.parts).toEqual(document.parts);
-  expect(parseCadDocument(JSON.parse(JSON.stringify(changed.document))).version).toBe(5);
+  expect(parseCadDocument(JSON.parse(JSON.stringify(changed.document))).partCuts![0]!.cornerRelief).toEqual({
+    diameter: 8,
+    diameterExpression: 'selectedCutter',
+  });
 });
 
 it.each([false, true, 0, -1, 'off', {}, { diameter: 0 }, { diameter: Infinity }, { diameter: 6, kind: 'tbone' }])(
@@ -100,7 +100,6 @@ it.each([false, true, 0, -1, 'off', {}, { diameter: 0 }, { diameter: Infinity },
     const document = source().document;
     const input = {
       ...document,
-      version: 5,
       partCuts: document.partCuts!.map((step, i) => (i ? step : { ...step, cornerRelief: relief })),
     };
     expect(() => parseCadDocument(input)).toThrow();
@@ -127,7 +126,6 @@ it('takes the smallest relief from the part and its active steps only', () => {
   expect(smallestCornerRelief(changed, seat.id)).toBe(3);
   const folded: CadDocument = {
     ...changed,
-    version: 5,
     folders: [{ id: 'f', name: 'Off', partIds: [], partCutIds: [second!.id], suppressed: true }],
   };
   expect(smallestCornerRelief(folded, seat.id)).toBe(4);

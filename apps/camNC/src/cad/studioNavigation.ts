@@ -10,7 +10,6 @@ import {
   setCutSuppressed,
   setPartPattern,
   splitApartRegions,
-  withFeatureVersion,
   type CadDocument,
   type CadDrawnOn,
   type CadPart,
@@ -231,8 +230,8 @@ export function closeStudioSketch(editor: StudioNavigationInput, keep: boolean) 
   return true;
 }
 
-/** Opens what a step of the design made: its sketch, its dialog, or its part in 3D. */
-export function openDesignStep(editor: StudioNavigationInput, step: DesignStep) {
+/** Opens what a step of the studio's feature list made: its sketch, its dialog, or its part's sketch view. */
+function openDesignStep(editor: StudioNavigationInput, step: DesignStep) {
   const {
     chooseTool,
     documentRef,
@@ -245,38 +244,32 @@ export function openDesignStep(editor: StudioNavigationInput, step: DesignStep) 
     setShow3D,
     setShowWorkspace,
     sketchBefore,
-    studioSession,
   } = editor;
-  // In the studio a step opens its dialog, and a sketch opens to be drawn on, as the reference does.
-  if (studioSession && step.kind === 'sketch') return openStudioSketch(editor, step.partId);
-  if (studioSession && step.kind === 'extrude')
+  // A step opens its dialog, and a sketch opens to be drawn on, as the reference does.
+  if (step.kind === 'sketch') return openStudioSketch(editor, step.partId);
+  if (step.kind === 'extrude')
     return openStudioFeature(editor, documentRef.current.parts.find(p => p.id === step.partId)?.hole ? 'hole' : 'extrude', step.partId);
-  if (studioSession && step.kind === 'move') return openStudioTransform(editor, step.partId, undefined, true);
-  if (studioSession && step.kind === 'fillet') return openDialog({ kind: 'fillet', partId: step.partId, filletId: step.id });
-  if (studioSession && step.kind === 'mirror') return openDialog({ kind: 'mirror', partId: step.partId, joinId: step.id });
-  if (studioSession && step.kind === 'copy') {
+  if (step.kind === 'move') return openStudioTransform(editor, step.partId, undefined, true);
+  if (step.kind === 'fillet') return openDialog({ kind: 'fillet', partId: step.partId, filletId: step.id });
+  if (step.kind === 'mirror') return openDialog({ kind: 'mirror', partId: step.partId, joinId: step.id });
+  if (step.kind === 'copy') {
     const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
     if (copy?.offset) return openStudioTransform(editor, step.partId, copy.id);
     if (copy?.mirror) return openDialog({ kind: 'mirror', partId: step.partId, copyId: copy.id });
   }
-  if (studioSession && (step.kind === 'pattern' || step.kind === 'copy')) return openStudioFeature(editor, 'pattern', step.partId);
+  if (step.kind === 'pattern' || step.kind === 'copy') return openStudioFeature(editor, 'pattern', step.partId);
   // A cut opens its part's sketch view from the studio: cancelling there goes back to the design as it is now.
-  if (studioSession && step.kind === 'cut') sketchBefore.current = markCadSession(session);
+  if (step.kind === 'cut') sketchBefore.current = markCadSession(session);
   setPartId(step.partId);
   setSelected([]);
   chooseTool('select');
-  if (step.kind === 'sketch') {
-    setShowWorkspace(false);
-    setShow3D(false);
-  } else if (step.kind === 'pattern' || step.kind === 'copy') {
-    setShowWorkspace(true);
-  } else if (step.kind === 'partCut') {
+  if (step.kind === 'partCut') {
     setShowWorkspace(true);
     openDialog({ kind: 'partCut', id: step.partCutId });
   } else if (step.kind === 'split') {
     setShowWorkspace(true);
     openDialog({ kind: 'split', partId: step.partId });
-  } else if (step.kind === 'cut' || step.kind === 'extrude') {
+  } else if (step.kind === 'cut') {
     setShowWorkspace(false);
     setShow3D(hasOutline(documentRef.current, step.partId));
   } else if (step.kind === 'faceSketch' && onEditFaceSketch && step.sketchId) {
@@ -363,7 +356,7 @@ export function studioFeatureAction(editor: StudioNavigationInput, entry: Featur
   else if (step.kind === 'sketch' || step.kind === 'extrude') {
     // A part is its sketch pushed out, so deleting either deletes the part, and the parts its extrude made with it.
     const parts = withoutPartsMadeWith(current, step.partId).parts.filter(candidate => candidate.id !== step.partId);
-    commitKept(withFeatureVersion({ ...current, parts }));
+    commitKept({ ...current, parts });
     setPartId(parts[0]?.id ?? '');
   } else if (step.kind === 'pattern') commitKept(setPartPattern(current, step.partId, null));
   else if (step.kind === 'partCut' && step.partCutId) commitKept(removePartCut(current, step.partCutId));

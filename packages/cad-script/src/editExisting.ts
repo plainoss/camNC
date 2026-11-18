@@ -11,7 +11,6 @@ import {
   setCutDepth,
   setCutSuppressed,
   updatePartCut,
-  withFeatureVersion,
   trimCadFolders,
   type CadDocument,
   type CadPart,
@@ -131,7 +130,7 @@ export function existingDesignEdit(ctx: EditContext, scope?: ExistingScope): Exi
     const part = findPart(typeof input === 'string' ? input : input.id);
     const document = ctx.get();
     // Keep dependent sketches/steps as explicit broken references, rather than silently deleting the user's work.
-    save(withFeatureVersion({ ...document, parts: document.parts.filter(candidate => candidate.id !== part.id) }));
+    save({ ...document, parts: document.parts.filter(candidate => candidate.id !== part.id) });
   };
   const setStep = (id: string, settings: ScriptStepSettings) => {
     const step = findStep(id);

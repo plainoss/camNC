@@ -205,7 +205,8 @@ describe('profile validation and source documents', () => {
   it('round trips serializable source and rejects duplicate identity', () => {
     const d = createPlateDocument();
     expect(parseCadDocument(JSON.parse(JSON.stringify(d)))).toEqual(d);
-    expect(() => parseCadDocument({ ...d, version: 2 })).toThrow('Invalid CAD document');
+    expect(parseCadDocument({ ...d, version: 7 }).version).toBe(1);
+    expect(() => parseCadDocument({ ...d, version: 8 })).toThrow('Invalid CAD document');
     d.parts[0]!.sketch.entities.push({ ...d.parts[0]!.sketch.entities[0]! });
     expect(() => parseCadDocument(d)).toThrow('unique');
   });

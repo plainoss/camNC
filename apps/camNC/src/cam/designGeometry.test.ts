@@ -54,10 +54,10 @@ describe('native geometry identity', () => {
     expect(await designGeometryKey(shape(20, 10, 130, 70))).not.toBe(key);
   });
 
-  it('keeps the exact fingerprint for parts without cuts, so cut sheets stay valid', () => {
+  it('fingerprints a plain part the same whether its cuts and rounded edges are absent or empty', () => {
     const plain = { ...shape(0, 0, 10, 5), holes: [] };
-    expect(designGeometryFingerprint(plain)).toBe('[12,"0,0;10,0;10,5;0,5",[]]');
-    expect(designGeometryFingerprint({ ...plain, cuts: [] })).toBe('[12,"0,0;10,0;10,5;0,5",[]]');
+    expect(designGeometryFingerprint(plain)).toBe('[12,"0,0;10,0;10,5;0,5",[],[],[]]');
+    expect(designGeometryFingerprint({ ...plain, cuts: [], rounds: [] })).toBe('[12,"0,0;10,0;10,5;0,5",[],[],[]]');
   });
 
   it('changes when a cut’s depth or shape changes, and ignores moving the whole sketch', () => {

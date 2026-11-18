@@ -20,7 +20,6 @@ it('requires an explicit physical target and keeps the old creation command copy
     bytes = JSON.stringify(source);
   const seed = addPhysicalTransform(source, { kind: 'seed', partId: f.partId }, { by: [0, 25, 0] });
   expect(seed.document.copyTransforms![0]).toEqual({ id: seed.id, partId: f.partId, seed: true, by: [0, 25, 0] });
-  expect(seed.document.version).toBe(4);
   expect(evaluateCadDocument(seed.document).placements![f.partId]!.position).toEqual([0, 25, 0]);
   expect(copyOperationSteps(seed.document)[0]).toMatchObject({ id: seed.id, target: { kind: 'seed', partId: f.partId } });
   const copyId = source.parts[0]!.copies![0]!.id;

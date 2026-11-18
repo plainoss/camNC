@@ -1,7 +1,6 @@
 import { applyExtrudeRemovals } from './extrudeRemoval';
 import { relieveStepOpenings } from './stepReliefFit';
 import { effectivePartCutRelief, partCutReliefIssue } from './partCutRelief';
-import { cadDocumentVersion } from './documentVersion';
 import { newCadId } from './document';
 import { validPartCutSplit } from './partCutSplit';
 import { joinedCutReferences } from './joinedCutReferences';
@@ -723,7 +722,7 @@ export function addPartCut(
     partCuts: [...(document.partCuts ?? []), step],
     ...(document.operationOrder && { operationOrder: [...document.operationOrder, step.id] }),
   };
-  return { id: step.id, document: { ...next, version: cadDocumentVersion(next) } };
+  return { id: step.id, document: next };
 }
 
 /** Changes a step's parts or clearance. A clearance given without an expression drops the step's old one. */
@@ -731,7 +730,7 @@ export function updatePartCut(document: CadDocument, id: string, change: Partial
   if (!validPartCutSplit(change.split)) throw new Error('Invalid CAD part cut');
   const reliefIssue = partCutReliefIssue(change.cornerRelief);
   if (reliefIssue) throw new Error(reliefIssue);
-  const documentWithChange = {
+  return {
     ...document,
     revision: document.revision + 1,
     partCuts: (document.partCuts ?? []).map(step => {
@@ -745,7 +744,6 @@ export function updatePartCut(document: CadDocument, id: string, change: Partial
       return next;
     }),
   };
-  return { ...documentWithChange, version: cadDocumentVersion(documentWithChange) };
 }
 
 export function removePartCut(document: CadDocument, id: string): CadDocument {
@@ -757,5 +755,5 @@ export function removePartCut(document: CadDocument, id: string): CadDocument {
     ...(document.legacyPartCutIds && { legacyPartCutIds: document.legacyPartCutIds.filter(operation => operation !== id) }),
   };
   if (!next.partCuts!.length) delete next.partCuts;
-  return { ...next, version: cadDocumentVersion(next) };
+  return next;
 }

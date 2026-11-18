@@ -98,7 +98,6 @@ function ToolpathPositionText() {
 
 export const GCodeVisualizer: React.FC = () => {
   const toolpath = useStore(s => s.toolpath);
-  const setIsToolpathSelected = useStore(s => s.setIsToolpathSelected);
   const setIsToolpathHovered = useStore(s => s.setIsToolpathHovered);
 
   const boundingSize = useMemo(() => {
@@ -118,11 +117,7 @@ export const GCodeVisualizer: React.FC = () => {
       <ToolpathTransformControls>
         <group
           position-z={kAboveStockZ}
-          onPointerMissed={e => e.type === 'click' && setIsToolpathSelected(false)}
-          onClick={e => {
-            e.stopPropagation();
-            setIsToolpathSelected(true);
-          }}
+          onClick={e => e.stopPropagation()}
           onPointerEnter={() => setIsToolpathHovered(true)}
           onPointerLeave={() => setIsToolpathHovered(false)}>
           <ToolpathCanvasPlane />

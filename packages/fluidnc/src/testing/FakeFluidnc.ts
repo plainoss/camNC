@@ -59,7 +59,6 @@ export class FakeFluidnc {
   readonly sockets = new Set<FakeSocket>();
   protected relative = false;
   protected jobAckPending = false;
-  private xmodem: { path: string; data: number[]; buffer: number[] } | null = null;
   readonly transcript: Transcript;
 
   constructor(readonly variant: FirmwareVariant = 'v3-81') {
@@ -131,10 +130,6 @@ export class FakeFluidnc {
   protected lineBuffer = '';
 
   onBytes(bytes: Uint8Array) {
-    if (this.xmodem) {
-      this.onXmodemBytes(bytes);
-      return;
-    }
     for (const byte of bytes) {
       if (byte === 0x3f || byte === 0x21 || byte === 0x7e || byte === 0x18 || byte >= 0x80) {
         this.onRealtime(byte);
@@ -232,11 +227,6 @@ export class FakeFluidnc {
     if (assign?.[1] === 'SD/Delete') {
       this.files.delete(assign[2]!.replace(/^\/+/, ''));
       return this.ok();
-    }
-    if (assign?.[1] === 'Xmodem/Receive') {
-      this.xmodem = { path: assign[2]!, data: [], buffer: [] };
-      this.emitRaw([0x43]);
-      return;
     }
     if (line === '$X') {
       this.state = 'Idle';
@@ -352,37 +342,6 @@ export class FakeFluidnc {
     }
     if (/G0?[01](?![\d.])/.test(upper) || /G53/.test(upper)) this.move(words, this.relative && !/G53/.test(upper), /G53/.test(upper));
     this.ok();
-  }
-
-  // --- XMODEM receiver ------------------------------------------------------------------------
-
-  private emitRaw(bytes: number[]) {
-    for (const socket of this.openSockets) socket.deliverBytes(new Uint8Array(bytes));
-  }
-
-  private onXmodemBytes(bytes: Uint8Array) {
-    const x = this.xmodem!;
-    x.buffer.push(...bytes);
-    for (;;) {
-      const head = x.buffer[0];
-      if (head === undefined) return;
-      if (head === 0x04) {
-        x.buffer.shift();
-        let end = x.data.length;
-        while (end > 0 && x.data[end - 1] === 0x1a) end--;
-        const name = x.path.replace(/^\/sd\//, '');
-        this.files.set(name, new Uint8Array(x.data.slice(0, end)));
-        this.xmodem = null;
-        this.emitRaw([0x06]);
-        this.ok([`[MSG:INFO: Received ${end} bytes to file ${x.path}]`]);
-        return;
-      }
-      const size = head === 0x02 ? 1024 : 128;
-      if (x.buffer.length < size + 5) return;
-      const block = x.buffer.splice(0, size + 5);
-      x.data.push(...block.slice(3, 3 + size));
-      this.emitRaw([0x06]);
-    }
   }
 }
 

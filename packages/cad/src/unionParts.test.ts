@@ -25,7 +25,6 @@ const volume = (part: EvaluatedCadPart) =>
   (part.cuts ?? []).reduce((sum, cut) => sum + Math.abs(polygonArea(cut.outline)) * (cut.to - cut.from), 0);
 const union = (parts: CadPart[], keep = false): CadDocument => ({
   ...createCadDocument(),
-  version: 7,
   parts,
   partCuts: [
     {
@@ -48,9 +47,8 @@ it('joins two boards drawn on one plane into the first, as high as the higher an
   expect(joined!.part.thickness).toBe(30);
   expect(volume(joined!.part)).toBeCloseTo(120_000, 3);
   expect(consumedTools(document)).toEqual(new Set(['Part 2']));
-  // Saved and loaded, it's a Boolean step that needs a reader that knows it.
+  // Saved and loaded, it's still a Boolean step.
   expect(parseCadDocument(JSON.parse(JSON.stringify(document))).partCuts![0]!.operation).toBe('union');
-  expect(() => parseCadDocument(JSON.parse(JSON.stringify({ ...document, version: 6 })))).toThrow();
 });
 
 it('keeps the tools as parts when asked, and refuses boards on planes apart, with a gap between them', async () => {
@@ -104,7 +102,7 @@ it('merges an Add with Merge with all into every board it runs into, and stays i
   const right = { ...board('Part 2', 30, 30, 10), placement: undefined };
   right.sketch = addRectangle(createCadPart('x').sketch, { x: 70, y: 0, width: 30, height: 30 });
   const bar = { ...board('Bar', 100, 10, 5), mergeAll: true as const };
-  const document: CadDocument = { ...createCadDocument(), version: 7, parts: [left, right, bar] };
+  const document: CadDocument = { ...createCadDocument(), parts: [left, right, bar] };
   const solved = await solveCadDocument(document);
   const parts = cadPartsToCut(solved.document, solved.parts);
   expect(parts.map(entry => [entry.part.name, entry.part.thickness, volume(entry.part)])).toEqual([['Part 1', 10, 20_000]]);
@@ -119,7 +117,7 @@ it('leaves chained merges, and merges into a part another step uses, apart rathe
   right.sketch = addRectangle(createCadPart('x').sketch, { x: 70, y: 0, width: 30, height: 30 });
   const bar = { ...board('Bar', 100, 10, 5), mergeAll: true as const };
   const stub = { ...board('Stub', 10, 30, 5), mergeAll: true as const };
-  const chained: CadDocument = { ...createCadDocument(), version: 7, parts: [left, right, bar, stub] };
+  const chained: CadDocument = { ...createCadDocument(), parts: [left, right, bar, stub] };
   expect(consumedTools(chained)).toEqual(new Set());
   const solved = await solveCadDocument(chained);
   expect(solved.diagnostics.some(d => d.code === 'merge-all-unresolved')).toBe(true);
@@ -128,7 +126,7 @@ it('leaves chained merges, and merges into a part another step uses, apart rathe
       .map(entry => entry.part.name)
       .sort()
   ).toEqual(['Bar', 'Part 1', 'Part 2', 'Stub']);
-  const ordered: CadDocument = { ...createCadDocument(), version: 7, operationOrder: [], parts: [left, right, bar] };
+  const ordered: CadDocument = { ...createCadDocument(), operationOrder: [], parts: [left, right, bar] };
   expect(consumedTools(ordered)).toEqual(new Set());
 });
 
@@ -149,7 +147,7 @@ it('joins four boards apart with a disc sunk into their tops by Merge with all, 
     drawnOn: { on: { plane: 'top' as const }, offset: 18, inward: true as const },
     mergeAll: true as const,
   };
-  const document = await solveCadDocument({ ...createCadDocument(), version: 7, parts: [...parts, disc] });
+  const document = await solveCadDocument({ ...createCadDocument(), parts: [...parts, disc] });
   const made = cadPartsToCut(document.document, document.parts);
   expect(made.map(({ part }) => part.name)).toEqual(['A']);
   const [joined] = made;

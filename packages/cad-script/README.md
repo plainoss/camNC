@@ -68,7 +68,7 @@ are the document's own, so the same design always prints the same text and a dif
 two reports shows what changed. With a script it reports on the design the script made;
 the exit code still follows the check.
 
-Ordered version 4 documents additionally report `spatial`: the saved operation IDs,
+Ordered documents additionally report `spatial`: the saved operation IDs,
 settings and order, each operation's physical output at its own prefix, and the final
 physical instances and CAM groups. Generation features and sketch frames stay before
 this spatial stream; their report does not present later cut openings as earlier

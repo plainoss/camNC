@@ -1,7 +1,6 @@
 import { parseListJson, SdFile, SdListing } from './parsers/list-json';
 import { FluidncAbortError, type FluidncProtocol, type MachineStatus } from './protocol';
 import { httpUrl } from './socket';
-import { xmodemUpload } from './xmodem';
 
 /** How long the socket may stay quiet during an HTTP upload before it counts as dead. */
 const kUploadSilenceMs = 60_000;
@@ -59,9 +58,6 @@ export function deleteSdFile(protocol: FluidncProtocol, name: string) {
 }
 
 export interface UploadOptions {
-  /** `http` (default): `no-cors` POST to `/upload`, verified via `$SD/ListJSON`. `xmodem`: over the socket. */
-  method?: 'http' | 'xmodem';
-  onProgress?: (fraction: number) => void;
   /** Inject `fetch` for tests. */
   fetchImpl?: typeof fetch;
   verifyTimeoutMs?: number;
@@ -102,23 +98,18 @@ export async function uploadSdFile(
     await deleteSdFile(protocol, filename);
     if (findFile(await listSdFiles(protocol), filename)) throw new Error(`Upload failed: could not replace ${filename}`);
   }
-  if (options.method === 'xmodem') {
-    await xmodemUpload(protocol, `/sd${filename}`, bytes, options.onProgress);
-  } else {
-    const form = new FormData();
-    form.append('path', '/');
-    form.append(`${filename}S`, String(bytes.length));
-    form.append('myfiles', new Blob([bytes as BlobPart], { type: 'application/octet-stream' }), filename);
-    const doFetch = options.fetchImpl ?? fetch;
-    // 3.9.x handles the upload in its only network task, so the socket goes quiet meanwhile (about 25 s were seen).
-    protocol.socket.allowSilence(kUploadSilenceMs);
-    try {
-      await doFetch(httpUrl(host, '/upload'), { method: 'POST', mode: 'no-cors', body: form });
-    } catch {
-      // An opaque response can still be rejected by the page's COEP policy after the upload went through.
-      // The listing below is the source of truth.
-    }
-    options.onProgress?.(1);
+  const form = new FormData();
+  form.append('path', '/');
+  form.append(`${filename}S`, String(bytes.length));
+  form.append('myfiles', new Blob([bytes as BlobPart], { type: 'application/octet-stream' }), filename);
+  const doFetch = options.fetchImpl ?? fetch;
+  // 3.9.x handles the upload in its only network task, so the socket goes quiet meanwhile (about 25 s were seen).
+  protocol.socket.allowSilence(kUploadSilenceMs);
+  try {
+    await doFetch(httpUrl(host, '/upload'), { method: 'POST', mode: 'no-cors', body: form });
+  } catch {
+    // An opaque response can still be rejected by the page's COEP policy after the upload went through.
+    // The listing below is the source of truth.
   }
 
   const deadline = Date.now() + (options.verifyTimeoutMs ?? kVerifyTimeoutMs);

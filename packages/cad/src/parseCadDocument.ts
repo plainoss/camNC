@@ -4,12 +4,11 @@ import { linearPatternIssue } from './pattern';
 import { cadVariableNameError } from './valueExpressions';
 import { nestedDeeperThan } from './nestingDepth';
 import { validPartCutSplit } from './partCutSplit';
-import type { CadDirection, CadDocument, CadPart, CadPlacement, CadSketch } from './types';
+import { CAD_DOCUMENT_VERSION, type CadDirection, type CadDocument, type CadPart, type CadPlacement, type CadSketch } from './types';
 import { splineHandleIssue, withSplineHandleSegments } from './splineHandles';
 import { constraintEntityIds, entityPointIds } from './entityReferences';
 import { cadFolderIssue, cadFolderStepIssue } from './folderModel';
 import { designSteps } from './designSteps';
-import { cadDocumentVersion } from './documentVersion';
 import { validCircularPartPattern } from './circularPartPattern';
 import { constructionShapeIssue } from './constructionShape';
 import { migrateDesignUnitNumbers } from './lengthUnits';
@@ -22,15 +21,16 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (!input || typeof input !== 'object' || nestedDeeperThan(input, 64)) throw new Error('Invalid CAD document');
   const d = input as CadDocument;
   if (
-    ![1, 2, 3, 4, 5, 6, 7].includes(d.version) ||
+    // Writers save version 1; retain files from the previously supported reader versions.
+    !Number.isInteger(d.version) ||
+    d.version < CAD_DOCUMENT_VERSION ||
+    d.version > 7 ||
     typeof d.id !== 'string' ||
     typeof d.name !== 'string' ||
     (d.lengthUnit !== undefined && !['mm', 'cm', 'm', 'in', 'ft'].includes(d.lengthUnit)) ||
     !Number.isSafeInteger(d.revision) ||
     d.revision < 0 ||
-    !Array.isArray(d.parts) ||
-    (d.version === 2 && !d.parts.some(p => p?.features?.length)) ||
-    (d.version < 3 && d.folders !== undefined)
+    !Array.isArray(d.parts)
   )
     throw new Error('Invalid CAD document');
   const constructionIssue = constructionShapeIssue(d.constructions);
@@ -335,7 +335,6 @@ export function parseCadDocument(input: unknown): CadDocument {
         throw new Error('Invalid CAD part support');
       number(offset);
     }
-    if (d.version === 1 && p.features !== undefined) throw new Error('Invalid CAD document');
     if (p.features !== undefined && !Array.isArray(p.features)) throw new Error('Invalid CAD features');
     // A shared sketch, and a Remove step's sketch on the board it cuts, are copies: their IDs are the original's, so
     // they're checked against IDs of their own. Loading migrates every sketch, so each is checked.
@@ -343,10 +342,7 @@ export function parseCadDocument(input: unknown): CadDocument {
     for (const f of p.features ?? []) {
       if (!f || typeof f !== 'object') throw new Error('Invalid CAD feature');
       addId(f.id);
-      if (f.copyId !== undefined) {
-        reference(f.copyId);
-        if (d.version < 3) throw new Error('Copy features require CAD document version 3');
-      }
+      if (f.copyId !== undefined) reference(f.copyId);
       if (f.type === 'sketch') {
         if (!f.sketch || typeof f.sketch !== 'object' || !Array.isArray(f.sketch.entities) || !Array.isArray(f.sketch.constraints))
           throw new Error('Invalid CAD feature');
@@ -626,10 +622,6 @@ export function parseCadDocument(input: unknown): CadDocument {
   }
   const folderIssue = cadFolderIssue(d) || cadFolderStepIssue(d, designSteps(d));
   if (folderIssue) throw new Error(folderIssue);
-  // The derived version walks feature arrays, so their shapes must be validated before it runs.
-  const requiredVersion = cadDocumentVersion(d);
-  if ((d.version === 3 || d.version >= 5) && requiredVersion !== d.version) throw new Error('Invalid CAD document');
-  if (d.version < requiredVersion) throw new Error(`These CAD source settings require document version ${requiredVersion}`);
   for (const folder of d.folders ?? []) addId(folder.id);
   for (const plan of d.constructions ?? []) {
     addId(plan.id);
@@ -637,6 +629,7 @@ export function parseCadDocument(input: unknown): CadDocument {
     for (const hardware of plan.hardware) addId(hardware.id);
   }
   const parsed = structuredClone(d);
+  parsed.version = CAD_DOCUMENT_VERSION;
   for (const part of parsed.parts) {
     part.sketch = withSplineHandleSegments(part.sketch);
     for (const feature of part.features ?? []) if (feature.type === 'sketch') feature.sketch = withSplineHandleSegments(feature.sketch);

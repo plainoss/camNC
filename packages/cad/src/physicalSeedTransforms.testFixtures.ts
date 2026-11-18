@@ -38,6 +38,6 @@ export function notchedSeedSource() {
   const cut = addPartCut(source, [knife.id], [part.id], { value: 0 });
   const move: CadSeedTransform = { id: 'move-original', partId: part.id, seed: true, by: [0, 25, 0] };
   // This is the explicit saved-source contract, independent of a creation command implementation.
-  source = { ...cut.document, version: 4, copyTransforms: [move], operationOrder: [move.id, cut.id] };
+  source = { ...cut.document, copyTransforms: [move], operationOrder: [move.id, cut.id] };
   return { source, partId: part.id, childId: child.id, dependentId: dependent.id, knifeId: knife.id, moveId: move.id, cutId: cut.id };
 }
