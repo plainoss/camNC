@@ -290,8 +290,9 @@ export function cadPartsMissingVariables(document: CadDocument): Set<string> {
   const check = (expression: string | undefined, partId?: string) => {
     if (partId && expression && cadExpressionNames(expression).some(name => !known.has(name))) missing.add(partId);
   };
+  // A copy's move that names a missing variable fails on its own, as the evaluation reports; the part is still built.
   visitTypedValues(document, {
-    value: (typed, _kind, owner) => check(typed.expression, owner.partId),
+    value: (typed, _kind, owner) => !owner.operationId && check(typed.expression, owner.partId),
     pattern: (pattern, owner) => Object.values(pattern.expressions).forEach(expression => check(expression, owner.partId)),
   });
   return missing;
