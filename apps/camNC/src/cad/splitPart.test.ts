@@ -48,13 +48,15 @@ it('splits the copy the Front plane runs through into two parts, listed as Split
   expect(designSteps(made.document).map(step => step.label)).toEqual(['Sketch 1', 'Extrude 1', 'Circular pattern 1', 'Split 1']);
   // Part 1 and its other copy, the split copy, and the side split off it.
   const parts = made.document.parts;
-  expect(parts.map(part => part.name)).toEqual(['Part 1', 'Part 1 2', 'Part 2']);
+  // The pattern's copies are Part 2 and Part 3; the side split off Part 2 is the next new part.
+  expect(parts.map(part => part.name)).toEqual(['Part 1', 'Part 2', 'Part 4']);
+  expect(parts[0]!.copies!.map(copy => copy.name)).toEqual(['Part 3']);
   expect(parts[0]!.copies).toHaveLength(1);
   expect(face(made.document, 'Part 1')).toBeCloseTo(6000, 3);
-  const halves = face(made.document, 'Part 1 2') + face(made.document, 'Part 2');
+  const halves = face(made.document, 'Part 2') + face(made.document, 'Part 4');
   expect(halves).toBeCloseTo(6000, 3);
-  expect(face(made.document, 'Part 2')).toBeGreaterThan(0);
-  expect(face(made.document, 'Part 2')).toBeLessThan(6000);
+  expect(face(made.document, 'Part 4')).toBeGreaterThan(0);
+  expect(face(made.document, 'Part 4')).toBeLessThan(6000);
   // The copy that only touches the plane at a corner isn't cut.
   expect(splitPartWith(document, `p:${beside!.id}`, { across: { plane: 'front' } }, 'split')).toEqual({
     error: 'The plane doesn’t cut through the part.',

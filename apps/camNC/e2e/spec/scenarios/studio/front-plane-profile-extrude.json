@@ -1,0 +1,114 @@
+[
+ {
+  "id": "studio/sketch/front-plane-profile-extrudes-toward-minus-y",
+  "title": "A profile sketched on the Front plane extrudes toward -Y from the plane, with its height as the stock thickness",
+  "evidence": "design workflow parity spec",
+  "steps": [
+   "dialogcancel",
+   {
+    "spec": "1 select"
+   },
+   "selectfeature Front",
+   {
+    "spec": "2 command"
+   },
+   "key Shift+s",
+   {
+    "spec": "3 view"
+   },
+   "key Shift+1",
+   {
+    "spec": "4 command"
+   },
+   "key g",
+   {
+    "spec": "5 draw"
+   },
+   "rect 0,0 25,15",
+   {
+    "spec": "6 cancel"
+   },
+   "key Escape",
+   {
+    "spec": "7 command"
+   },
+   "key d",
+   {
+    "spec": "8 pick"
+   },
+   "viewpick 12.5,15,0",
+   "viewpick 12.5,22,0",
+   {
+    "spec": "9 field"
+   },
+   "field Length 120",
+   {
+    "spec": "10 cancel"
+   },
+   "key Escape",
+   "key f",
+   {
+    "spec": "11 command"
+   },
+   "key d",
+   {
+    "spec": "12 pick"
+   },
+   "viewpick 120,36,0",
+   "viewpick 132,36,0",
+   {
+    "spec": "13 cancel"
+   },
+   "key Escape",
+   {
+    "spec": "14 field"
+   },
+   "editdim 132,36",
+   "field Length 18",
+   {
+    "spec": "15 confirm"
+   },
+   "closesketch",
+   {
+    "spec": "16 command"
+   },
+   "key Shift+e",
+   {
+    "spec": "17 pick"
+   },
+   "viewpick 60,0,9",
+   {
+    "spec": "18 field"
+   },
+   "dialogfill Thickness = 80",
+   "key Enter",
+   {
+    "spec": "19 confirm"
+   },
+   "dialogconfirm",
+   {
+    "expect": {
+     "studio": {
+      "dialog": null,
+      "features": [
+       {
+        "name": "Sketch 1",
+        "state": [
+         "hidden"
+        ]
+       },
+       "Extrude 1"
+      ],
+      "parts": [
+       "Part 1"
+      ]
+     }
+    }
+   },
+   {
+    "spec": "20 view"
+   },
+   "key Shift+5"
+  ]
+ }
+]

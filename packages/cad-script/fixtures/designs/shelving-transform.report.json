@@ -136,7 +136,7 @@
    "result": {
     "copies": [
      {
-      "name": "Part 1 2",
+      "name": "Part 3",
       "position": [
        0,
        0,
@@ -144,7 +144,7 @@
       ]
      },
      {
-      "name": "Part 1 3",
+      "name": "Part 4",
       "position": [
        0,
        0,
@@ -212,6 +212,7 @@
    "label": "Transform 1",
    "part": "Part 2",
    "settings": {
+    "name": "Part 5",
     "offset": {
      "position": [
       0,
@@ -513,8 +514,8 @@
    "pieces": {
     "names": [
      "Part 1",
-     "Part 1 2",
-     "Part 1 3"
+     "Part 3",
+     "Part 4"
     ],
     "mirrored": []
    },
@@ -612,7 +613,7 @@
    "pieces": {
     "names": [
      "Part 2",
-     "Part 2 2"
+     "Part 5"
     ],
     "mirrored": []
    },
@@ -712,7 +713,7 @@
     ]
    },
    {
-    "name": "Part 1 2",
+    "name": "Part 3",
     "at": [
      -150,
      0,
@@ -725,7 +726,7 @@
     ]
    },
    {
-    "name": "Part 1 3",
+    "name": "Part 4",
     "at": [
      -150,
      0,
@@ -751,7 +752,7 @@
     ]
    },
    {
-    "name": "Part 2 2",
+    "name": "Part 5",
     "at": [
      -150,
      681,
@@ -790,7 +791,7 @@
      "rotated": false
     },
     {
-     "name": "Part 1 2",
+     "name": "Part 3",
      "at": [
       6.7,
       1874.7
@@ -802,7 +803,7 @@
      "rotated": false
     },
     {
-     "name": "Part 1 3",
+     "name": "Part 4",
      "at": [
       6.7,
       2484.7
@@ -826,7 +827,7 @@
      "rotated": false
     },
     {
-     "name": "Part 2 2",
+     "name": "Part 5",
      "at": [
       6.7,
       635.7
@@ -847,14 +848,14 @@
      "ok": true
     },
     {
-     "name": "Part 1 2",
+     "name": "Part 3",
      "how": "placed",
      "tabs": 4,
      "anchored": 4,
      "ok": true
     },
     {
-     "name": "Part 1 3",
+     "name": "Part 4",
      "how": "placed",
      "tabs": 4,
      "anchored": 4,
@@ -868,7 +869,7 @@
      "ok": true
     },
     {
-     "name": "Part 2 2",
+     "name": "Part 5",
      "how": "placed",
      "tabs": 4,
      "anchored": 4,

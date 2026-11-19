@@ -46,7 +46,6 @@ import {
   cadCopyName,
   type CadPoint,
   cadVariableProblems,
-  partCutInputProblems,
   drawnOnOutline,
   cadSketchFrame,
   resolveExtrudeSteps,
@@ -154,6 +153,7 @@ import { StudioSketchDialog } from './StudioSketchDialog';
 import { openSketchFinishReason, sketchPendingFinishReason } from './sketchPendingFinishReason';
 import { PartsList } from './PartsList';
 import { renamedStudioPart } from './renamedStudioPart';
+import { partTrouble } from './partTrouble';
 import { toggledKey } from './toggledKey';
 import { usePointPicker } from './pointPicker';
 import { ShortcutList } from './ShortcutList';
@@ -1325,11 +1325,6 @@ export function CadEditor({
   const variableProblems = cadVariableProblems(doc);
   // A dimension that can't follow its variables shows like a conflicting one.
   const shownConflicts = [...conflictedConstraints, ...variableProblems.flatMap(problem => problem.constraintIds ?? [])];
-  /** Why a part can't take its current values, for the mark beside it in the list. */
-  const partTrouble = (id: string) =>
-    // A Cut parts step that can't use a tool or target says so on the parts it joins, as a value in error does.
-    [...variableProblems, ...partCutInputProblems(doc)].find(problem => problem.partId === id)?.message ??
-    (sketchStatuses[id]?.status === 'conflict' ? 'This part’s sketch can’t be solved with its current values.' : null);
   // A studio sketch closes whatever its edit did to the features built from it, which show as broken in the feature list.
   const openSketchProblems = studioSession && !showWorkspace ? sketchProblems : problems;
   const displayStatus =
@@ -1444,7 +1439,7 @@ export function CadEditor({
         hiddenParts={hiddenParts}
         transparent={studioSession ? [transparentParts, setTransparentParts] : undefined}
         onToggleHidden={key => setHiddenParts(previous => toggledKey(previous, key))}
-        trouble={partTrouble}
+        trouble={id => partTrouble(doc, variableProblems, sketchStatuses, id)}
         onPick={(partId, copyId) => {
           setSelectedFace(null);
           if (partPicking && showWorkspace) return cutSelection.pickForCut(partId, copyId);
@@ -1759,6 +1754,7 @@ export function CadEditor({
             style={showWorkspace || (show3D && partHasOutline) ? { display: 'none' } : undefined}
             data-sketch-turned={sketchBackdrop && sketchTurn !== straightOn ? '' : undefined}
             data-testid="cad-canvas"
+            data-part-id={part?.id}
             role="img"
             aria-label="2D sketch drawing canvas"
             tabIndex={0}
@@ -1798,6 +1794,7 @@ export function CadEditor({
               activeSketchStatus={activeSketchStatus}
               annotationSketch={annotationSketch}
               centerArcSweep={centerArcSweep}
+              acceptLinearPattern={acceptLinearPattern}
               chain={chain}
               chamferDistances={chamferDistances}
               chamferPreview={chamferPreview}

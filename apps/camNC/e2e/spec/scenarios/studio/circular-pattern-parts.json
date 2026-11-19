@@ -56,7 +56,6 @@
     "spec": "5 field"
    },
    "dialogfill Instance count = 3",
-   "key Tab",
    {
     "expect": {
      "pageText": "Parts \\(3\\)"
@@ -81,6 +80,17 @@
    {
     "expect": {
      "pageText": "Parts \\(3\\)"
+    }
+   },
+   {
+    "expect": {
+     "studio": {
+      "parts": [
+       "Part 1",
+       "Part 2",
+       "Part 3"
+      ]
+     }
     }
    }
   ]

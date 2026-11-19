@@ -46,7 +46,8 @@ export interface AssemblyModel {
   /** Which piece each mesh is, in the same order. */
   instances: AssemblyInstance[];
   /** What each mesh is built from, in its local frame, in the same order: for a solid that isn't a mesh. */
-  solids: Pick<ReturnType<typeof nativePart>, 'entry' | 'below'>[];
+  /** `flat` takes the part's solid from its sketch's frame to the one its features are in (a part milled lying flat). */
+  solids: (Pick<ReturnType<typeof nativePart>, 'entry' | 'below'> & { flat?: number[] })[];
   parts: CamPartInfo[];
   /** Where every shown piece sits, including those laid out because they haven't been placed, by `instanceKey`. */
   placements: Map<string, CadPlacement>;
@@ -163,7 +164,7 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
     for (let i = 0; i < positions.length; i += 3) v.fromArray(positions, i).applyMatrix4(matrix).toArray(positions, i);
     model.meshes.push({ ...shape.mesh, name: instance.name, positions, flat: matrix.clone().invert().toArray() });
     model.instances.push(instance);
-    model.solids.push({ entry: shape.entry, below: shape.below });
+    model.solids.push({ entry: shape.entry, below: shape.below, ...(shape.mesh.flat && { flat: shape.mesh.flat }) });
     if (!model.parts.includes(shape.info)) model.parts.push(shape.info);
     model.placements.set(instanceKey(instance), placement);
   }

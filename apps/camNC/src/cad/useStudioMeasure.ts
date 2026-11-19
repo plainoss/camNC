@@ -86,12 +86,8 @@ export function useStudioMeasure(
     const item: PickedSelection = { key, instance: owner, label: `${instance.name} · ${pick.entity.kind}`, entity: pick.entity };
     setPicked(previous => {
       const current = previous.version === version ? previous.items : [];
-      const items =
-        expanded || pick.additive
-          ? current.some(item => item.key === key)
-            ? current.filter(item => item.key !== key)
-            : [...current, item]
-          : [item];
+      // A click adds to the selection, and a second click on the same geometry takes it off; empty space clears.
+      const items = current.some(item => item.key === key) ? current.filter(item => item.key !== key) : [...current, item];
       return { version, items };
     });
     setSelectedRowId(null);

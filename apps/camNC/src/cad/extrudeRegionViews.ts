@@ -2,6 +2,7 @@ import {
   cadFaceFrame,
   cadSketchFrame,
   CAD_CHORD_TOLERANCE,
+  designSteps,
   evaluateCadPart,
   removalRegions,
   sketchRegions,
@@ -88,13 +89,19 @@ export function extrudeRegionViews(document: CadDocument, target: CadPart): View
   if ('error' in frame) return [];
   const along = (target.drawnOn?.offset ?? 0) + (target.drawnOn?.inward ? 0.1 : target.thickness + 0.1);
   const origin = frame.origin.map((value, axis) => value + frame.normal[axis]! * along) as [number, number, number];
-  return regions.map(region => ({
-    id: region.id,
-    frame: { origin, x: frame.x, y: frame.y, normal: frame.normal },
-    outline: region.points,
-    holes: region.holes,
-    picked: !!target.regions?.includes(region.id) || alsoMade.has(region.id),
-  }));
+  // Picked for a step that can't be made as it stands, as an Add with no part to merge with, the picks show red.
+  const failing = !!designSteps(document).find(step => step.id === `${target.id}:extrude`)?.broken;
+  return regions.map(region => {
+    const picked = !!target.regions?.includes(region.id) || alsoMade.has(region.id);
+    return {
+      id: region.id,
+      frame: { origin, x: frame.x, y: frame.y, normal: frame.normal },
+      outline: region.points,
+      holes: region.holes,
+      picked,
+      ...(picked && failing && { failing: true }),
+    };
+  });
 }
 
 /**

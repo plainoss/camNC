@@ -49,13 +49,15 @@ export function studioStep(
     const belongs = owner(instance),
       key = instanceKey(belongs);
     if (options.only && key !== instanceKey(options.only)) return;
-    const { entry, below } = model.solids[i]!;
+    const { entry, below, flat } = model.solids[i]!;
     const brep = partBrep(entry.features, below, entry.rounds);
     const open = brepProblems(brep);
     if (open.length)
       return void problems.push({ name: instance.name, message: 'Its solid doesn’t close, so it can’t be written exactly.' });
-    // The mesh's `flat` takes it back from the assembly to its own frame; the solid goes the other way.
-    const matrix = new Matrix4().fromArray(model.meshes[i]!.flat!).invert().toArray();
+    // The mesh's `flat` takes it back from the assembly to its sketch's frame; the solid goes the other way, from the
+    // frame its features are in (lying flat, for a part milled that way) through its sketch's.
+    const own = flat ? new Matrix4().fromArray(flat).invert() : new Matrix4();
+    const matrix = new Matrix4().fromArray(model.meshes[i]!.flat!).invert().multiply(own).toArray();
     const name = model.instances.find(candidate => instanceKey(candidate) === key)?.name ?? instance.name;
     const product = products.get(key) ?? products.set(key, { name, solids: [] }).get(key)!;
     product.solids.push({ brep, matrix });

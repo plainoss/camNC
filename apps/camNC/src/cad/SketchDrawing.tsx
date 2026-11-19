@@ -127,6 +127,8 @@ export type SketchDrawingProps = Pick<
     snapCue: { point: Point; label: string } | null;
     startAnnotationDrag: (id: string, event: PointerEvent<SVGGElement>) => void;
     startHandleDrag: (event: { pointerId: number }, gesture: HandleDrag) => void;
+    /** Makes the linear pattern being set up, as clicking its guide does. */
+    acceptLinearPattern: () => void;
     stroke: string;
     transformParameters: TransformParameters;
     turned: boolean;
@@ -137,6 +139,7 @@ export function SketchDrawing({
   activeSketchStatus,
   annotationSketch,
   centerArcSweep,
+  acceptLinearPattern,
   chain,
   chamferDistances,
   chamferPreview,
@@ -368,9 +371,17 @@ export function SketchDrawing({
           counts={[parsedLinear.countX, linearParameters.secondDirection ? parsedLinear.countY : 1]}
           bound={[!!parsedLinear.expressions?.countX, !!parsedLinear.expressions?.countY]}
           pixelScale={markerScale}
-          onStart={(index, event) =>
-            startHandleDrag(event, { tool: 'linearPattern', index, anchor: patternAnchor, parameters: linearParameters })
+          onStart={(index, event, instances) =>
+            startHandleDrag(event, {
+              tool: 'linearPattern',
+              index,
+              instances,
+              anchor: patternAnchor,
+              parameters: linearParameters,
+              screenStart: { x: event.clientX, y: event.clientY },
+            })
           }
+          onApply={acceptLinearPattern}
           onEdit={(field, chip) => openPatternField(patternFields.current[field], chip)}
         />
       )}
