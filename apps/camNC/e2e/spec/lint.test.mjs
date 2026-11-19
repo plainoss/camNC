@@ -50,7 +50,9 @@ describe('no extra inputs per spec step', () => {
     const result = lintScenario(scenario([{ spec: '1 pick' }, 'button Select profile', 'viewpick 30,20,0']));
     expect(result.ok).toBe(false);
     expect(result.findings).toEqual([expect.objectContaining({ spec: '1 pick', problem: 'input not allowed for this kind', inputs: ['button Select profile', 'viewpick 30,20,0'] })]);
-    expect(lintScenario(scenario([{ spec: '1 pick' }, 'viewpick 30,20,0', 'viewpick 70,20,0'])).findings[0].problem).toBe('1 extra input');
+    // A dimension's pick is its edge, then where its label goes; a third pick is one too many.
+    expect(lintScenario(scenario([{ spec: '1 pick' }, 'viewpick 30,20,0', 'viewpick 70,20,0'])).ok).toBe(true);
+    expect(lintScenario(scenario([{ spec: '1 pick' }, 'viewpick 30,20,0', 'viewpick 70,20,0', 'viewpick 90,20,0'])).findings[0].problem).toBe('1 extra input');
   });
   it('allows Enter only after a field, and refuses a missing input', () => {
     expect(lintScenario(scenario([{ spec: '1 confirm' }, 'key Enter', 'key Enter'])).ok).toBe(false);
