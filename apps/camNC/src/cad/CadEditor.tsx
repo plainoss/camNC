@@ -53,8 +53,6 @@ import {
 } from '@wbcnc/cad';
 import {
   useEffect,
-  Suspense,
-  lazy,
   useLayoutEffect,
   useImperativeHandle,
   useMemo,
@@ -99,7 +97,7 @@ import { SelectionReadout } from './SelectionReadout';
 import { SketchPartProperties } from './SketchPartProperties';
 import { SketchDrawing } from './SketchDrawing';
 import { CadVariablesPanel } from './CadVariablesPanel';
-import { drawnOnName, nextSketchLabel, pendingRow, sketchPlaneName } from './drawnOnName';
+import { pendingRow, sketchPlaneName } from './drawnOnName';
 import { SketchContextMenu } from './SketchContextMenu';
 import {
   createSketchContext,
@@ -152,7 +150,7 @@ import { builtStudioParts, disabledStudioCommands, isBlankDesign, listedStudioPa
 import { applyFramed } from './insertFraming';
 import { usePartCutSelection } from './usePartCutSelection';
 import { usePartIsolation } from './usePartIsolation';
-import { SketchPlaneDialog, StudioSketchDialog } from './StudioSketchDialog';
+import { StudioSketchDialog } from './StudioSketchDialog';
 import { openSketchFinishReason, sketchPendingFinishReason } from './sketchPendingFinishReason';
 import { PartsList } from './PartsList';
 import { renamedStudioPart } from './renamedStudioPart';
@@ -173,7 +171,6 @@ import { useAssistantProposal } from './assistant/useAssistantProposal';
 import type { CadEditorProps } from './CadEditor.types';
 export type { CadEditorController, CadEditorProps } from './CadEditor.types';
 import { useProfileSelection } from './useProfileSelection';
-import { basePlaneViews, pickedPlane } from './basePlanes';
 import { studioKeyActions } from './studioKeyActions';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
 import { designStepLabel, trimCadFolders } from '@wbcnc/cad';
@@ -181,7 +178,7 @@ import type { PartEdge } from './partEdges';
 import { straightOn, type SketchTurn } from './sketchOrbit';
 import { useEditorCameras } from './studioCamera';
 import { sketchBackdropView } from './sketchBackdropView';
-import { initialFaceSketchView, assemblyCameraFromPart } from './faceSketchScene';
+import { initialFaceSketchView } from './faceSketchScene';
 import { useFaceSketchCamera } from './useFaceSketchCamera';
 import { fitSketchView } from './fitSketchView';
 import { sketchValuePosition, projectSketchPoint, focusSketchCanvas, creationEditorPositions } from './sketchViewport';
@@ -197,12 +194,8 @@ import { useStudioPreview } from './useStudioPreview';
 import { useEditorDocumentKeys } from './useEditorDocumentKeys';
 import { editedStep, useEditorVariableFields } from './useEditorVariableFields';
 import { useFeatureShown, withMadeSketchHidden } from './useFeatureShown';
+import { CadCanvasBar, CadPartPane, CadSketchBackdropPane, CadWorkspacePane } from './CadDrawingPanes';
 import './cad.css';
-
-const FaceSketchBackdrop = lazy(() => import('./FaceSketchBackdrop'));
-const PartView3D = lazy(() => import('./PartView3D'));
-const WorkspaceView = lazy(() => import('./WorkspaceView'));
-const SketchBackdrop = lazy(() => import('./SketchBackdrop'));
 
 /** Native editable source stays in one document while CAM remains a derived consumer of accepted revisions. */
 export function CadEditor({
@@ -1665,208 +1658,100 @@ export function CadEditor({
               }}
             />
           )}
-          <div className="cad-canvas-bar">
-            {showWorkspace ? (
-              <span>
-                <strong>PART STUDIO</strong> · {physicalPartCount === 1 ? 'one part' : `${physicalPartCount} parts`}
-              </span>
-            ) : studioSession && part ? (
-              <span>
-                <strong>SKETCH</strong> · {part.name}{' '}
-                <span className="cad-muted">/ on {part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'the top plane'}</span>
-              </span>
-            ) : (
-              <span>
-                <strong>{faceSketch?.below ? 'BOTTOM' : 'TOP'}</strong> · {part?.name ?? 'Sketch'}{' '}
-                <span className="cad-muted">/ {faceSketch?.label ?? 'XY plane'}</span>
-              </span>
-            )}
-            <div>
-              {!faceSketch && !(studioSession && showWorkspace) && (
-                <div className="cad-view-switch" role="group" aria-label="Show">
-                  <button
-                    type="button"
-                    aria-pressed={!show3D && !showWorkspace}
-                    title="The sketch, to draw on"
-                    onClick={() => {
-                      // Back on the drawing, its keys work straight away.
-                      requestAnimationFrame(() => focusSketchCanvas(svg.current));
-                      setShow3D(false);
-                      setShowWorkspace(false);
-                    }}>
-                    Drawing
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={show3D && !showWorkspace}
-                    disabled={!partHasOutline}
-                    title="This part in 3D, to set its cuts"
-                    onClick={() => {
-                      chooseTool('select');
-                      setShowWorkspace(false);
-                      setShow3D(true);
-                    }}>
-                    3D
-                  </button>
-                  {!studioSession && (
-                    <button
-                      type="button"
-                      aria-pressed={showWorkspace}
-                      disabled={!doc.parts.length}
-                      title="Every part where it sits"
-                      onClick={() => {
-                        chooseTool('select');
-                        setShowWorkspace(true);
-                      }}>
-                      All parts
-                    </button>
-                  )}
-                </div>
-              )}
-              {!show3D && !showWorkspace && (
-                <>
-                  <button type="button" className="cad-bar-button" title="Zoom to show the whole sketch" onClick={() => fit()}>
-                    Fit <kbd>F</kbd>
-                  </button>
-                  <button
-                    type="button"
-                    role="switch"
-                    className="cad-switch"
-                    aria-checked={snap}
-                    title="Snap to points, lines and the grid while drawing"
-                    onClick={() => {
-                      setSnap(value => !value);
-                      setDrawingCue(null);
-                      setSnapCue(null);
-                      hoveredReferences.current = [];
-                      svg.current?.focus();
-                    }}>
-                    Snap
-                    <span className="cad-switch-track" aria-hidden="true" />
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
+          <CadCanvasBar
+            {...{
+              showWorkspace,
+              physicalPartCount,
+              studioSession,
+              part,
+              doc,
+              faceSketch,
+              show3D,
+              svg,
+              setShow3D,
+              setShowWorkspace,
+              partHasOutline,
+              chooseTool,
+              fit,
+              snap,
+              setSnap,
+              setDrawingCue,
+              setSnapCue,
+              hoveredReferences,
+            }}
+          />
           {studioSession && studioRefusal && (
             <p className="cad-notice cad-studio-refusal" role="alert">
               {studioRefusal}
             </p>
           )}
           {showWorkspace && (
-            <Suspense fallback={<div className="cad-part-view" />}>
-              <WorkspaceView
-                cameraState={studioCamera}
-                extrusionDepth={extrusionDepth.control(shownDocument)}
-                measurementEnabled={!busy && !stepDialogOpen && !choosingFace && !directionPicker && !pointPicker.onPick}
-                onReady={focusViewIfIdle}
-                document={shownDocument}
-                profileDocument={doc}
-                viewRequest={viewRequest}
-                onViewRequest={
-                  studioSession ? request => setViewRequest(previous => ({ ...request, seq: (previous?.seq ?? 0) + 1 })) : undefined
-                }
-                transparentIds={transparentParts}
-                selectedId={cutSelection.selectedTool ? part!.id : null}
-                selectedCopyId={cutSelection.selectedCopyId}
-                onSelect={(id, copyId) => {
-                  setSketchRowPicked(null);
-                  if (partPicking) return cutSelection.pickForCut(id, copyId);
-                  cutSelection.selectPart(id, copyId);
-                  setSelected([]);
-                }}
-                highlightIds={dialog?.kind === 'partCut' ? cutSelection.cutPicked : cutSelection.selectedReferences}
-                hiddenIds={hiddenParts}
-                featureShown={featureShown}
-                onHover={onHoverPart}
-                onOpen={(id, copyId) => {
-                  if (partPicking) return cutSelection.pickForCut(id, copyId);
-                  if (studioSession) return openSketch(id);
-                  setPartId(id);
-                  setSelected([]);
-                  setShowWorkspace(false);
-                  setShow3D(hasOutline(documentRef.current, id));
-                }}
-                {...(studioSession
-                  ? { choosing: choosingFace, onChoosingChange: setChoosingFace }
-                  : { onCutParts: () => openDialog({ kind: 'partCut' }) })}
-                onNewPart={newPartOn}
-                selectedPlane={selectedPlane}
-                {...{ selectedFace, pickingMirrorPlane: dialog?.kind === 'mirror' && !!directionPicker }}
-                onSelectPlane={pickPlane}
-                hoverIds={hoveredStepParts ?? undefined}
-                picked={
-                  selectedPlane ? (pickedPlane(doc, selectedPlane)?.name ?? null) : selectedFace ? drawnOnName(doc, selectedFace) : null
-                }
-                regions={directionPicker ? [] : profiles.regions}
-                onPickRegion={profiles.pickRegion}
-                onPickSketch={
-                  studioSession && !directionPicker && !choosingFace && !pointPicker.onPick && dialog?.kind !== 'partCut'
-                    ? (id, region) => {
-                        if (profiles.pickSketch(id, region)) return;
-                        setSelectedFace(null);
-                        setSketchRowPicked(id);
-                        cutSelection.selectPart(id);
-                        setSelected([]);
-                      }
-                    : undefined
-                }
-                onPickPoint={pointPicker.onPick}
-                connectors={dialog?.kind === 'transform' ? mateConnectors : undefined}
-                onSelectFace={on => {
-                  if (directionPicker && on) {
-                    directionPicker(on);
-                    return setDirectionPicker(null);
-                  }
-                  if (on && profiles.pickFace(on)) return;
-                  setSelectedFace(on);
-                  if (on) setSelectedPlane(null);
-                }}>
-                {studioSession && choosingFace && (
-                  <SketchPlaneDialog title={nextSketchLabel(doc, userRollback)} onCancel={() => setChoosingFace(false)} />
-                )}
-                {/* Cut parts sits in the view's own box, below the canvas bar. */}
-                {dialog?.kind === 'partCut' && stepDialog}
-              </WorkspaceView>
-            </Suspense>
+            <CadWorkspacePane
+              {...{
+                studioCamera,
+                extrusionDepth,
+                shownDocument,
+                busy,
+                stepDialogOpen,
+                choosingFace,
+                directionPicker,
+                pointPicker,
+                focusViewIfIdle,
+                doc,
+                viewRequest,
+                setViewRequest,
+                studioSession,
+                transparentParts,
+                cutSelection,
+                part,
+                setSketchRowPicked,
+                partPicking,
+                setSelected,
+                dialog,
+                hiddenParts,
+                featureShown,
+                onHoverPart,
+                openSketch,
+                setPartId,
+                setShowWorkspace,
+                setShow3D,
+                documentRef,
+                setChoosingFace,
+                openDialog,
+                newPartOn,
+                selectedPlane,
+                selectedFace,
+                pickPlane,
+                hoveredStepParts,
+                userRollback,
+                profiles,
+                mateConnectors,
+                setDirectionPicker,
+                setSelectedFace,
+                setSelectedPlane,
+                stepDialog,
+              }}
+            />
           )}
           {!showWorkspace && show3D && partHasOutline && part && (
-            <Suspense fallback={<div className="cad-part-view" />}>
-              <PartView3D
-                key={part.id}
-                part={part}
-                document={doc}
-                variables={variableScope}
-                onChoose={(entry, depth, expression) => commit(withRegionDepth(documentRef.current, part.id, entry, depth, expression))}
-                onSketchFace={onEditFaceSketch && faceEditor.create}
-                cameraState={partCameraState}
-                onSketchSide={
-                  studioSession
-                    ? (face, snapshot) => {
-                        studioCamera.current = assemblyCameraFromPart(documentRef.current, part.id, snapshot);
-                        newPartOn({ partId: part.id, face });
-                      }
-                    : undefined
-                }
-              />
-            </Suspense>
+            <CadPartPane
+              {...{
+                part,
+                doc,
+                variableScope,
+                commit,
+                documentRef,
+                onEditFaceSketch,
+                faceEditor,
+                partCameraState,
+                studioSession,
+                studioCamera,
+                newPartOn,
+              }}
+            />
           )}
           {sketchBackdrop && canvasBox && (
-            <Suspense fallback={null}>
-              <div className="cad-sketch-backdrop-frame" style={canvasBox}>
-                {faceSketch?.scene ? (
-                  <FaceSketchBackdrop scene={faceSketch.scene} view={sketchBackdrop.view} />
-                ) : (
-                  <SketchBackdrop
-                    document={sketchBackdrop.document}
-                    view={sketchBackdrop.view}
-                    planes={basePlaneViews(doc).filter(plane => featureShown(plane.id))}
-                    hiddenIds={hiddenParts}
-                    onEdges={setPartEdges}
-                  />
-                )}
-              </div>
-            </Suspense>
+            <CadSketchBackdropPane {...{ sketchBackdrop, canvasBox, faceSketch, doc, featureShown, hiddenParts, setPartEdges }} />
           )}
           <svg
             ref={svg}
