@@ -24,6 +24,8 @@ export interface ViewRegion {
   outline: { x: number; y: number }[];
   holes: { x: number; y: number }[][];
   picked: boolean;
+  /** The step it's picked for can't be made as it stands: drawn red, as the reference draws a failing preview. */
+  failing?: boolean;
 }
 
 export function Region({ region, model, onPick }: { region: ViewRegion; model: THREE.Matrix4; onPick: () => void }) {
@@ -56,7 +58,7 @@ export function Region({ region, model, onPick }: { region: ViewRegion; model: T
         if (event.delta <= 4) onPick();
       }}>
       <meshBasicMaterial
-        color={region.picked ? '#2f80ed' : '#1f6fc5'}
+        color={region.failing ? '#d64545' : region.picked ? '#2f80ed' : '#1f6fc5'}
         transparent
         opacity={region.picked ? 0.45 : hovered ? 0.3 : 0.12}
         side={THREE.DoubleSide}

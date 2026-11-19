@@ -1,5 +1,5 @@
 import type { CadPart } from '@wbcnc/cad';
-import { partMass } from './materialLibrary';
+import { partCenterOfMass, partMass } from './materialLibrary';
 import { FeatureDialog } from './FeatureDialog';
 import './materialPanel.css';
 
@@ -63,6 +63,16 @@ export function PartPropertiesDialog({ part, name, onClose }: { part: CadPart; n
           return mass === null ? 'Mass: assign a material to compute it' : `Mass: ${mass.toFixed(3)} kg, computed from its material`;
         })()}
       </p>
+      {(() => {
+        const center = partCenterOfMass(part);
+        return (
+          center && (
+            <p className="cad-feature-hint" aria-label="Center of mass">
+              Center of mass: ({center.map(value => +value.toFixed(2)).join(', ')}) mm, in the part’s sketch
+            </p>
+          )
+        );
+      })()}
     </FeatureDialog>
   );
 }

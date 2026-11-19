@@ -82,6 +82,17 @@
     "expect": {
      "pageText": "Parts \\(3\\)"
     }
+   },
+   {
+    "expect": {
+     "studio": {
+      "parts": [
+       "Part 1",
+       "Part 2",
+       "Part 3"
+      ]
+     }
+    }
    }
   ]
  }

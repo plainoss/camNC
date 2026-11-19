@@ -15,7 +15,12 @@ export function withPartPieces(document: CadDocument, earlier: CadDocument = doc
   const before = new Map(earlier.parts.filter(part => part.pieceOf).map(part => [part.id, part]));
   let parts = withoutPartPieces(document).parts;
   // Named as a new part is, after the parts listed: a Remove's or a sketch's own name isn't a part's.
-  const names = new Set(parts.filter(part => isCadPart(part)).map(part => part.name));
+  // Copies named as parts of their own ("Part 2") count as parts.
+  const names = new Set(
+    parts
+      .filter(part => isCadPart(part))
+      .flatMap(part => [part.name, ...(part.copies ?? []).flatMap(copy => (copy.name ? [copy.name] : []))])
+  );
   const made: CadPart[] = [];
   parts = parts.map(part => {
     // A Split's far side is a part of its own; the part keeps the near side (`pieceProfile`).

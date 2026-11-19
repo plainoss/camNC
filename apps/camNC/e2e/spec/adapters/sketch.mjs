@@ -534,16 +534,13 @@ export async function createAdapter(page, url) {
         await chooseByKey('a', /^Arc \(A\)$/);
         for (const at of args) await click(point(at));
         return leaveTool();
-      case 'field': {
-        const value = args.pop();
-        const field = page.getByLabel(new RegExp(`^${args.join(' ')}`));
-        await field.fill(value);
-        await page.keyboard.press('Enter');
-        return;
-      }
+      // `field <label> <value>`, or `field <label> = <value>` for a value of several words, as a view's name "Iso A".
+      case 'field':
       case 'fieldkeep': {
-        const value = args.pop();
-        await page.getByLabel(new RegExp(`^${args.join(' ')}`)).fill(value);
+        const at = args.indexOf('=');
+        const value = at >= 0 ? args.slice(at + 1).join(' ') : args.pop();
+        const label = at >= 0 ? args.slice(0, at).join(' ') : args.join(' ');
+        await page.getByLabel(new RegExp(`^${label}`)).fill(value);
         await page.keyboard.press('Enter');
         return;
       }
@@ -697,13 +694,16 @@ export async function createAdapter(page, url) {
     const failures = [];
     const scene = await page.evaluate(readScene, cursor);
     const fail = (name, want, got) => failures.push(`${name}: wanted ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
+    // `part` picks the part whose sketch is read: its index, or "open" for the sketch being drawn.
+    const openPart = expect.part === 'open' ? await page.getByTestId('cad-canvas').getAttribute('data-part-id') : null;
+    const partOf = design => (expect.part === 'open' ? design?.parts?.find(part => part.id === openPart) : design?.parts?.[expect.part ?? 0]);
     if (SKETCH_KEYS.some(key => key in expect)) {
       const design = await readDesign();
-      checkSketch(expect, canonical(design?.parts?.[expect.part ?? 0]), fail);
+      checkSketch(expect, canonical(partOf(design)), fail);
     }
     if ('acceptedEntityCount' in expect) {
       const accepted = await readDesign('accepted');
-      const got = canonical(accepted?.parts?.[expect.part ?? 0]).entities.length;
+      const got = canonical(partOf(accepted)).entities.length;
       if (got !== expect.acceptedEntityCount) fail('acceptedEntityCount', expect.acceptedEntityCount, got);
     }
     if (expect.savedBoards) {
