@@ -24,7 +24,14 @@ export default defineConfig(({ command }) => {
     cadSandboxPlugin(),
 
     tsconfigPaths(),
-    TanStackRouterVite({ target: 'react', autoCodeSplitting: true, routeFileIgnorePattern }),
+    TanStackRouterVite({
+      target: 'react',
+      autoCodeSplitting: true,
+      routeFileIgnorePattern,
+      // A spec run's server reads the committed route tree and never writes it: two servers in one checkout regenerating
+      // it in turn reload every open page in a loop.
+      enableRouteGeneration: !process.env.CAMNC_SPEC_SERVER,
+    }),
     react({
       babel: {
         plugins: [['babel-plugin-react-compiler', ReactCompilerConfig], ['module:@preact/signals-react-transform']],
@@ -96,6 +103,8 @@ export default defineConfig(({ command }) => {
         'Cross-Origin-Opener-Policy': 'same-origin',
         'Cross-Origin-Embedder-Policy': 'require-corp',
       },
+      // A spec run's server doesn't reload its pages for the route tree that another dev server in the checkout rewrites.
+      ...(process.env.CAMNC_SPEC_SERVER && { watch: { ignored: ['**/src/routeTree.gen.ts'] } }),
     },
   };
 });
