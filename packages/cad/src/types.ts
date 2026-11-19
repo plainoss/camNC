@@ -794,6 +794,10 @@ export interface EvaluatedCadRound {
   points: CadPoint[];
   /** Where the part's material is: inside the loop for its outline, outside it for a hole or a cut's opening. */
   material: 'inside' | 'outside';
+  /** Cut off flat at 45° by a Chamfer, `radius` along each face, rather than rounded. */
+  chamfer?: true;
+  /** Only these stretches of the loop, from one point to another along it; the rest stays sharp. */
+  edges?: [CadPoint, CadPoint][];
 }
 export type CadEntityFreedom = 'fully-constrained' | 'underconstrained' | 'unknown';
 export interface CadSketchSolveStatus {
@@ -826,6 +830,8 @@ export interface CadFilletRim {
   loops: string[];
   /** Picked as the face these loops bound, rather than edge by edge: it's listed as that one face. */
   face?: true;
+  /** Only the stretches of these loops along these lines of the part's sketch, picked edge by edge; else all of them. */
+  lines?: string[];
 }
 
 /**
@@ -841,4 +847,6 @@ export interface CadEdgeFillet {
   radius: number;
   radiusExpression?: string;
   suppressed?: true;
+  /** A Chamfer step: its edges cut off flat at 45°, `radius` taken off each face they join (Equal distance). */
+  chamfer?: true;
 }

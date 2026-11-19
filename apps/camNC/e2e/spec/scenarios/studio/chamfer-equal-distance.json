@@ -1,0 +1,169 @@
+[
+ {
+  "id": "studio/chamfer/equal-distance-top-front-edge",
+  "title": "An Equal-distance chamfer on a block's top front edge cuts a 3 x 3 triangle along the whole edge",
+  "evidence": "design workflow parity spec",
+  "steps": [
+   "dialogcancel",
+   {
+    "spec": "1 view"
+   },
+   "view top",
+   {
+    "spec": "2 select"
+   },
+   "selectfeature Top",
+   {
+    "spec": "3 command"
+   },
+   "key Shift+s",
+   {
+    "spec": "4 command"
+   },
+   "key g",
+   {
+    "spec": "5 draw"
+   },
+   "rect 0,0 25,15",
+   {
+    "spec": "6 cancel"
+   },
+   "key Escape",
+   {
+    "spec": "7 command"
+   },
+   "key d",
+   {
+    "spec": "8 pick"
+   },
+   "viewpick 12.5,15,0",
+   "viewpick 12.5,22,0",
+   {
+    "spec": "9 field"
+   },
+   "field Length 100",
+   {
+    "spec": "10 cancel"
+   },
+   "key Escape",
+   "key f",
+   {
+    "spec": "11 command"
+   },
+   "key d",
+   {
+    "spec": "12 pick"
+   },
+   "viewpick 100,7.5,0",
+   "viewpick 110,7.5,0",
+   {
+    "spec": "13 field"
+   },
+   "field Length 40",
+   {
+    "spec": "14 confirm"
+   },
+   "closesketch",
+   {
+    "spec": "15 command"
+   },
+   "key Shift+e",
+   {
+    "spec": "16 pick"
+   },
+   "viewpick 50,20,0",
+   {
+    "spec": "17 field"
+   },
+   "dialogfill Thickness = 10",
+   "key Enter",
+   {
+    "spec": "18 confirm"
+   },
+   "dialogconfirm",
+   {
+    "expect": {
+     "studio": {
+      "dialog": null,
+      "features": [
+       {
+        "name": "Sketch 1",
+        "state": [
+         "hidden"
+        ]
+       },
+       "Extrude 1"
+      ],
+      "parts": [
+       "Part 1"
+      ]
+     }
+    }
+   },
+   {
+    "spec": "19 view"
+   },
+   "key Shift+7",
+   {
+    "spec": "20 command"
+   },
+   "searchtool Chamfer",
+   {
+    "expect": {
+     "studio": {
+      "dialog": "Chamfer 1"
+     },
+     "pageText": "Entities to chamfer"
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Equal distance"
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Tangent propagation"
+    }
+   },
+   {
+    "spec": "21 pick"
+   },
+   "viewpick 50,0,10",
+   {
+    "expect": {
+     "pageText": "Edge of Extrude 1"
+    }
+   },
+   {
+    "spec": "22 field"
+   },
+   "dialogfill Distance = 3",
+   "key Enter",
+   {
+    "spec": "24 confirm"
+   },
+   "dialogconfirm",
+   {
+    "expect": {
+     "studio": {
+      "dialog": null,
+      "features": [
+       {
+        "name": "Sketch 1",
+        "state": [
+         "hidden"
+        ]
+       },
+       "Extrude 1",
+       "Chamfer 1"
+      ],
+      "parts": [
+       "Part 1"
+      ]
+     }
+    }
+   }
+  ]
+ }
+]

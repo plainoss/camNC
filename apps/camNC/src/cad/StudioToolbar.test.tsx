@@ -43,7 +43,7 @@ function expectAllCommandsVisible() {
 
 describe('studio toolbar overflow', () => {
   it('shows every feature command and no More control when the toolbar is wide', async () => {
-    setup(1440);
+    setup(1600);
     await waitFor(expectAllCommandsVisible);
     expect(screen.queryByRole('button', { name: /^More/ })).toBeNull();
   });
@@ -70,7 +70,7 @@ describe('studio toolbar overflow', () => {
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
 
     // Widening the toolbar brings every command back and drops the menu.
-    resize(1440);
+    resize(1600);
     await waitFor(expectAllCommandsVisible);
     expect(screen.queryByRole('button', { name: /^More/ })).toBeNull();
     resize(700);

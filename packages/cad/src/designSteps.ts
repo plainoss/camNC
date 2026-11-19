@@ -92,7 +92,9 @@ function numberedSteps(document: CadDocument, steps: DesignStep[]): DesignStep[]
       step.kind === 'sketch'
         ? 'Sketch'
         : step.kind === 'fillet'
-          ? 'Fillet'
+          ? step.label.startsWith('Chamfer · ')
+            ? 'Chamfer'
+            : 'Fillet'
           : transform
             ? 'Transform'
             : step.kind === 'mirror'
@@ -365,8 +367,10 @@ function listedSteps(document: CadDocument): DesignStep[] {
           steps.push({
             id: fillet.id,
             kind: 'fillet',
-            label: `Fillet · ${part.name}`,
-            detail: fillet.suppressed ? 'off' : `r ${typed(fillet.radiusExpression, fillet.radius, document.lengthUnit)}`,
+            label: `${fillet.chamfer ? 'Chamfer' : 'Fillet'} · ${part.name}`,
+            detail: fillet.suppressed
+              ? 'off'
+              : `${fillet.chamfer ? 'd' : 'r'} ${typed(fillet.radiusExpression, fillet.radius, document.lengthUnit)}`,
             partId: part.id,
             suppressed: !!fillet.suppressed,
           });
