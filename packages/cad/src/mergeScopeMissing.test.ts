@@ -1,5 +1,14 @@
 import { expect, it } from 'vitest';
-import { addCircle, createCadDocument, createCadPart, designSteps, resolveExtrudeSteps, sketchRegions, type CadPart } from './index';
+import {
+  addCircle,
+  createCadDocument,
+  createCadPart,
+  designSteps,
+  resolveExtrudeSteps,
+  sketchRegions,
+  type CadDocument,
+  type CadPart,
+} from './index';
 
 it('marks an Add whose merge scope was emptied as missing a selection, on its Extrude row only', () => {
   const cup: CadPart = { ...createCadPart('Part 1', 20), id: 'cup', drawnOn: { on: { plane: 'top' }, offset: 0 } };
@@ -22,6 +31,9 @@ it('marks an Add whose merge scope was emptied as missing a selection, on its Ex
   expect(rows['Extrude 2']).toBe('Select the parts to merge with. 1 missing selection');
   expect(rows['Sketch 2']).toBeNull();
   // Merge with all needs no scope.
-  const all = { ...document, parts: document.parts.map(part => (part.id === 'boss' ? { ...part, mergeAll: true } : part)) };
+  const all: CadDocument = {
+    ...document,
+    parts: document.parts.map(part => (part.id === 'boss' ? ({ ...part, mergeAll: true } as CadPart) : part)),
+  };
   expect(designSteps(all).find(step => step.label === 'Extrude 2')?.broken).toBeUndefined();
 });
