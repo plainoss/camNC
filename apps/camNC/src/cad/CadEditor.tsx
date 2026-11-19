@@ -659,7 +659,6 @@ export function CadEditor({
     canvas.addEventListener('wheel', zoom, { passive: false });
     return () => canvas.removeEventListener('wheel', zoom);
   }, []);
-
   useEffect(() => {
     const visible = sketch && visibleSketchPointIds(sketch, selected);
     const validSelected = selected.filter(id =>
@@ -673,7 +672,6 @@ export function CadEditor({
     if (partId !== (part?.id ?? '')) setPartId(part?.id ?? '');
     saveCadViewState(doc.id, { selectedPartId: part?.id ?? '', view, selectedEntityIds: validSelected });
   }, [doc.id, part, partId, selected, selectedConstraints, dimensionDraft, sketch, view]);
-
   useEffect(() => {
     if (!sketch) return;
     setDimensionFlow(previous =>
