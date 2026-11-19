@@ -126,7 +126,8 @@ export function SketchLinearPatternManipulator({
   counts: number[];
   bound?: boolean[];
   pixelScale: number;
-  onStart: (index: number, event: PointerEvent<SVGElement>) => void;
+  /** `instances` is how many spacings the dragged handle is from the seed: 1 for the first copy, more for the guide's end. */
+  onStart: (index: number, event: PointerEvent<SVGElement>, instances?: number) => void;
   /** Makes the pattern, as a click on its guide does in the reference. */
   onApply?: () => void;
   /** A pattern the sketch has, shown as it's drawn: no handles to drag, and a horizontal guide marked as such. */
@@ -151,6 +152,9 @@ export function SketchLinearPatternManipulator({
           y: end.y - unit.y * 7 * k + side * unit.x * 4 * k,
         });
         const [left, right] = [head(1), head(-1)];
+        // The spacing sits on the same side of the guide however it's turned (above a horizontal one), off the line a
+        // click on the guide aims at.
+        const side = unit.x < -1e-9 || (Math.abs(unit.x) <= 1e-9 && unit.y < 0) ? -1 : 1;
         const edit =
           (field: 'countX' | 'countY' | 'spacingX' | 'spacingY') => (e: { stopPropagation: () => void; currentTarget: Element }) => {
             e.stopPropagation();
@@ -211,6 +215,24 @@ export function SketchLinearPatternManipulator({
                 <title>Drag direction {label} spacing and angle</title>
               </circle>
             )}
+            {count > 1 && !made && (
+              // The guide's end arrow drags too, as a person turns a pattern round by its arrow: the spacing follows.
+              <circle
+                data-pattern-end={index}
+                cx={end.x}
+                cy={-end.y}
+                r={7 * k}
+                fill="transparent"
+                stroke="none"
+                style={{ cursor: 'move' }}
+                onPointerDown={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onStart(index, e, count - 1);
+                }}>
+                <title>Drag direction {label} to turn it</title>
+              </circle>
+            )}
             <text
               data-pattern-count={index}
               role="button"
@@ -238,8 +260,8 @@ export function SketchLinearPatternManipulator({
                 role="button"
                 tabIndex={0}
                 aria-label={`Edit spacing ${label}`}
-                x={anchor.x + step.x / 2 - unit.y * 10 * k}
-                y={-(anchor.y + step.y / 2 + unit.x * 10 * k)}
+                x={anchor.x + step.x / 2 - unit.y * side * 10 * k}
+                y={-(anchor.y + step.y / 2 + unit.x * side * 10 * k)}
                 textAnchor="middle"
                 fill="currentColor"
                 stroke="none"

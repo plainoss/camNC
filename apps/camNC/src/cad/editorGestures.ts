@@ -60,6 +60,8 @@ export type HandleDrag =
   | {
       tool: 'linearPattern';
       index: number;
+      /** Spacings from the seed to the dragged handle; the first copy's handle is one. */
+      instances?: number;
       anchor: CadPoint;
       parameters: LinearPatternParameters;
       screenStart?: { x: number; y: number };

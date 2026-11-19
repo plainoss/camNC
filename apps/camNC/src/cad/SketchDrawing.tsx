@@ -371,10 +371,11 @@ export function SketchDrawing({
           counts={[parsedLinear.countX, linearParameters.secondDirection ? parsedLinear.countY : 1]}
           bound={[!!parsedLinear.expressions?.countX, !!parsedLinear.expressions?.countY]}
           pixelScale={markerScale}
-          onStart={(index, event) =>
+          onStart={(index, event, instances) =>
             startHandleDrag(event, {
               tool: 'linearPattern',
               index,
+              instances,
               anchor: patternAnchor,
               parameters: linearParameters,
               screenStart: { x: event.clientX, y: event.clientY },

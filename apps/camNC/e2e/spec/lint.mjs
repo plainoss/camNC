@@ -19,6 +19,8 @@ export const ALLOWED = {
   select: {
     // `key Enter` takes the highlighted choice of a field's list, such as New variable.
     steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'partmenu', 'menuitem', 'patterncount', 'patternspacing', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click', 'shiftclick', 'drag', 'panelclose', 'featurefilter', 'viewmenu', 'dialogoption', 'key Enter'],
+    // "Select A, then (Shift-click) B" is one step: each shift-click adds to what the first input selected.
+    then: ['shiftclick'],
   },
   command: { steps: ['studiotool', 'searchtool', 'key', 'tool'] },
   draw: { steps: ['rect', 'circle', 'line', 'arc'] },

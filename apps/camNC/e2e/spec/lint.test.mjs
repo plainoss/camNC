@@ -34,6 +34,10 @@ describe('no extra inputs per spec step', () => {
     expect(lintScenario(scenario([{ spec: '1 select' }, 'featuremenu Extrude · Part 1', { spec: '2 select' }, 'menuitem Suppress', { spec: '3 select' }, 'dialogfocus Tools'])).ok).toBe(true);
     expect(lintScenario(scenario([{ spec: '1 select' }, 'featuremenu Extrude · Part 1', 'menuitem Suppress'])).findings[0].problem).toBe('1 extra input');
   });
+  it('takes a click and the shift-clicks adding to it as one select', () => {
+    expect(lintScenario(scenario([{ spec: '1 select' }, 'click 21,13', 'shiftclick 0,0'])).ok).toBe(true);
+    expect(lintScenario(scenario([{ spec: '1 select' }, 'click 21,13', 'click 0,0'])).findings[0].problem).toBe('1 extra input');
+  });
   it('takes a row or dimension double-click, and a dialog choice, as a select', () => {
     expect(lintScenario(scenario([{ spec: '1 select' }, 'feature Sketch 1', { spec: '2 select' }, 'editdim 50,25', { spec: '3 select' }, 'dialogselect Type = Offset'])).ok).toBe(true);
   });
