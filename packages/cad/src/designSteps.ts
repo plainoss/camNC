@@ -139,8 +139,13 @@ export function designSteps(document: CadDocument): DesignStep[] {
           ? `It’s on ${part.name}, which is suppressed.`
           : own && `It’s on ${part.name}, which can’t be built.`
         : null;
-    // An Extrude whose picked regions an edit of its sketch took away waits for them to be picked again.
-    const regions = step.kind === 'extrude' && part && !own ? missingRegionProblem(part) : null;
+    // An Extrude whose picked regions an edit of its sketch took away waits for them to be picked again; an Add with its
+    // merge scope emptied, while its dialog is open, waits for the parts to merge with.
+    const regions =
+      step.kind === 'extrude' && part && !own
+        ? (missingRegionProblem(part) ??
+          (part.addTo === '' && !part.mergeAll ? 'Select the parts to merge with. 1 missing selection' : null))
+        : null;
     // A sketch or extrude that lost what it stands on is missing its picks, and says so as the reference does.
     // The face it's drawn on gone takes its picked regions with it; a part it adds to or removes from gone is one more.
     const faceLost = !!own && own.startsWith('It’s drawn on');

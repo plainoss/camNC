@@ -182,6 +182,10 @@ export function PartsList({
               ? [
                   { label: 'Properties…', onSelect: () => setPanel({ kind: 'properties', key: menu.key, name: menu.name }) },
                   { label: 'Assign material…', onSelect: () => setPanel({ kind: 'material', key: menu.key, name: menu.name }) },
+                  // With a material, a part has a mass and a center to it.
+                  ...(rows.find(row => row.key === menu.key)?.part.material
+                    ? [{ label: 'Show center of mass', onSelect: () => setPanel({ kind: 'properties', key: menu.key, name: menu.name }) }]
+                    : []),
                 ]
               : []),
             { label: hiddenParts.has(menu.key) ? 'Show' : 'Hide', onSelect: () => onToggleHidden(menu.key) },

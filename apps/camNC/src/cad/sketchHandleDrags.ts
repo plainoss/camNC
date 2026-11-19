@@ -56,11 +56,18 @@ export function moveHandleDrag(
       return;
     }
     case 'linearPattern': {
-      const { index, anchor, parameters } = gesture;
+      const { index, anchor, parameters, screenStart, instances = 1 } = gesture;
+      // A few pixels of jitter in a click aren't a drag.
+      if (!gesture.moved && screenStart && Math.hypot(event.clientX - screenStart.x, event.clientY - screenStart.y) < 3) return;
+      gesture.moved = true;
       const x = point.x - anchor.x,
         y = point.y - anchor.y,
-        spacing = lengthText(Math.round(Math.hypot(x, y) * 1e6) / 1e6),
-        angle = text((Math.atan2(y, x) * 180) / Math.PI);
+        spacing = lengthText(Math.round((Math.hypot(x, y) / instances) * 1e6) / 1e6),
+        raw = (Math.atan2(y, x) * 180) / Math.PI,
+        // Near an axis the direction lies on it, as the reference holds a guide drawn along one horizontal or vertical:
+        // turned to the other side, it stays exactly on the axis.
+        axis = Math.round(raw / 90) * 90,
+        angle = text(Math.abs(raw - axis) < 4 ? (axis === -180 ? 180 : axis) : raw);
       editor.setLinearParameters({
         ...parameters,
         ...(index === 0 ? { spacingX: spacing, angleX: angle } : { spacingY: spacing, angleY: angle }),

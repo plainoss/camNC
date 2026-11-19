@@ -158,7 +158,9 @@ export default function WorkspaceView({
   useLayoutEffect(() => {
     onReady?.();
   }, [onReady]);
-  const lastClick = useRef<{ partId: string; face: string; at: number; topology: object } | null>(null);
+  const lastClick = useRef<{ partId: string; face: string; at: number; topology: object; measured: string | null } | null>(null);
+  // Picks of one face share their geometry: a quick second click on another face (a round's top after its side) adds it.
+  const lastMeasured = useRef<string | null>(null);
   const assembly = useMemo(() => assemblyModel(document, hiddenIds), [document, hiddenIds]);
   const physical = useMemo(() => studioGeometry(document), [document]);
   const clashes = useMemo(() => {
@@ -436,6 +438,7 @@ export default function WorkspaceView({
           measureEnabled
             ? pick => {
                 if (pick.additive || measure.expanded) lastClick.current = null;
+                lastMeasured.current = JSON.stringify(pick.entity);
                 measure.pick(pick);
               }
             : undefined
@@ -507,12 +510,13 @@ export default function WorkspaceView({
             lastClick.current?.topology === inspectionTopology &&
             lastClick.current.partId === key &&
             lastClick.current.face === faceKey &&
+            lastClick.current.measured === lastMeasured.current &&
             now - lastClick.current.at < kDoubleClickMs
           ) {
             lastClick.current = null;
             return onOpen(partId, instance.copyId);
           }
-          lastClick.current = { partId: key, face: faceKey, at: now, topology: inspectionTopology };
+          lastClick.current = { partId: key, face: faceKey, at: now, topology: inspectionTopology, measured: lastMeasured.current };
           onSelect(partId, instance.copyId);
           frame.current?.focus({ preventScroll: true });
         }}

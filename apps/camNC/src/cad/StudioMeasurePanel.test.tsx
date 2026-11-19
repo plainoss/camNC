@@ -177,7 +177,7 @@ describe('assembled measurement inspector', () => {
     rerenderPanel({ selection: [], result: { rows: [] } });
     expect(screen.getByRole('dialog', { name: 'Measure' })).toBeVisible();
     expect(screen.getByRole('button', { name: /^Clear$/ })).toBeDisabled();
-    expect(screen.getByText(/Select a vertex, straight edge or planar face/)).toBeVisible();
+    expect(screen.getByText(/Select a vertex, straight edge or face/)).toBeVisible();
     rerenderPanel({ expanded: false });
     expect(screen.queryByRole('region', { name: 'Selection measurements' })).toBeNull();
   });

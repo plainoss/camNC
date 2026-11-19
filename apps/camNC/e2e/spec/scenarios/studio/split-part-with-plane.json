@@ -40,7 +40,7 @@
    {
     "spec": "2 select"
    },
-   "selectpart Part 1 2",
+   "selectpart Part 2",
    {
     "spec": "3 select"
    },
@@ -73,6 +73,18 @@
    {
     "expect": {
      "pageText": "Parts \\(4\\)"
+    }
+   },
+   {
+    "expect": {
+     "studio": {
+      "parts": [
+       "Part 1",
+       "Part 3",
+       "Part 2",
+       "Part 4"
+      ]
+     }
     }
    }
   ]

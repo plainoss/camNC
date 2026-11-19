@@ -272,8 +272,11 @@ export function sketchPointerEnd(editor: SketchEditorInput, cancel = false, even
     tool,
   } = editor;
   if (handleDrag.current) {
-    if (cancel) cancelHandleDrag(editor, handleDrag.current);
+    const handle = handleDrag.current;
     handleDrag.current = null;
+    if (cancel) cancelHandleDrag(editor, handle);
+    // The linear pattern's direction handle pressed and let go without moving is a click on its guide: it makes it.
+    else if (handle.tool === 'linearPattern' && handle.screenStart && !handle.moved) editor.acceptLinearPattern();
     return;
   }
 

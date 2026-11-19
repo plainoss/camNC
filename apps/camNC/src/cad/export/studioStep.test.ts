@@ -1,5 +1,6 @@
 import {
   addCircle,
+  addRectangle,
   createCadDocument,
   createCadPart,
   evaluateCadDocument,
@@ -82,6 +83,28 @@ describe('studio STEP export', () => {
       expect(file[axis]![0]).toBeCloseTo(lo!, 1);
       expect(file[axis]![1]).toBeCloseTo(hi!, 1);
     });
+  });
+
+  it('writes a part milled lying flat where the 3D view has it, not as it lies for milling', async () => {
+    // 120 × 18 on the Front plane, extruded 80 toward −Y: milled as an 18 mm board, shown standing as drawn.
+    const part = { ...createCadPart('Part 1', 80), id: 'profile', drawnOn: { on: { plane: 'front' as const }, offset: 0 } };
+    part.sketch = addRectangle(part.sketch, { x: 0, y: 0, width: 120, height: 18 });
+    const document: CadDocument = { ...createCadDocument(), parts: [part] };
+    const result = studioStep(document);
+    expect(result.problems).toEqual([]);
+    const { bodies } = await loadStep(new TextEncoder().encode(result.text), { locateFile: () => occtWasmUrl });
+    const positions = bodies[0]!.mesh.positions;
+    const range = (axis: number) => {
+      let lo = Infinity,
+        hi = -Infinity;
+      for (let i = axis; i < positions.length; i += 3) [lo, hi] = [Math.min(lo, positions[i]!), Math.max(hi, positions[i]!)];
+      return [Number(lo.toFixed(3)) + 0, Number(hi.toFixed(3)) + 0];
+    };
+    expect([0, 1, 2].map(range)).toEqual([
+      [0, 120],
+      [-80, 0],
+      [0, 18],
+    ]);
   });
 
   it('writes a cup with both edges of its rim rounded over, taking away what the rounds do', async () => {

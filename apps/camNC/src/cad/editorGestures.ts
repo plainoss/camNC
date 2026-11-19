@@ -56,7 +56,17 @@ export type HandleDrag =
       last: number;
       sweep: number;
     }
-  | { tool: 'linearPattern'; index: number; anchor: CadPoint; parameters: LinearPatternParameters }
+  // A press on the direction handle that doesn't move (`moved` unset) is a click on the guide: it makes the pattern.
+  | {
+      tool: 'linearPattern';
+      index: number;
+      /** Spacings from the seed to the dragged handle; the first copy's handle is one. */
+      instances?: number;
+      anchor: CadPoint;
+      parameters: LinearPatternParameters;
+      screenStart?: { x: number; y: number };
+      moved?: boolean;
+    }
   | { tool: 'transform'; kind: TransformDragKind; start: CadPoint; parameters: TransformParameters }
   | { tool: 'chamfer'; side: number; origin: CadPoint; direction: CadPoint; previous: string[] };
 

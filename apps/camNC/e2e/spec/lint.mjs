@@ -12,20 +12,29 @@ export const VIEW_KEYS = ['f', 'F', 'n', 'N', ...[1, 2, 3, 4, 5, 6, 7].flatMap(d
 
 export const ALLOWED = {
   // `click x,y` is a pick on an open sketch's drawing, as `viewpick` is there.
-  pick: { steps: ['viewpick', 'click'] },
+  // A dimension's pick is the edge and then where its label goes: a second pick in the same step.
+  pick: { steps: ['viewpick', 'click'], then: ['viewpick', 'click'] },
   // A context menu is two selects: `featuremenu` (the right-click) and `menuitem` (the choice).
   // Double-clicking a row (`feature`) or a dimension label (`editdim`) selects it, and so does a dialog's choice list.
   select: {
     // `key Enter` takes the highlighted choice of a field's list, such as New variable.
-    steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'partmenu', 'menuitem', 'patterncount', 'patternspacing', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click', 'panelclose', 'featurefilter', 'viewmenu', 'dialogoption', 'key Enter'],
+    steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'partmenu', 'menuitem', 'patterncount', 'patternspacing', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click', 'shiftclick', 'drag', 'panelclose', 'featurefilter', 'viewmenu', 'dialogoption', 'key Enter'],
+    // "Select A, then (Shift-click) B" is one step: each shift-click adds to what the first input selected.
+    then: ['shiftclick'],
   },
   command: { steps: ['studiotool', 'searchtool', 'key', 'tool'] },
   draw: { steps: ['rect', 'circle', 'line', 'arc'] },
   // A value typed into a box a chip or dimension opened: double-click it, type, and Enter (or Tab, moving on).
   // A part taken out of a selection box with its chip's cross is a field's input too.
-  field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'dialogremove', 'featurefilter', 'field', 'type', 'patterncount', 'patternspacing'], then: ['type', 'key Enter', 'key Tab'] },
-  confirm: { steps: ['dialogconfirm', 'closesketch', 'key Enter'] },
-  cancel: { steps: ['dialogcancel', 'key Escape'] },
+  // A dimension's value is typed into the box double-clicking its label (`editdim`) opens.
+  field: {
+    steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'dialogremove', 'featurefilter', 'field', 'type', 'patterncount', 'patternspacing', 'editdim'],
+    then: ['field', 'type', 'key Enter', 'key Tab'],
+  },
+  // A dialog's own accept button, as a panel's "+" that saves what's typed, is pressed with `dialogfocus`.
+  confirm: { steps: ['dialogconfirm', 'closesketch', 'dialogfocus', 'key Enter'] },
+  // Escape, then zoom to fit (F) to look at what's drawn.
+  cancel: { steps: ['dialogcancel', 'key Escape'], then: ['key f', 'fitview'] },
   // Zooming the drawing to show what's drawn next, and reopening the page, are what a person does to look.
   view: { steps: ['view', 'reload', ...VIEW_KEYS.map(key => `key ${key}`)] },
 };

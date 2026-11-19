@@ -2,6 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
+import { kViewDirections } from './viewDirections';
 import type { StudioCameraRef } from '@/cad/studioCamera';
 
 export interface ViewRequest {
@@ -13,16 +14,6 @@ export interface ViewRequest {
   /** A saved camera to go back to exactly, as a named view is: where it looks at, from where, which way up, how far in. */
   camera?: { center: [number, number, number]; back: [number, number, number]; up: [number, number, number]; height: number };
 }
-
-const kViewDirections = {
-  front: [0, -1, 0],
-  back: [0, 1, 0],
-  left: [-1, 0, 0],
-  right: [1, 0, 0],
-  top: [0, 0, 1],
-  bottom: [0, 0, -1],
-  iso: [0.2, -0.75, 1],
-} satisfies Record<Exclude<ViewRequest['name'], 'fit' | 'normal'>, [number, number, number]>;
 
 /**
  * Point the camera at the box from the front-right, above (Z up), and orbit around its center. It does so once there's

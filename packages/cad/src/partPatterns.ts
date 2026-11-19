@@ -148,7 +148,31 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
     changed = true;
     return { ...part, ...(mirrorJoins && { mirrorJoins }), ...(split && { split }) };
   });
-  return changed ? { ...document, parts: joined } : document;
+  const named = namedCopies(joined);
+  return changed || named !== joined ? { ...document, parts: named } : document;
+}
+
+const kDefaultPartName = /^Part \d+$/;
+
+/**
+ * Copies of a part still called by its default name ("Part 1") are parts of their own, named as a new part is: the
+ * next "Part N" nobody has, once, so the copies of a pattern are Part 2, Part 3 and on. Copies of a part given a name
+ * of its own keep theirs ("Leg 2").
+ */
+function namedCopies(parts: CadPart[]): CadPart[] {
+  if (!parts.some(part => kDefaultPartName.test(part.name) && part.copies?.some(copy => !copy.name))) return parts;
+  const taken = new Set(parts.flatMap(part => [part.name, ...(part.copies ?? []).flatMap(copy => (copy.name ? [copy.name] : []))]));
+  let n = 1;
+  const next = () => {
+    while (taken.has(`Part ${n}`)) n++;
+    taken.add(`Part ${n}`);
+    return `Part ${n}`;
+  };
+  return parts.map(part =>
+    kDefaultPartName.test(part.name) && part.copies?.some(copy => !copy.name)
+      ? { ...part, copies: part.copies.map(copy => (copy.name ? copy : { ...copy, name: next() })) }
+      : part
+  );
 }
 
 /** Sets a part's pattern, or removes it with `null`, and lays its copies out. */

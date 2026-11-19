@@ -1,5 +1,5 @@
 import { numeric, type ConstraintTool } from './cadEditorShared';
-import { isCadPart, type CadDrawnOn } from '@wbcnc/cad';
+import { cadSketchFrame, isCadPart, type CadDrawnOn } from '@wbcnc/cad';
 import type { Dispatch, KeyboardEvent, PointerEvent, RefObject, SetStateAction } from 'react';
 import { idleDimensionWorkflow } from '@wbcnc/cad-editor/dimensionWorkflow';
 import { idleDrawingGesture } from '@wbcnc/cad-editor/drawingGesture';
@@ -12,6 +12,7 @@ import type { ViewRequest } from '@/cam/model/ModelViewport';
 import { normalTurn } from './sketchOrbit';
 import { studioNormalView } from './studioNormalView';
 import { studioViewShortcut } from './studioViewShortcut';
+import { sketchTurnForView } from './studioCamera';
 import type { StudioCommand } from './StudioToolbar';
 import type { SketchEditorInput } from './sketchEditorInput';
 
@@ -322,6 +323,16 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     return;
   }
   if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+  // Shift+1 to Shift+7 turn an open sketch to the studio's named views (Front, Top, Isometric…), as they turn the
+  // studio: a sketch on the Front plane is straight on from the front.
+  const named = sketchBackdrop && event.shiftKey ? studioViewShortcut(event) : undefined;
+  const frame = named && named !== 'fit' && part ? cadSketchFrame(documentRef.current, part) : null;
+  if (named && named !== 'fit' && frame) {
+    event.preventDefault();
+    setSketchTurn(sketchTurnForView(named, frame));
+    setSketchCameraShift([0, 0]);
+    return;
+  }
   // `n` looks straight at the sketch's plane, and again, at its other side, as in the reference.
   if (key === 'n' && sketchBackdrop) {
     event.preventDefault();

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import type { CadViewport } from '@wbcnc/cad-editor/viewState';
 import type { SketchTurn } from './sketchOrbit';
+import { kViewDirections } from '@/cam/model/viewDirections';
 
 type Vec = [number, number, number];
 export interface StudioCameraState {
@@ -131,4 +132,20 @@ export function useEditorCameras(studio?: StudioCameraRef, part?: StudioCameraRe
     return { studio: { current: null } as StudioCameraRef, part: { current: null } as StudioCameraRef };
   });
   return { studioCamera: studio ?? own.studio, partCameraState: part ?? own.part };
+}
+
+/**
+ * How an open sketch is turned to show it as a named view shows the studio (Front, Top, Isometric and so on): a sketch on
+ * the Front plane seen from the front is straight on, seen from the top it would be edge-on.
+ */
+export function sketchTurnForView(name: keyof typeof kViewDirections, frame: Frame): SketchTurn {
+  const back = new Vector3(...kViewDirections[name]).normalize();
+  const vertical = Math.abs(back.z) > 1 - 1e-10;
+  const camera: StudioCameraState = {
+    center: [...frame.origin] as Vec,
+    back: back.toArray() as Vec,
+    up: vertical ? [0, 1, 0] : [0, 0, 1],
+    height: 100,
+  };
+  return sketchFromCamera(camera, frame, 1).turn;
 }

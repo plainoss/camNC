@@ -4,6 +4,7 @@ import { profileFeatures, summarizePart, type FlatPart, type MeshRound, type Par
 import { ExtrudeGeometry, Path, Shape, Vector2 } from 'three';
 import type { BodyMesh, CamPartInfo, ModelImport, Outline2D } from './camTypes';
 import { cutPartMesh } from './cutPartMesh';
+import { laidFlat } from './nativeLaidFlat';
 import { asMilled } from './millSide';
 
 export interface NativeCadEntry {
@@ -51,6 +52,10 @@ export function nativePart(source: EvaluatedCadPart): {
   }
   // CAM runs a roundover bit around each, where one of its radius is in the job.
   if (rounds.length) features.rounds = rounds.map(({ points, ...round }) => ({ loop: points, ...round }));
+  // A profile extruded further than it is high (an end profile drawn on a side plane and pushed out to the board's
+  // width) is milled lying on its widest faces, from the top, with the profile's height as the stock's thickness.
+  const lying = !rounds.length && !below ? laidFlat(source.name, positions, indices, source.thickness) : null;
+  if (lying) return laidFlatPart(source, lying, positions, indices, offset);
   const part: FlatPart = {
     name: source.name,
     size,
@@ -96,6 +101,39 @@ export function nativePart(source: EvaluatedCadPart): {
       indices: indices.slice(),
       flat: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     },
+  };
+}
+
+/** A native part as `laidFlat` lays it: features read from its solid, as a STEP body's are. */
+function laidFlatPart(
+  source: EvaluatedCadPart,
+  { part, features, flat }: NonNullable<ReturnType<typeof laidFlat>>,
+  positions: Float64Array,
+  indices: Uint32Array,
+  offset: { x: number; y: number }
+): ReturnType<typeof nativePart> {
+  const paths = (loops: { x: number; y: number }[][]): Outline2D => loops.map(loop => loop.map(p => [p.x, p.y]));
+  return {
+    entry: { part: { ...part, name: source.name }, features },
+    info: {
+      id: source.partId,
+      // Its holes are read from the solid: no sketch loop to name them by.
+      holeIds: [],
+      // The mesh stays in the sketch's frame, as the studio shows it; `flat` lays it down for CAM.
+      sourceOrigin: [offset.x, offset.y],
+      name: source.name,
+      modelName: source.name,
+      names: [source.name],
+      size: part.size,
+      thickness: part.thickness,
+      summary: summarizePart(part, features),
+      shape: {
+        outlines: paths(features.outlines),
+        holes: paths(features.throughHoles),
+        pockets: features.pockets.map(pocket => ({ depth: part.thickness - pocket.floorZ, region: paths(pocket.strictRegion) })),
+      },
+    },
+    mesh: { name: source.name, partId: source.partId, positions: Float32Array.from(positions), indices: indices.slice(), flat },
   };
 }
 

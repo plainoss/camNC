@@ -1,0 +1,69 @@
+[
+ {
+  "id": "studio/sketch/linear-pattern-flipped-keeps-constraints",
+  "title": "A sketch linear pattern flipped to the other side keeps its guide horizontal and moves with its seed when constrained",
+  "evidence": "design workflow parity spec",
+  "steps": [
+   "uncheck Snap",
+   "dialogcancel",
+   {
+    "spec": "1 view"
+   },
+   "view top",
+   {
+    "spec": "2 select"
+   },
+   "selectfeature Top",
+   {
+    "spec": "3 command"
+   },
+   "key Shift+s",
+   {
+    "spec": "4 command"
+   },
+   "key c",
+   {
+    "spec": "5 draw"
+   },
+   "circle 21,13 7.5",
+   {
+    "spec": "6 command"
+   },
+   "tool Linear pattern",
+   {
+    "spec": "7 select"
+   },
+   "click 28.5,13",
+   {
+    "spec": "8 select"
+   },
+   "drag 71,13 -29,13",
+   {
+    "spec": "9 select"
+   },
+   "click 8,13",
+   {
+    "spec": "10 command"
+   },
+   "key h",
+   {
+    "spec": "11 select"
+   },
+   "click 21,13",
+   "shiftclick 0,0",
+   {
+    "spec": "12 command"
+   },
+   "key h",
+   {
+    "expect": {
+     "part": "open",
+     "constraintsAtLeast": {
+      "horizontalPoints": 1,
+     "linearPattern": 1
+     }
+    }
+   }
+  ]
+ }
+]

@@ -56,3 +56,31 @@ export function partMass(part: CadPart): number | null {
   const mm2 = area(face.outline) - face.holes.reduce((sum, hole) => sum + area(hole), 0);
   return mm2 * part.thickness * 1e-9 * part.material.density;
 }
+
+/**
+ * Where a part's center of mass is, in its own sketch's mm: the middle of its face, less its through holes, halfway
+ * up its thickness. None without a material, as there's no mass to have a center.
+ */
+export function partCenterOfMass(part: CadPart): [number, number, number] | null {
+  const profile = evaluateCadPart(part).part;
+  if (!profile || !part.material) return null;
+  const face = evaluateCadFeatures(part, profile).part;
+  let a = 0,
+    cx = 0,
+    cy = 0;
+  for (const [loop, sign] of [[face.outline, 1], ...face.holes.map(hole => [hole, -1] as const)] as const) {
+    const area = signedArea(loop);
+    const scale = sign * Math.sign(area || 1);
+    loop.forEach((p, i) => {
+      const q = loop[(i + 1) % loop.length]!;
+      const cross = p.x * q.y - q.x * p.y;
+      cx += scale * (p.x + q.x) * cross;
+      cy += scale * (p.y + q.y) * cross;
+    });
+    a += scale * area;
+  }
+  return a ? [cx / (6 * a), cy / (6 * a), part.thickness / 2] : null;
+}
+
+const signedArea = (points: { x: number; y: number }[]) =>
+  points.reduce((sum, a, i) => sum + a.x * points[(i + 1) % points.length]!.y - points[(i + 1) % points.length]!.x * a.y, 0) / 2;

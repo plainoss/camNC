@@ -25,10 +25,21 @@ export async function startDevServer() {
   const url = `http://127.0.0.1:${port}`;
   const server = spawn('pnpm', ['vite', '--port', String(port), '--host', '127.0.0.1', '--strictPort'], {
     cwd: path.resolve(root, '../..'),
-    env: { ...process.env, CAMNC_SKIP_TYPECHECK: '1' },
+    env: { ...process.env, CAMNC_SKIP_TYPECHECK: '1', CAMNC_SPEC_SERVER: '1' },
     stdio: 'ignore',
     detached: true,
   });
+  // The server runs in its own process group: stop it however this run ends, so no server outlives it and keeps
+  // watching the checkout.
+  const stop = () => {
+    try {
+      process.kill(-server.pid);
+    } catch {
+      /* Already stopped. */
+    }
+  };
+  process.once('exit', stop);
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, () => (stop(), process.exit(130)));
   const started = Date.now();
   for (;;) {
     const ready = await fetch(url).then(response => response.ok).catch(() => false);
@@ -36,7 +47,7 @@ export async function startDevServer() {
     assert(Date.now() - started < 120_000, 'The dev server did not start');
     await new Promise(resolve => setTimeout(resolve, 500));
   }
-  return { url, stop: () => process.kill(-server.pid) };
+  return { url, stop };
 }
 
 /** Runs in each page before its own scripts. */

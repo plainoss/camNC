@@ -114,6 +114,13 @@ export function CircularPartPatternField({
   // Viewport picks arrive later, after a count or angle may have changed.
   const latestApply = useRef(apply);
   latestApply.current = apply;
+  // A count or angle the field can take shows in the preview as it's typed, as the reference updates it; one it can't
+  // yet, as a half-typed expression, waits.
+  useEffect(() => {
+    if (dirty.current && typeof parse() !== 'string') latestApply.current();
+    // Only when what's typed changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [count, angle]);
   const cancelPick = () => {
     pickGeneration.current++;
     pickPoint?.(null);

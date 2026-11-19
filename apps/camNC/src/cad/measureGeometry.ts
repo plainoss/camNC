@@ -1,11 +1,20 @@
 /** Coordinates in the assembly's millimetre frame, before exploded/flat display offsets. */
 export type MeasureVec3 = [number, number, number];
 export type MeasureTriangle = [MeasureVec3, MeasureVec3, MeasureVec3];
-/** A planar face contains only its actual material triangles, including the boundaries around holes. */
+/** The round a curved face's facets approximate; its axis passes through the center. */
+export interface MeasureCylinder {
+  axis: MeasureVec3;
+  center: MeasureVec3;
+  radius: number;
+}
+/**
+ * A face contains only its actual material triangles, including the boundaries around holes. A planar face's normal
+ * is its plane's; a round face's is its axis. `area` is the true surface's, where round edges make the facets short of it.
+ */
 export type MeasureEntity =
   | { kind: 'vertex'; point: MeasureVec3 }
   | { kind: 'edge'; a: MeasureVec3; b: MeasureVec3 }
-  | { kind: 'face'; triangles: MeasureTriangle[]; normal: MeasureVec3 };
+  | { kind: 'face'; triangles: MeasureTriangle[]; normal: MeasureVec3; area?: number; cylinder?: MeasureCylinder };
 
 export interface MeasureWitness {
   a: MeasureVec3;
@@ -291,6 +300,7 @@ function maximumPair(first: MeasureEntity, second: MeasureEntity): MeasureWitnes
 function extremePoints(entity: MeasureEntity): MeasureVec3[] {
   if (entity.kind !== 'face') return pointsOf(entity);
   const points = [...new Map(pointsOf(entity).map(point => [point.join(','), point])).values()];
+  if (entity.cylinder) return points;
   const drop = entity.normal.map(Math.abs).indexOf(Math.max(...entity.normal.map(Math.abs)));
   const axes = [0, 1, 2].filter(axis => axis !== drop),
     x = axes[0]!,
@@ -381,11 +391,16 @@ export function measureEntities(entities: readonly MeasureEntity[]): MeasureResu
       kind: 'length',
       ...(edges.length === 1 && { witness: { a: edges[0]!.a, b: edges[0]!.b } }),
     });
+  if (faces.length === 1 && faces[0]!.cylinder && entities.length === 1)
+    rows.push({ id: 'diameter', label: 'Diameter', value: faces[0]!.cylinder.radius * 2, kind: 'length' });
   if (faces.length)
     rows.push({
       id: 'area',
       label: faces.length > 1 ? 'Total area' : 'Area',
-      value: faces.reduce((sum, face) => sum + face.triangles.reduce((area, triangle) => area + triangleArea(triangle), 0), 0),
+      value: faces.reduce(
+        (sum, face) => sum + (face.area ?? face.triangles.reduce((area, triangle) => area + triangleArea(triangle), 0)),
+        0
+      ),
       kind: 'area',
     });
   if (entities.length === 1) rows.push(...positionRows(centerOf(entities[0]!), entities[0]!.kind === 'vertex' ? 'Position' : 'Center'));
@@ -405,14 +420,25 @@ export function measureEntities(entities: readonly MeasureEntity[]): MeasureResu
         rows.push({ id, label, value: distance(witness.a, witness.b), kind: 'length', witness });
       rows.push(...deltaRows(center, 'Center Δ'));
     }
+    const round = first.kind === 'face' && second.kind === 'face' ? [first, second].filter(face => face.cylinder).length : 0;
+    const axes = round && first.kind === 'face' && second.kind === 'face' ? directionAngle(first.normal, second.normal, true) : null;
+    // A round face has an axis, not a facing side: two rounds give the angle between their axes, a round and a plane
+    // the angle between the axis and the plane (an axis standing on the plane is perpendicular to it, 90°).
     const angle =
       first.kind === 'edge' && second.kind === 'edge'
         ? directionAngle(sub(first.b, first.a), sub(second.b, second.a), true)
-        : first.kind === 'face' && second.kind === 'face'
-          ? directionAngle(first.normal, second.normal, false)
-          : null;
+        : axes !== null
+          ? round === 2
+            ? axes
+            : 90 - axes
+          : first.kind === 'face' && second.kind === 'face'
+            ? directionAngle(first.normal, second.normal, false)
+            : null;
     if (angle !== null) {
-      rows.push({ id: 'angle', label: 'Angle', value: angle, kind: 'angle' });
+      const label = round === 1 ? 'Perp axes angle' : round === 2 ? 'Axes angle' : 'Angle';
+      // With a round face the angle is what the pair is picked for, so it leads the quick readout.
+      if (round) rows.unshift({ id: 'angle', label, value: angle, kind: 'angle' });
+      else rows.push({ id: 'angle', label, value: angle, kind: 'angle' });
       if (first.kind === 'edge' && second.kind === 'edge') parallel = angle <= 1e-9;
     }
   }
