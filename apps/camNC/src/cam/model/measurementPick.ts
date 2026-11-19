@@ -1,6 +1,7 @@
 import type { MeasureEntity, MeasureTriangle, MeasureVec3 } from '@/cad/measureGeometry';
 import { joinStraightEdges, type ModelEdge } from './edgePick';
 import { measurementTriangleIndex } from './measurementTriangleIndex';
+import { cylinderMeasurementFace, planarFaceArea } from './curvedMeasurementFace';
 
 /** A geometry selection in assembly coordinates; the workspace resolves its mesh index to the exact physical copy. */
 export interface ModelMeasurePick {
@@ -248,7 +249,9 @@ export function planarMeasurementFace(positions: Float32Array, indices: ArrayLik
       }
     }
     const members = [...selected].sort((a, b) => a - b);
-    const result: FaceEntity = { kind: 'face', triangles: members.map(index => source.values[index]!.points), normal: plane.normal };
+    const faceTriangles = members.map(index => source.values[index]!.points),
+      area = planarFaceArea(faceTriangles, plane.normal);
+    const result: FaceEntity = { kind: 'face', triangles: faceTriangles, normal: plane.normal, ...(area !== undefined && { area }) };
     facePlanes.set(result, plane);
     for (const index of selected) {
       remaining.delete(index);
@@ -275,7 +278,7 @@ function inTriangle(point: MeasureVec3, triangle: MeasureTriangle, tolerance: nu
 }
 
 /**
- * Vertex, straight edge, or planar face at a click. Only real feature-edge endpoints count as vertices, so a
+ * Vertex, straight edge, planar face or whole round face at a click. Only real feature-edge endpoints count as vertices, so a
  * triangulation split or a mate connector's face-middle never becomes a vertex measurement.
  */
 export function measurementEntityAt(
@@ -285,6 +288,9 @@ export function measurementEntityAt(
   screen: Projection,
   tolerance = 8
 ): MeasureEntity | null {
+  // A round wall is one face: its facets' seams are not edges, and it has no corners to pick.
+  const round = cylinderMeasurementFace(positions, indices, triangleIndex);
+  if (round) return round;
   const face = planarMeasurementFace(positions, indices, triangleIndex);
   if (!face) return null;
   const accuracy = triangleSource({ positions, indices }).tolerance;

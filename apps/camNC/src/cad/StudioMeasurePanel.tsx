@@ -226,7 +226,9 @@ export function StudioMeasurePanel({
             ))}
           </ul>
         ) : (
-          <p className="cad-studio-measure-hint">Select a vertex, straight edge or planar face. Shift-click to add another selection.</p>
+          <p className="cad-studio-measure-hint">
+            Select a vertex, straight edge or face. Each click adds to the selection; click empty space to clear it.
+          </p>
         )}
         <div className="cad-studio-measure-options">
           <label htmlFor={`${id}-type`}>Measure type</label>
