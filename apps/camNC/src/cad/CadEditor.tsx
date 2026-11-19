@@ -1909,6 +1909,7 @@ export function CadEditor({
               activeSketchStatus={activeSketchStatus}
               annotationSketch={annotationSketch}
               centerArcSweep={centerArcSweep}
+              acceptLinearPattern={acceptLinearPattern}
               chain={chain}
               chamferDistances={chamferDistances}
               chamferPreview={chamferPreview}

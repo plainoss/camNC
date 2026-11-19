@@ -118,6 +118,7 @@ export function SketchLinearPatternManipulator({
   pixelScale,
   onStart,
   onEdit,
+  onApply,
   made = false,
 }: {
   anchor: CadPoint;
@@ -126,6 +127,8 @@ export function SketchLinearPatternManipulator({
   bound?: boolean[];
   pixelScale: number;
   onStart: (index: number, event: PointerEvent<SVGElement>) => void;
+  /** Makes the pattern, as a click on its guide does in the reference. */
+  onApply?: () => void;
   /** A pattern the sketch has, shown as it's drawn: no handles to drag, and a horizontal guide marked as such. */
   made?: boolean;
   onEdit: (field: 'countX' | 'countY' | 'spacingX' | 'spacingY' | 'angleX' | 'angleY', chip: Element) => void;
@@ -163,6 +166,22 @@ export function SketchLinearPatternManipulator({
               strokeDasharray={`${6 * k} ${4 * k}`}
               pointerEvents="none"
             />
+            {onApply && !made && count > 1 && (
+              // Wide and unseen, so the dashed guide is easy to click: clicking it makes the pattern.
+              <path
+                data-pattern-guide-hit={index}
+                d={`M${anchor.x} ${-anchor.y}L${end.x} ${-end.y}`}
+                stroke="transparent"
+                strokeWidth={10 * k}
+                fill="none"
+                pointerEvents="stroke"
+                onPointerDown={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onApply();
+                }}
+              />
+            )}
             <path d={`M${left.x} ${-left.y}L${end.x} ${-end.y}L${right.x} ${-right.y}`} fill="none" pointerEvents="none" />
             {made && count > 1 && Math.abs(unit.y) < 1e-9 && (
               <text
