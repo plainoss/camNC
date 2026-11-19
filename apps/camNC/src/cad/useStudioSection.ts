@@ -162,7 +162,8 @@ export function useStudioSection(
       if (!('error' in picked))
         source = {
           kind: 'face',
-          frame: picked,
+          // Through a point of the face itself, where the section's handle sits.
+          frame: { ...picked, origin: picked.anchor ?? picked.origin },
           label: `${model.instances.find(item => item.partId === selectedFace.partId && item.copyId === selectedFace.copyId)?.name ?? 'Selected'} face`,
           document,
         };

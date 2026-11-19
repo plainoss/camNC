@@ -2083,6 +2083,8 @@ export function CadEditor({
             {sketch && (
               <SelectionReadout
                 sketch={sketch}
+                document={doc}
+                part={part}
                 selectedIds={dimensionSelection}
                 picks={dimensionFlow.phase === 'idle' ? selectionHints.current : dimensionFlow.pickHints}
               />

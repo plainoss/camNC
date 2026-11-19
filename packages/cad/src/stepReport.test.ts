@@ -42,10 +42,10 @@ describe('reading faces by the way they look', () => {
     ]);
     const top = cadFaceFacing(document, side.id, '+z');
     expect(cadFaceFrame(document, { partId: side.id, ...(top as { face: { edge: string } }) })).toEqual({
-      // The top edge, walked counterclockwise from the sketch's top right corner towards its top left.
-      origin: [0, 300, 720],
-      x: [0, -1, 0],
-      y: [1, 0, 0],
+      // The top edge looks up, so it's sketched as the Top plane is, from the studio's origin below it.
+      origin: [0, 0, 720],
+      x: [1, 0, 0],
+      y: [0, 1, 0],
       normal: [0, 0, 1],
       length: 300,
     });
