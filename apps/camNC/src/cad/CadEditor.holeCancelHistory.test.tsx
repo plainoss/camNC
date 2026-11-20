@@ -14,7 +14,7 @@ afterEach(() => {
 const settled = () =>
   waitFor(() => expect(document.querySelector('.cad-editor')!.getAttribute('aria-busy')).toBe('false'), { timeout: 20_000 });
 
-it('puts both history stacks back when Hole made a board’s points sketch the hole and is cancelled', async () => {
+it('leaves both history stacks as they were when a new Hole is cancelled', async () => {
   const board = { ...createPlateDocument({ width: 100, height: 60, thickness: 18 }).parts[0]!, name: 'Board' };
   board.drawnOn = { on: { plane: 'top' }, offset: 0 };
   const points = {
@@ -54,17 +54,16 @@ it('puts both history stacks back when Hole made a board’s points sketch the h
   await waitFor(() => expect(thickness()).toBe(25));
   expect([undo().disabled, redo().disabled]).toEqual([false, false]);
 
-  await userEvent.click(within(screen.getByRole('list', { name: 'Parts' })).getByRole('button', { name: /^▱?\s*Board/ }));
+  await userEvent.click(within(features).getByRole('button', { name: /Sketch · Points/ }));
   await userEvent.click(await studioCommand(/^Hole/));
-  const dialog = await screen.findByRole('dialog', { name: 'Hole · Points' });
-  await waitFor(() => expect(latest().parts[1]).toHaveProperty('hole'));
+  const dialog = await screen.findByRole('dialog', { name: '⌀ 6 mm THRU' });
   await userEvent.fill(within(dialog).getByRole('textbox', { name: 'Diameter' }), '8');
   await userEvent.tab();
-  await waitFor(() => expect(latest().parts[1]!.hole).toEqual({ diameter: 8 }));
+  await screen.findByRole('dialog', { name: '⌀ 8 mm THRU' });
   await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Hole · Points' })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^⌀/ })).toBeNull());
 
-  // The sketch is unextruded again, and the stacks are as they were: the conversion and the preview are on neither.
+  // The sketch is still only a sketch, and the stacks are as they were: the preview is on neither.
   await waitFor(() => expect(latest().parts[1]).not.toHaveProperty('hole'));
   expect(latest().parts[1]).not.toHaveProperty('remove');
   expect(latest().parts[1]!.extrude).toBe(false);

@@ -347,7 +347,7 @@ export interface CadPart {
    * A Hole step: a Remove whose sketch's points are the holes' centres, each cut as a round hole this wide, as deep as
    * `remove` says. The sketch's lines and curves only place the points.
    */
-  hole?: { diameter: number; diameterExpression?: string };
+  hole?: CadHoleSpec;
   /**
    * Fillet steps: the part's edges through its thickness, at these corners of its sketch, rounded to a radius. The sketch
    * itself keeps its sharp corners; the part is rounded where it's made.
@@ -849,4 +849,16 @@ export interface CadEdgeFillet {
   suppressed?: true;
   /** A Chamfer step: its edges cut off flat at 45°, `radius` taken off each face they join (Equal distance). */
   chamfer?: true;
+}
+
+/** What a Hole step drills: its diameter, and the drill's tip, which the hole's depth doesn't count. */
+export interface CadHoleSpec {
+  diameter: number;
+  diameterExpression?: string;
+  /** The standard drill size it was picked as, in mm; a typed diameter overrides it. */
+  drillSize?: number;
+  /** The drill tip's angle, in degrees, below a blind hole: 118 for a twist drill. */
+  tipAngle?: number;
+  /** The sketch's points the holes are at, as picked; without them, every point of the sketch standing on its own. */
+  points?: string[];
 }
