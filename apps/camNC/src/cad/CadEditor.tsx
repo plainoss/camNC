@@ -12,7 +12,23 @@ import {
   beginSketchDimension,
   editSketchDimension,
   finishSketchSpline,
+  cancelSketchDimensionEdit,
+  selectSketchDimension,
+  applySketchCreationValue,
 } from './sketchDimensionActions';
+import {
+  sketchTransformSelectionCenter,
+  editSketchPattern,
+  acceptSketchSlot,
+  acceptSketchTransform,
+  openSketchContext,
+  keyboardSketchContext,
+  toggleSketchFix,
+  fixSketchGeometry,
+  toggleSketchConstruction,
+  takeSketchEdges,
+  sketchDoubleClick,
+} from './sketchCommandActions';
 import {
   acceptSketchLinearPattern,
   acceptSketchCircularPattern,
@@ -25,19 +41,14 @@ import {
   constrainSketch,
   sketchContextAction,
 } from './sketchModifyActions';
-import { cadFieldText, DesignUnitContext, useDesignUnits } from './designUnits';
+import { DesignUnitContext, useDesignUnits } from './designUnits';
 import { useSketchCommandPreviews } from './useSketchCommandPreviews';
 import { SketchCommandControls } from './SketchCommandControls';
-import { initialCircularPatternParameters, circularPatternParameters } from './circularPatternParameters';
+import { initialCircularPatternParameters } from './circularPatternParameters';
 import {
   withCadLengthUnit,
-  addConstraint,
   createCadPart,
-  dimensionValueError,
-  entityPointIds as curvePointIds,
-  updateDimension,
   visibleSketchPointIds,
-  withDimensionPlacement,
   type CadDimension,
   type CadDocument,
   type CadDrawnOn,
@@ -47,7 +58,6 @@ import {
   type CadPoint,
   cadVariableProblems,
   drawnOnOutline,
-  cadSketchFrame,
   resolveExtrudeSteps,
 } from '@wbcnc/cad';
 import {
@@ -82,15 +92,10 @@ import {
   type DimensionWorkflowEvent,
 } from '@wbcnc/cad-editor/dimensionWorkflow';
 import { idleDrawingGesture, type DrawingGesture } from '@wbcnc/cad-editor/drawingGesture';
-import { advanceCreationValue, creationValueAnchor, creationValueAt, type CreationValues } from './creationValues';
+import { creationValueAt, type CreationValues } from './creationValues';
 import { CreationValueControls } from './CreationValueControls';
 import { SketchConicRhoForm, SketchDimensionEditor, SketchPolygonForm, SketchShapeSizeForm } from './SketchValueForms';
-import {
-  initialLinearPatternParameters,
-  linearPatternParameters,
-  editablePatternSources,
-  type LinearPatternParameters,
-} from './linearPatternParameters';
+import { initialLinearPatternParameters, type LinearPatternParameters } from './linearPatternParameters';
 import { initialTransformParameters } from './transformParameters';
 import { SelectionReadout } from './SelectionReadout';
 import { SketchPartProperties } from './SketchPartProperties';
@@ -99,9 +104,6 @@ import { CadVariablesPanel } from './CadVariablesPanel';
 import { pendingRow, sketchPlaneName } from './drawnOnName';
 import { SketchContextMenu } from './SketchContextMenu';
 import {
-  createSketchContext,
-  selectedSketchContextTarget,
-  toggleContextConstruction,
   type SketchContext,
   type SketchContextAction,
   type SketchContextPress,
@@ -159,7 +161,6 @@ import { usePointPicker } from './pointPicker';
 import { ShortcutList } from './ShortcutList';
 import { sketchShortcutTabs, studioShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
-import { toggleFixed } from './sketchFix';
 import { hasOutline, isSingleLine, replacePart } from './editorHelpers';
 import { useFeaturePreview } from './useFeaturePreview';
 import { SketchProblems } from './SketchProblems';
@@ -182,7 +183,6 @@ import { initialFaceSketchView } from './faceSketchScene';
 import { useFaceSketchCamera } from './useFaceSketchCamera';
 import { fitSketchView } from './fitSketchView';
 import { sketchValuePosition, projectSketchPoint, focusSketchCanvas, creationEditorPositions } from './sketchViewport';
-import { addUsedPartEdges } from './partEdgeUse';
 import { faceSketchHost } from './faceSketchHost';
 import { useExtrudeDepth } from './useExtrudeDepth';
 import { bindPartCorners } from './partCornerInference';
@@ -750,41 +750,11 @@ export function CadEditor({
     }
   }, [conicEditing]);
 
-  const cancelDimensionEdit = () => {
-    const placed = dimension && !dimensionDraft;
-    newDimensionCommand.current = null;
-    setDimensionFlow(previous => idleDimensionWorkflow(previous.mode));
-    setDimension(null);
-    if (dimensionDraft) setSelectedConstraints(ids => ids.filter(id => id !== dimensionDraft.id));
-    setMessage(
-      placed
-        ? 'Dimension value unchanged. Select geometry or choose a tool.'
-        : 'Dimension creation cancelled. Select geometry or choose a tool.'
-    );
-    svg.current?.focus();
-  };
-  const selectDimension = (id: string, additive = false) => {
-    newDimensionCommand.current = null;
-    setDimensionFlow(previous => idleDimensionWorkflow(previous.mode));
-    setDimension(null);
-    setSelectedConstraints(ids => (additive ? (ids.includes(id) ? ids.filter(existing => existing !== id) : [...ids, id]) : [id]));
-    setSelected([]);
-    setMessage('Dimension selected. Double-click or press Enter to edit; Delete removes it.');
-  };
+  const cancelDimensionEdit = () => cancelSketchDimensionEdit(sketchEditorInput());
+  const selectDimension = (id: string, additive = false) => selectSketchDimension(sketchEditorInput(), id, additive);
   const editDimension = (id: string) => editSketchDimension(sketchEditorInput(), id);
   const startAnnotationDrag = (id: string, event: PointerEvent<SVGGElement>) => startSketchAnnotationDrag(sketchEditorInput(), id, event);
-  const transformSelectionCenter = (ids: readonly string[]) => {
-    const wanted = new Set(
-      ids.flatMap(id => {
-        const e = sketch?.entities.find(e => e.id === id);
-        return !e ? [] : e.type === 'point' ? [e.id] : curvePointIds(e);
-      })
-    );
-    const points = sketch?.entities.filter(e => e.type === 'point' && wanted.has(e.id)) ?? [];
-    const xs = points.flatMap(e => (e.type === 'point' ? [e.x] : [])),
-      ys = points.flatMap(e => (e.type === 'point' ? [e.y] : []));
-    return xs.length ? { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 } : { x: 0, y: 0 };
-  };
+  const transformSelectionCenter = (ids: readonly string[]) => sketchTransformSelectionCenter(sketchEditorInput(), ids);
   const chooseTool = (next: Tool) => chooseSketchTool(sketchEditorInput(), next);
   const navigateHistory = (redo = false) => {
     chooseTool('select');
@@ -820,120 +790,31 @@ export function CadEditor({
     return reason;
   };
   const applyDimensionValue = () => applySketchDimensionValue(sketchEditorInput());
-  const applyCreationValue = ({ advance = true } = {}): string | null => {
-    if (!creationValues || !part || !sketch || creationValues.partId !== part.id) return null;
-    const current = creationValueAt(creationValues, sketch);
-    if (!current) return rejectValue('This drawing value no longer applies. Select its geometry again.', creationInput.current);
-    const parsed = parseCadValue(
-      creationValues.editing ? cadFieldText(creationInput.current, creationValues.text) : lengthText(current.constraint.value),
-      { unit: 'mm', variables: variableScope }
-    );
-    if ('error' in parsed) return rejectValue(parsed.error, creationInput.current);
-    const valueError = dimensionValueError(current.constraint, parsed.value);
-    if (valueError) return rejectValue(valueError, creationInput.current);
-    if (current.existingConstraintId)
-      commit(updateDimension(documentRef.current, current.existingConstraintId, parsed.value, parsed.expression));
-    else {
-      const constraint = { ...current.constraint, value: parsed.value, expression: parsed.expression };
-      const position = creationValueAnchor(creationValues, sketch, creationValues.index, markerScale);
-      changeSketch(addConstraint(sketch, position ? withDimensionPlacement(sketch, constraint, position) : constraint));
-    }
-    setCreationValues(advance ? advanceCreationValue(creationValues) : null);
-    setMessage('Drawing dimension applied. Type the next value or keep drawing.');
-    svg.current?.focus();
-    return null;
-  };
+  const applyCreationValue = (options?: { advance?: boolean }) => applySketchCreationValue(sketchEditorInput(), options);
   const finishSpline = (keepTool = false) => finishSketchSpline(sketchEditorInput(), keepTool);
-  const editPattern = (id: string) => {
-    const pattern = sketch?.constraints.find(c => c.id === id);
-    if (pattern?.type !== 'linearPattern' && pattern?.type !== 'circularPattern') return;
-    chooseTool(pattern.type);
-    setPatternEditId(id);
-    patternCommandId.current = id;
-    if (pattern.type === 'linearPattern') setLinearParameters(linearPatternParameters(pattern, lengthUnit));
-    else setCircularParameters(circularPatternParameters(pattern, sketch!, lengthUnit));
-    setSelected(editablePatternSources(pattern));
-    setMessage('Edit the pattern counts, spacing or direction. Deleted instances remain excluded.');
-  };
-  const acceptSlot = () => {
-    if (!slotPreview?.ok) return setMessage(slotPreview?.message ?? 'Select source curves for a slot.');
-    const group = slotPreview.sketch.constraints.find(c => c.id === slotPreview.slotId);
-    changeSketch(slotPreview.sketch);
-    if (group?.type === 'slot') setSharedSlotWidth(group.widthEntityId);
-    setSelected([]);
-    setMessage('Slot created. Select more source curves to share its width, or press Escape.');
-    svg.current?.focus();
-  };
+  const editPattern = (id: string) => editSketchPattern(sketchEditorInput(), id);
+  const acceptSlot = () => acceptSketchSlot(sketchEditorInput());
   const acceptCircularPattern = () => acceptSketchCircularPattern(sketchEditorInput());
   const acceptLinearPattern = () => acceptSketchLinearPattern(sketchEditorInput());
-  const acceptTransform = () => {
-    if (!transformPreview?.ok) return setMessage(transformPreview?.message ?? 'Select geometry to transform.');
-    if (transformPreview.changed) changeSketch(transformPreview.sketch);
-    const ids = transformPreview.entityIds,
-      released = transformPreview.releasedConstraintIds.length;
-    chooseTool('select');
-    setSelected(ids);
-    if (released) setTransformNotice(`${released} external or directed relations were released by the transform.`);
-    setMessage(transformPreview.changed ? 'Transform applied.' : 'Transform closed without changes.');
-  };
+  const acceptTransform = () => acceptSketchTransform(sketchEditorInput());
   const acceptChamfer = () => acceptSketchChamfer(sketchEditorInput());
   const acceptFillet = () => acceptSketchFillet(sketchEditorInput());
   const acceptOffset = () => acceptSketchOffset(sketchEditorInput());
   const applyConicRho = () => applySketchConicRho(sketchEditorInput());
   const removeSelected = (entityIds: readonly string[] = selected, constraintIds: readonly string[] = selectedConstraints) =>
     removeSketchSelection(sketchEditorInput(), entityIds, constraintIds);
-  const openContext = (target: SketchContextTarget, position: Point) => {
-    if (!sketch || busy || drag.current || annotationDrag.current) return;
-    const context = createSketchContext(sketch, target, position, { entityIds: dimensionSelection, constraintIds: selectedConstraints });
-    chooseTool('select');
-    setSelected([...context.entityIds]);
-    setSelectedConstraints([...context.constraintIds]);
-    setContextMenu(context);
-  };
+  const openContext = (target: SketchContextTarget, position: Point) => openSketchContext(sketchEditorInput(), target, position);
   const contextTarget = (target: Element, position: Point) => sketchContextTarget(sketchEditorInput(), target, position);
-  const keyboardContext = () => {
-    if (!sketch || !svg.current) return;
-    const target = selectedSketchContextTarget(sketch, { entityIds: dimensionSelection, constraintIds: selectedConstraints });
-    const element =
-      target.kind === 'blank'
-        ? svg.current
-        : (svg.current.querySelector(
-            `[${target.kind === 'dimension' ? 'data-dimension' : target.kind === 'constraint' ? 'data-constraint-id' : 'data-entity-id'}="${CSS.escape(target.id)}"]`
-          ) ?? svg.current);
-    const bounds = element.getBoundingClientRect();
-    openContext(target, { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 });
-  };
+  const keyboardContext = () => keyboardSketchContext(sketchEditorInput());
   const contextAction = (action: SketchContextAction, context: SketchContext) => sketchContextAction(sketchEditorInput(), action, context);
   const placeDimension = (placed: CadDimension) => placeSketchDimension(sketchEditorInput(), placed);
   const applyDimensionEvent = (event: DimensionWorkflowEvent) => applySketchDimensionEvent(sketchEditorInput(), event);
   const beginDimension = () => beginSketchDimension(sketchEditorInput());
   const constrain = (type: ConstraintTool) => constrainSketch(sketchEditorInput(), type);
-  const toggleFix = () => {
-    if (!sketch) return;
-    if (!selected.length) {
-      chooseTool('select');
-      setFixMode(true);
-      setMessage('Click geometry to fix or unfix it. Escape ends Fix.');
-      svg.current?.focus();
-      return;
-    }
-    fixGeometry(selected);
-  };
+  const toggleFix = () => toggleSketchFix(sketchEditorInput());
   /** Fixes the points of `targets`, or unfixes them when they are all fixed already. */
-  const fixGeometry = (targets: string[]) => {
-    if (!sketch) return;
-    const result = toggleFixed(sketch, targets, fixMode);
-    if (result.sketch) changeSketch(result.sketch);
-    setMessage(result.message);
-  };
-  const toggleConstruction = () => {
-    if (sketch && selected.length) {
-      const next = toggleContextConstruction(sketch, selected);
-      if (next === sketch)
-        setMessage('Spline tangent handles remain construction geometry. Select the curve to change its construction state.');
-      else changeSketch(next);
-    } else setConstruction(value => !value);
-  };
+  const fixGeometry = (targets: string[]) => fixSketchGeometry(sketchEditorInput(), targets);
+  const toggleConstruction = () => toggleSketchConstruction(sketchEditorInput());
   const keyDown = (event: KeyboardEvent<HTMLDivElement>) =>
     cadEditorKeyDown(
       {
@@ -941,8 +822,6 @@ export function CadEditor({
         applyCreationValue,
         beginDimension,
         constrain,
-        creationValues,
-        dimension,
         finishSpline,
         hoveredPart,
         isolatePart,
@@ -951,7 +830,6 @@ export function CadEditor({
         partHasOutline,
         pointerEnd,
         polygonInput,
-        selectedConstraints,
         selectedFace,
         selectedPlane,
         setHiddenParts,
@@ -1001,8 +879,12 @@ export function CadEditor({
     contextPress,
     contextTarget,
     contextualArc,
+    creationInput,
+    creationValues,
     currentDimension,
     cursor,
+    dimension,
+    dimensionDraft,
     dimensionFlow,
     dimensionInput,
     dimensionMode,
@@ -1067,6 +949,7 @@ export function CadEditor({
     rhoInput,
     selectDimension,
     selected,
+    selectedConstraints,
     selectionHints,
     session,
     setBusy,
@@ -1075,6 +958,7 @@ export function CadEditor({
     setCircularParameters,
     setConicEditing,
     setConstraintMode,
+    setConstruction,
     setContextMenu,
     setContextualArc,
     setCreationValues,
@@ -1114,12 +998,14 @@ export function CadEditor({
     setTool,
     setTransformNotice,
     setTransformParameters,
+    setUseNotice,
     setUsingEdges,
     setView,
     shownSketch,
     sketch,
     sketchBackdrop,
     sketchTurn,
+    slotPreview,
     snap,
     solveDrag,
     solving,
@@ -1128,6 +1014,7 @@ export function CadEditor({
     takeEdges,
     tangentAxis,
     tool,
+    transformPreview,
     transformSelectionCenter,
     usingEdges,
     variableScope,
@@ -1360,17 +1247,7 @@ export function CadEditor({
     setPickedEdges([]);
   }, [part?.id, showWorkspace]);
   /** `u`: the picked edges become the sketch's own, fixed where they are, to draw and constrain against. */
-  const takeEdges = (keys = pickedEdges) => {
-    if (!sketch) return;
-    const source = sketchBackdrop?.document ?? documentRef.current,
-      frame = part && cadSketchFrame(documentRef.current, part);
-    const used = addUsedPartEdges(sketch, partEdges, keys, source, frame, part?.id);
-    if (used.problem) return setUseNotice(used.problem);
-    setUseNotice(null);
-    changeSketch(used.sketch);
-    setPickedEdges([]);
-    setSelected(used.selected);
-  };
+  const takeEdges = (keys = pickedEdges) => takeSketchEdges(sketchEditorInput(), keys);
   // One line drawn on a plane or face is a board drawn edge-on, as the reference's thin extrude: its sketch can close.
   const edgeOnBoard = !!(studioSession && part?.drawnOn && !part.thin && isSingleLine(part));
   const sketchFinishReason = openSketchFinishReason(sketch, openSketchProblems, {
@@ -1761,21 +1638,7 @@ export function CadEditor({
             viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
             onPointerDown={pointerDown}
             onPointerMove={pointerMove}
-            onDoubleClick={event => {
-              if (tool === 'spline' || tool === 'bezier') {
-                event.preventDefault();
-                finishSpline();
-                return;
-              }
-              if (tool !== 'select' || !sketch) return;
-              const id = (event.target as Element).closest('[data-entity-id]')?.getAttribute('data-entity-id');
-              const curve = sketch.entities.find(entity => entity.id === id);
-              if (curve?.type === 'conic') {
-                event.preventDefault();
-                setRho(String(curve.rho));
-                setConicEditing(curve.id);
-              }
-            }}
+            onDoubleClick={event => sketchDoubleClick(sketchEditorInput(), event)}
             onPointerLeave={() => {
               if (!drag.current) {
                 setHoveredPoint(null);

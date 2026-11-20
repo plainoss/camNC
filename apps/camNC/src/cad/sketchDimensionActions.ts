@@ -7,12 +7,16 @@ import {
   newCadId,
   updateDimension,
   applyNewDimension,
+  addConstraint,
+  withDimensionPlacement,
   type CadDimension,
 } from '@wbcnc/cad';
 import { prepareDimensionCreation } from './solveCad';
 import { amendCadSession, cadCommandCheckpoint } from '@wbcnc/cad-editor/session';
 import { idleDimensionWorkflow, transitionDimensionWorkflow, type DimensionWorkflowEvent } from '@wbcnc/cad-editor/dimensionWorkflow';
 import { replacePart } from './editorHelpers';
+import { cadFieldText } from './designUnits';
+import { advanceCreationValue, creationValueAnchor, creationValueAt } from './creationValues';
 import type { SketchEditorInput } from './sketchEditorInput';
 
 // Placing and editing dimensions and typed creation values, split out of CadEditor. They read the editor through SketchEditorInput.
@@ -194,4 +198,71 @@ export function finishSketchSpline(editor: SketchEditorInput, keepTool: boolean)
   } catch (error) {
     setMessage(error instanceof Error ? error.message : String(error));
   }
+}
+
+export function cancelSketchDimensionEdit(editor: SketchEditorInput) {
+  const { dimension, dimensionDraft, newDimensionCommand, setDimensionFlow, setDimension, setSelectedConstraints, setMessage, svg } =
+    editor;
+  const placed = dimension && !dimensionDraft;
+  newDimensionCommand.current = null;
+  setDimensionFlow(previous => idleDimensionWorkflow(previous.mode));
+  setDimension(null);
+  if (dimensionDraft) setSelectedConstraints(ids => ids.filter(id => id !== dimensionDraft.id));
+  setMessage(
+    placed
+      ? 'Dimension value unchanged. Select geometry or choose a tool.'
+      : 'Dimension creation cancelled. Select geometry or choose a tool.'
+  );
+  svg.current?.focus();
+}
+
+export function selectSketchDimension(editor: SketchEditorInput, id: string, additive: boolean) {
+  const { newDimensionCommand, setDimensionFlow, setDimension, setSelectedConstraints, setSelected, setMessage } = editor;
+  newDimensionCommand.current = null;
+  setDimensionFlow(previous => idleDimensionWorkflow(previous.mode));
+  setDimension(null);
+  setSelectedConstraints(ids => (additive ? (ids.includes(id) ? ids.filter(existing => existing !== id) : [...ids, id]) : [id]));
+  setSelected([]);
+  setMessage('Dimension selected. Double-click or press Enter to edit; Delete removes it.');
+}
+
+export function applySketchCreationValue(editor: SketchEditorInput, { advance = true } = {}): string | null {
+  const {
+    creationValues,
+    part,
+    sketch,
+    rejectValue,
+    creationInput,
+    parseCadValue,
+    lengthText,
+    variableScope,
+    commit,
+    documentRef,
+    markerScale,
+    changeSketch,
+    setCreationValues,
+    setMessage,
+    svg,
+  } = editor;
+  if (!creationValues || !part || !sketch || creationValues.partId !== part.id) return null;
+  const current = creationValueAt(creationValues, sketch);
+  if (!current) return rejectValue('This drawing value no longer applies. Select its geometry again.', creationInput.current);
+  const parsed = parseCadValue(
+    creationValues.editing ? cadFieldText(creationInput.current, creationValues.text) : lengthText(current.constraint.value),
+    { unit: 'mm', variables: variableScope }
+  );
+  if ('error' in parsed) return rejectValue(parsed.error, creationInput.current);
+  const valueError = dimensionValueError(current.constraint, parsed.value);
+  if (valueError) return rejectValue(valueError, creationInput.current);
+  if (current.existingConstraintId)
+    commit(updateDimension(documentRef.current, current.existingConstraintId, parsed.value, parsed.expression));
+  else {
+    const constraint = { ...current.constraint, value: parsed.value, expression: parsed.expression };
+    const position = creationValueAnchor(creationValues, sketch, creationValues.index, markerScale);
+    changeSketch(addConstraint(sketch, position ? withDimensionPlacement(sketch, constraint, position) : constraint));
+  }
+  setCreationValues(advance ? advanceCreationValue(creationValues) : null);
+  setMessage('Drawing dimension applied. Type the next value or keep drawing.');
+  svg.current?.focus();
+  return null;
 }
