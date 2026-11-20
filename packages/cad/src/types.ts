@@ -729,6 +729,10 @@ export interface CadVariable {
   before?: string;
   /** Switched off: it has no value, so what uses it fails until it's back on, as if it were deleted. */
   suppressed?: true;
+  /** The design step it's listed after, as made by the Variable tool once that step was the last: the list shows it there. */
+  after?: string;
+  /** What it's for, as written in its dialog. */
+  description?: string;
 }
 
 export interface CadDiagnostic {

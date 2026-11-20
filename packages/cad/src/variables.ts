@@ -238,7 +238,7 @@ export function cadVariableUses(document: CadDocument, name: string): number {
  */
 export function setCadVariable(
   document: CadDocument,
-  change: { id?: string; name: string; expression: string; folderId?: string | null },
+  change: { id?: string; name: string; expression: string; folderId?: string | null; description?: string; after?: string },
   /** How a plain number in it is read, as `cadVariableExpression` says: the design's unit unless given. */
   units: { lengthUnit?: CadLengthUnit; spellOutLengths?: boolean } = {}
 ): { document: CadDocument; id: string } | { error: string } {
@@ -259,7 +259,14 @@ export function setCadVariable(
     return { error: 'This folder no longer exists.' };
   if (variables.some(variable => variable.name === name && variable.id !== existing?.id))
     return { error: `There's already a variable called ${name}.` };
-  if (existing && existing.name === name && existing.expression === expression && existing.folderId === folderId)
+  const description = change.description === undefined ? existing?.description : change.description.trim() || undefined;
+  if (
+    existing &&
+    existing.name === name &&
+    existing.expression === expression &&
+    existing.folderId === folderId &&
+    existing.description === description
+  )
     return { document, id: existing.id };
   const id = existing?.id ?? change.id ?? newCadId();
   let next: CadDocument = {
@@ -275,11 +282,23 @@ export function setCadVariable(
                 expression,
                 ...(folderId && { folderId }),
                 ...(variable.before && { before: variable.before }),
+                ...(variable.after && { after: variable.after }),
                 ...(variable.suppressed && { suppressed: true as const }),
+                ...(description && { description }),
               }
             : variable
         )
-      : [...variables, { id, name, expression, ...(folderId && { folderId }) }],
+      : [
+          ...variables,
+          {
+            id,
+            name,
+            expression,
+            ...(folderId && { folderId }),
+            ...(change.after && { after: change.after }),
+            ...(description && { description }),
+          },
+        ],
   };
   if (existing && existing.name !== name) next = mapExpressions(next, text => renameCadExpressionVariable(text, existing.name, name));
   const { errors } = cadVariableValues(next);

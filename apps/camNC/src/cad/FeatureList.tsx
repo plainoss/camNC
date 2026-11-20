@@ -275,7 +275,7 @@ export function FeatureList({
     if (entry.kind === 'plane') return document.planes!.find(candidate => candidate.id === entry.id)!.name;
     const variable = document.variables!.find(candidate => candidate.id === entry.id)!;
     const result = scope[variable.name];
-    const unit = result?.kind === 'length' ? ` ${lengthUnit}` : result?.kind === 'angle' ? '°' : '';
+    const unit = result?.kind === 'length' ? ` ${lengthUnit}` : result?.kind === 'angle' ? ' deg' : '';
     return `#${variable.name} = ${result ? `${result.kind === 'length' ? formatLength(result.value) : formatCadValue(result.value)}${unit}` : variable.expression}`;
   };
   /** What a row's eye shows or hides: a sketch, by its step's id, or a plane. */
