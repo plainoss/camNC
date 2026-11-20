@@ -29,7 +29,7 @@
         }
       },
       "feature #board",
-      { "expect": { "studio": { "dialog": "#board" } } },
+      { "expect": { "studio": { "dialog": "#board = 18 mm" } } },
       "dialogfill Value = 24mm",
       "dialogcancel",
       { "expect": { "studio": { "unchangedSince": "initial", "dialog": null } } },
