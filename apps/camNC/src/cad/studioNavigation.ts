@@ -250,7 +250,10 @@ function openDesignStep(editor: StudioNavigationInput, step: DesignStep) {
   if (step.kind === 'extrude')
     return openStudioFeature(editor, documentRef.current.parts.find(p => p.id === step.partId)?.hole ? 'hole' : 'extrude', step.partId);
   if (step.kind === 'move') return openStudioTransform(editor, step.partId, undefined, true);
-  if (step.kind === 'fillet') return openDialog({ kind: 'fillet', partId: step.partId, filletId: step.id });
+  if (step.kind === 'fillet') {
+    const chamfer = documentRef.current.parts.find(p => p.id === step.partId)?.fillets?.find(f => f.id === step.id)?.chamfer;
+    return openDialog({ kind: chamfer ? 'chamfer' : 'fillet', partId: step.partId, filletId: step.id });
+  }
   if (step.kind === 'mirror') return openDialog({ kind: 'mirror', partId: step.partId, joinId: step.id });
   if (step.kind === 'copy') {
     const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
@@ -497,6 +500,7 @@ export function runStudioCommand(editor: StudioNavigationInput, command: StudioC
       mark = () => markCadSession(session);
     startHole({ ...at, rolledTo: userRollback, read, mark, commit, open: openFeature, refuse: setStudioRefusal });
   } else if (command === 'fillet') openDialog({ kind: 'fillet' });
+  else if (command === 'chamfer') openDialog({ kind: 'chamfer' });
   else if (command === 'mirror') {
     if (part) openDialog({ kind: 'mirror', partId: part.id });
   } else if (command === 'plane') {
