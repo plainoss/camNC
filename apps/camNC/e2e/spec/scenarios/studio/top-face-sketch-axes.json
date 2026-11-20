@@ -1,0 +1,128 @@
+[
+ {
+  "id": "studio/sketch/top-face-sketch-keeps-world-axes",
+  "title": "A sketch on a block's top face keeps the world axes: sketch (60, h) is world (60, +h, z of the face)",
+  "evidence": "design workflow parity spec",
+  "steps": [
+   "dialogcancel",
+   "selectfeature Front",
+   "key Shift+s",
+   "key Shift+1",
+   "key g",
+   "rect 0,0 25,15",
+   "key Escape",
+   "key d",
+   "viewpick 12.5,15,0",
+   "viewpick 12.5,22,0",
+   "field Length 120",
+   "key Escape",
+   "key f",
+   "key d",
+   "viewpick 120,36,0",
+   "viewpick 132,36,0",
+   "key Escape",
+   "editdim 132,36",
+   "field Length 18",
+   "closesketch",
+   "key Shift+e",
+   "viewpick 60,0,9",
+   "dialogfill Thickness = 80",
+   "key Enter",
+   "dialogconfirm",
+   "key Shift+5",
+   "key Shift+7",
+   {
+    "expect": {
+     "studio": {
+      "dialog": null,
+      "features": [
+       {
+        "name": "Sketch 1",
+        "state": [
+         "hidden"
+        ]
+       },
+       "Extrude 1"
+      ],
+      "parts": [
+       "Part 1"
+      ]
+     }
+    }
+   },
+   {
+    "spec": "1 pick"
+   },
+   "viewpick 60,-40,18",
+   {
+    "spec": "2 command"
+   },
+   "key Shift+s",
+   {
+    "expect": {
+     "pageText": "Face of Extrude 1"
+    }
+   },
+   {
+    "spec": "3 view"
+   },
+   "key n",
+   {
+    "spec": "4 command"
+   },
+   "key g",
+   {
+    "spec": "5 draw"
+   },
+   "rect 0,0 25,15",
+   {
+    "spec": "6 cancel"
+   },
+   "key Escape",
+   {
+    "spec": "7 command"
+   },
+   "key d",
+   {
+    "spec": "8 pick"
+   },
+   "viewpick 12.5,15,0",
+   "viewpick 12.5,22,0",
+   {
+    "spec": "9 field"
+   },
+   "field Length 60",
+   {
+    "spec": "10 cancel"
+   },
+   "key Escape",
+   "key f",
+   {
+    "spec": "11 pick"
+   },
+   "viewpick 60,15,0",
+   {
+    "expect": {
+     "pageText": "X\\D{0,6}60\\.000"
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Z\\D{0,6}18\\.000"
+    }
+   },
+   {
+    "expect": {
+     "pageText": "Y\\D{0,6}15\\.000"
+    }
+   },
+   {
+    "expect": {
+     "studio": {
+      "dialog": "Sketch 2"
+     }
+    }
+   }
+  ]
+ }
+]

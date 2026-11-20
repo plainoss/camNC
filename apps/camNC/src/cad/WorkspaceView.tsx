@@ -422,7 +422,7 @@ export default function WorkspaceView({
             ? {
                 partId: selectedFace!.partId,
                 index: selectedFaceIndex,
-                point: selectedFrame.origin,
+                point: selectedFrame.anchor ?? selectedFrame.origin,
                 normal: selectedFrame.normal,
               }
             : null

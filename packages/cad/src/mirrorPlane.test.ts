@@ -33,13 +33,14 @@ it('resolves an Add body face on an inherited parent copy', () => {
   const document = createPlateDocument({ width: 100, height: 100, thickness: 18 });
   const block = document.parts[0]!;
   block.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
-  block.copies = [{ id: 'along', placement: { position: [200, 0, 0], rotation: [0, 0, 0, 1] } }];
+  block.copies = [{ id: 'along', placement: { position: [200, 0, 5], rotation: [0, 0, 0, 1] } }];
   const boss = createPlateDocument({ width: 20, height: 20, thickness: 10 }).parts[0]!;
   boss.addTo = block.id;
   boss.placement = { position: [40, 40, 18], rotation: [0, 0, 0, 1] };
   document.parts.push(boss);
   const frame = cadMirrorPlaneFrame(document, { across: { partId: boss.id, copyId: 'along', face: 'top' } });
   if (!frame || 'error' in frame) throw new Error('Missing inherited face');
-  expect(frame.origin).toEqual([240, 40, 28]);
+  // The copy's boss top, raised with the copy: 18 + 10 + 5.
+  expect(frame.origin[2]).toBe(33);
   expect(frame.normal).toEqual([0, 0, 1]);
 });
