@@ -1,0 +1,142 @@
+[
+  {
+    "id": "studio/hole/counterbore-countersink-dialogs",
+    "title": "The Hole dialog's Counterbore and Countersink tabs show their own sizes, and Cancel adds nothing",
+    "evidence": "design workflow parity spec",
+    "steps": [
+      "dialogcancel",
+      "view top",
+      "selectfeature Top",
+      "key Shift+s",
+      "key g",
+      "rect 0,0 25,15",
+      "key Escape",
+      "key d",
+      "viewpick 12.5,15,0",
+      "viewpick 12.5,22,0",
+      "field Length 100",
+      "key Escape",
+      "key f",
+      "key d",
+      "viewpick 100,7.5,0",
+      "viewpick 110,7.5,0",
+      "field Length 40",
+      "closesketch",
+      "key Shift+e",
+      "viewpick 50,20,0",
+      "dialogfill Thickness = 10",
+      "key Enter",
+      "dialogconfirm",
+      "key Shift+7",
+      "searchtool Chamfer",
+      "viewpick 50,0,10",
+      "dialogfill Distance = 3",
+      "key Enter",
+      "dialogconfirm",
+      "viewpick 50,20,10",
+      "key Shift+s",
+      "key n",
+      "key c",
+      "circle 50,20 6",
+      "key Escape",
+      "closesketch",
+      "key Shift+7",
+      "searchtool Hole",
+      "viewpick 50,20,10",
+      "dialogselect Termination = Through all",
+      "dialogselect Termination = Blind",
+      "dialogfill Diameter = 10",
+      "key Enter",
+      "dialogfill Hole depth = 5",
+      "key Enter",
+      "dialogconfirm",
+      {
+        "spec": "1 command"
+      },
+      "searchtool Hole",
+      {
+        "spec": "2 select"
+      },
+      "dialogtab Countersink",
+      {
+        "expect": {
+          "studio": {
+            "dialog": "⌀ 6 mm x 5 mm | (countersink)⌀ 10 mm x 90°"
+          },
+          "pageText": "Countersink diameter"
+        }
+      },
+      {
+        "expect": {
+          "pageText": "Tip angle"
+        }
+      },
+      {
+        "spec": "3 cancel"
+      },
+      "dialogcancel",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": ["hidden"]
+              },
+              "Extrude 1",
+              "Chamfer 1",
+              {
+                "name": "Sketch 2",
+                "state": ["hidden"]
+              },
+              "⌀ 10 mm x 5 mm"
+            ],
+            "parts": ["Part 1"]
+          }
+        }
+      },
+      {
+        "spec": "4 command"
+      },
+      "searchtool Hole",
+      {
+        "spec": "5 select"
+      },
+      "dialogtab Counterbore",
+      {
+        "expect": {
+          "studio": {
+            "dialog": "⌀ 6 mm x 5 mm | (counterbore)⌀ 12.25 mm x 1 mm"
+          },
+          "pageText": "Counterbore depth"
+        }
+      },
+      {
+        "spec": "6 cancel"
+      },
+      "dialogcancel",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": ["hidden"]
+              },
+              "Extrude 1",
+              "Chamfer 1",
+              {
+                "name": "Sketch 2",
+                "state": ["hidden"]
+              },
+              "⌀ 10 mm x 5 mm"
+            ],
+            "parts": ["Part 1"]
+          }
+        }
+      }
+    ]
+  }
+]

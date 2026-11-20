@@ -102,7 +102,13 @@ export function standaloneSketchPoints(sketch: CadSketch): Extract<CadEntity, { 
  * circles take their IDs from their points, so the holes keep theirs as the design changes.
  */
 export function holeSketch(part: CadPart): CadSketch {
-  const centres = standaloneSketchPoints(part.sketch);
+  // Points picked for the holes, a circle's centre among them; else every point standing on its own.
+  const picked = part.hole?.points && new Set(part.hole.points);
+  const centres = picked
+    ? part.sketch.entities.filter(
+        (entity): entity is Extract<CadEntity, { type: 'point' }> => entity.type === 'point' && picked.has(entity.id)
+      )
+    : standaloneSketchPoints(part.sketch);
   const radius = part.hole!.diameter / 2;
   return {
     ...part.sketch,

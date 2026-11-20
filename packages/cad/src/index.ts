@@ -1,4 +1,5 @@
 export * from './types';
+export * from './holeName';
 export * from './document';
 export * from './partCutSplit';
 export * from './partReferences';

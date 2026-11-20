@@ -107,6 +107,19 @@ describe('studio STEP export', () => {
     ]);
   });
 
+  it('writes a block with one top edge chamfered as the flat 45° face the chamfer cuts', async () => {
+    const part: CadPart = { ...createCadPart('Part 1', 10), id: 'block' };
+    part.sketch = addRectangle(part.sketch, { x: 0, y: 0, width: 100, height: 40 });
+    const points = new Map(part.sketch.entities.flatMap(e => (e.type === 'point' ? [[e.id, e] as const] : [])));
+    const front = part.sketch.entities.find(e => e.type === 'line' && points.get(e.startId)!.y === 0 && points.get(e.endId)!.y === 0)!;
+    part.fillets = [{ id: 'c', corners: [], rims: [{ side: 'top', loops: ['outline'], lines: [front.id] }], radius: 3, chamfer: true }];
+    const result = studioStep({ ...createCadDocument(), parts: [part] });
+    expect(result.problems).toEqual([]);
+    const { bodies } = await loadStep(new TextEncoder().encode(result.text), { locateFile: () => occtWasmUrl });
+    expect(bodies).toHaveLength(1);
+    expect(volume(bodies[0]!.mesh.positions, bodies[0]!.mesh.indices)).toBeCloseTo(39550, 3);
+  });
+
   it('writes a cup with both edges of its rim rounded over, taking away what the rounds do', async () => {
     const body: CadPart = { ...createCadPart('Part 1', 20), id: 'body' };
     body.sketch = addCircle(body.sketch, { x: 0, y: 0, radius: 38.9 });

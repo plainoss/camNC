@@ -36,15 +36,23 @@ export function nextSketchLabel(document: CadDocument, rolledTo?: string | null)
   return `Sketch ${(at < 0 ? steps : steps.slice(0, at + 1)).filter(step => step.kind === 'sketch').length + 1}`;
 }
 
+const isChamfer = (label: string) => /^Chamfer( ·| \d)/.test(label);
+
 /** The name a new Fillet takes, numbered after every fillet in the design, as Fillet 2. */
 export function nextFilletLabel(document: CadDocument): string {
-  return `Fillet ${designSteps(document).filter(step => step.kind === 'fillet').length + 1}`;
+  return `Fillet ${designSteps(document).filter(step => step.kind === 'fillet' && !isChamfer(step.label)).length + 1}`;
+}
+
+/** The name a new Chamfer takes, numbered after every chamfer in the design, as Chamfer 2. */
+export function nextChamferLabel(document: CadDocument): string {
+  return `Chamfer ${designSteps(document).filter(step => step.kind === 'fillet' && isChamfer(step.label)).length + 1}`;
 }
 
 /** The row of a feature whose dialog is open before it's made: a sketch waiting for its plane, or a new Fillet. */
 export function pendingRow(document: CadDocument, dialog: StudioDialog | null, choosingPlane: boolean, rolledTo: string | null) {
   if (choosingPlane) return { kind: 'sketch' as const, label: nextSketchLabel(document, rolledTo) };
   if (dialog?.kind === 'fillet' && !dialog.filletId) return { kind: 'fillet' as const, label: nextFilletLabel(document) };
+  if (dialog?.kind === 'chamfer' && !dialog.filletId) return { kind: 'fillet' as const, label: nextChamferLabel(document) };
   if (dialog?.kind === 'transform' && !dialog.copyId && !dialog.move) {
     const made = designSteps(document).filter(step => step.label.startsWith('Transform')).length;
     return { kind: 'copy' as const, label: `Transform ${made + 1}` };
