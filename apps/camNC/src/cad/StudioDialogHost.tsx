@@ -4,6 +4,7 @@ import { LinearPatternDialog } from './LinearPatternDialog';
 import { useRef, type ComponentProps } from 'react';
 import { ExtrudeDialog, type CadConnectorPick } from './PartFeatureDialogs';
 import { FilletDialog } from './FilletDialog';
+import { ChamferDialog } from './ChamferDialog';
 import { HoleDialog } from './HoleDialog';
 import { MirrorDialog } from './MirrorDialog';
 import { PartCutDialog } from './PartCutDialog';
@@ -164,6 +165,20 @@ export function StudioDialogHost({
     case 'fillet':
       return (
         <FilletDialog
+          key={dialogKey(dialog)}
+          document={document}
+          variables={variables}
+          partId={dialog.partId}
+          filletId={dialog.filletId}
+          pickEdge={pickPoint}
+          onPreview={onPreview}
+          onSave={save}
+          onCancel={close}
+        />
+      );
+    case 'chamfer':
+      return (
+        <ChamferDialog
           key={dialogKey(dialog)}
           document={document}
           variables={variables}
