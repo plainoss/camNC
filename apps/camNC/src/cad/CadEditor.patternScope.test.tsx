@@ -86,7 +86,7 @@ it('keeps a disappeared selected pattern slot from silently opening the source p
   const { change, latest } = await studio(parseCadDocument(structuredClone(tray)));
   await userEvent.click(parts().getByRole('button', { name: 'Divider 3' }));
   await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^#dividers/ }));
-  const dialog = await screen.findByRole('dialog', { name: '#dividers' });
+  const dialog = await screen.findByRole('dialog', { name: /^#dividers = / });
   const value = within(dialog).getByRole('textbox', { name: 'Value' });
   await userEvent.clear(value);
   await userEvent.type(value, '2');

@@ -138,6 +138,7 @@
         }
       },
       "studiotool Variable",
+      "dialogtab Number",
       "dialogfill Name = shelves",
       "dialogfill Value = 3",
       "dialogconfirm",

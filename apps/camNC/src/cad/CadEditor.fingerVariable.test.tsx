@@ -31,12 +31,12 @@ it('says on the joined parts and the Cut parts row why a finger count of 1 isnâ€
   const parts = () => within(screen.getByRole('list', { name: 'Parts' }));
   expect(within(features).queryByRole('status', { name: /with errors/ })).toBeNull();
   await userEvent.dblClick(within(features).getByRole('button', { name: /^#fingers = 5/ }));
-  const variable = await screen.findByRole('dialog', { name: '#fingers' });
+  const variable = await screen.findByRole('dialog', { name: /^#fingers = / });
   const field = within(variable).getByRole('textbox', { name: 'Value' });
   await userEvent.clear(field);
   await userEvent.type(field, '1');
   await userEvent.click(within(variable).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: '#fingers' })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^#fingers = / })).toBeNull());
   await settled();
   // The joint keeps its last good count, and says so where it's seen rather than silently.
   expect(latest.partCuts![1]!.split).toEqual({ fingers: 5, fingersExpression: 'fingers' });
