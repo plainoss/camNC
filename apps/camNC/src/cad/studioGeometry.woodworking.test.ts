@@ -162,7 +162,8 @@ it.each(['cabinet', 'tray'] as const)(
         expect(face).not.toHaveProperty('error');
         if ('error' in face) throw Error(face.error);
         const faceOrigin = cabinet ? [0, 400, bottom + state.board] : [left + state.board, 400, 0];
-        faceOrigin.forEach((value, axis) => expect(face.origin[axis]).toBeCloseTo(value, 6));
+        // A point of the face itself: a face looking up or down is sketched from the studio's origin, off the face.
+        faceOrigin.forEach((value, axis) => expect((face.anchor ?? face.origin)[axis]).toBeCloseTo(value, 6));
         const prefix = assemblyModel(copyOperationPrefix(current, move.id));
         const selected = prefix.instances.findIndex(instance => instance.partId === owner.id && instance.copyId === copyId);
         expect(boundaryVolume(prefix.meshes[selected]!.positions, prefix.meshes[selected]!.indices)).toBeCloseTo(stock - notch, 4);
