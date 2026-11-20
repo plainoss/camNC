@@ -6,7 +6,7 @@ merge_queue:
 
 queue_rules:
   - name: main
-    # Queue with @mergifyio queue, or label the PR `ready` (pull_request_rules below); passing CI alone is not merge
+    # Queue with @mergifyio queue, or label the PR `ready` (auto_merge_conditions below); passing CI alone is not merge
     # consent.
     queue_conditions:
       - base = main
@@ -55,11 +55,10 @@ priority_rules:
     allow_checks_interruption: false
 
 # The `ready` label is merge consent that doesn't need the author around: the PR queues once its queue conditions
-# hold (Run tests green, approved, no conflict), even if the session that opened it has stopped.
-pull_request_rules:
-  - name: queue PRs labelled ready
-    conditions:
-      - base = main
-      - label = ready
-    actions:
-      queue:
+# hold (Run tests green, approved, no conflict), even if the session that opened it has stopped. This uses auto-merge
+# conditions rather than a `queue` action in pull_request_rules, which only runs when Mergify's separate Workflow
+# Automation product is active (it isn't here, so labelled PRs never queued).
+merge_protections_settings:
+  auto_merge_conditions:
+    - base = main
+    - label = ready
