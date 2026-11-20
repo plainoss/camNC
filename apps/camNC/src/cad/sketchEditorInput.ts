@@ -35,6 +35,7 @@ import type { PartEdge } from './partEdges';
 import type { SketchTurn } from './sketchOrbit';
 import type { sketchBackdropView } from './sketchBackdropView';
 import type { useFaceSketchCamera } from './useFaceSketchCamera';
+import type { useSketchCommandPreviews } from './useSketchCommandPreviews';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { CadViewport } from '@wbcnc/cad-editor/viewState';
 import type { FaceSketchScene } from './faceSketchScene';
@@ -74,8 +75,12 @@ export type SketchEditorInput = {
     position: Point
   ) => { kind: 'entity' | 'dimension' | 'constraint'; id: string } | { readonly kind: 'blank' };
   contextualArc: boolean;
+  creationInput: RefObject<HTMLInputElement | null>;
+  creationValues: CreationValues | null;
   currentDimension: CadDimension | CadConstraint | undefined;
   cursor: Point;
+  dimension: string | null;
+  dimensionDraft: CadDimension | null;
   dimensionFlow: DimensionWorkflow;
   dimensionInput: RefObject<HTMLInputElement | null>;
   dimensionMode: CadDimensionMode;
@@ -155,6 +160,7 @@ export type SketchEditorInput = {
   rhoInput: RefObject<HTMLInputElement | null>;
   selectDimension: (id: string, additive?: boolean) => void;
   selected: string[];
+  selectedConstraints: string[];
   selectionHints: RefObject<Record<string, Point>>;
   session: CadSession;
   setBusy: Dispatch<SetStateAction<boolean>>;
@@ -163,6 +169,7 @@ export type SketchEditorInput = {
   setCircularParameters: Dispatch<SetStateAction<CircularPatternParameters>>;
   setConicEditing: Dispatch<SetStateAction<string | null>>;
   setConstraintMode: Dispatch<SetStateAction<ConstraintCommandTool | null>>;
+  setConstruction: Dispatch<SetStateAction<boolean>>;
   setContextMenu: Dispatch<SetStateAction<SketchContext | null>>;
   setContextualArc: Dispatch<SetStateAction<boolean>>;
   setCreationValues: Dispatch<SetStateAction<CreationValues | null>>;
@@ -202,12 +209,14 @@ export type SketchEditorInput = {
   setTool: Dispatch<SetStateAction<SketchTool>>;
   setTransformNotice: Dispatch<SetStateAction<string>>;
   setTransformParameters: Dispatch<SetStateAction<TransformParameters>>;
+  setUseNotice: Dispatch<SetStateAction<string | null>>;
   setUsingEdges: Dispatch<SetStateAction<boolean>>;
   setView: Dispatch<SetStateAction<CadViewport>>;
   shownSketch: CadSketch;
   sketch: CadSketch;
   sketchBackdrop: ReturnType<typeof useFaceSketchCamera> | ReturnType<typeof sketchBackdropView>;
   sketchTurn: SketchTurn;
+  slotPreview: ReturnType<typeof useSketchCommandPreviews>['slotPreview'];
   snap: boolean;
   solveDrag: (moving: DragGesture) => Promise<void>;
   solving: boolean;
@@ -216,6 +225,7 @@ export type SketchEditorInput = {
   takeEdges: (keys?: string[]) => void;
   tangentAxis: RefObject<InferredLineAxis | null>;
   tool: SketchTool;
+  transformPreview: ReturnType<typeof useSketchCommandPreviews>['transformPreview'];
   transformSelectionCenter: (ids: readonly string[]) => { x: number; y: number };
   usingEdges: boolean;
   variableScope: Readonly<Record<string, { value: number; kind: CadVariableKind }>>;
