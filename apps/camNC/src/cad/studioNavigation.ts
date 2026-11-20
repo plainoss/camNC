@@ -4,6 +4,7 @@ import {
   handOverEmptyExtrude,
   removeCadFeature,
   removeCadVariable,
+  setCadVariableSuppressed,
   removeDatumPlane,
   removeEdgeFillet,
   removePartCut,
@@ -319,6 +320,10 @@ export function studioFeatureAction(editor: StudioNavigationInput, entry: Featur
         if (sketchBefore.current) return;
       }
       return openDialog({ kind: 'variable', id: entry.id });
+    }
+    if (action === 'suppress') {
+      const variable = current.variables?.find(candidate => candidate.id === entry.id);
+      return commit(setCadVariableSuppressed(current, entry.id, !variable?.suppressed));
     }
     if (action === 'delete') {
       const result = removeCadVariable(current, entry.id);

@@ -40,7 +40,8 @@ function evaluateVariable(expression: string, scope: CadValueScope): CadVariable
 
 /** Every variable's value, and why any of them can't be worked out, by variable ID. */
 export function cadVariableValues(document: CadDocument): { scope: Record<string, CadVariableValue>; errors: Record<string, string> } {
-  const variables = document.variables ?? [];
+  // A suppressed variable has no value: what uses it can't be worked out, as if it were gone.
+  const variables = (document.variables ?? []).filter(variable => !variable.suppressed);
   const byName = new Map(variables.map(variable => [variable.name, variable]));
   const scope: Record<string, CadVariableValue> = {},
     errors: Record<string, string> = {},
@@ -268,7 +269,14 @@ export function setCadVariable(
       ? // Its place in the feature list stays as it was.
         variables.map(variable =>
           variable.id === id
-            ? { id, name, expression, ...(folderId && { folderId }), ...(variable.before && { before: variable.before }) }
+            ? {
+                id,
+                name,
+                expression,
+                ...(folderId && { folderId }),
+                ...(variable.before && { before: variable.before }),
+                ...(variable.suppressed && { suppressed: true as const }),
+              }
             : variable
         )
       : [...variables, { id, name, expression, ...(folderId && { folderId }) }],
@@ -285,7 +293,7 @@ export const kVariableMissing = 'Variable not found, is suppressed, or has not b
 
 /** The parts with a value naming a variable the design doesn't have, as after deleting one they used. */
 export function cadPartsMissingVariables(document: CadDocument): Set<string> {
-  const known = new Set((document.variables ?? []).map(variable => variable.name));
+  const known = new Set((document.variables ?? []).filter(variable => !variable.suppressed).map(variable => variable.name));
   const missing = new Set<string>();
   const check = (expression: string | undefined, partId?: string) => {
     if (partId && expression && cadExpressionNames(expression).some(name => !known.has(name))) missing.add(partId);
@@ -296,6 +304,20 @@ export function cadPartsMissingVariables(document: CadDocument): Set<string> {
     pattern: (pattern, owner) => Object.values(pattern.expressions).forEach(expression => check(expression, owner.partId)),
   });
   return missing;
+}
+
+/** Switches a variable off or back on: off, what uses it fails, as the reference marks it; on, it's all back. */
+export function setCadVariableSuppressed(document: CadDocument, id: string, suppressed: boolean): CadDocument {
+  if (!document.variables?.some(variable => variable.id === id && !!variable.suppressed !== suppressed)) return document;
+  return applyCadVariables({
+    ...document,
+    revision: document.revision + 1,
+    variables: document.variables.map(variable => {
+      if (variable.id !== id) return variable;
+      const { suppressed: _off, ...on } = variable;
+      return suppressed ? { ...on, suppressed: true as const } : on;
+    }),
+  });
 }
 
 /**

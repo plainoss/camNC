@@ -56,6 +56,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         throw new Error('Invalid CAD variable name');
       if (typeof variable.expression !== 'string') throw new Error('Invalid CAD variable');
       if (variable.before !== undefined && typeof variable.before !== 'string') throw new Error('Invalid CAD variable');
+      if (variable.suppressed !== undefined && variable.suppressed !== true) throw new Error('Invalid CAD variable');
       names.add(variable.name);
     }
   }

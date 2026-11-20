@@ -727,6 +727,8 @@ export interface CadVariable {
   folderId?: string;
   /** The design step it's listed before, as made while that step was edited: the feature list shows it there. */
   before?: string;
+  /** Switched off: it has no value, so what uses it fails until it's back on, as if it were deleted. */
+  suppressed?: true;
 }
 
 export interface CadDiagnostic {
