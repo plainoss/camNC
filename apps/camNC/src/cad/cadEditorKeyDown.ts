@@ -4,7 +4,7 @@ import type { Dispatch, KeyboardEvent, PointerEvent, RefObject, SetStateAction }
 import { idleDimensionWorkflow } from '@wbcnc/cad-editor/dimensionWorkflow';
 import { idleDrawingGesture } from '@wbcnc/cad-editor/drawingGesture';
 import { transitionModification } from '@wbcnc/cad-editor/modificationWorkflow';
-import { creationValueAt, type CreationValues } from './creationValues';
+import { creationValueAt } from './creationValues';
 import { initialTransformParameters } from './transformParameters';
 import { sketchTools as tools } from './sketchTools';
 import { editable } from './editorHelpers';
@@ -21,8 +21,6 @@ export type CadEditorKeyDownInput = SketchEditorInput & {
   applyCreationValue: (options?: { advance?: boolean }) => string | null;
   beginDimension: () => void;
   constrain: (type: ConstraintTool) => void;
-  creationValues: CreationValues | null;
-  dimension: string | null;
   finishSpline: (keepTool?: boolean) => void;
   hoveredPart: RefObject<string | null>;
   isolatePart: () => void;
@@ -31,7 +29,6 @@ export type CadEditorKeyDownInput = SketchEditorInput & {
   partHasOutline: boolean;
   pointerEnd: (cancel?: boolean, event?: PointerEvent<SVGSVGElement>) => void;
   polygonInput: RefObject<HTMLInputElement | null>;
-  selectedConstraints: string[];
   selectedFace: Extract<CadDrawnOn['on'], { partId: string }> | null;
   selectedPlane: string | null;
   setHiddenParts: Dispatch<SetStateAction<ReadonlySet<string>>>;
