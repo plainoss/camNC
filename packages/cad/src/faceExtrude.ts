@@ -1,5 +1,5 @@
 import { createCadPart } from './document';
-import { drawnOnOutline } from './drawnOn';
+import { drawnOnOutline, drawnOnReframe } from './drawnOn';
 import { faceSupportShape } from './faceSupport';
 import type { CadDocument, CadDrawnOn, CadEntity, CadPart } from './types';
 
@@ -45,10 +45,14 @@ export function refreshFaceProfile(document: CadDocument, part: CadPart): CadPar
     support && on && 'partId' in on && (on.face === 'top' || on.face === 'underside')
       ? (faceSupportShape(support, on.copyId ? support.copies?.find(copy => copy.id === on.copyId) : undefined)?.holes ?? [])
       : [];
+  // The holes are in the face's own coordinates; the outline is already as this sketch sees it.
+  const reframe = drawnOnReframe(document, part) ?? (points => points);
   const loops = outline
     ? [
         outline,
-        ...holes.map(hole => (on && 'partId' in on && on.face === 'underside' ? hole.map(p => ({ x: -p.x, y: p.y })).reverse() : hole)),
+        ...holes.map(hole =>
+          reframe(on && 'partId' in on && on.face === 'underside' ? hole.map(p => ({ x: -p.x, y: p.y })).reverse() : hole)
+        ),
       ]
     : [];
   const entities: CadEntity[] = part.sketch.entities.filter(e => e.faceEdge || e.id === `${part.sketch.id}:origin`);

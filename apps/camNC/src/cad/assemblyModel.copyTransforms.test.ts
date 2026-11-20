@@ -80,8 +80,10 @@ it.each([false, true])('lays out an unplaced host copy together with its joined 
   expect(bounds(model.meshes[parent]!)).toEqual({ min: [140, 0, 0], max: [240, 100, 18] });
   expect(bounds(model.meshes[child]!)).toEqual({ min: [180, 30, 18], max: [200, 40, 28] });
   expect(model.placements.get(instanceKey(model.instances[child]!))!.position).toEqual([mirrored ? 200 : 180, 30, 18]);
+  // A face looking up is sketched from the studio's origin below it; its anchor is the face's own corner.
   expect(physicalFaceFrame(document, { partId: f.childId, copyId: f.copyId, face: 'top' })).toMatchObject({
-    origin: [mirrored ? 200 : 180, 30, 28],
+    origin: [0, 0, 28],
+    anchor: [mirrored ? 200 : 180, 30, 28],
     normal: [0, 0, 1],
   });
   const cam = await nativeCadModel(document);

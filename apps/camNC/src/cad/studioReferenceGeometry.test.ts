@@ -76,7 +76,8 @@ it('reads a physical face frame without writing the source creation pose', () =>
   const f = context(false),
     bytes = JSON.stringify(f.document);
   expect(physicalFaceFrame(f.document, { partId: f.partId, copyId: f.copyId, face: 'top' })).toMatchObject({
-    origin: [300, 0, 18],
+    origin: [0, 0, 18],
+    anchor: [300, 0, 18],
     normal: [0, 0, 1],
   });
   expect(JSON.stringify(f.document)).toBe(bytes);

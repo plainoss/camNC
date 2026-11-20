@@ -1,5 +1,5 @@
 import { constraintEntityIds, entityPointIds } from './document';
-import { drawnOnOutline } from './drawnOn';
+import { drawnOnOutline, drawnOnReframe } from './drawnOn';
 import { faceSupportPart } from './faceSupport';
 import { evaluateCadPart } from './geometry';
 import type { CadDocument, CadEntity, CadPart, CadPointEntity, CadSketch } from './types';
@@ -11,6 +11,19 @@ const faceEdgeId = (sketch: CadSketch, key: string) => `${sketch.id}:face:${key}
 
 /** The edges a part's sketch sees of the face it's drawn on: its outline's lines, or an edge face's four sides. */
 function wantedFaceEdges(document: CadDocument, part: CadPart): CadEntity[] {
+  const on = part.drawnOn?.on;
+  const edges = faceEdgesOwn(document, part);
+  // A top or underside's edges come in the face's own coordinates; an edge face's outline is already the sketch's.
+  if (!on || 'plane' in on || (on.face !== 'top' && on.face !== 'underside')) return edges;
+  const reframe = drawnOnReframe(document, part);
+  if (!reframe) return edges;
+  const points = edges.filter((e): e is CadPointEntity => e.type === 'point');
+  const moved = reframe(points.map(p => ({ x: p.x, y: p.y })));
+  const at = new Map(points.map((p, i) => [p, moved[i]!]));
+  return edges.map(e => (e.type === 'point' ? { ...e, x: at.get(e)!.x === 0 ? 0 : at.get(e)!.x, y: at.get(e)!.y } : e));
+}
+
+function faceEdgesOwn(document: CadDocument, part: CadPart): CadEntity[] {
   const on = part.drawnOn?.on;
   if (!on || 'plane' in on) return [];
   const source = document.parts.find(candidate => candidate.id === on.partId);

@@ -845,7 +845,7 @@
      "face": "edge face-bracket-14",
      "looks": "+z",
      "origin": [
-      57.268,
+      0,
       0,
       63
      ]
@@ -921,7 +921,7 @@
      "looks": "-z",
      "origin": [
       0,
-      -25,
+      0,
       48.34
      ]
     },
@@ -938,8 +938,8 @@
      "face": "edge face-bracket-39",
      "looks": "+z",
      "origin": [
-      57.268,
-      -25,
+      0,
+      0,
       63
      ]
     },
@@ -1020,8 +1020,8 @@
      "face": "edge face-bracket-60",
      "looks": "+z",
      "origin": [
-      57.268,
-      -25,
+      0,
+      0,
       63
      ]
     },
@@ -1038,8 +1038,8 @@
      "face": "edge face-bracket-62",
      "looks": "-z",
      "origin": [
-      57.268,
-      -90.7,
+      0,
+      0,
       0
      ]
     }

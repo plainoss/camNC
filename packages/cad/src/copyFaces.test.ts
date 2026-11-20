@@ -174,6 +174,7 @@ it('preserves the reflected holes when a mirrored copy face is extruded as New',
   const result = evaluateCadPart(made);
   expect(result.part).toBeDefined();
   expect(result.part!.holes).toHaveLength(1);
-  expect(Math.min(...result.part!.holes[0]!.map(point => point.x))).toBeCloseTo(-24, 1);
-  expect(Math.max(...result.part!.holes[0]!.map(point => point.x))).toBeCloseTo(-16, 1);
+  // In the studio's x on the copy's top: the hole at 16..24 reflected about the copy at 300.
+  expect(Math.min(...result.part!.holes[0]!.map(point => point.x))).toBeCloseTo(276, 1);
+  expect(Math.max(...result.part!.holes[0]!.map(point => point.x))).toBeCloseTo(284, 1);
 });
