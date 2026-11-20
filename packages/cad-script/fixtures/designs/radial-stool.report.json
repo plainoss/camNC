@@ -788,8 +788,8 @@
      "face": "edge stool:leg:l0",
      "looks": "-z",
      "origin": [
-      120,
-      9,
+      0,
+      0,
       0
      ]
     },
@@ -806,8 +806,8 @@
      "face": "edge stool:leg:l2",
      "looks": "+z",
      "origin": [
-      180,
-      9,
+      0,
+      0,
       400
      ]
     },

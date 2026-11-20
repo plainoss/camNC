@@ -48,6 +48,40 @@ function rotationOf({ x, y, z }: Frame): [number, number, number, number] {
   return q.map(value => tidy(value / length)) as [number, number, number, number];
 }
 
+/**
+ * The sketch axes of a face looking straight up or down, as on the Top plane seen from above or below. Faces looking
+ * sideways already run along their edge and up, as the Front and Right planes do.
+ */
+const kAxisFaces: { z: Vec3; x: Vec3; y: Vec3 }[] = [
+  { z: [0, 0, 1], x: [1, 0, 0], y: [0, 1, 0] },
+  { z: [0, 0, -1], x: [1, 0, 0], y: [0, -1, 0] },
+];
+
+/**
+ * A face looking straight up or down sketches in the studio's x and y, from the studio's origin projected onto it: a
+ * block's top is drawn on as the Top plane is, however the block was made. Other faces keep their own frame.
+ */
+function studioAligned(frame: Frame): Frame {
+  const axes = kAxisFaces.find(candidate => dot(candidate.z, frame.z) > 1 - 1e-9);
+  if (!axes) return frame;
+  const along = dot(frame.origin, axes.z);
+  return {
+    origin: scale(axes.z, along).map(tidy) as Vec3,
+    x: axes.x,
+    y: axes.y,
+    z: axes.z,
+    ...(frame.length !== undefined && { length: frame.length }),
+  };
+}
+
+/** Points in one frame's sketch coordinates as another frame on the same plane has them. */
+const reframed = (points: CadPoint[], from: Frame, to: Frame): CadPoint[] =>
+  points.map(p => {
+    const world = add(add(from.origin, from.x, p.x), from.y, p.y),
+      offset = add(world, to.origin, -1);
+    return { x: tidy(dot(offset, to.x)), y: tidy(dot(offset, to.y)) };
+  });
+
 /** A frame given in a part's own coordinates, carried into the assembly with the part's placement. */
 const carried = (placement: CadPlacement, frame: Frame): Frame => ({
   origin: placePoint(placement, frame.origin),
@@ -158,7 +192,7 @@ export function resolveDrawnPlacements(
       if (!shape) return problem(`${support.name} can’t be worked out, so neither can where this goes.`);
       const face = partFace(facePart, shape, on.face);
       if (typeof face === 'string') return problem(face);
-      frame = carried(supportPlacement, face);
+      frame = studioAligned(carried(supportPlacement, face));
     }
     visiting.delete(part.id);
     let placement: CadPlacement;
@@ -231,16 +265,40 @@ export function drawnOnOutline(document: CadDocument, part: CadPart): CadPoint[]
   const facePart = support && faceSupportPart(support, on.copyId ? support.copies?.find(copy => copy.id === on.copyId) : undefined);
   const shape = support && faceSupportShape(support, on.copyId ? support.copies?.find(copy => copy.id === on.copyId) : undefined);
   if (!support || !shape) return null;
-  if (on.face === 'top') return shape.outline;
-  if (on.face === 'underside') return shape.outline.map(p => ({ x: -p.x, y: p.y })).reverse();
   const face = partFace(facePart!, shape, on.face);
   if (typeof face === 'string') return null;
-  return [
-    { x: 0, y: 0 },
-    { x: face.length!, y: 0 },
-    { x: face.length!, y: support.thickness },
-    { x: 0, y: support.thickness },
-  ];
+  const own =
+    on.face === 'top'
+      ? shape.outline
+      : on.face === 'underside'
+        ? shape.outline.map(p => ({ x: -p.x, y: p.y })).reverse()
+        : [
+            { x: 0, y: 0 },
+            { x: face.length!, y: 0 },
+            { x: face.length!, y: support.thickness },
+            { x: 0, y: support.thickness },
+          ];
+  return drawnOnReframe(document, part)?.(own) ?? null;
+}
+
+/**
+ * Points given in the coordinates of the face a part is drawn on (its support's sketch for a top, that seen from below
+ * for an underside, along the edge and up for an edge face) as the part's own sketch has them: a face looking up or
+ * down is sketched in the studio's x and y.
+ */
+export function drawnOnReframe(document: CadDocument, part: CadPart): ((points: CadPoint[]) => CadPoint[]) | null {
+  const on = part.drawnOn?.on;
+  if (!on || 'plane' in on) return null;
+  const support = document.parts.find(candidate => candidate.id === on.partId);
+  const copy = support && on.copyId ? support.copies?.find(candidate => candidate.id === on.copyId) : undefined;
+  if (!support || (on.copyId && !copy)) return null;
+  const shape = faceSupportShape(support, copy);
+  if (!shape) return null;
+  const face = partFace(faceSupportPart(support, copy), shape, on.face);
+  if (typeof face === 'string') return null;
+  const placed = carried(copy?.placement ?? readingPlacement(document, support), face);
+  const aligned = studioAligned(placed);
+  return aligned === placed ? points => points : points => reframed(points, placed, aligned);
 }
 
 /**
@@ -288,6 +346,11 @@ export interface CadFaceFrame {
   normal: Vec3;
   /** An edge face's length along its x. */
   length?: number;
+  /**
+   * A point of the face itself, where its own outline starts, when the sketch's origin isn't on it: a face looking up
+   * or down is sketched from the studio's origin projected onto it, which can lie off the face.
+   */
+  anchor?: Vec3;
 }
 /** A direction along one of the studio's axes. */
 export type CadAxisDirection = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
@@ -347,10 +410,9 @@ export function cadFaceFrame(document: CadDocument, on: CadDrawnOn['on']): CadFa
   if (!shape) return { error: `${part.name} can’t be worked out until its sketch is fixed.` };
   const face = partFace(facePart, shape, on.face);
   if (typeof face === 'string') return { error: `${part.name}: ${face}` };
-  return frame({
-    ...carried(copy?.placement ?? readingPlacement(document, part), face),
-    ...(face.length !== undefined && { length: face.length }),
-  });
+  const placed = carried(copy?.placement ?? readingPlacement(document, part), face);
+  const aligned = studioAligned({ ...placed, ...(face.length !== undefined && { length: face.length }) });
+  return { ...frame(aligned), ...(aligned.origin !== placed.origin && { anchor: placed.origin.map(tidy) as Vec3 }) };
 }
 
 /** Every flat face of a part a new part can be drawn on, with where it is in the studio. */

@@ -36,6 +36,7 @@ function fixture() {
   const dependent = createCadPart('Dependent', 6);
   dependent.sketch = addRectangle(dependent.sketch, { x: 0, y: 0, width: 10, height: 10 });
   dependent.drawnOn = { on: { partId, copyId, face: 'top' }, offset: 2 };
+  // Its sketch is in the studio's x and y on that top, from the origin below; the move turns it about (400, 0).
   dependent.moved = { by: [3, 4, 5], turn: { about: [400, 0, 20], axis: [0, 0, 1], degrees: 90 } };
   const used = createCadPart('Used generation', 6);
   used.sketch = addRectangle(used.sketch, { x: 0, y: 0, width: 10, height: 10 });
@@ -89,12 +90,12 @@ it('freezes placed body drawnOn/moved regeneration in the physical view while re
   expect(evaluation.diagnostics).toEqual([]);
   const view = physicalCadView(f.source, evaluation),
     projected = body(view.document, f.dependent);
-  expect(projected.placement!.position).toEqual([403, 4, 25]);
+  expect(projected.placement!.position).toEqual([403, -396, 25]);
   const regenerated = resolvePartPatterns(resolveDrawnPlacements(view.document).document);
   expect(body(regenerated, f.dependent).placement).toEqual(projected.placement);
   expect(body(regenerated, f.partId).copies![1]!.placement!.position).toEqual([500, 0, 0]);
   const frame = cadFaceFrame(regenerated, { partId: f.dependent, face: 'top' });
-  expect(frame).toEqual(expect.objectContaining({ origin: [403, 4, 31], x: [0, 1, 0], normal: [0, 0, 1] }));
+  expect(frame).toEqual(expect.objectContaining({ origin: [0, 0, 31], x: [1, 0, 0], normal: [0, 0, 1] }));
   const generated = evaluateCadPartFamily(projected, evaluateCadPart(projected).part!).part;
   expect(generated).toEqual(evaluation.parts.find(part => part.partId === f.dependent));
   expect(generated.cuts).toContainEqual(expect.objectContaining({ side: 'underside', from: 0, to: 2 }));
@@ -138,7 +139,7 @@ it('keeps prefix poses, future consumption and repeated physical queries in the 
     const view = physicalCadView(f.source, result),
       again = resolvePartPatterns(resolveDrawnPlacements(view.document).document);
     expect(body(again, f.partId).copies![1]!.placement!.position).toEqual([x, 0, 0]);
-    expect(body(again, f.dependent).placement!.position).toEqual([403, 4, 25]);
+    expect(body(again, f.dependent).placement!.position).toEqual([403, -396, 25]);
     expect(physicalCadView(f.source, result)).toEqual(view);
   }
   const prefix = physicalCadView(f.source, moved),

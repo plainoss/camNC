@@ -93,24 +93,25 @@ describe('the edges of the face a part is drawn on', () => {
       document.parts[0]!.sketch.entities.filter((e): e is CadPointEntity => e.type === 'point' && isFaceEdge(e)).map(p =>
         [p.x, p.y].map(v => Math.round(v * 1000) / 1000)
       );
-    const length = Math.max(...corners().map(([x]) => x!));
-    expect(corners()).toEqual([
-      [0, 0],
-      [length, 0],
-      [length, 18],
-      [0, 18],
-    ]);
+    // The face's own sketch axes are the studio's, from its origin: the rectangle sits where the edge face is.
+    const size = () => {
+      const points = corners();
+      return [0, 1].map(axis => Math.max(...points.map(p => p[axis]!)) - Math.min(...points.map(p => p[axis]!)));
+    };
+    expect(corners()).toHaveLength(4);
+    // This edge face looks down, so its sketch has the studio's x and its y the other way, the thickness along x.
+    expect(size()).toEqual([18, 100]);
     document = await withVariables(document, { board: '12mm' });
-    expect(corners().map(([, y]) => y)).toEqual([0, 0, 12, 12]);
+    expect(size()).toEqual([12, 100]);
   });
 
-  it('flips an underside’s edges as the underside is seen from below', () => {
+  it('turns an underside’s edges as the underside is seen from below: the studio’s x, its y the other way', () => {
     const bottom = plate('Bottom', '100mm', '50mm', 18, { on: { plane: 'top' }, offset: 0 });
     const under = plate('Under', '10mm', '10mm', 6, { on: { partId: bottom.id, face: 'underside' }, offset: 0 });
     const sketch = withFaceEdges({ ...createCadDocument(), parts: [bottom, under] }, under);
-    const xs = sketch.entities.filter((e): e is CadPointEntity => e.type === 'point' && isFaceEdge(e)).map(p => p.x);
-    expect(Math.min(...xs)).toBe(-100);
-    expect(Math.max(...xs)).toBe(0);
+    const points = sketch.entities.filter((e): e is CadPointEntity => e.type === 'point' && isFaceEdge(e));
+    expect([Math.min(...points.map(p => p.x)), Math.max(...points.map(p => p.x))]).toEqual([0, 100]);
+    expect([Math.min(...points.map(p => p.y)), Math.max(...points.map(p => p.y))]).toEqual([-100, 0]);
   });
 
   it('lets go of edges that are gone, keeping only those something is still tied to, where they were', () => {
