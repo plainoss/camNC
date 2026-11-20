@@ -12,6 +12,7 @@ export type StudioCommand =
   | 'mirror'
   | 'hole'
   | 'fillet'
+  | 'chamfer'
   | 'plane'
   | 'variable'
   | 'split';
@@ -64,6 +65,12 @@ export const kStudioCommands: { id: StudioCommand; label: string; hint: string; 
     label: 'Fillet',
     hint: 'Round a part’s edges through its thickness: click them in the view',
     glyph: <path d="M5 19V9a4 4 0 0 1 4-4h10M5 19h14" />,
+  },
+  {
+    id: 'chamfer',
+    label: 'Chamfer',
+    hint: 'Cut a part’s edges off flat at 45°: click them in the view, or a face for all of its edges',
+    glyph: <path d="M5 19V10l5-5h9M5 19h14" />,
   },
   {
     id: 'plane',

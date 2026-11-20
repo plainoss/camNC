@@ -99,8 +99,8 @@ it('rolls back to a Hole feature instead of looking for a pattern', async () => 
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   await waitFor(() => expect(props().meshes).toHaveLength(2));
   const features = screen.getByRole('region', { name: 'Features' });
-  await userEvent.dblClick(within(features).getByRole('button', { name: /Hole · Points/ }));
-  const dialog = await screen.findByRole('dialog', { name: 'Hole · Points' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /⌀ 8 mm THRU/ }));
+  const dialog = await screen.findByRole('dialog', { name: '⌀ 8 mm THRU' });
   await waitFor(() => expect(props().meshes).toHaveLength(1));
   await userEvent.click(within(dialog).getByRole('button', { name: 'Final' }));
   await waitFor(() => expect(props().meshes).toHaveLength(2));

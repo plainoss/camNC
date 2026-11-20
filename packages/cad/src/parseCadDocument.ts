@@ -239,6 +239,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         number(fillet.radius);
         if (fillet.radiusExpression !== undefined && typeof fillet.radiusExpression !== 'string') throw new Error('Invalid CAD fillet');
         if (fillet.suppressed !== undefined && typeof fillet.suppressed !== 'boolean') throw new Error('Invalid CAD fillet');
+        if (fillet.chamfer !== undefined && fillet.chamfer !== true) throw new Error('Invalid CAD fillet');
         if (fillet.rims !== undefined) {
           if (!Array.isArray(fillet.rims)) throw new Error('Invalid CAD fillet');
           for (const rim of fillet.rims)
@@ -249,7 +250,8 @@ export function parseCadDocument(input: unknown): CadDocument {
               !Array.isArray(rim.loops) ||
               !rim.loops.length ||
               rim.loops.some((loop: unknown) => typeof loop !== 'string' || !loop) ||
-              (rim.face !== undefined && rim.face !== true)
+              (rim.face !== undefined && rim.face !== true) ||
+              (rim.lines !== undefined && (!Array.isArray(rim.lines) || rim.lines.some((line: unknown) => typeof line !== 'string')))
             )
               throw new Error('Invalid CAD fillet');
         }

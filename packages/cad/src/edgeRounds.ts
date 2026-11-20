@@ -137,10 +137,23 @@ export function withEdgeRounds(
   const diagnostics: CadDiagnostic[] = [];
   const problems: CadEdgeRoundProblem[] = [];
   const key = (loopId: string, side: string) => `${side}\n${loopId}`;
+  // A sketch line's two ends, as the stretch of a loop it runs along.
+  const points = new Map(source.sketch.entities.flatMap(e => (e.type === 'point' ? [[e.id, e] as const] : [])));
+  const stretch = (id: string): [CadPoint, CadPoint] | null => {
+    const line = source.sketch.entities.find(e => e.id === id);
+    const a = line?.type === 'line' ? points.get(line.startId) : undefined,
+      b = line?.type === 'line' ? points.get(line.endId) : undefined;
+    return a && b
+      ? [
+          { x: a.x, y: a.y },
+          { x: b.x, y: b.y },
+        ]
+      : null;
+  };
   for (const fillet of fillets) {
     const wanted = [
       ...new Map(
-        fillet.rims!.flatMap(rim => rim.loops.map(loopId => [key(loopId, rim.side), { loopId, side: rim.side }] as const))
+        fillet.rims!.flatMap(rim => rim.loops.map(loopId => [key(loopId, rim.side), { loopId, side: rim.side, lines: rim.lines }] as const))
       ).values(),
     ];
     const reasons: string[] = [];
@@ -153,12 +166,17 @@ export function withEdgeRounds(
     };
     const r = fillet.radius;
     const found: CadRimLoop[] = [];
-    for (const edge of wanted) {
+    const stretches = new Map<CadRimLoop, [CadPoint, CadPoint][]>();
+    for (const { lines, ...edge } of wanted) {
       const loop = loops.find(candidate => candidate.id === edge.loopId && candidate.side === edge.side);
-      if (!loop) refuse(edge, 'an edge it rounds is gone.');
+      const along = lines?.map(stretch);
+      if (!loop || along?.some(line => !line)) refuse(edge, 'an edge it rounds is gone.');
       else if (rounds.some(round => round.loopId === loop.id && round.side === loop.side))
         refuse(edge, 'an edge it rounds is already rounded by an earlier fillet.');
-      else found.push(loop);
+      else {
+        found.push(loop);
+        if (along) stretches.set(loop, along as [CadPoint, CadPoint][]);
+      }
     }
     // Each edge is checked against the walls and faces around it, with this step's other rounds and earlier ones.
     // On a pocket's floor, the pocket's own wall bounds the face too, as a counterbore's does around its hole.
@@ -212,6 +230,8 @@ export function withEdgeRounds(
         radius: r,
         points: loop.points,
         material: loop.material,
+        ...(fillet.chamfer && { chamfer: true as const }),
+        ...(stretches.has(loop) && { edges: stretches.get(loop)! }),
       });
     if (!sharp.length) continue;
     const some = kept.length ? ` at ${sharp.length} of its ${wanted.length} edges` : '';

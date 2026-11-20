@@ -23,7 +23,8 @@ export const ALLOWED = {
     then: ['shiftclick'],
   },
   command: { steps: ['studiotool', 'searchtool', 'key', 'tool'] },
-  draw: { steps: ['rect', 'circle', 'line', 'arc'] },
+  // Drawing ends with Escape, putting the tool down, as a spec step may say.
+  draw: { steps: ['rect', 'circle', 'line', 'arc'], then: ['key Escape'] },
   // A value typed into a box a chip or dimension opened: double-click it, type, and Enter (or Tab, moving on).
   // A part taken out of a selection box with its chip's cross is a field's input too.
   // A dimension's value is typed into the box double-clicking its label (`editdim`) opens.
