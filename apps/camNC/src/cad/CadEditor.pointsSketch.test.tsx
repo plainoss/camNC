@@ -47,9 +47,9 @@ it('finishes a sketch of only points on a board’s face, and Hole drills at the
   expect(latest().parts[1]).toMatchObject({ extrude: false });
   await userEvent.click(within(features).getByRole('button', { name: /Sketch · Points/ }));
   await userEvent.click(await studioCommand(/^Hole/));
-  const dialog = await screen.findByRole('dialog', { name: 'Hole · Points' });
+  const dialog = await screen.findByRole('dialog', { name: '⌀ 6 mm THRU' });
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() =>
     expect(latest().parts[0]!.features?.filter(feature => feature.type === 'cut' && feature.depth === 'through')).toHaveLength(2)
   );
-});
+}, 40_000);

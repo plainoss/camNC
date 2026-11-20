@@ -95,10 +95,10 @@ it('previews hole diameter and blind depth without leaving either field', () => 
   render(<HoleDialog document={document} part={part} onChange={change} onOk={() => {}} onCancel={() => {}} />);
   edit('Diameter', '9');
   expect(latest.parts[0]!.hole?.diameter).toBe(9);
-  edit('Depth', '12');
+  edit('Hole depth', '12');
   expect(latest.parts[0]!.hole?.diameter).toBe(9);
   expect(latest.parts[0]!.remove?.depth).toBe(12);
-  edit('Depth', '0');
+  edit('Hole depth', '0');
   expect(latest.parts[0]!.remove?.depth).toBe(12);
 });
 

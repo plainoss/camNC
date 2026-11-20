@@ -39,6 +39,13 @@ export function nativePart(source: EvaluatedCadPart): {
       down: round.side === 'top',
       radius: round.radius,
       material: round.material,
+      ...(round.chamfer && { chamfer: true as const }),
+      ...(round.edges && {
+        edges: round.edges.map(([a, b]) => [
+          { x: a.x - offset.x, y: a.y - offset.y },
+          { x: b.x - offset.x, y: b.y - offset.y },
+        ]),
+      }),
     })
   );
   if (source.cuts?.length || rounds.length) ({ positions, indices } = cutPartMesh(features, below ?? undefined, rounds));
@@ -50,8 +57,10 @@ export function nativePart(source: EvaluatedCadPart): {
     indices = geometry.index ? Uint32Array.from(geometry.index.array) : Uint32Array.from({ length: positions.length / 3 }, (_, i) => i);
     geometry.dispose();
   }
-  // CAM runs a roundover bit around each, where one of its radius is in the job.
-  if (rounds.length) features.rounds = rounds.map(({ points, ...round }) => ({ loop: points, ...round }));
+  // CAM runs a roundover bit around each, where one of its radius is in the job. A chamfer isn't milled yet: its edge
+  // is cut square.
+  const rounded = rounds.filter(round => !round.chamfer);
+  if (rounded.length) features.rounds = rounded.map(({ points, ...round }) => ({ loop: points, ...round }));
   // A profile extruded further than it is high (an end profile drawn on a side plane and pushed out to the board's
   // width) is milled lying on its widest faces, from the top, with the profile's height as the stock's thickness.
   const lying = !rounds.length && !below ? laidFlat(source.name, positions, indices, source.thickness) : null;

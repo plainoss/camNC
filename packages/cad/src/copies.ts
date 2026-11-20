@@ -98,7 +98,21 @@ export function mirrorEvaluatedPart(part: EvaluatedCadPart): EvaluatedCadPart {
         ...(cut.tool && { tool: { ...cut.tool, x0: -cut.tool.x1, x1: -cut.tool.x0 } }),
       })),
     }),
-    ...(part.rounds && { rounds: part.rounds.map(round => ({ ...round, points: mirrorLoop(round.points) })) }),
+    ...(part.rounds && {
+      rounds: part.rounds.map(round => ({
+        ...round,
+        points: mirrorLoop(round.points),
+        ...(round.edges && {
+          edges: round.edges.map(
+            ([a, b]) =>
+              [
+                { ...a, x: -a.x },
+                { ...b, x: -b.x },
+              ] as [CadPoint, CadPoint]
+          ),
+        }),
+      })),
+    }),
   };
 }
 
