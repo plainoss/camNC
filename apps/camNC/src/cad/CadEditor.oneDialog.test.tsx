@@ -81,7 +81,7 @@ it('keeps what an Extrude dialog set when its sketch is opened from it', async (
 
 it('swaps an open dialog for a new Hole, keeping one dialog open', async () => {
   await studio();
-  await start(/^Variable/, 'Variable');
+  await start(/^Variable/, /^#\? = /);
   await userEvent.click(await studioCommand(/^Hole/));
   await screen.findByRole('dialog', { name: '⌀ 6 mm THRU' });
   expect(screen.getAllByRole('dialog')).toHaveLength(1);

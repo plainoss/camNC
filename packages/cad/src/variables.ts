@@ -40,7 +40,8 @@ function evaluateVariable(expression: string, scope: CadValueScope): CadVariable
 
 /** Every variable's value, and why any of them can't be worked out, by variable ID. */
 export function cadVariableValues(document: CadDocument): { scope: Record<string, CadVariableValue>; errors: Record<string, string> } {
-  const variables = document.variables ?? [];
+  // A suppressed variable has no value: what uses it can't be worked out, as if it were gone.
+  const variables = (document.variables ?? []).filter(variable => !variable.suppressed);
   const byName = new Map(variables.map(variable => [variable.name, variable]));
   const scope: Record<string, CadVariableValue> = {},
     errors: Record<string, string> = {},
@@ -237,7 +238,7 @@ export function cadVariableUses(document: CadDocument, name: string): number {
  */
 export function setCadVariable(
   document: CadDocument,
-  change: { id?: string; name: string; expression: string; folderId?: string | null },
+  change: { id?: string; name: string; expression: string; folderId?: string | null; description?: string; after?: string },
   /** How a plain number in it is read, as `cadVariableExpression` says: the design's unit unless given. */
   units: { lengthUnit?: CadLengthUnit; spellOutLengths?: boolean } = {}
 ): { document: CadDocument; id: string } | { error: string } {
@@ -258,7 +259,14 @@ export function setCadVariable(
     return { error: 'This folder no longer exists.' };
   if (variables.some(variable => variable.name === name && variable.id !== existing?.id))
     return { error: `There's already a variable called ${name}.` };
-  if (existing && existing.name === name && existing.expression === expression && existing.folderId === folderId)
+  const description = change.description === undefined ? existing?.description : change.description.trim() || undefined;
+  if (
+    existing &&
+    existing.name === name &&
+    existing.expression === expression &&
+    existing.folderId === folderId &&
+    existing.description === description
+  )
     return { document, id: existing.id };
   const id = existing?.id ?? change.id ?? newCadId();
   let next: CadDocument = {
@@ -268,10 +276,29 @@ export function setCadVariable(
       ? // Its place in the feature list stays as it was.
         variables.map(variable =>
           variable.id === id
-            ? { id, name, expression, ...(folderId && { folderId }), ...(variable.before && { before: variable.before }) }
+            ? {
+                id,
+                name,
+                expression,
+                ...(folderId && { folderId }),
+                ...(variable.before && { before: variable.before }),
+                ...(variable.after && { after: variable.after }),
+                ...(variable.suppressed && { suppressed: true as const }),
+                ...(description && { description }),
+              }
             : variable
         )
-      : [...variables, { id, name, expression, ...(folderId && { folderId }) }],
+      : [
+          ...variables,
+          {
+            id,
+            name,
+            expression,
+            ...(folderId && { folderId }),
+            ...(change.after && { after: change.after }),
+            ...(description && { description }),
+          },
+        ],
   };
   if (existing && existing.name !== name) next = mapExpressions(next, text => renameCadExpressionVariable(text, existing.name, name));
   const { errors } = cadVariableValues(next);
@@ -285,7 +312,7 @@ export const kVariableMissing = 'Variable not found, is suppressed, or has not b
 
 /** The parts with a value naming a variable the design doesn't have, as after deleting one they used. */
 export function cadPartsMissingVariables(document: CadDocument): Set<string> {
-  const known = new Set((document.variables ?? []).map(variable => variable.name));
+  const known = new Set((document.variables ?? []).filter(variable => !variable.suppressed).map(variable => variable.name));
   const missing = new Set<string>();
   const check = (expression: string | undefined, partId?: string) => {
     if (partId && expression && cadExpressionNames(expression).some(name => !known.has(name))) missing.add(partId);
@@ -296,6 +323,20 @@ export function cadPartsMissingVariables(document: CadDocument): Set<string> {
     pattern: (pattern, owner) => Object.values(pattern.expressions).forEach(expression => check(expression, owner.partId)),
   });
   return missing;
+}
+
+/** Switches a variable off or back on: off, what uses it fails, as the reference marks it; on, it's all back. */
+export function setCadVariableSuppressed(document: CadDocument, id: string, suppressed: boolean): CadDocument {
+  if (!document.variables?.some(variable => variable.id === id && !!variable.suppressed !== suppressed)) return document;
+  return applyCadVariables({
+    ...document,
+    revision: document.revision + 1,
+    variables: document.variables.map(variable => {
+      if (variable.id !== id) return variable;
+      const { suppressed: _off, ...on } = variable;
+      return suppressed ? { ...on, suppressed: true as const } : on;
+    }),
+  });
 }
 
 /**
