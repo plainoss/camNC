@@ -48,6 +48,8 @@ describe('reading faces by the way they look', () => {
       y: [0, 1, 0],
       normal: [0, 0, 1],
       length: 300,
+      // Where the edge itself starts, on the face.
+      anchor: [0, 300, 720],
     });
     expect(cadFaceFrame(document, { plane: 'front' })).toEqual({ origin: [0, 0, 0], x: [1, 0, 0], y: [0, 0, 1], normal: [0, -1, 0] });
   });
