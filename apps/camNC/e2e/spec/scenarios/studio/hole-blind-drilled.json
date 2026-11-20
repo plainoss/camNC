@@ -1,0 +1,209 @@
+[
+  {
+    "id": "studio/hole/blind-drilled",
+    "title": "A Hole on a sketch point drills a blind hole of the typed diameter and depth",
+    "evidence": "design workflow parity spec",
+    "steps": [
+      "dialogcancel",
+      "view top",
+      "selectfeature Top",
+      "key Shift+s",
+      "key g",
+      "rect 0,0 25,15",
+      "key Escape",
+      "key d",
+      "viewpick 12.5,15,0",
+      "viewpick 12.5,22,0",
+      "field Length 100",
+      "key Escape",
+      "key f",
+      "key d",
+      "viewpick 100,7.5,0",
+      "viewpick 110,7.5,0",
+      "field Length 40",
+      "closesketch",
+      "key Shift+e",
+      "viewpick 50,20,0",
+      "dialogfill Thickness = 10",
+      "key Enter",
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": ["hidden"]
+              },
+              "Extrude 1"
+            ],
+            "parts": ["Part 1"]
+          }
+        }
+      },
+      "key Shift+7",
+      "searchtool Chamfer",
+      {
+        "expect": {
+          "studio": {
+            "dialog": "Chamfer 1"
+          },
+          "pageText": "Entities to chamfer"
+        }
+      },
+      {
+        "expect": {
+          "pageText": "Equal distance"
+        }
+      },
+      {
+        "expect": {
+          "pageText": "Tangent propagation"
+        }
+      },
+      "viewpick 50,0,10",
+      {
+        "expect": {
+          "pageText": "Edge of Extrude 1"
+        }
+      },
+      "dialogfill Distance = 3",
+      "key Enter",
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": ["hidden"]
+              },
+              "Extrude 1",
+              "Chamfer 1"
+            ],
+            "parts": ["Part 1"]
+          }
+        }
+      },
+      {
+        "spec": "1 pick"
+      },
+      "viewpick 50,20,10",
+      {
+        "spec": "2 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "3 view"
+      },
+      "key n",
+      {
+        "spec": "4 command"
+      },
+      "key c",
+      {
+        "spec": "5 draw"
+      },
+      "circle 50,20 6",
+      "key Escape",
+      {
+        "spec": "6 confirm"
+      },
+      "closesketch",
+      {
+        "spec": "7 view"
+      },
+      "key Shift+7",
+      {
+        "spec": "8 command"
+      },
+      "searchtool Hole",
+      {
+        "expect": {
+          "studio": {
+            "dialog": "⌀ 6 mm THRU"
+          },
+          "pageText": "Sketch points to place holes"
+        }
+      },
+      {
+        "expect": {
+          "pageText": "Start from part"
+        }
+      },
+      {
+        "spec": "9 pick"
+      },
+      "viewpick 50,20,10",
+      {
+        "expect": {
+          "pageText": "Vertex of Sketch 2"
+        }
+      },
+      {
+        "spec": "10 select"
+      },
+      "dialogselect Termination = Through all",
+      {
+        "spec": "11 select"
+      },
+      "dialogselect Termination = Blind",
+      {
+        "expect": {
+          "studio": {
+            "dialog": "⌀ 6 mm x 33 mm"
+          }
+        }
+      },
+      {
+        "spec": "12 field"
+      },
+      "dialogfill Diameter = 10",
+      "key Enter",
+      {
+        "expect": {
+          "pageText": "Parameters have been overridden"
+        }
+      },
+      {
+        "spec": "13 field"
+      },
+      "dialogfill Hole depth = 5",
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": "⌀ 10 mm x 5 mm"
+          }
+        }
+      },
+      {
+        "spec": "14 confirm"
+      },
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": ["hidden"]
+              },
+              "Extrude 1",
+              "Chamfer 1",
+              {
+                "name": "Sketch 2",
+                "state": ["hidden"]
+              },
+              "⌀ 10 mm x 5 mm"
+            ],
+            "parts": ["Part 1"]
+          }
+        }
+      }
+    ]
+  }
+]

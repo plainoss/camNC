@@ -22,6 +22,10 @@ export type StudioDialog =
   | { kind: 'transform'; partId: string; copyId?: string; move?: boolean }
   | { kind: 'mirror'; partId: string; copyId?: string; joinId?: string }
   | { kind: 'fillet'; partId?: string; filletId?: string }
+  /** A Hole being added: its sketch points picked in the view. A Hole step is changed in its feature dialog. */
+  | { kind: 'newHole'; sketchId?: string }
+  /** A Chamfer step being added, or the one being changed: a fillet step that cuts its edges off flat. */
+  | { kind: 'chamfer'; partId?: string; filletId?: string }
   | { kind: 'plane'; id?: string; preselected?: CadDrawnOn['on'] }
   /** A variable being added, or the one being changed. */
   | { kind: 'variable'; id?: string }
@@ -38,6 +42,8 @@ export const dialogCommand: Record<StudioDialog['kind'], StudioCommand> = {
   transform: 'transform',
   mirror: 'mirror',
   fillet: 'fillet',
+  chamfer: 'chamfer',
+  newHole: 'hole',
   plane: 'plane',
   variable: 'variable',
   partCut: 'cutParts',
@@ -60,7 +66,10 @@ export function dialogKey(dialog: StudioDialog): string | null {
     case 'mirror':
       return dialog.joinId ?? dialog.copyId ?? dialog.partId;
     case 'fillet':
+    case 'chamfer':
       return dialog.filletId ?? 'new';
+    case 'newHole':
+      return 'new';
     case 'plane':
     case 'variable':
     case 'partCut':
@@ -115,6 +124,7 @@ export function editedStepId(document: CadDocument, dialog: StudioDialog | null)
     case 'mirror':
       return dialog.joinId ?? dialog.copyId ?? null;
     case 'fillet':
+    case 'chamfer':
       return dialog.filletId ?? null;
     case 'split':
       return (dialog.partId && document.parts.find(part => part.id === dialog.partId)?.split?.id) || null;
