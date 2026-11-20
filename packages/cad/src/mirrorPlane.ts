@@ -38,10 +38,13 @@ export function cadMirrorPlaneFrame(document: CadDocument, mirror: NonNullable<C
     if (instance!.mirrored) local[0] *= -1;
     return rotateVector(copy.placement!.rotation, local);
   };
-  const local = rotateVector(back, frame.origin.map((value, axis) => value - at.position[axis]!) as Vec3);
+  // A point of the face itself, so the copy's plane passes through the copy's face.
+  const onFace = frame.anchor ?? frame.origin;
+  const local = rotateVector(back, onFace.map((value, axis) => value - at.position[axis]!) as Vec3);
   if (instance!.mirrored) local[0] *= -1;
+  const { anchor: _anchor, ...plane } = frame;
   return {
-    ...frame,
+    ...plane,
     origin: placePoint(copy.placement, local),
     x: vector(frame.x),
     y: vector(frame.y),

@@ -653,7 +653,7 @@
      "face": "edge b9f4",
      "looks": "+z",
      "origin": [
-      150,
+      0,
       0,
       619
      ]
@@ -662,7 +662,7 @@
      "face": "edge cc8c",
      "looks": "-z",
      "origin": [
-      -150,
+      0,
       0,
       0
      ]
@@ -680,7 +680,7 @@
      "face": "edge 7d46",
      "looks": "+z",
      "origin": [
-      150,
+      0,
       0,
       619
      ]

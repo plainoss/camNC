@@ -155,6 +155,9 @@ function* solveCadSteps(document: CadDocument, options: CadSolveOptions): Genera
       sketches,
     };
   }
+  // A face square to a studio axis is sketched in the studio's axes, so where its edges fall in a sketch drawn on it
+  // depends on where its part is: place the parts first, as the sketches stand, before their face edges are read.
+  next = resolveDrawnPlacements(next).document;
   let nativeModule: ModuleStatic | undefined;
   let nativePromise: Promise<ModuleStatic> | undefined;
   try {
