@@ -80,7 +80,7 @@ it('keeps a disappeared pattern copy from becoming a source transform', async ()
   const { change, latest } = await studio(source);
   await userEvent.click(within(screen.getByRole('list', { name: 'Parts' })).getByRole('button', { name: 'Divider 3' }));
   await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^#dividers/ }));
-  const dialog = await screen.findByRole('dialog', { name: '#dividers' });
+  const dialog = await screen.findByRole('dialog', { name: /^#dividers = / });
   const value = within(dialog).getByRole('textbox', { name: 'Value' });
   await userEvent.clear(value);
   await userEvent.type(value, '2');

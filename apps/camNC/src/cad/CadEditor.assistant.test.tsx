@@ -187,7 +187,7 @@ it('keeps an assistant proposal pending until a feature preview is cancelled', a
   const preview = await within(dock).findByRole('button', { name: 'Review proposal' }, { timeout: 45_000 });
   const toolbar = screen.getByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(await studioCommand(/^Variable$/));
-  const feature = await screen.findByRole('dialog', { name: 'Variable' });
+  const feature = await screen.findByRole('dialog', { name: /^#\? = / });
   expect(preview).toHaveProperty('disabled', true);
   expect(screen.getByRole('button', { name: 'Assistant' })).toHaveProperty('disabled', true);
   expect(toolbar.querySelector<HTMLInputElement>('input[type="file"]')!.disabled).toBe(true);
