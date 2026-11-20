@@ -148,7 +148,7 @@ it('retains the ordinary variable dialog cancellation behavior', async () => {
       />
     </div>
   );
-  const dialog = screen.getByRole('dialog', { name: '#width' });
+  const dialog = screen.getByRole('dialog', { name: /^#width = / });
   const field = within(dialog).getByRole('textbox', { name: 'Value' });
   await userEvent.clear(field);
   await userEvent.type(field, '1200mm');

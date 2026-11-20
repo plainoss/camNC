@@ -128,7 +128,7 @@ it('does not substitute the source when the selected pattern slot disappears', a
   const { source, latest } = await studio(parseCadDocument(structuredClone(cabinet)));
   await userEvent.click(parts().getByRole('button', { name: 'Shelf 3' }));
   await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^#shelves/ }));
-  const dialog = await screen.findByRole('dialog', { name: '#shelves' });
+  const dialog = await screen.findByRole('dialog', { name: /^#shelves = / });
   const value = within(dialog).getByRole('textbox', { name: 'Value' });
   await userEvent.clear(value);
   await userEvent.type(value, '2');
