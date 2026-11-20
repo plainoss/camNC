@@ -81,7 +81,10 @@ function menuItems(
     sketchName = 'sketch',
     shown,
     folders = false,
+    suppressed = false,
   }: {
+    /** A variable switched off: its menu offers to switch it back on. */
+    suppressed?: boolean;
     rolledBack?: boolean;
     last?: boolean;
     sketchName?: string;
@@ -90,9 +93,19 @@ function menuItems(
     folders?: boolean;
   } = {}
 ): { action: FeatureAction; label: string; disabled?: boolean; title?: string }[] {
-  if (entry.kind === 'variable' || entry.kind === 'plane')
+  if (entry.kind === 'variable')
     return [
-      ...(entry.kind === 'plane' ? [{ action: 'newSketch' as const, label: 'New sketch' }] : []),
+      { action: 'edit', label: 'Edit…' },
+      unavailable('Add selection to folder…'),
+      unavailable('Section view…'),
+      { action: 'suppress', label: suppressed ? 'Unsuppress' : 'Suppress' },
+      unavailable('Dynamic suppression'),
+      unavailable('Add comment'),
+      { action: 'delete', label: 'Delete' },
+    ];
+  if (entry.kind === 'plane')
+    return [
+      { action: 'newSketch' as const, label: 'New sketch' },
       { action: 'edit', label: 'Edit…' },
       { action: 'delete', label: 'Delete' },
     ];
@@ -218,6 +231,7 @@ export function FeatureList({
 }) {
   const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);
+  const variableOff = (id: string) => !!document.variables?.find(variable => variable.id === id)?.suppressed;
   const pendingProblem = useSyncExternalStore(subscribePendingProblem, pendingProblemNow);
   const previewed = useMemo(() => (preview && preview !== document ? designSteps(preview) : null), [preview, document]);
   const entries = folderFeatureEntries(document).map(entry => {
@@ -261,7 +275,7 @@ export function FeatureList({
     if (entry.kind === 'plane') return document.planes!.find(candidate => candidate.id === entry.id)!.name;
     const variable = document.variables!.find(candidate => candidate.id === entry.id)!;
     const result = scope[variable.name];
-    const unit = result?.kind === 'length' ? ` ${lengthUnit}` : result?.kind === 'angle' ? '°' : '';
+    const unit = result?.kind === 'length' ? ` ${lengthUnit}` : result?.kind === 'angle' ? ' deg' : '';
     return `#${variable.name} = ${result ? `${result.kind === 'length' ? formatLength(result.value) : formatCadValue(result.value)}${unit}` : variable.expression}`;
   };
   /** What a row's eye shows or hides: a sketch, by its step's id, or a plane. */
@@ -552,7 +566,7 @@ export function FeatureList({
                   rollbackAt >= 0 && index > rollbackAt && 'cad-feature-rolled-back',
                   folderId && 'cad-folder-child',
                   folder?.suppressed && 'cad-feature-suppressed',
-                  step?.suppressed && 'cad-feature-suppressed',
+                  (step?.suppressed || (entry.kind === 'variable' && variableOff(entry.id))) && 'cad-feature-suppressed',
                   step?.broken && 'cad-feature-broken',
                   visibilityId(entry) && shown?.(visibilityId(entry)!) === false && 'cad-feature-hidden',
                   ...dropClasses(key(entry)),
@@ -692,6 +706,7 @@ export function FeatureList({
             sketchName: sketchOf(menu.entry),
             shown: onToggleShown && visibilityId(menu.entry) ? shown?.(visibilityId(menu.entry)!) !== false : undefined,
             folders: !!onChange && !inFolder(menu.entry),
+            suppressed: menu.entry.kind === 'variable' && variableOff(menu.entry.id),
           }).map(item => (
             <button
               key={item.label}

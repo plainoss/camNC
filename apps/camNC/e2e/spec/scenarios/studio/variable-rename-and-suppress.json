@@ -1,0 +1,147 @@
+[
+  {
+    "id": "studio/variable/rename-and-suppress-used",
+    "title": "Renaming a used variable follows through; suppressing it makes what uses it fail until it's back on",
+    "evidence": "design workflow parity spec",
+    "steps": [
+      "dialogcancel",
+      "view top",
+      "selectfeature Top",
+      "key Shift+s",
+      "key g",
+      "rect 0,0 25,15",
+      "key Escape",
+      "key d",
+      "viewpick 12.5,15,0",
+      "viewpick 12.5,22,0",
+      "field Length 100",
+      "key Escape",
+      "key f",
+      "key d",
+      "viewpick 100,7.5,0",
+      "viewpick 110,7.5,0",
+      "field Length 40",
+      "closesketch",
+      "key Shift+e",
+      "viewpick 50,20,0",
+      "dialogfill Thickness = 10",
+      "key Enter",
+      "dialogconfirm",
+      "key Shift+7",
+      {
+        "spec": "1 select"
+      },
+      "feature Extrude 1",
+      {
+        "spec": "2 field"
+      },
+      "dialogfill Thickness = #thic",
+      {
+        "spec": "3 field"
+      },
+      "type k",
+      {
+        "spec": "4 select"
+      },
+      "key Enter",
+      {
+        "spec": "5 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": ["hidden"]
+              },
+              "#thick = 10 mm",
+              "Extrude 1"
+            ]
+          }
+        }
+      },
+      {
+        "spec": "6 confirm"
+      },
+      "dialogconfirm",
+      {
+        "spec": "7 select"
+      },
+      "feature #thick",
+      {
+        "spec": "8 field"
+      },
+      "dialogfill Name = thk",
+      {
+        "spec": "9 confirm"
+      },
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": ["hidden"]
+              },
+              "#thk = 10 mm",
+              "Extrude 1"
+            ],
+            "parts": ["Part 1"]
+          }
+        }
+      },
+      {
+        "spec": "10 select"
+      },
+      "featuremenu #thk",
+      "menuitem Suppress",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": ["hidden"]
+              },
+              {
+                "name": "#thk = 10 mm",
+                "state": ["suppressed"]
+              },
+              {
+                "name": "Extrude 1",
+                "state": ["error"]
+              }
+            ],
+            "parts": []
+          }
+        }
+      },
+      {
+        "spec": "11 select"
+      },
+      "featuremenu #thk",
+      "menuitem Unsuppress",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": ["hidden"]
+              },
+              "#thk = 10 mm",
+              "Extrude 1"
+            ],
+            "parts": ["Part 1"]
+          }
+        }
+      }
+    ]
+  }
+]

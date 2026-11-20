@@ -526,17 +526,21 @@ it('lists variables with the steps, edits them in a dialog, and offers a menu on
   const { latest } = await studio();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(await studioCommand(/Variable/));
-  let dialog = screen.getByRole('dialog', { name: 'Variable' });
+  let dialog = screen.getByRole('dialog', { name: /^#\? = / });
   await userEvent.type(within(dialog).getByRole('textbox', { name: /Name/ }), 'board');
+  await userEvent.clear(within(dialog).getByRole('textbox', { name: /Value/ }));
   await userEvent.type(within(dialog).getByRole('textbox', { name: /Value/ }), '19 mm');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   const features = screen.getByRole('region', { name: 'Features' });
-  await waitFor(() => expect([...features.querySelectorAll('ol button')].map(button => button.textContent)[0]).toMatch(/#board = 19 mm/));
+  // Made by the Variable tool, it's listed after the last step.
+  await waitFor(() =>
+    expect([...features.querySelectorAll('ol button')].map(button => button.textContent).at(-1)).toMatch(/#board = 19 mm/)
+  );
   expect(latest().variables?.map(variable => variable.name)).toEqual(['board']);
 
   // Double-clicking it opens it again.
   await userEvent.dblClick(within(features).getByRole('button', { name: /#board/ }));
-  dialog = screen.getByRole('dialog', { name: '#board' });
+  dialog = screen.getByRole('dialog', { name: /^#board = / });
   await userEvent.clear(within(dialog).getByRole('textbox', { name: /Value/ }));
   await userEvent.type(within(dialog).getByRole('textbox', { name: /Value/ }), '12 mm');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
@@ -560,6 +564,8 @@ it('lists variables with the steps, edits them in a dialog, and offers a menu on
     'Add comment',
     'Zoom to selection',
     'Show dependencies…',
+    // The variable is listed after it, so it can be rolled back to.
+    'Roll to here',
     'Add appearance to feature…',
     'Delete',
   ]);
@@ -662,7 +668,7 @@ it('deletes a variable in use, brought back by one Undo, and edits a variable fr
   await userEvent.dblClick(within(features).getByRole('button', { name: /Sketch · Plate/ }));
   await screen.findByRole('dialog', { name: 'Sketch · Plate' });
   await userEvent.dblClick(within(features).getByRole('button', { name: /#a = 10 mm/ }));
-  expect(await screen.findByRole('dialog', { name: '#a' })).toBeDefined();
+  expect(await screen.findByRole('dialog', { name: /^#a = / })).toBeDefined();
   expect(screen.queryByRole('dialog', { name: 'Sketch · Plate' })).toBeNull();
 });
 
@@ -670,10 +676,10 @@ it('closes an open variable dialog when another step is started', async () => {
   await studio();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(await studioCommand(/Variable/));
-  expect(screen.getByRole('dialog', { name: 'Variable' })).toBeDefined();
+  expect(screen.getByRole('dialog', { name: /^#\? = / })).toBeDefined();
   await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
   expect(await screen.findByRole('dialog', { name: /^Extrude \d/ })).toBeDefined();
-  expect(screen.queryByRole('dialog', { name: 'Variable' })).toBeNull();
+  expect(screen.queryByRole('dialog', { name: /^#\? = / })).toBeNull();
 });
 
 it('keeps steps already set when a cut’s sketch view is cancelled', async () => {

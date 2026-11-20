@@ -1,0 +1,121 @@
+[
+  {
+    "id": "studio/variable/angle-and-number",
+    "title": "The Variable tool makes Angle and Number variables, listed after the last feature",
+    "evidence": "design workflow parity spec",
+    "steps": [
+      "dialogcancel",
+      "view top",
+      "selectfeature Top",
+      "key Shift+s",
+      "key g",
+      "rect 0,0 25,15",
+      "key Escape",
+      "key d",
+      "viewpick 12.5,15,0",
+      "viewpick 12.5,22,0",
+      "field Length 100",
+      "key Escape",
+      "key f",
+      "key d",
+      "viewpick 100,7.5,0",
+      "viewpick 110,7.5,0",
+      "field Length 40",
+      "closesketch",
+      "key Shift+e",
+      "viewpick 50,20,0",
+      "dialogfill Thickness = 10",
+      "key Enter",
+      "dialogconfirm",
+      "key Shift+7",
+      {
+        "spec": "1 command"
+      },
+      "searchtool Variable",
+      {
+        "expect": {
+          "studio": {
+            "dialog": "#? = 0 mm"
+          },
+          "pageText": "Description"
+        }
+      },
+      {
+        "spec": "2 select"
+      },
+      "dialogtab Angle",
+      {
+        "expect": {
+          "studio": {
+            "dialog": "#? = 0 deg"
+          }
+        }
+      },
+      {
+        "spec": "3 field"
+      },
+      "dialogfill Name = ang",
+      {
+        "spec": "4 field"
+      },
+      "dialogfill Value = 45",
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": "#ang = 45 deg"
+          }
+        }
+      },
+      {
+        "spec": "5 confirm"
+      },
+      "dialogconfirm",
+      {
+        "spec": "6 command"
+      },
+      "searchtool Variable",
+      {
+        "spec": "7 select"
+      },
+      "dialogtab Number",
+      {
+        "spec": "8 field"
+      },
+      "dialogfill Name = n",
+      {
+        "spec": "9 field"
+      },
+      "dialogfill Value = 3",
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": "#n = 3"
+          }
+        }
+      },
+      {
+        "spec": "10 confirm"
+      },
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": ["hidden"]
+              },
+              "Extrude 1",
+              "#ang = 45 deg",
+              "#n = 3"
+            ],
+            "parts": ["Part 1"]
+          }
+        }
+      }
+    ]
+  }
+]
