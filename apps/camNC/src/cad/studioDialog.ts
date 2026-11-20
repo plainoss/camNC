@@ -22,6 +22,8 @@ export type StudioDialog =
   | { kind: 'transform'; partId: string; copyId?: string; move?: boolean }
   | { kind: 'mirror'; partId: string; copyId?: string; joinId?: string }
   | { kind: 'fillet'; partId?: string; filletId?: string }
+  /** A Hole being added: its sketch points picked in the view. A Hole step is changed in its feature dialog. */
+  | { kind: 'newHole'; sketchId?: string }
   /** A Chamfer step being added, or the one being changed: a fillet step that cuts its edges off flat. */
   | { kind: 'chamfer'; partId?: string; filletId?: string }
   | { kind: 'plane'; id?: string; preselected?: CadDrawnOn['on'] }
@@ -41,6 +43,7 @@ export const dialogCommand: Record<StudioDialog['kind'], StudioCommand> = {
   mirror: 'mirror',
   fillet: 'fillet',
   chamfer: 'chamfer',
+  newHole: 'hole',
   plane: 'plane',
   variable: 'variable',
   partCut: 'cutParts',
@@ -65,6 +68,8 @@ export function dialogKey(dialog: StudioDialog): string | null {
     case 'fillet':
     case 'chamfer':
       return dialog.filletId ?? 'new';
+    case 'newHole':
+      return 'new';
     case 'plane':
     case 'variable':
     case 'partCut':

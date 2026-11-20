@@ -6,6 +6,7 @@ import { ExtrudeDialog, type CadConnectorPick } from './PartFeatureDialogs';
 import { FilletDialog } from './FilletDialog';
 import { ChamferDialog } from './ChamferDialog';
 import { HoleDialog } from './HoleDialog';
+import { NewHoleDialog } from './NewHoleDialog';
 import { MirrorDialog } from './MirrorDialog';
 import { PartCutDialog } from './PartCutDialog';
 import { PlaneDialog } from './PlaneDialog';
@@ -171,6 +172,19 @@ export function StudioDialogHost({
           partId={dialog.partId}
           filletId={dialog.filletId}
           pickEdge={pickPoint}
+          onPreview={onPreview}
+          onSave={save}
+          onCancel={close}
+        />
+      );
+    case 'newHole':
+      return (
+        <NewHoleDialog
+          key={dialogKey(dialog)}
+          document={document}
+          sketchId={dialog.sketchId}
+          variables={variables}
+          pickPoint={pickPoint}
           onPreview={onPreview}
           onSave={save}
           onCancel={close}

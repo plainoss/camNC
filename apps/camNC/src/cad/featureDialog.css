@@ -235,3 +235,13 @@
   border-color: #d64545;
   background: #fff1f1;
 }
+
+/* A notice about the dialog's inputs, such as a typed size overriding a standard one. */
+.cad-dialog-note {
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #e5effb;
+  color: #1d4f8c;
+  font-size: 12px;
+}

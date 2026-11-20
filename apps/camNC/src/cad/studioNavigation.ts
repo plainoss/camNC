@@ -25,7 +25,6 @@ import { keepStepNames } from './keepStepNames';
 import { featureLeadId, hasOutline, ownsItsSketch, replacePart, withoutExtrude, withoutPartsMadeWith } from './editorHelpers';
 import type { faceSketchHost } from './faceSketchHost';
 import type { FeatureAction, FeatureEntry } from './FeatureList';
-import { startHole } from './holeSource';
 import { newSketchPart } from './newSketchPart';
 import type { PatternOpening } from './partPatternKind';
 import { pickedPlane, planeOffsetFrom } from './basePlanes';
@@ -464,7 +463,6 @@ export function runStudioCommand(editor: StudioNavigationInput, command: StudioC
     setSelectedPlane,
     setStudioRefusal,
     sketchRowPicked,
-    userRollback,
   } = editor;
   const openFeature = (kind: 'extrude' | 'pattern' | 'hole', partId: string, before?: CadHistoryMark, patternKind?: PatternOpening) =>
     openStudioFeature(editor, kind, partId, before, patternKind);
@@ -495,10 +493,12 @@ export function runStudioCommand(editor: StudioNavigationInput, command: StudioC
       );
   } else if (command === 'variable') openDialog({ kind: 'variable' });
   else if (command === 'hole') {
-    const at = { partId: part?.id, copyId: cutSelection.pickedCopyId, cancel: () => feature && closeStudioFeature(editor, false) };
-    const read = () => documentRef.current,
-      mark = () => markCadSession(session);
-    startHole({ ...at, rolledTo: userRollback, read, mark, commit, open: openFeature, refuse: setStudioRefusal });
+    // A new Hole opens with nothing picked: its sketch points are clicked in the view, as the reference does. A Hole
+    // step is changed from its row.
+    // A sketch picked from its row first gives the Hole its points, as a sketch selected does in the reference.
+    if (feature) closeStudioFeature(editor, false);
+    const sketchId = part && sketchRowPicked === part.id && part.extrude === false ? part.id : undefined;
+    openDialog({ kind: 'newHole', ...(sketchId && { sketchId }) });
   } else if (command === 'fillet') openDialog({ kind: 'fillet' });
   else if (command === 'chamfer') openDialog({ kind: 'chamfer' });
   else if (command === 'mirror') {

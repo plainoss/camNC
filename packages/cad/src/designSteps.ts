@@ -1,4 +1,5 @@
 import { cadPartsMissingVariables, kVariableMissing } from './variables';
+import { cadHoleName } from './holeName';
 import { cadCuts } from './featureModel';
 import { mergedWithAll } from './unionParts';
 import { evaluateCadPart } from './geometry';
@@ -88,6 +89,8 @@ function numberedSteps(document: CadDocument, steps: DesignStep[]): DesignStep[]
     const transform = (step.kind === 'copy' || step.kind === 'move') && step.label.startsWith('Transform · ');
     if (step.kind !== 'sketch' && step.kind !== 'extrude' && step.kind !== 'fillet' && step.kind !== 'mirror' && !transform) return step;
     const part = byId.get(step.partId);
+    // A hole is named for what it drills, as ⌀ 6 mm THRU, not numbered.
+    if (step.kind === 'extrude' && part?.hole && !part.extrudeName) return step;
     const noun =
       step.kind === 'sketch'
         ? 'Sketch'
@@ -295,7 +298,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
                 {
                   id: `${part.id}:extrude`,
                   kind: 'extrude' as const,
-                  label: part.extrudeName ?? `${part.hole ? 'Hole' : 'Extrude'} · ${part.name}`,
+                  label: part.extrudeName ?? (part.hole ? cadHoleName(part) : `Extrude · ${part.name}`),
                   detail: withPartCount(
                     extrudeDetail(document, part),
                     1 + (part.extrudedWith ? 0 : document.parts.filter(other => other.extrudedWith === part.id).length)
