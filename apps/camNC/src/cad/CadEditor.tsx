@@ -92,12 +92,9 @@ import {
   type DimensionWorkflowEvent,
 } from '@wbcnc/cad-editor/dimensionWorkflow';
 import { idleDrawingGesture, type DrawingGesture } from '@wbcnc/cad-editor/drawingGesture';
-import { creationValueAt, type CreationValues } from './creationValues';
-import { CreationValueControls } from './CreationValueControls';
-import { SketchConicRhoForm, SketchDimensionEditor, SketchPolygonForm, SketchShapeSizeForm } from './SketchValueForms';
+import { type CreationValues } from './creationValues';
 import { initialLinearPatternParameters, type LinearPatternParameters } from './linearPatternParameters';
 import { initialTransformParameters } from './transformParameters';
-import { SelectionReadout } from './SelectionReadout';
 import { SketchPartProperties } from './SketchPartProperties';
 import { SketchDrawing } from './SketchDrawing';
 import { CadVariablesPanel } from './CadVariablesPanel';
@@ -109,7 +106,6 @@ import {
   type SketchContextPress,
   type SketchContextTarget,
 } from '@wbcnc/cad-editor/sketchContext';
-import { dimensionAnchor } from '@wbcnc/cad-editor/dimensionGeometry';
 import { type CadSnapResult } from '@wbcnc/cad-editor/picking';
 import { type CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
 import { addDrawingRelations } from '@wbcnc/cad-editor/drawingCommit';
@@ -121,13 +117,11 @@ import { type AnnotationGesture, type BoxGesture, type ChainAnchor, type DragGes
 import { constraintColorNotice, isEmptyDesign, isEmptySketch, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
 import { failedCheckProblems, noSketchProblems } from './sketchProblemLists';
 import { isDemoMode } from '@/lib/demo/demo-mode';
-import { CommandSearch, type SearchCommand } from './CommandSearch';
+import { type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
-import { withRegionDepth, type CutRegion } from './cutRegions';
-import { RegionDepthField } from './RegionDepthField';
-import { sketchTools as tools, type SketchTool } from './sketchTools';
-import { ModificationControls } from './ModificationControls';
-import { idleModificationWorkflow, transitionModification, type ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
+import { type CutRegion } from './cutRegions';
+import { sketchTools as tools } from './sketchTools';
+import { idleModificationWorkflow, type ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
 import { useSvgPixelScale, sketchStrokeColor } from './sketchAppearance';
 import { associatedEntityIds } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
@@ -143,7 +137,6 @@ import {
   studioFeatureAction,
   type StudioNavigationInput,
 } from './studioNavigation';
-import { StudioCommandSearch } from './StudioCommandSearch';
 import type { PatternOpening } from './partPatternKind';
 import { featureRowParts, picksFeatureRows, selectStudioFeature } from './studioFeatureSelection';
 import { startExtrude } from './studioExtrude';
@@ -158,9 +151,6 @@ import { renamedStudioPart } from './renamedStudioPart';
 import { partTrouble } from './partTrouble';
 import { toggledKey } from './toggledKey';
 import { usePointPicker } from './pointPicker';
-import { ShortcutList } from './ShortcutList';
-import { sketchShortcutTabs, studioShortcuts } from './shortcuts';
-import { sketchSearchCommands } from './sketchSearchCommands';
 import { hasOutline, isSingleLine, replacePart } from './editorHelpers';
 import { useFeaturePreview } from './useFeaturePreview';
 import { SketchProblems } from './SketchProblems';
@@ -182,7 +172,7 @@ import { sketchBackdropView } from './sketchBackdropView';
 import { initialFaceSketchView } from './faceSketchScene';
 import { useFaceSketchCamera } from './useFaceSketchCamera';
 import { fitSketchView } from './fitSketchView';
-import { sketchValuePosition, projectSketchPoint, focusSketchCanvas, creationEditorPositions } from './sketchViewport';
+import { projectSketchPoint, focusSketchCanvas } from './sketchViewport';
 import { faceSketchHost } from './faceSketchHost';
 import { useExtrudeDepth } from './useExtrudeDepth';
 import { bindPartCorners } from './partCornerInference';
@@ -194,6 +184,7 @@ import { useStudioPreview } from './useStudioPreview';
 import { useEditorDocumentKeys } from './useEditorDocumentKeys';
 import { editedStep, useEditorVariableFields } from './useEditorVariableFields';
 import { useFeatureShown, withMadeSketchHidden } from './useFeatureShown';
+import { CadSketchOverlays } from './CadSketchOverlays';
 import { CadCanvasBar, CadPartPane, CadSketchBackdropPane, CadWorkspacePane } from './CadDrawingPanes';
 import './cad.css';
 
@@ -1188,24 +1179,9 @@ export function CadEditor({
     workspace: showWorkspace,
     partView: show3D,
   });
-  const valuePosition = (anchor: Point | null, desiredWidth = 216, topOffset = 12) =>
-    sketchValuePosition(anchor, svg.current, drawingGroup.current, desiredWidth, topOffset);
-  const dimensionEditorPosition =
-    currentDimension && numeric(currentDimension) && sketch
-      ? valuePosition(dimensionAnchor(currentDimension, sketch, markerScale))
-      : undefined;
-  const creationPositions = creationEditorPositions(creationValues, sketch, markerScale, valuePosition);
   const offsetDimension = offsetPreview?.ok
     ? (offsetPreview.sketch.constraints.find(c => c.id === offsetPreview.dimensionId && numeric(c)) as NumericConstraint | undefined)
     : undefined;
-  const offsetPosition =
-    offsetDimension && offsetPreview?.ok
-      ? valuePosition(
-          dimensionAnchor(offsetDimension, offsetPreview.sketch, markerScale),
-          modification.phase === 'offset' && modification.editing ? 250 : 140,
-          -14
-        )
-      : undefined;
   const activeSketchStatus = sketchStatuses[part?.id ?? ''];
   const variableProblems = cadVariableProblems(doc);
   // A dimension that can't follow its variables shows like a conflicting one.
@@ -1739,218 +1715,126 @@ export function CadEditor({
               view={view}
             />
           </svg>
-          <ModificationControls
-            state={modification}
-            inputRef={offsetInput}
-            position={offsetPosition}
-            error={offsetPreview && !offsetPreview.ok ? offsetPreview.message : undefined}
-            onText={text => setModification(previous => transitionModification(previous, { type: 'text', text }))}
-            onEdit={() => setModification(previous => transitionModification(previous, { type: 'edit' }))}
-            onAccept={acceptOffset}
-            onCancel={() => {
-              chooseTool('select');
-              setSelected([]);
-              svg.current?.focus();
-            }}
-            onMirrorPicking={picking => {
-              setModification(previous => transitionModification(previous, { type: 'mirrorPicking', picking }));
-              setMessage(picking === 'axis' ? 'Select the mirror line.' : 'Select entities to mirror; Shift-click adds to selection.');
-              svg.current?.focus();
-            }}
-          />
-          {creationValues && creationValues.partId === part?.id && sketch && (
-            <CreationValueControls
-              inputRef={creationInput}
-              state={creationValues}
-              sketch={sketch}
-              positions={creationPositions}
-              onChange={text => setCreationValues({ ...creationValues, text })}
-              onStart={index => {
-                const value = creationValueAt(creationValues, sketch, index);
-                if (value)
-                  setCreationValues({ ...creationValues, index, editing: true, text: lengthText(value.constraint.value), selectAll: true });
-              }}
-              onAccept={applyCreationValue}
-              onCancel={() => {
-                setCreationValues(null);
-                svg.current?.focus();
-              }}
-            />
-          )}
-          {regionField && part && (
-            <RegionDepthField
-              key={regionField.entry.region.id}
-              style={valuePosition(regionField.anchor, 280)}
-              depth={regionField.entry.depth}
-              expression={regionField.entry.cut?.depthExpression}
-              thickness={part.thickness - regionField.entry.from}
-              variables={variableScope}
-              onClose={() => {
-                setRegionField(null);
-                svg.current?.focus();
-              }}
-              onChoose={(depth, expression) => {
-                const next = withRegionDepth(documentRef.current, part.id, regionField.entry, depth, expression);
-                if (next !== documentRef.current) commit(next);
-                setRegionField(null);
-                svg.current?.focus();
-              }}
-            />
-          )}
-          <ShortcutList
-            tabs={studioSession ? studioShortcuts : sketchShortcutTabs}
-            initial={studioSession && showWorkspace ? 'General' : 'Sketch'}
-            open={shortcutsOpen}
-            onOpenChange={setShortcutsOpen}
-          />
-          {palette && !searchMode && (
-            <div className="cad-command-palette cad-quick-tools">
-              <h3>Sketch tools</h3>
-              {tools.map(t => (
-                <button type="button" key={t.id} onClick={() => chooseTool(t.id)}>
-                  {t.label}
-                  <kbd>{t.key}</kbd>
-                </button>
-              ))}
-            </div>
-          )}
-          {palette && searchMode && studioSession && showWorkspace && (
-            // In the studio the search is of its commands; in a sketch, of the sketch's tools.
-            <StudioCommandSearch
-              disabled={studioDisabled}
-              workspace={root}
-              onOpenChange={setPalette}
-              onCommand={studioCommand}
-              onHighlight={setSearchHighlight}
-            />
-          )}
-          {palette && searchMode && !(studioSession && showWorkspace) && (
-            <CommandSearch
-              commands={sketchSearchCommands}
-              onHighlight={setSearchHighlight}
-              onClose={(restoreFocus = true) => {
-                setPalette(false);
-                if (restoreFocus) svg.current?.focus();
-              }}
-              onChoose={id => {
-                setPalette(false);
-                if (id === 'construction') toggleConstruction();
-                else if (id === 'fix') toggleFix();
-                else if (id === 'fit') fit();
-                else if (tools.some(t => t.id === id)) {
-                  if (id === 'dimension') beginDimension();
-                  else chooseTool(id as SketchTool);
-                } else constrain(id as ConstraintTool);
-                svg.current?.focus();
-              }}
-            />
-          )}
-          {polygonTool && (
-            <SketchPolygonForm
-              inputRef={polygonInput}
-              sides={polygonSides}
-              canCreate={!!pending[1]}
-              onSides={value => {
-                setPolygonSides(value);
-                if (pending[0])
-                  polygonCountGesture.current = {
-                    sides: Number(value),
-                    radius: Math.hypot(cursor.x - pending[0].x, cursor.y - pending[0].y),
-                  };
-              }}
-              onCreate={() => {
-                if (pending[1]) addShape(pending[1]);
-              }}
-              onEscape={() => chooseTool('select')}
-            />
-          )}
-          <SketchCommandControls
-            tool={tool}
-            selected={selected}
-            lengthUnit={lengthUnit}
-            chooseTool={chooseTool}
-            setSelected={setSelected}
-            slotPreview={slotPreview}
-            linearPreview={linearPreview}
-            parsedCircular={parsedCircular}
-            parsedLinear={parsedLinear}
-            transformPreview={transformPreview}
-            chamferPreview={chamferPreview}
-            chamferSelection={chamferSelection}
-            filletPreview={filletPreview}
-            slotWidth={slotWidth}
-            setSlotWidth={setSlotWidth}
-            slotChain={slotChain}
-            setSlotChain={setSlotChain}
-            slotWidthField={slotWidthField}
-            acceptSlot={acceptSlot}
-            circularParameters={circularParameters}
-            setCircularParameters={setCircularParameters}
-            circularFields={circularFields}
-            acceptCircularPattern={acceptCircularPattern}
-            linearParameters={linearParameters}
-            setLinearParameters={setLinearParameters}
-            patternFields={patternFields}
-            acceptLinearPattern={acceptLinearPattern}
-            patternNotice={patternNotice}
-            transformParameters={transformParameters}
-            setTransformParameters={setTransformParameters}
-            acceptTransform={acceptTransform}
-            transformNotice={transformNotice}
-            splitNotice={splitNotice}
-            chamferDistances={chamferDistances}
-            setChamferDistances={setChamferDistances}
-            acceptChamfer={acceptChamfer}
-            filletInput={filletInput}
-            filletRadius={filletRadius}
-            setFilletRadius={setFilletRadius}
-            setFilletEditing={setFilletEditing}
-            acceptFillet={acceptFillet}
-          />
-          {conicEditing && (
-            <SketchConicRhoForm inputRef={rhoInput} rho={rho} onRho={setRho} onApply={applyConicRho} onClose={() => chooseTool('select')} />
-          )}
-          {currentDimension && numeric(currentDimension) && (
-            <SketchDimensionEditor
-              dimension={currentDimension}
-              inputRef={dimensionInput}
-              style={dimensionEditorPosition}
-              onApply={applyDimensionValue}
-              onCancel={cancelDimensionEdit}
-            />
-          )}
-          {pending[0] && (tool === 'rectangle' || tool === 'centerRectangle' || tool === 'circle') && (
-            <SketchShapeSizeForm
-              from={pending[0]}
-              rectangle={tool === 'rectangle' || tool === 'centerRectangle'}
-              width={width}
-              height={height}
-              radius={radius}
-              onWidth={setWidth}
-              onHeight={setHeight}
-              onRadius={setRadius}
-              onCreate={() => addShape()}
-            />
-          )}
-          <div className="cad-canvas-footer">
-            <span>
-              {formatLength(cursor.x)}, {formatLength(cursor.y)} {lengthUnit}
-            </span>
-            <span>
-              {sketchBackdrop
-                ? 'Scroll to zoom · middle-drag to pan · right-drag to turn · N to look straight at it · U uses parts’ edges and vertices'
-                : 'Scroll to zoom · right-drag to pan'}
-            </span>
-            {sketch && (
-              <SelectionReadout
-                sketch={sketch}
-                document={doc}
-                part={part}
-                selectedIds={dimensionSelection}
-                picks={dimensionFlow.phase === 'idle' ? selectionHints.current : dimensionFlow.pickHints}
+          <CadSketchOverlays
+            commandControls={
+              <SketchCommandControls
+                tool={tool}
+                selected={selected}
+                lengthUnit={lengthUnit}
+                chooseTool={chooseTool}
+                setSelected={setSelected}
+                slotPreview={slotPreview}
+                linearPreview={linearPreview}
+                parsedCircular={parsedCircular}
+                parsedLinear={parsedLinear}
+                transformPreview={transformPreview}
+                chamferPreview={chamferPreview}
+                chamferSelection={chamferSelection}
+                filletPreview={filletPreview}
+                slotWidth={slotWidth}
+                setSlotWidth={setSlotWidth}
+                slotChain={slotChain}
+                setSlotChain={setSlotChain}
+                slotWidthField={slotWidthField}
+                acceptSlot={acceptSlot}
+                circularParameters={circularParameters}
+                setCircularParameters={setCircularParameters}
+                circularFields={circularFields}
+                acceptCircularPattern={acceptCircularPattern}
+                linearParameters={linearParameters}
+                setLinearParameters={setLinearParameters}
+                patternFields={patternFields}
+                acceptLinearPattern={acceptLinearPattern}
+                patternNotice={patternNotice}
+                transformParameters={transformParameters}
+                setTransformParameters={setTransformParameters}
+                acceptTransform={acceptTransform}
+                transformNotice={transformNotice}
+                splitNotice={splitNotice}
+                chamferDistances={chamferDistances}
+                setChamferDistances={setChamferDistances}
+                acceptChamfer={acceptChamfer}
+                filletInput={filletInput}
+                filletRadius={filletRadius}
+                setFilletRadius={setFilletRadius}
+                setFilletEditing={setFilletEditing}
+                acceptFillet={acceptFillet}
               />
-            )}
-          </div>
+            }
+            {...{
+              acceptOffset,
+              addShape,
+              applyConicRho,
+              applyCreationValue,
+              applyDimensionValue,
+              beginDimension,
+              cancelDimensionEdit,
+              chooseTool,
+              commit,
+              conicEditing,
+              constrain,
+              creationInput,
+              creationValues,
+              currentDimension,
+              cursor,
+              dimensionFlow,
+              dimensionInput,
+              dimensionSelection,
+              doc,
+              documentRef,
+              drawingGroup,
+              fit,
+              formatLength,
+              height,
+              lengthText,
+              lengthUnit,
+              markerScale,
+              modification,
+              offsetDimension,
+              offsetInput,
+              offsetPreview,
+              palette,
+              part,
+              pending,
+              polygonCountGesture,
+              polygonInput,
+              polygonSides,
+              polygonTool,
+              radius,
+              regionField,
+              rho,
+              rhoInput,
+              root,
+              searchMode,
+              selectionHints,
+              setCreationValues,
+              setHeight,
+              setMessage,
+              setModification,
+              setPalette,
+              setPolygonSides,
+              setRadius,
+              setRegionField,
+              setRho,
+              setSearchHighlight,
+              setSelected,
+              setShortcutsOpen,
+              setWidth,
+              shortcutsOpen,
+              showWorkspace,
+              sketch,
+              sketchBackdrop,
+              studioCommand,
+              studioDisabled,
+              studioSession,
+              svg,
+              toggleConstruction,
+              toggleFix,
+              tool,
+              variableScope,
+              width,
+            }}
+          />
         </main>
       </div>
       {sketch && (
