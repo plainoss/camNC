@@ -83,7 +83,7 @@ async function compareFrame(scenario, name, svg, options, outDir) {
   return sameSvg(svg, await readFile(golden, 'utf8')) ? null : `frame ${name} differs from its golden; see ${path.join(outDir, file)}`;
 }
 
-async function runScenario(browser, scenario, options, outDir) {
+async function runScenario(browser, scenario, options, outDir, attempt = 0) {
   const started = performance.now();
   const { createAdapter } = await import(`./adapters/${scenario.id.split('/')[0]}.mjs`);
   const { context, page, runtime } = await openPage(browser);
@@ -115,6 +115,13 @@ async function runScenario(browser, scenario, options, outDir) {
     }
     await adapter.settle();
   } catch (error) {
+    // A page that doesn't load in time on a busy runner, before any step has run, is tried once more in a fresh page.
+    // Only bootstrap is retried: a step that times out is the scenario's own failure.
+    if (phase === 'bootstrap' && attempt === 0 && /Timeout \d+ms exceeded/.test(String(error.message))) {
+      await context.close();
+      const retried = await runScenario(browser, scenario, options, outDir, 1);
+      return { ...retried, durationMs: performance.now() - started };
+    }
     failures.push(`stopped during ${phase}: ${String(error.message).split('\n').slice(0, 12).join('\n        ')}`);
   }
   failures.push(...runtime);
