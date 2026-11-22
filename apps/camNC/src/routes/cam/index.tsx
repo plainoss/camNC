@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { zodValidator } from '@tanstack/zod-adapter';
 import { z } from 'zod';
 import { SampleProjectCard } from '@/cam/samples/SampleProjectCard';
@@ -69,48 +70,54 @@ function CamIndex() {
 
   return (
     <CamPage className="h-app">
-      <PageHeader title="Projects" />
+      <PageHeader title={translate('Projects')} />
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 overflow-y-auto p-6">
         <button onClick={() => void design()} className="flex items-center gap-4 rounded-xl border p-6 text-left hover:bg-muted/50">
           <PencilRuler className="size-9 shrink-0 text-primary" />
           <span className="flex flex-col gap-1">
-            <span className="text-lg font-medium">New design</span>
+            <span className="text-lg font-medium">{translate('New design')}</span>
             <span className="text-sm text-muted-foreground">
-              Sketch and dimension a flat part, then prepare its cuts and machining here.
+              {translate('Sketch and dimension a flat part, then prepare its cuts and machining here. ')}
             </span>
           </span>
         </button>
         <button onClick={() => void carving()} className="flex items-center gap-4 rounded-xl border p-6 text-left hover:bg-muted/50">
           <Type className="size-9 shrink-0 text-primary" />
           <span className="flex flex-col gap-1">
-            <span className="text-lg font-medium">New carving</span>
-            <span className="text-sm text-muted-foreground">Type lettering or open an SVG, place it on a board, and V-carve it.</span>
+            <span className="text-lg font-medium">{translate('New carving')}</span>
+            <span className="text-sm text-muted-foreground">
+              {translate('Type lettering or open an SVG, place it on a board, and V-carve it.')}
+            </span>
           </span>
         </button>
         <button
           onClick={open}
           className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed p-10 text-center hover:bg-muted/50">
           <Box className="size-10 text-muted-foreground" />
-          <span className="text-lg font-medium">Drop a STEP or STL file of your project</span>
+          <span className="text-lg font-medium">{translate('Drop a STEP or STL file of your project')}</span>
           <span className="max-w-md text-sm text-muted-foreground">
-            Boards and panels are found and laid flat automatically. Pockets, holes and outlines become G-code for your machine. Everything
-            stays in this browser.
+            {translate(
+              'Boards and panels are found and laid flat automatically. Pockets, holes and outlines become G-code for your machine. Everything stays in this browser. '
+            )}
           </span>
           <span className="mt-2 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
-            <FileUp className="size-4" /> Open model…
+            <FileUp className="size-4" />
+            {translate(' Open model… ')}
           </span>
         </button>
 
         {notice && (
           <p role="alert" className="rounded-lg border p-3 text-sm">
-            This rehearsal has expired or is unavailable. Your saved projects are unchanged. Open a plan to start a new rehearsal.
+            {translate(
+              'This rehearsal has expired or is unavailable. Your saved projects are unchanged. Open a plan to start a new rehearsal. '
+            )}
           </p>
         )}
         <SampleProjectCard autoOpen={!!sample} />
 
         {!!jobs?.length && (
           <section className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium text-muted-foreground">Recent projects</h2>
+            <h2 className="text-sm font-medium text-muted-foreground">{translate('Recent projects')}</h2>
             <ul className="divide-y rounded-lg border">
               {jobs.map(job => {
                 const parts = job.parts.reduce((n, p) => n + (p.milled ? p.quantity : 0), 0);
@@ -121,23 +128,38 @@ function CamIndex() {
                         <span className="truncate font-medium">{job.name}</span>
                         {job.readError && (
                           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-2 py-px text-xs text-destructive">
-                            <TriangleAlert className="size-3" /> Could not be read
+                            <TriangleAlert className="size-3" />
+                            {translate(' Could not be read ')}
                           </span>
                         )}
                       </span>
                       <span className="truncate text-xs text-muted-foreground">
-                        {job.origin?.kind === 'sample' && 'Sample project · '}
-                        {job.origin?.kind === 'designFile' && 'Imported design · '}
-                        {job.carving ? 'Carving' : job.design ? 'Native design' : job.fileName}
-                        {job.parts.length > 0 && ` · ${parts} ${parts === 1 ? 'part' : 'parts'} to mill`} · {kWhen.format(job.updatedAt)}
+                        {job.origin?.kind === 'sample' && translate('Sample project · ')}
+                        {job.origin?.kind === 'designFile' && translate('Imported design · ')}
+                        {job.carving ? translate('Carving') : job.design ? translate('Native design') : job.fileName}
+                        {job.parts.length > 0 &&
+                          translate(' · {{parts}} {{value2}} to mill', {
+                            parts: parts,
+                            value2: parts === 1 ? translate('part') : translate('parts'),
+                          })}{' '}
+                        · {kWhen.format(job.updatedAt)}
                       </span>
                     </Link>
                     {job.readError ? (
-                      <Button variant="outline" size="sm" aria-label={`Delete ${job.name}`} onClick={() => remove(job.id, job.name)}>
-                        <Trash2 /> Delete
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={translate('Delete {{value1}}', { value1: job.name })}
+                        onClick={() => remove(job.id, job.name)}>
+                        <Trash2 />
+                        {translate(' Delete ')}
                       </Button>
                     ) : (
-                      <Button variant="ghost" size="icon" aria-label={`Delete ${job.name}`} onClick={() => remove(job.id, job.name)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={translate('Delete {{value1}}', { value1: job.name })}
+                        onClick={() => remove(job.id, job.name)}>
                         <Trash2 />
                       </Button>
                     )}
@@ -150,10 +172,11 @@ function CamIndex() {
 
         <p className="rounded-lg bg-violet-500/10 px-4 py-3 text-sm leading-relaxed">
           <span className="mr-2 rounded-full bg-violet-500/15 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-violet-700 dark:text-violet-300">
-            Beta
+            {translate('Beta ')}
           </span>
-          Making G-code here is new: check every program in the top view and the simulation before you cut, and keep a hand near the stop
-          button on the first run.
+          {translate(
+            'Making G-code here is new: check every program in the top view and the simulation before you cut, and keep a hand near the stop button on the first run. '
+          )}
         </p>
       </div>
     </CamPage>

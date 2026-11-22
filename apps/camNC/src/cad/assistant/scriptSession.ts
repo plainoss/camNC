@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadDocument } from '@wbcnc/cad';
 import {
   assistantDataArray,
@@ -43,32 +44,32 @@ export function createAssistantScriptSession(base: CadDocument, options: Assista
   const snapshot = JSON.stringify(initialBase);
   const limits = { maxScripts: 20, maxSourceBytes: 256_000, maxPatches: 20, maxPatchBytes: 64_000, ...options };
   if (Object.values(limits).some(value => !Number.isSafeInteger(value) || value < 1))
-    throw new Error('Script session limits must be positive integers.');
+    throw new Error(translate('Script session limits must be positive integers.'));
   const scripts = new Map<string, AssistantScriptRecord>();
   const assertBase = (current: CadDocument) => {
     // Revision is part of the snapshot: editing and then undoing must not revive an earlier script session.
     if (JSON.stringify(current) !== snapshot)
-      throw new Error('The design revision changed. Start a new script session against the current design.');
+      throw new Error(translate('The design revision changed. Start a new script session against the current design.'));
   };
   const sourceSize = (source: unknown): source is string => {
-    if (typeof source !== 'string' || !source.trim()) throw new Error('A script needs nonempty JavaScript source.');
-    if (encoder.encode(source).length > limits.maxSourceBytes) throw new Error('The script exceeds the source byte limit.');
+    if (typeof source !== 'string' || !source.trim()) throw new Error(translate('A script needs nonempty JavaScript source.'));
+    if (encoder.encode(source).length > limits.maxSourceBytes) throw new Error(translate('The script exceeds the source byte limit.'));
     return true;
   };
   const get = (id: unknown, current = base): AssistantScriptRecord => {
     assertBase(current);
-    if (typeof id !== 'string' || !scripts.has(id)) throw new Error('Unknown scriptId in this design session.');
+    if (typeof id !== 'string' || !scripts.has(id)) throw new Error(translate('Unknown scriptId in this design session.'));
     return scripts.get(id)!;
   };
   const resolve = async (input: unknown, current = base): Promise<AssistantScriptRecord> => {
     assertBase(current);
     const request = plainAssistantData(input, 'Script request');
     const kinds = ['source', 'recipe', 'scriptId'].filter(key => Object.hasOwn(request, key));
-    if (kinds.length !== 1) throw new Error('Choose exactly one of source, recipe, or scriptId.');
+    if (kinds.length !== 1) throw new Error(translate('Choose exactly one of source, recipe, or scriptId.'));
     const allowed =
       kinds[0] === 'source' ? ['source'] : kinds[0] === 'recipe' ? ['recipe', 'parameters'] : ['scriptId', 'expectedHash', 'patches'];
     if (Object.keys(request).some(key => !allowed.includes(key)))
-      throw new Error(`Unexpected script request field. Available: ${allowed.join(', ')}.`);
+      throw new Error(translate('Unexpected script request field. Available: {{value1}}.', { value1: allowed.join(', ') }));
     let source: string;
     let provenance: Pick<AssistantScriptRecord, 'recipe' | 'parameters'> = {};
     if (kinds[0] === 'source') {
@@ -81,12 +82,13 @@ export function createAssistantScriptSession(base: CadDocument, options: Assista
     } else {
       const previous = get(request.scriptId, current);
       if (request.expectedHash !== undefined && request.expectedHash !== previous.hash)
-        throw new Error('Script hash does not match this immutable revision.');
+        throw new Error(translate('Script hash does not match this immutable revision.'));
       if (request.patches === undefined) return previous;
-      if (request.expectedHash !== previous.hash) throw new Error('Patches require the expectedHash of the script being repaired.');
+      if (request.expectedHash !== previous.hash)
+        throw new Error(translate('Patches require the expectedHash of the script being repaired.'));
       const patches = assistantDataArray(request.patches, 'Script patches');
       if (patches.length < 1 || patches.length > limits.maxPatches)
-        throw new Error(`Use between 1 and ${limits.maxPatches} exact-match patches.`);
+        throw new Error(translate('Use between 1 and {{value1}} exact-match patches.', { value1: limits.maxPatches }));
       let patchBytes = 0;
       source = previous.source;
       for (const inputPatch of patches) {
@@ -97,22 +99,22 @@ export function createAssistantScriptSession(base: CadDocument, options: Assista
           !patch.oldText ||
           typeof patch.newText !== 'string'
         )
-          throw new Error('Each patch needs nonempty oldText and string newText, with no other fields.');
+          throw new Error(translate('Each patch needs nonempty oldText and string newText, with no other fields.'));
         patchBytes += encoder.encode(patch.oldText).length + encoder.encode(patch.newText).length;
-        if (patchBytes > limits.maxPatchBytes) throw new Error('The patches exceed the patch byte limit.');
+        if (patchBytes > limits.maxPatchBytes) throw new Error(translate('The patches exceed the patch byte limit.'));
         const at = source.indexOf(patch.oldText);
         if (at < 0 || source.indexOf(patch.oldText, at + 1) >= 0)
-          throw new Error('Patch oldText must match exactly once; include more unchanged context.');
+          throw new Error(translate('Patch oldText must match exactly once; include more unchanged context.'));
         source = source.slice(0, at) + patch.newText + source.slice(at + patch.oldText.length);
         sourceSize(source);
       }
       // An arbitrary repair is no longer guaranteed to retain its original recipe parameter meanings.
     }
     sourceSize(source);
-    if (scripts.size >= limits.maxScripts) throw new Error('The script session has reached its stored script limit.');
+    if (scripts.size >= limits.maxScripts) throw new Error(translate('The script session has reached its stored script limit.'));
     const hash = await sourceHash(source);
     assertBase(current);
-    if (scripts.size >= limits.maxScripts) throw new Error('The script session has reached its stored script limit.');
+    if (scripts.size >= limits.maxScripts) throw new Error(translate('The script session has reached its stored script limit.'));
     const record = Object.freeze({
       scriptId: `script-${crypto.randomUUID()}`,
       hash,

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { MachineConnectionForm } from '@/components/machine/MachineConnectionForm';
 import { ConnectionBadge } from '@/components/machine/MachineStatusBar';
 import { getCncApi } from '@/lib/fluidnc/machine';
@@ -32,13 +33,13 @@ export function ConnectMachineButton({
       }}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <ConnectionBadge /> {connected ? 'Machine' : 'Connect'}
+          <ConnectionBadge /> {connected ? translate('Machine') : translate('Connect')}
         </Button>
       </DialogTrigger>
       <DialogContent className="dark max-h-[90dvh] overflow-auto text-foreground">
         <DialogHeader>
-          <DialogTitle>Connect your FluidNC</DialogTitle>
-          <DialogDescription>camNC reads the bed size from the controller over your local network.</DialogDescription>
+          <DialogTitle>{translate('Connect your FluidNC')}</DialogTitle>
+          <DialogDescription>{translate('camNC reads the bed size from the controller over your local network.')}</DialogDescription>
         </DialogHeader>
         <div className="flex min-w-0 flex-col gap-4">
           <MachineConnectionForm />

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { AssistantMessage } from './provider';
 
 export interface AssistantContextOptions {
@@ -25,21 +26,23 @@ export function assistantContextCharacters(messages: readonly AssistantMessage[]
 /** Compact the provider copy only. Never silently discard a user's earlier constraints. */
 export function buildAssistantContext(messages: readonly AssistantMessage[], options: AssistantContextOptions): AssistantMessage[] {
   const limit = options.maxCharacters ?? 120_000;
-  if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('Assistant context limit must be a positive integer.');
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new Error(translate('Assistant context limit must be a positive integer.'));
   const batches: Batch[] = [];
   for (let index = 0; index < messages.length; index++) {
     const message = messages[index]!;
-    if (message.role === 'tool') throw new Error('Assistant context contains a tool result without its call.');
+    if (message.role === 'tool') throw new Error(translate('Assistant context contains a tool result without its call.'));
     if (!message.calls?.length) continue;
     const pending = new Set(message.calls.map(call => call.id));
-    if (pending.size !== message.calls.length) throw new Error('Assistant context contains duplicate tool call IDs.');
+    if (pending.size !== message.calls.length) throw new Error(translate('Assistant context contains duplicate tool call IDs.'));
     const start = index;
     while (messages[index + 1]?.role === 'tool') {
       const result = messages[++index]!;
-      if (!result.callId || !pending.delete(result.callId)) throw new Error('Assistant context contains an unmatched tool result.');
+      if (!result.callId || !pending.delete(result.callId))
+        throw new Error(translate('Assistant context contains an unmatched tool result.'));
     }
     // Trimming half of a batch breaks all three provider protocols, including Responses reasoning replay.
-    if (pending.size) throw new Error('Assistant context contains an interrupted tool call. Resume the conversation before sending.');
+    if (pending.size)
+      throw new Error(translate('Assistant context contains an interrupted tool call. Resume the conversation before sending.'));
     batches.push({ start, end: index, message });
   }
 
@@ -99,7 +102,9 @@ export function buildAssistantContext(messages: readonly AssistantMessage[], opt
   const result = render(retained);
   if (!fits(result))
     throw new Error(
-      'Assistant context exceeds the input limit. Start a new conversation and restate the constraints you want to keep; nothing was sent.'
+      translate(
+        'Assistant context exceeds the input limit. Start a new conversation and restate the constraints you want to keep; nothing was sent.'
+      )
     );
   return result;
 }

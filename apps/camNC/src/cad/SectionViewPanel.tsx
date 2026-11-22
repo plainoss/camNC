@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useId } from 'react';
 import { CadUnitSuffix } from './CadValueInput';
 import { FeatureDialog } from './FeatureDialog';
@@ -50,10 +51,10 @@ export function SectionViewPanel({
 }: SectionViewPanelProps) {
   const id = useId();
   const selected = planes.some(plane => plane.id === planeId);
-  const reason = confirmReason || offsetProblem || (!selected ? 'Pick a plane or a planar face for the section.' : null);
+  const reason = confirmReason || offsetProblem || (!selected ? translate('Pick a plane or a planar face for the section.') : null);
   return (
     <FeatureDialog
-      title="Section view"
+      title={translate('Section view')}
       className="cad-section-view-dialog"
       okLabel="Confirm section view"
       okDisabled={!!reason}
@@ -62,29 +63,29 @@ export function SectionViewPanel({
       onCancel={onCancel}>
       {/* What's cut away: everything but what's listed. Sectioning only some items isn't offered yet. */}
       {/* Shown, not switched: only Exclude works, so the keyboard starts in the plane box rather than on a tab. */}
-      <div className="cad-feature-tabs cad-static-tabs" role="tablist" aria-label="Section mode">
+      <div className="cad-feature-tabs cad-static-tabs" role="tablist" aria-label={translate('Section mode')}>
         <span role="tab" aria-selected>
-          Exclude
+          {translate('Exclude ')}
         </span>
-        <span role="tab" aria-selected={false} aria-disabled title="Not available yet">
-          Include
+        <span role="tab" aria-selected={false} aria-disabled title={translate('Not available yet')}>
+          {translate('Include ')}
         </span>
       </div>
-      <ViewInfoBanner message={selected ? null : 'Select a plane, planar face, cylinder, cone, or mate connector.'} />
+      <ViewInfoBanner message={selected ? null : translate('Select a plane, planar face, cylinder, cone, or mate connector.')} />
       <div
         className="cad-feature-selection cad-section-plane"
         role="group"
-        aria-label="Section planes"
+        aria-label={translate('Section planes')}
         data-active={picking || !selected ? '' : undefined}>
-        <label htmlFor={`${id}-plane`}>Section planes</label>
+        <label htmlFor={`${id}-plane`}>{translate('Section planes')}</label>
         <span className="cad-section-plane-chip">
           <select
             id={`${id}-plane`}
-            aria-label="Section plane"
+            aria-label={translate('Section plane')}
             value={selected ? planeId! : ''}
             onChange={event => onSelectPlane(event.target.value)}>
             <option value="" disabled>
-              Pick a plane or planar face
+              {translate('Pick a plane or planar face ')}
             </option>
             {planes.map(plane => (
               <option key={plane.id} value={plane.id}>
@@ -92,24 +93,29 @@ export function SectionViewPanel({
               </option>
             ))}
           </select>
-          <button type="button" aria-label="Flip plane" title="Flip plane" aria-pressed={flipped} onClick={onFlip}>
+          <button
+            type="button"
+            aria-label={translate('Flip plane')}
+            title={translate('Flip plane')}
+            aria-pressed={flipped}
+            onClick={onFlip}>
             ⇅
           </button>
         </span>
         <button type="button" aria-pressed={picking} onClick={onPickFace}>
-          Pick planar face
+          {translate('Pick planar face ')}
         </button>
       </div>
-      <div className="cad-feature-selection" role="group" aria-label="Items to exclude">
-        <small>Items to exclude</small>
+      <div className="cad-feature-selection" role="group" aria-label={translate('Items to exclude')}>
+        <small>{translate('Items to exclude')}</small>
       </div>
       {picking && (
         <p role="status" className="cad-feature-hint">
-          Click a planar face in the view.
+          {translate('Click a planar face in the view. ')}
         </p>
       )}
       <div className="cad-section-offset">
-        <label htmlFor={`${id}-offset`}>Offset</label>
+        <label htmlFor={`${id}-offset`}>{translate('Offset')}</label>
         <span className="cad-section-value">
           {/* Defining a variable is a design edit, so a view-only offset deliberately uses a native field. */}
           <input
@@ -145,13 +151,13 @@ export function SectionViewPanel({
       )}
       <div className="cad-section-actions">
         <button type="button" disabled={!selected} onClick={onViewNormal}>
-          View normal
+          {translate('View normal ')}
         </button>
       </div>
-      <p className="cad-feature-hint">The section stays on after you confirm.</p>
+      <p className="cad-feature-hint">{translate('The section stays on after you confirm.')}</p>
       {onTurnOff && (
         <button type="button" className="cad-section-off" onClick={onTurnOff}>
-          Turn off section view
+          {translate('Turn off section view ')}
         </button>
       )}
     </FeatureDialog>

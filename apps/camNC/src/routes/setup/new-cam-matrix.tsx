@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { PageHeader } from '@/components/page-header';
 import { cvToMatrix3, matrix3ToCV } from '@/lib/three-cv';
 import { useCalibrationData, useCamResolution, useStore } from '@/store/store';
@@ -42,7 +43,7 @@ function AlphaUpdateComponent() {
   function handleSave() {
     // 0 is a valid alpha (crop to valid pixels only).
     if (alpha === undefined) {
-      toast.error('Alpha is required');
+      toast.error(translate('Alpha is required'));
       return;
     }
     const newCamMatrix = getNewCameraMatrix(calibration, { width: resolution[0], height: resolution[1] }, alpha);
@@ -55,7 +56,7 @@ function AlphaUpdateComponent() {
   return (
     <div className="flex flex-col gap-2">
       <NumberInput
-        label="alpha"
+        label={translate('alpha')}
         value={alpha}
         onValueChange={v => setAlpha(v)}
         min={0}
@@ -63,7 +64,7 @@ function AlphaUpdateComponent() {
         step={0.05}
         formatOptions={{ style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }}
       />
-      <Button onClick={handleSave}>Save</Button>
+      <Button onClick={handleSave}>{translate('Save')}</Button>
     </div>
   );
 }
@@ -71,7 +72,7 @@ function AlphaUpdateComponent() {
 function RouteComponent() {
   return (
     <div className="w-full h-full">
-      <PageHeader title="New Cam Matrix" />
+      <PageHeader title={translate('New Cam Matrix')} />
       <div className="flex justify-center p-1 flex-row">
         <Card className="w-full max-w-xl">
           <CardContent>

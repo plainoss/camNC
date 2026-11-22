@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { CameraStatusDot } from '@/components/CamSourceSelector';
 import { PageHeader } from '@/components/page-header';
 import { cameraSourceLabel } from '@/lib/camera/source-label';
@@ -28,15 +29,16 @@ function CameraCard({ id, camera, active }: { id: string; camera: ICamSource; ac
         </Link>
         {active ? (
           <span className="flex shrink-0 flex-row items-center gap-1 text-sm text-muted-foreground">
-            <Check className="size-4" /> In use
+            <Check className="size-4" />
+            {translate(' In use ')}
           </span>
         ) : (
           <Button variant="outline" size="sm" onClick={() => setActiveCam(id)}>
-            Use
+            {translate('Use ')}
           </Button>
         )}
         <Button variant="ghost" size="icon" asChild>
-          <Link to="/setup/cameras/$camId" params={{ camId: id }} aria-label={`Open ${camera.name}`}>
+          <Link to="/setup/cameras/$camId" params={{ camId: id }} aria-label={translate('Open {{value1}}', { value1: camera.name })}>
             <ChevronRight />
           </Link>
         </Button>
@@ -51,21 +53,22 @@ function CamerasComponent() {
   const cameras = Object.entries(camSources);
   return (
     <div className="w-full h-full">
-      <PageHeader title="Cameras" />
+      <PageHeader title={translate('Cameras')} />
       <div className="flex justify-center p-1 flex-row">
         <div className="max-w-xl gap-3 flex flex-1 flex-col pb-8">
-          {cameras.length === 0 && <p className="text-sm px-1">No cameras yet.</p>}
+          {cameras.length === 0 && <p className="text-sm px-1">{translate('No cameras yet.')}</p>}
           {cameras.map(([id, camera]) => (
             <CameraCard key={id} id={id} camera={camera} active={id === activeCamId} />
           ))}
           <div className="flex flex-row gap-2">
             <Button asChild>
               <Link to="/setup/url-entry" search={{ new: true }}>
-                <Plus /> Add camera
+                <Plus />
+                {translate(' Add camera ')}
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link to="/settings/backup">Restore from a backup</Link>
+              <Link to="/settings/backup">{translate('Restore from a backup')}</Link>
             </Button>
           </div>
         </div>

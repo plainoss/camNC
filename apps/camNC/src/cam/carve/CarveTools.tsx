@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { ReactNode } from 'react';
 import { Button } from '@wbcnc/ui/components/button';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
@@ -56,26 +57,30 @@ export function CarveToolbar({
   return (
     <div
       role="group"
-      aria-label="Carve tools"
+      aria-label={translate('Carve tools')}
       className="absolute top-1/2 left-3 z-10 grid -translate-y-1/2 gap-1 rounded-xl border bg-background/95 p-1 shadow-md">
-      <Tool label="Lettering" onClick={onText}>
+      <Tool label={translate('Lettering')} onClick={onText}>
         <Type className="size-[19px]" />
       </Tool>
-      <Tool label="Open SVG" busy={choosing} onClick={onFile}>
-        {choosing ? <LoadingSpinner className="size-4" aria-label="Opening file chooser" /> : <Image className="size-[19px]" />}
+      <Tool label={translate('Open SVG')} busy={choosing} onClick={onFile}>
+        {choosing ? (
+          <LoadingSpinner className="size-4" aria-label={translate('Opening file chooser')} />
+        ) : (
+          <Image className="size-[19px]" />
+        )}
       </Tool>
       <Tool
-        label="AI artwork"
+        label={translate('AI artwork')}
         pressed={panel === 'assistant'}
         className="text-violet-600 dark:text-violet-300"
         onClick={() => onPanel('assistant')}>
         <Sparkles className="size-[19px]" />
       </Tool>
       <hr className="mx-1" />
-      <Tool label="Items" pressed={panel === 'items'} onClick={() => onPanel('items')}>
+      <Tool label={translate('Items')} pressed={panel === 'items'} onClick={() => onPanel('items')}>
         <Layers className="size-[19px]" />
       </Tool>
-      <Tool label="Board and bit" pressed={panel === 'settings'} onClick={() => onPanel('settings')}>
+      <Tool label={translate('Board and bit')} pressed={panel === 'settings'} onClick={() => onPanel('settings')}>
         <SlidersHorizontal className="size-[19px]" />
       </Tool>
     </div>
@@ -88,18 +93,21 @@ export function CarveEmptyStart({ onText, onFile, onAssistant }: { onText: () =>
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
       <div
         role="group"
-        aria-label="Start your carving"
+        aria-label={translate('Start your carving')}
         className="pointer-events-auto grid justify-items-center gap-3 rounded-xl border bg-background p-4 shadow-lg">
-        <p className="text-sm text-muted-foreground">Start your carving</p>
+        <p className="text-sm text-muted-foreground">{translate('Start your carving')}</p>
         <div className="flex flex-wrap justify-center gap-2">
           <Button variant="outline" size="sm" onClick={onText}>
-            <Type /> Add lettering
+            <Type />
+            {translate(' Add lettering ')}
           </Button>
           <Button variant="outline" size="sm" onClick={onFile}>
-            <Image /> Open an SVG file
+            <Image />
+            {translate(' Open an SVG file ')}
           </Button>
           <Button variant="outline" size="sm" className="border-violet-500 text-violet-700 dark:text-violet-300" onClick={onAssistant}>
-            <Sparkles /> Describe it to AI
+            <Sparkles />
+            {translate(' Describe it to AI ')}
           </Button>
         </div>
       </div>
@@ -126,7 +134,7 @@ export function CarvePanelHeader({
         {title}
       </h3>
       {actions}
-      <Button variant="ghost" size="icon" aria-label={`Close ${title}`} onClick={onClose}>
+      <Button variant="ghost" size="icon" aria-label={translate('Close {{title}}', { title: title })} onClick={onClose}>
         <X />
       </Button>
     </div>

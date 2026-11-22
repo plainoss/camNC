@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { numeric, type ConstraintTool } from './cadEditorShared';
 import { cadSketchFrame, isCadPart, type CadDrawnOn } from '@wbcnc/cad';
 import type { Dispatch, KeyboardEvent, PointerEvent, RefObject, SetStateAction } from 'react';
@@ -340,7 +341,7 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
   if (key === 'escape' && usingEdges) {
     event.preventDefault();
     setUsingEdges(false);
-    setMessage('Choose a drawing tool or select geometry.');
+    setMessage(translate('Choose a drawing tool or select geometry.'));
     return;
   }
   // `u` uses the edges picked, or with none picked, starts Use: click edges to use them, as the reference teaches.
@@ -350,10 +351,10 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     else if (usingEdges) {
       // U again ends Use, as choosing the tool again does in the reference.
       setUsingEdges(false);
-      setMessage('Choose a drawing tool or select geometry.');
+      setMessage(translate('Choose a drawing tool or select geometry.'));
     } else {
       setUsingEdges(true);
-      setMessage('Use: click the edges or vertices of the parts to bring them into the sketch. Esc ends.');
+      setMessage(translate('Use: click the edges or vertices of the parts to bring them into the sketch. Esc ends.'));
     }
     return;
   }
@@ -372,7 +373,7 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
   if (key === 'enter' && modification.phase === 'mirror' && modification.entityIds.length) {
     event.preventDefault();
     setModification(previous => transitionModification(previous, { type: 'mirrorPicking', picking: 'axis' }));
-    setMessage('Select the mirror line.');
+    setMessage(translate('Select the mirror line.'));
     return;
   }
   if (key === 'escape' && modification.phase !== 'idle') {
@@ -481,7 +482,8 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
   } else if (key === 'enter' && tool === 'fillet') {
     event.preventDefault();
     if (filletPreview?.ok) setFilletEditing(true);
-    else setMessage(filletPreview && !filletPreview.ok ? filletPreview.message : 'Select shared corner points or adjacent lines.');
+    else
+      setMessage(filletPreview && !filletPreview.ok ? filletPreview.message : translate('Select shared corner points or adjacent lines.'));
   } else if (key === 'enter' && (tool === 'spline' || tool === 'bezier')) {
     event.preventDefault();
     finishSpline();

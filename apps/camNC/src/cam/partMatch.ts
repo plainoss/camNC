@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { BoardV1 } from './boards';
 import type { CamPartInfo, Outline2D } from './camTypes';
 import type { CamJobPartV1 } from './jobDb';
@@ -106,7 +107,7 @@ export function carriedParts(
 
 const kWhy: Record<PartMatch['affected'][number]['why'], string> = {
   changed: 'changed',
-  unclear: 'can’t tell which',
+  unclear: translate('can’t tell which'),
   new: 'new',
   gone: 'gone',
 };
@@ -115,7 +116,7 @@ const kWhy: Record<PartMatch['affected'][number]['why'], string> = {
 export function replaceWarning(affected: PartMatch['affected']) {
   if (!affected.length) return undefined;
   const list = affected.map(a => `${a.name} (${kWhy[a.why]})`).join(', ');
-  return `Model replaced: these parts did not keep a name or milled tick, check them: ${list}.`;
+  return translate('Model replaced: these parts did not keep a name or milled tick, check them: {{value1}}.', { value1: list });
 }
 
 /** Boards after a replaced model: bodies follow their part to its new id, those of parts not found again are off. */

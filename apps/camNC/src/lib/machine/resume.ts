@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 /**
  * Resume a job that was interrupted (power cycle, reset, alarm, Stop) from close to where it stopped.
  *
@@ -295,23 +296,27 @@ const fmt = (n: number) => (Math.round(n * 1000) / 1000).toFixed(3).replace(/\.?
 export function resumeWarnings(program: ParsedProgram, line: number): string[] {
   const warnings: string[] = [];
   const target = program.lines[line];
-  if (!target) return ['That line is past the end of the program.'];
+  if (!target) return [translate('That line is past the end of the program.')];
   const before = program.lines.slice(0, line);
   if (target.before.distance === 'G91' || before.some(l => l.motion && l.before.distance === 'G91' && /G91/.test(l.code))) {
-    warnings.push('The program moves in incremental mode (G91), so the restart position may be wrong.');
+    warnings.push(translate('The program moves in incremental mode (G91), so the restart position may be wrong.'));
   }
   if (before.some(l => /\bG92\b/.test(l.code))) {
-    warnings.push('The program sets a G92 offset, which is lost after a reset. Check the position before resuming.');
+    warnings.push(translate('The program sets a G92 offset, which is lost after a reset. Check the position before resuming.'));
   }
-  if (target.before.feedMode === 'G93') warnings.push('The program uses inverse time feed (G93), which camNC cannot resume safely.');
+  if (target.before.feedMode === 'G93')
+    warnings.push(translate('The program uses inverse time feed (G93), which camNC cannot resume safely.'));
   const toolChanges = before.filter(l => /\bM0?6\b/.test(l.code));
   if (toolChanges.length) {
     const tool = target.before.tool;
     warnings.push(
-      `The program changed tools before this point. Make sure ${tool !== null ? `T${tool}` : 'the right tool'} is in the spindle and Z is zeroed for it.`
+      translate('The program changed tools before this point. Make sure {{value1}} is in the spindle and Z is zeroed for it.', {
+        value1: tool !== null ? `T${tool}` : translate('the right tool'),
+      })
     );
   }
-  if (target.before.plane !== 'G17') warnings.push(`The program cuts in ${target.before.plane}; only the XY plane is checked.`);
+  if (target.before.plane !== 'G17')
+    warnings.push(translate('The program cuts in {{value1}}; only the XY plane is checked.', { value1: target.before.plane }));
   return warnings;
 }
 
@@ -350,13 +355,14 @@ function plungeFeedMm(program: ParsedProgram, line: number): number | null {
 export function buildResumeProgram(program: ParsedProgram, options: ResumeOptions): ResumeProgram {
   const { line, safeZMachine, spindleDwell = 5, plungeClearance = 2 } = options;
   const target = program.lines[line];
-  if (!target) throw new Error(`Line ${line + 1} is past the end of the program`);
-  if (!target.motion) throw new Error(`Line ${line + 1} is not a move`);
-  if (!isKnown(target.start)) throw new Error(`The position before line ${line + 1} is not known (after a G53/G28 move)`);
+  if (!target) throw new Error(translate('Line {{value1}} is past the end of the program', { value1: line + 1 }));
+  if (!target.motion) throw new Error(translate('Line {{value1}} is not a move', { value1: line + 1 }));
+  if (!isKnown(target.start))
+    throw new Error(translate('The position before line {{value1}} is not known (after a G53/G28 move)', { value1: line + 1 }));
   const state = target.before;
   const start = target.start;
   const plungeMm = plungeFeedMm(program, line);
-  if (plungeMm === null) throw new Error('Cannot resume without a known positive feed rate in units per minute (G94)');
+  if (plungeMm === null) throw new Error(translate('Cannot resume without a known positive feed rate in units per minute (G94)'));
 
   const out: string[] = [];
   out.push(`(camNC resume${options.name ? ` of ${options.name.replace(/[()]/g, '')}` : ''} from line ${line + 1})`);

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { saveMachinePlacement } from '@/cam/machine/saveMachinePlacement';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { useStore, getMachineBounds } from '@/store/store';
@@ -97,9 +98,9 @@ export function setXYZeroFromToolpath(move = false) {
   const { x, y } = useStore.getState().toolpathOffset;
   const promise = move ? api.setWorkspaceXYZeroAndMove(x, y) : api.setWorkspaceXYZero(x, y);
   toast.promise(promise, {
-    loading: 'Setting XY zero…',
-    success: `XY zero set to ${x.toFixed(2)}, ${y.toFixed(2)}`,
-    error: err => `Setting XY zero failed: ${errorText(err)}`,
+    loading: translate('Setting XY zero…'),
+    success: translate('XY zero set to {{value1}}, {{value2}}', { value1: x.toFixed(2), value2: y.toFixed(2) }),
+    error: err => translate('Setting XY zero failed: {{value1}}', { value1: errorText(err) }),
   });
   return promise.catch(() => {});
 }
@@ -109,7 +110,7 @@ function assertEffectiveXYZero(
   effective: { x: number; y: number } | null | undefined
 ) {
   if (workspace && effective && (Math.abs(workspace.x - effective.x) > 0.01 || Math.abs(workspace.y - effective.y) > 0.01))
-    throw new Error('The effective XY offset differs from the workspace zero. Review or clear G92 offsets before starting.');
+    throw new Error(translate('The effective XY offset differs from the workspace zero. Review or clear G92 offsets before starting.'));
 }
 
 /** The effective work offset once its XY reports `target`, or null when the controller never reports it. */
@@ -130,7 +131,7 @@ async function confirmedXYZero(api: ReturnType<typeof getCncApi>, assertCurrent:
   const wco = await reportedXYZero(api, zero, assertCurrent);
   if (!wco) {
     assertEffectiveXYZero(zero, api.status.value?.wco);
-    throw new Error('Wait for a machine position report before using its zero.');
+    throw new Error(translate('Wait for a machine position report before using its zero.'));
   }
   return { zero, wco };
 }
@@ -150,11 +151,11 @@ export async function moveToolpathToMachineZero() {
   let zero: Awaited<ReturnType<typeof api.getCurrentZero>>;
   try {
     ({ zero } = await confirmedXYZero(api, () => {
-      if (!stillCurrent()) throw new Error('The machine or setup changed before its zero was confirmed.');
+      if (!stillCurrent()) throw new Error(translate('The machine or setup changed before its zero was confirmed.'));
     }));
     await saveMachinePlacement(zero.x, zero.y, stillCurrent);
   } catch (error) {
-    toast.error('Unable to move the job to the machine zero', { description: errorText(error) });
+    toast.error(translate('Unable to move the job to the machine zero'), { description: errorText(error) });
     return false;
   }
   if (!stillCurrent()) return false;
@@ -162,7 +163,9 @@ export async function moveToolpathToMachineZero() {
   store.setIsToolpathDragging(true);
   store.setToolpathOffset(new Vector3(zero.x, zero.y, zero.z));
   setTimeout(() => useStore.getState().setIsToolpathDragging(false));
-  toast.success('Toolpath moved to the machine zero', { description: `${zero.x.toFixed(2)}, ${zero.y.toFixed(2)}` });
+  toast.success(translate('Toolpath moved to the machine zero'), {
+    description: translate('{{value1}}, {{value2}}', { value1: zero.x.toFixed(2), value2: zero.y.toFixed(2) }),
+  });
   return true;
 }
 
@@ -172,7 +175,7 @@ export async function zeroXYAtBit() {
   try {
     await getCncApi().zeroAxes(['x', 'y']);
   } catch (err) {
-    toast.error('Zeroing failed', { description: errorText(err) });
+    toast.error(translate('Zeroing failed'), { description: errorText(err) });
     return;
   }
   await moveToolpathToMachineZero();
@@ -201,7 +204,7 @@ function captureRunContext(
 ): RunContext {
   const host = api.host.value,
     wco = api.status.value?.wco;
-  if (!host || !wco) throw new Error('Wait for a machine position report before starting the job.');
+  if (!host || !wco) throw new Error(translate('Wait for a machine position report before starting the job.'));
   const executionId = crypto.randomUUID();
   return {
     api,
@@ -244,8 +247,9 @@ function assertRunContext(context: RunContext, awaitingXYReport = false) {
     (!awaitingXYReport && (Math.abs(status.wco.x - context.setup.wco.x) > 0.01 || Math.abs(status.wco.y - context.setup.wco.y) > 0.01)) ||
     Math.abs(status.wco.z - context.setup.wco.z) > 0.01
   )
-    throw new Error('The controller position or activity changed while preparing. Execution was not requested.');
-  if (sessionChanged(context)) throw new Error('The machine or session changed while preparing this program. Execution was not requested.');
+    throw new Error(translate('The controller position or activity changed while preparing. Execution was not requested.'));
+  if (sessionChanged(context))
+    throw new Error(translate('The machine or session changed while preparing this program. Execution was not requested.'));
 }
 class ReceiptConflict extends Error {}
 interface Preparation {
@@ -268,16 +272,18 @@ async function recordJob(
     previousRecord: head?.record ?? undefined,
   };
   try {
-    if (!head) throw new Error('Recovery storage could not be read.');
+    if (!head) throw new Error(translate('Recovery storage could not be read.'));
     if (!(await saveJobRecordAtHead(head, record)))
-      throw new ReceiptConflict('Another execution replaced this recovery receipt. Execution was not requested.');
+      throw new ReceiptConflict(translate('Another execution replaced this recovery receipt. Execution was not requested.'));
     return { record, original: head, stored: true };
   } catch (error) {
     if (fields.camSnapshot || error instanceof ReceiptConflict) throw error;
     assertRunContext(context);
     await invalidateJobRecovery(context.host, context.demo);
     if (interruptedJob.value?.record.host === context.host) interruptedJob.value = null;
-    toast.warning('Job recovery is unavailable', { description: 'The program can run, but its progress cannot be saved in this browser.' });
+    toast.warning(translate('Job recovery is unavailable'), {
+      description: translate('The program can run, but its progress cannot be saved in this browser.'),
+    });
     return { record, original: head, stored: false };
   }
 }
@@ -294,7 +300,7 @@ async function activateReceipt(context: RunContext, preparation: Preparation) {
       head.stored.execution !== 'prepared' ||
       !(await saveJobRecordAtHead(head, active))
     )
-      throw new ReceiptConflict('Another execution replaced this preparation. Execution was not requested.');
+      throw new ReceiptConflict(translate('Another execution replaced this preparation. Execution was not requested.'));
   }
   return active;
 }
@@ -311,7 +317,9 @@ function retainFailedPreparation(context: RunContext, snapshot: ManufacturingSna
     runSnapshot: snapshot,
     runReview: 'requested',
     runRecord: context.reference,
-    runPreparationError: `Execution was not requested. ${message} Review this original setup before replacing it.`,
+    runPreparationError: translate('Execution was not requested. {{value1}} Review this original setup before replacing it.', {
+      value1: message,
+    }),
   });
 }
 
@@ -359,7 +367,7 @@ async function dispatchExecution(context: RunContext, dispatch: Dispatch) {
     const head = await dispatch.confirmSetup();
     assertRunContext(context);
     uploadStarted = true;
-    await step(api.uploadGcode(gcode, sdFile, { fresh: true }), 'Uploading…', 'Uploaded and verified');
+    await step(api.uploadGcode(gcode, sdFile, { fresh: true }), 'Uploading…', translate('Uploaded and verified'));
     uploadVerified = true;
     assertRunContext(context);
     preparation = await recordJob(context, { gcode, sdFile, toolpathName, camSnapshot }, head);
@@ -376,7 +384,7 @@ async function dispatchExecution(context: RunContext, dispatch: Dispatch) {
     runningJobName.value = toolpathName;
     rememberExecutionProgram(sdFile, gcode);
     startRequested = true;
-    await step(api.runFile(sdFile), 'Starting job…', dispatch.startedMessage);
+    await step(api.runFile(sdFile), translate('Starting job…'), dispatch.startedMessage);
     dispatch.onStarted(preparation.original?.record);
   } catch (error) {
     if (!startRequested) {
@@ -385,7 +393,7 @@ async function dispatchExecution(context: RunContext, dispatch: Dispatch) {
       let rollbackError: unknown;
       try {
         if (nativePreparation && !(await rollbackNativePreparation(nativePreparation)))
-          throw new Error('The original physical preparation could not be released.');
+          throw new Error(translate('The original physical preparation could not be released.'));
         if (preparation) await restoreRecoveryRecord(context, preparation, activated ? 'requested' : 'prepared');
       } catch (failure) {
         rollbackError = failure;
@@ -405,8 +413,8 @@ async function dispatchExecution(context: RunContext, dispatch: Dispatch) {
 async function startProgram(setXYZero: boolean) {
   const api = getCncApi();
   const { toolpath, toolpathName } = useStore.getState();
-  if (!toolpath?.gcode) throw new Error('No toolpath loaded');
-  if (isManufacturingLocked()) throw new Error('Review or dismiss the original machine job before starting another program.');
+  if (!toolpath?.gcode) throw new Error(translate('No toolpath loaded'));
+  if (isManufacturingLocked()) throw new Error(translate('Review or dismiss the original machine job before starting another program.'));
   assertInsideTravel();
   const context = captureRunContext(api),
     pendingZero = api.currentZero?.value,
@@ -419,7 +427,7 @@ async function startProgram(setXYZero: boolean) {
     sdFile: executionJobFileName(context.executionId),
     toolpathName,
     camSnapshot,
-    startedMessage: 'Job started',
+    startedMessage: translate('Job started'),
     async confirmSetup() {
       let head: JobRecordHead | null;
       try {
@@ -433,7 +441,7 @@ async function startProgram(setXYZero: boolean) {
       if (unreviewed) {
         useCamMachine.setState({ preparingRun: false, preparingExecutionId: null });
         await showRecordedNativeRun(api, unreviewed, context.demo);
-        throw new Error('Review the original machine setup before starting another program.');
+        throw new Error(translate('Review the original machine setup before starting another program.'));
       }
       const confirmed = await confirmedXYZero(api, () => assertRunContext(context, awaitingXYReport));
       // Only a zero already awaiting its status report may replace the captured XY.
@@ -442,18 +450,22 @@ async function startProgram(setXYZero: boolean) {
       if (setXYZero) {
         assertRunContext(context);
         const { x, y } = context.setup.toolpathOffset;
-        await step(api.setWorkspaceXYZero(x, y), 'Setting XY zero…', `XY zero set to ${x.toFixed(2)}, ${y.toFixed(2)}`);
+        await step(
+          api.setWorkspaceXYZero(x, y),
+          translate('Setting XY zero…'),
+          translate('XY zero set to {{value1}}, {{value2}}', { value1: x.toFixed(2), value2: y.toFixed(2) })
+        );
         // G10's acknowledgement is not a position report. Wait for the actual effective WCO;
         // an optimistic UI zero must never become the recovery receipt's machine zero.
         const wco = await reportedXYZero(api, { x, y }, () => {
           if (sessionChanged(context))
-            throw new Error('The machine or session changed while setting XY zero. Execution was not requested.');
+            throw new Error(translate('The machine or session changed while setting XY zero. Execution was not requested.'));
           const status = idleStatus(api);
-          if (!status) throw new Error('The controller activity changed while setting XY zero. Execution was not requested.');
+          if (!status) throw new Error(translate('The controller activity changed while setting XY zero. Execution was not requested.'));
           if (Math.abs(status.wco.z - context.setup.wco.z) > 0.01)
-            throw new Error('Z zero changed while setting XY zero. Execution was not requested.');
+            throw new Error(translate('Z zero changed while setting XY zero. Execution was not requested.'));
         });
-        if (!wco) throw new Error('The controller did not confirm the requested XY zero. Execution was not requested.');
+        if (!wco) throw new Error(translate('The controller did not confirm the requested XY zero. Execution was not requested.'));
         context.setup.wco = wco;
       }
       return head;
@@ -494,7 +506,7 @@ export function resumeSafeZ() {
 export function prepareResume(job: InterruptedJob, line: number) {
   const api = getCncApi();
   const safeZMachine = resumeSafeZ();
-  if (safeZMachine === null) throw new Error('The machine position is not known yet');
+  if (safeZMachine === null) throw new Error(translate('The machine position is not known yet'));
   const resume = buildResumeProgram(parseProgram(job.record.gcode), { line, safeZMachine, name: job.record.toolpathName ?? undefined });
   const travel = api.travel.value;
   const wco = api.status.value?.wco;
@@ -510,14 +522,14 @@ export async function runResume(job: InterruptedJob, line: number) {
   const api = getCncApi(),
     machine = useCamMachine.getState();
   if (machine.preparingRun || recoveryPending.value || api.jobProgress?.value != null || api.jobStartedAt?.value != null)
-    throw new Error('A program is running or preparing. Wait before resuming another job.');
+    throw new Error(translate('A program is running or preparing. Wait before resuming another job.'));
   if (isManufacturingLocked() && (machine.runReview === 'finished' || !matchesResumableSetup(machine, job.record.camSnapshot)))
-    throw new Error('Review the original machine setup before resuming a different job.');
-  if (api.host.value !== job.record.host) throw new Error('Reconnect to the original controller before resuming this job.');
+    throw new Error(translate('Review the original machine setup before resuming a different job.'));
+  if (api.host.value !== job.record.host) throw new Error(translate('Reconnect to the original controller before resuming this job.'));
   const resume = prepareResume(job, line);
   if (resume.travel?.blocking) throw new Error(resume.travel.details?.join(' ') ?? resume.travel.label);
   assertInsideTravel();
-  const name = `${job.record.toolpathName ?? 'Job'} (from line ${line + 1})`,
+  const name = translate('{{value1}} (from line {{value2}})', { value1: job.record.toolpathName ?? 'Job', value2: line + 1 }),
     store = useStore.getState();
   const previousView = {
     toolpath: store.toolpath,
@@ -548,7 +560,7 @@ export async function runResume(job: InterruptedJob, line: number) {
     toolpathName: name,
     camSnapshot: job.record.camSnapshot,
     requireStartedSheet: true,
-    startedMessage: 'Job resumed: Resume once the bit is clear',
+    startedMessage: translate('Job resumed: Resume once the bit is clear'),
     async confirmSetup() {
       applyRecord(api, { ...job.record, gcode: resume.gcode, toolpathName: name }, { machineState: false });
       context.resumeReference = useCamMachine.getState().runRecord;
@@ -560,7 +572,7 @@ export async function runResume(job: InterruptedJob, line: number) {
         (head.stored && (!head.record || !sameJobExecution(head.stored, job.record))) ||
         (durableResume && (!head.stored || !head.record || !sameJobExecution(head.record, job.record)))
       )
-        throw new ReceiptConflict('The interrupted execution receipt was removed, replaced, or still needs preparation review.');
+        throw new ReceiptConflict(translate('The interrupted execution receipt was removed, replaced, or still needs preparation review.'));
       return head;
     },
     onStarted() {

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { Plus, Undo2 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -20,7 +21,7 @@ export function BedToolbar({ item, children }: { item?: string; children?: React
     <div className="dark flex max-w-full flex-col items-start gap-1 text-xs text-foreground">
       <div
         role="toolbar"
-        aria-label={item ?? `Edit board ${tools!.board}`}
+        aria-label={item ?? translate('Edit board {{value1}}', { value1: tools!.board })}
         onPointerDown={e => e.stopPropagation()}
         className="flex max-w-full flex-wrap items-center gap-0.5 rounded-md border bg-background/95 p-0.5 shadow-md">
         {item && <span className="px-1.5 font-medium">{item}</span>}
@@ -28,17 +29,19 @@ export function BedToolbar({ item, children }: { item?: string; children?: React
         {!item && tools?.hold && (
           <button
             aria-pressed={adding}
-            title={`Tap the board where another ${tools.hold} goes.`}
+            title={translate('Tap the board where another {{value1}} goes.', { value1: tools.hold })}
             disabled={tools.blocked}
             className={cn(kBedButton, adding && 'bg-primary text-primary-foreground hover:bg-primary/90')}
             onClick={() => setMode(adding ? 'move' : 'add')}>
-            <Plus className="size-3.5" /> Add {tools.hold}
+            <Plus className="size-3.5" />
+            {translate(' Add ')}
+            {tools.hold}
           </button>
         )}
         {tools && (
           <button
-            aria-label="Undo"
-            title="Undo the last change here (⌘Z)"
+            aria-label={translate('Undo')}
+            title={translate('Undo the last change here (⌘Z)')}
             disabled={!tools.undo}
             className={kBedButton}
             onClick={() => tools.undo?.()}>

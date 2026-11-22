@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getRehearsalId, isDemoMode } from '@/lib/demo/demo-mode';
 import { carvingBoard, carvingRegion, kCarvingBoard, kDefaultVBit, type CarvingV1 } from './carving';
 import { outlineArt } from './carvingOutline';
@@ -269,7 +270,7 @@ export async function createJob(file: File, defaults: NewJobDefaults = {}): Prom
 }
 
 /** Start a native flat-part design without an intermediate model file. */
-export async function createDesignJob(name = 'Untitled design'): Promise<CamJobV1> {
+export async function createDesignJob(name = translate('Untitled design')): Promise<CamJobV1> {
   return newJob(currentStore(), name, title => {
     const draft = { ...createCadDocument(title), lengthUnit: 'cm' as const };
     draft.parts.push(createCadPart('Part 1'));
@@ -281,7 +282,10 @@ export async function createDesignJob(name = 'Untitled design'): Promise<CamJobV
  * Start a carving: an empty board, ready to add lettering, a file or AI artwork on the Carve step. `lettering` starts it
  * with that text centred on the board instead.
  */
-export async function createCarvingJob(name = 'Untitled carving', { lettering }: { lettering?: string } = {}): Promise<CamJobV1> {
+export async function createCarvingJob(
+  name = translate('Untitled carving'),
+  { lettering }: { lettering?: string } = {}
+): Promise<CamJobV1> {
   return newJob(currentStore(), name, async title => {
     const items: CarvingV1['items'] = [];
     if (lettering) {
@@ -342,7 +346,7 @@ export async function saveJob(job: CamJobV1, base?: CamJobV1): Promise<CamJobV1>
   const store = currentStore();
   if (base) {
     const saved = await updateForModel(store, base, current => rebaseJob(base, job, current));
-    if (!saved) throw new Error('This job or its model changed. Open it again before editing.');
+    if (!saved) throw new Error(translate('This job or its model changed. Open it again before editing.'));
     return saved;
   }
   const saved = { ...job, updatedAt: Date.now() };
@@ -362,7 +366,7 @@ export function updateJobForModel(source: CamJobV1, update: (current: CamJobV1) 
 /** Swap the model file of a job; parts are re-derived on the next import, found again by what they are (`partMatch`). */
 export async function replaceModel(job: CamJobV1, file: File): Promise<CamJobV1> {
   const store = currentStore();
-  if (job.design) throw new Error('Open a model as a new job. Native designs are edited in Design.');
+  if (job.design) throw new Error(translate('Open a model as a new job. Native designs are edited in Design.'));
   const bytes = await file.arrayBuffer();
   // Reading a file or picking it in another tab can outlive edits, another replacement, or deletion. Derive the
   // revision from the stored job in the same transaction as the bytes, so every committed model has its own key.
@@ -376,7 +380,7 @@ export async function replaceModel(job: CamJobV1, file: File): Promise<CamJobV1>
     },
     bytes
   );
-  if (!saved) throw new Error('This job no longer exists. Open another job before replacing its model.');
+  if (!saved) throw new Error(translate('This job no longer exists. Open another job before replacing its model.'));
   return saved;
 }
 

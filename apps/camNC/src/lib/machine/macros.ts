@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 /** Where a macro's content goes, mirroring the macro targets of the FluidNC WebUI. */
 export type MacroKind = 'gcode' | 'sd' | 'localfs';
 
@@ -15,8 +16,8 @@ export interface Macro {
  */
 export const kDefaultMacros: Macro[] = [
   { id: 'lift-z', name: 'Lift Z 10 mm', kind: 'gcode', content: 'G91\nG0 Z10\nG90' },
-  { id: 'retract-xy0', name: 'Retract & go to XY zero', kind: 'gcode', content: 'G53 G0 Z-5\nG90 G0 X0 Y0' },
-  { id: 'park-front', name: 'Park (retract, front left)', kind: 'gcode', content: 'G53 G0 Z-5\nG53 G0 X10 Y10' },
+  { id: 'retract-xy0', name: translate('Retract & go to XY zero'), kind: 'gcode', content: 'G53 G0 Z-5\nG90 G0 X0 Y0' },
+  { id: 'park-front', name: translate('Park (retract, front left)'), kind: 'gcode', content: 'G53 G0 Z-5\nG53 G0 X10 Y10' },
 ];
 
 /** The `$` command or lines that run a macro. */

@@ -1,18 +1,19 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useSyncExternalStore } from 'react';
 import { featureUses, type CadDocument, type DesignStep } from '@wbcnc/cad';
 
 /** The filter syntax, as the box's help lists it. A bare word filters by name or type. */
 export const kFeatureFilterHelp: [string, string][] = [
-  [':part name', 'Features of parts by name'],
-  [':type name', 'Features by type, such as Extrude'],
-  [':name name', 'Features by name'],
-  [':errors name', 'Features with errors'],
-  [':warnings name', 'Features with warnings'],
-  [':folder name', 'Features in folders by name'],
-  [':variable name', 'Variables by name (case sensitive), and the features that use them'],
-  [':suppressed name', 'Suppressed features'],
-  [':hidden name', 'Hidden features'],
-  [':shown name', 'Shown features'],
+  [':part name', translate('Features of parts by name')],
+  [':type name', translate('Features by type, such as Extrude')],
+  [':name name', translate('Features by name')],
+  [':errors name', translate('Features with errors')],
+  [':warnings name', translate('Features with warnings')],
+  [':folder name', translate('Features in folders by name')],
+  [':variable name', translate('Variables by name (case sensitive), and the features that use them')],
+  [':suppressed name', translate('Suppressed features')],
+  [':hidden name', translate('Hidden features')],
+  [':shown name', translate('Shown features')],
 ];
 
 const kKeywords = new Set(['part', 'type', 'name', 'errors', 'warnings', 'folder', 'variable', 'suppressed', 'hidden', 'shown']);
@@ -47,8 +48,8 @@ const kStepTypes: Record<DesignStep['kind'], string> = {
   fillet: 'Fillet',
   mirror: 'Mirror',
   copy: 'Transform',
-  pattern: 'Linear pattern',
-  partCut: 'Cut parts',
+  pattern: translate('Linear pattern'),
+  partCut: translate('Cut parts'),
   split: 'Split',
 };
 

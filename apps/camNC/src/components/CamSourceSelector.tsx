@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { isCameraReady, useActiveCamId, useAllCamSources, useSetActiveCam } from '@/store/store';
 import { Link } from '@tanstack/react-router';
 import { Button } from '@wbcnc/ui/components/button';
@@ -17,7 +18,7 @@ export function CameraStatusDot({ ready, className }: { ready: boolean; classNam
   return (
     <span
       className={cn('inline-block size-2 shrink-0 rounded-full', ready ? 'bg-green-500' : 'bg-amber-500', className)}
-      title={ready ? 'Ready' : 'Setup unfinished'}
+      title={ready ? translate('Ready') : translate('Setup unfinished')}
     />
   );
 }
@@ -35,7 +36,8 @@ export function CamSourceSelector() {
       <div className="p-2">
         <Button size="sm" variant="outline" className="w-full" asChild>
           <Link to="/setup/url-entry" search={{ new: true }}>
-            <Plus /> Add camera
+            <Plus />
+            {translate(' Add camera ')}
           </Link>
         </Button>
       </div>
@@ -46,14 +48,14 @@ export function CamSourceSelector() {
     <div className="p-2">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="w-full justify-start gap-2 font-normal" aria-label="Camera">
+          <Button variant="outline" className="w-full justify-start gap-2 font-normal" aria-label={translate('Camera')}>
             {active ? <CameraStatusDot ready={isCameraReady(active)} /> : <VideoOff className="text-muted-foreground" />}
-            <span className="truncate">{active?.name ?? 'No camera'}</span>
+            <span className="truncate">{active?.name ?? translate('No camera')}</span>
             <ChevronsUpDown className="ml-auto size-4 opacity-50" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-(--radix-dropdown-menu-trigger-width) min-w-56" align="start">
-          <DropdownMenuLabel className="text-xs text-muted-foreground">Cameras</DropdownMenuLabel>
+          <DropdownMenuLabel className="text-xs text-muted-foreground">{translate('Cameras')}</DropdownMenuLabel>
           {cameras.map(([id, camera]) => (
             <DropdownMenuItem key={id} onSelect={() => setActiveCam(id)}>
               <CameraStatusDot ready={isCameraReady(camera)} />
@@ -64,8 +66,8 @@ export function CamSourceSelector() {
           <DropdownMenuItem onSelect={() => setActiveCam(null)}>
             <VideoOff />
             <span className="flex flex-col">
-              <span>No camera</span>
-              <span className="text-xs text-muted-foreground">Continue with toolpath only</span>
+              <span>{translate('No camera')}</span>
+              <span className="text-xs text-muted-foreground">{translate('Continue with toolpath only')}</span>
             </span>
             {!activeCamId && <Check className="ml-auto" />}
           </DropdownMenuItem>
@@ -73,18 +75,21 @@ export function CamSourceSelector() {
           {activeCamId && (
             <DropdownMenuItem asChild>
               <Link to="/setup/cameras/$camId" params={{ camId: activeCamId }}>
-                <Settings2 /> Camera settings
+                <Settings2 />
+                {translate(' Camera settings ')}
               </Link>
             </DropdownMenuItem>
           )}
           <DropdownMenuItem asChild>
             <Link to="/setup/url-entry" search={{ new: true }}>
-              <Plus /> Add camera…
+              <Plus />
+              {translate(' Add camera… ')}
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link to="/setup/cameras">
-              <List /> Manage cameras
+              <List />
+              {translate(' Manage cameras ')}
             </Link>
           </DropdownMenuItem>
         </DropdownMenuContent>

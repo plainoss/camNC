@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { assemblyReport, evaluateCadDocument, parseCadDocument, type CadDocument } from '@wbcnc/cad';
@@ -12,7 +13,7 @@ import './assistant/dock.css';
 import { SvgInsert } from './svg/SvgInsert';
 import { useSvgAssetSession } from './svg/useSvgAssetSession';
 
-const unchangedFile = 'This file matches the open design. Reviewing it would change nothing.';
+const unchangedFile = translate('This file matches the open design. Reviewing it would change nothing.');
 
 const AssistantDock = lazy(() => import('./assistant/Dock').then(module => ({ default: module.AssistantDock })));
 
@@ -74,7 +75,8 @@ export function StudioProposals({
     setProposal(null);
     try {
       const parsed = parseCadDocument(JSON.parse(await file.text()));
-      if (parsed.id !== start.id) throw new Error('This file is a different design. Open it from Projects › Open model… instead.');
+      if (parsed.id !== start.id)
+        throw new Error(translate('This file is a different design. Open it from Projects › Open model… instead.'));
       // Check before solving: an untouched new design fails the check only because its sketch is still empty.
       // Revisions are ignored, so an edit and its undo still match the file saved before them.
       if (sameContent(parsed, parseCadDocument(structuredClone(start)))) return setNotice(unchangedFile);
@@ -82,14 +84,14 @@ export function StudioProposals({
       // Saved coordinates can lag behind their constraints. Review exactly the solved geometry Apply will keep.
       const checked = await inspectCadDocument(candidate.document);
       if (!checked.report.ok)
-        throw new Error(checked.report.errors.map(error => error.message).join('\n') || 'Fix this design before reviewing it.');
+        throw new Error(checked.report.errors.map(error => error.message).join('\n') || translate('Fix this design before reviewing it.'));
       const next = cadProposal(start, checked.document);
       const comparison = compareCadProposal(next);
       if (!comparison.added.length && !comparison.changed.length && !comparison.removed.length) return setNotice(unchangedFile);
       setProposal(next);
       setReviewKey(key => key + 1);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to read this design.');
+      setError(cause instanceof Error ? cause.message : translate('Unable to read this design.'));
     } finally {
       setBuilding(false);
     }
@@ -120,16 +122,16 @@ export function StudioProposals({
       setProposal(cadProposal(start, result.document));
       setReviewKey(key => key + 1);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to build this cupboard.');
+      setError(cause instanceof Error ? cause.message : translate('Unable to build this cupboard.'));
     } finally {
       setBuilding(false);
     }
   };
   return (
     <>
-      <div ref={tools} className="cad-proposal-tools" aria-label="Insert and assistant">
+      <div ref={tools} className="cad-proposal-tools" aria-label={translate('Insert and assistant')}>
         <details className="cad-insert-menu">
-          <summary>Insert</summary>
+          <summary>{translate('Insert')}</summary>
           <div>
             <SvgInsert document={document} disabled={disabled || building} onProposal={setProposal} />
             <button
@@ -140,7 +142,7 @@ export function StudioProposals({
                 clearMessages();
                 insert.current?.showModal();
               }}>
-              Cupboard…
+              {translate('Cupboard… ')}
             </button>
             <button
               type="button"
@@ -150,14 +152,14 @@ export function StudioProposals({
                 clearMessages();
                 input.current?.click();
               }}>
-              Review design file…
+              {translate('Review design file… ')}
             </button>
           </div>
         </details>
         <button
           type="button"
           className="cad-assistant-toggle"
-          aria-label="Assistant"
+          aria-label={translate('Assistant')}
           aria-pressed={assistant}
           disabled={disabled}
           onClick={() => {
@@ -167,7 +169,7 @@ export function StudioProposals({
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 4h16v12H9l-5 4V4Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
           </svg>
-          <span>Assistant</span>
+          <span>{translate('Assistant')}</span>
         </button>
         <input
           ref={input}
@@ -184,7 +186,7 @@ export function StudioProposals({
         {error && !insert.current?.open && (
           <div role="alert" className="cad-proposal-error">
             <span>{error}</span>
-            <button type="button" aria-label="Dismiss message" onClick={clearMessages}>
+            <button type="button" aria-label={translate('Dismiss message')} onClick={clearMessages}>
               ×
             </button>
           </div>
@@ -192,7 +194,7 @@ export function StudioProposals({
         {notice && !error && (
           <div role="status" className="cad-proposal-error cad-proposal-notice">
             <span>{notice}</span>
-            <button type="button" aria-label="Dismiss message" onClick={clearMessages}>
+            <button type="button" aria-label={translate('Dismiss message')} onClick={clearMessages}>
               ×
             </button>
           </div>
@@ -206,7 +208,7 @@ export function StudioProposals({
               className="cad-cupboard-insert"
               aria-labelledby="cad-cupboard-title"
               onKeyDown={event => event.stopPropagation()}>
-              <h2 id="cad-cupboard-title">Insert cupboard</h2>
+              <h2 id="cad-cupboard-title">{translate('Insert cupboard')}</h2>
               <form
                 onSubmit={event => {
                   event.preventDefault();
@@ -215,7 +217,7 @@ export function StudioProposals({
                 {(['width', 'height', 'depth', 'board', 'shelves'] as const).map(key => (
                   <label key={key}>
                     {key[0].toUpperCase() + key.slice(1)}
-                    {key !== 'shelves' && ' (mm)'}
+                    {key !== 'shelves' && translate(' (mm)')}
                     <input
                       type="number"
                       required
@@ -229,15 +231,15 @@ export function StudioProposals({
                 ))}
                 {error && <p role="alert">{error}</p>}
                 <button type="button" disabled={building} onClick={() => insert.current?.close()}>
-                  Cancel
+                  {translate('Cancel ')}
                 </button>
                 <button type="submit" disabled={building}>
-                  {building ? 'Checking…' : 'Preview cupboard'}
+                  {building ? translate('Checking…') : translate('Preview cupboard')}
                 </button>
               </form>
             </dialog>
             {assistant && (
-              <Suspense fallback={<p>Opening assistant…</p>}>
+              <Suspense fallback={<p>{translate('Opening assistant…')}</p>}>
                 <AssistantDock
                   key={document.id}
                   document={document}

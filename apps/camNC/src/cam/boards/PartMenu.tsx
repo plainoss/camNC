@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@wbcnc/ui/components/dropdown-menu';
 import { Pin, PinOff, Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -26,7 +27,8 @@ function MoveTargets({ targets, onMoveTo, noRoom }: Pick<PartMenuProps, 'targets
   const [full] = useState(() => new Map(targets.map(b => [b.id, noRoom?.(b)])));
   return targets.map(b => (
     <DropdownMenuItem key={b.id} disabled={!!full.get(b.id)} onSelect={() => onMoveTo(b.id)}>
-      Board {b.name}
+      {translate('Board ')}
+      {b.name}
       {full.get(b.id) && <span className="text-[10px] text-muted-foreground">{full.get(b.id)}</span>}
     </DropdownMenuItem>
   ));
@@ -36,24 +38,30 @@ function MoveTargets({ targets, onMoveTo, noRoom }: Pick<PartMenuProps, 'targets
 export function PartMenuContent({ name, targets, onMoveTo, noRoom, pinned, onUnpin, onTabsReset }: PartMenuProps) {
   return (
     <DropdownMenuContent align="start">
-      <DropdownMenuLabel className="text-xs">Move {name} to</DropdownMenuLabel>
+      <DropdownMenuLabel className="text-xs">
+        {translate('Move ')}
+        {name}
+        {translate(' to')}
+      </DropdownMenuLabel>
       <MoveTargets targets={targets} onMoveTo={onMoveTo} noRoom={noRoom} />
       {targets.length > 0 && <DropdownMenuSeparator />}
       <DropdownMenuItem onSelect={() => onMoveTo('new')}>
-        <Plus className="size-3" /> New board
+        <Plus className="size-3" />
+        {translate(' New board ')}
       </DropdownMenuItem>
       {pinned && (
         <>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={onUnpin}>
-            <PinOff className="size-3" /> Unpin (auto-fill may move it)
+            <PinOff className="size-3" />
+            {translate(' Unpin (auto-fill may move it) ')}
           </DropdownMenuItem>
         </>
       )}
       {onTabsReset && (
         <>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={onTabsReset}>Place its tabs automatically again</DropdownMenuItem>
+          <DropdownMenuItem onSelect={onTabsReset}>{translate('Place its tabs automatically again')}</DropdownMenuItem>
         </>
       )}
     </DropdownMenuContent>
@@ -67,13 +75,15 @@ export function PartBadges({ pinned, holding }: { pinned: boolean; holding?: Par
       {holding === 'unheld' && (
         <span
           className="rounded bg-destructive/15 px-1 text-[10px] text-destructive"
-          title="No edge where tabs would hold it: widen the gap or margin between parts, move it, use a smaller bit, or switch the board to a bottom skin">
-          can’t hold
+          title={translate(
+            'No edge where tabs would hold it: widen the gap or margin between parts, move it, use a smaller bit, or switch the board to a bottom skin'
+          )}>
+          {translate('can’t hold ')}
         </span>
       )}
       {pinned && (
-        <Hint text="Pinned: you placed it by hand, so auto-fill leaves it on this board. ⋯ › Unpin lets it move again.">
-          <span role="img" aria-label="Placed by hand" tabIndex={0} className="rounded-full bg-background/80 p-0.5">
+        <Hint text={translate('Pinned: you placed it by hand, so auto-fill leaves it on this board. ⋯ › Unpin lets it move again.')}>
+          <span role="img" aria-label={translate('Placed by hand')} tabIndex={0} className="rounded-full bg-background/80 p-0.5">
             <Pin className="size-3 text-muted-foreground" aria-hidden />
           </span>
         </Hint>

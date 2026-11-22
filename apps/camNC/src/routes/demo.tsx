@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { PageHeader } from '@/components/page-header';
 import { SampleProjectCard } from '@/cam/samples/SampleProjectCard';
@@ -17,25 +18,26 @@ export const Route = createFileRoute('/demo')({
 function DemoEntry() {
   return (
     <div className="w-full">
-      <PageHeader title="Explore camNC" />
+      <PageHeader title={translate('Explore camNC')} />
       <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
         <div>
-          <h1 className="text-2xl font-medium">Try camNC without a machine</h1>
-          <p className="mt-2 text-muted-foreground">Start with a saved CAM project, or explore a simulated controller.</p>
+          <h1 className="text-2xl font-medium">{translate('Try camNC without a machine')}</h1>
+          <p className="mt-2 text-muted-foreground">{translate('Start with a saved CAM project, or explore a simulated controller.')}</p>
         </div>
         <SampleProjectCard />
         <section className="flex flex-col items-start gap-3 rounded-lg border p-5">
-          <h2 className="text-lg font-medium">Explore a demo machine</h2>
+          <h2 className="text-lg font-medium">{translate('Explore a demo machine')}</h2>
           <p className="text-sm text-muted-foreground">
-            Jog, home, probe and run G-code with a simulated FluidNC. The camera is a recorded example, not a live feed. Demo changes are
-            discarded.
+            {translate(
+              'Jog, home, probe and run G-code with a simulated FluidNC. The camera is a recorded example, not a live feed. Demo changes are discarded. '
+            )}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
-              <a href="/demo?machine=1">Explore demo machine</a>
+              <a href="/demo?machine=1">{translate('Explore demo machine')}</a>
             </Button>
             <Button asChild variant="ghost">
-              <a href="/demo?camera=off">Without a camera</a>
+              <a href="/demo?camera=off">{translate('Without a camera')}</a>
             </Button>
           </div>
         </section>

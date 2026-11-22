@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { useStore } from '@/store/store';
 import { toast } from '@wbcnc/ui/components/sonner';
@@ -15,8 +16,8 @@ export function useProbeZ() {
     const promise = api.probeZ({ plateThickness: prefs.probePlateThickness, maxTravel: prefs.probeMaxTravel, feed: prefs.probeFeed });
     toast.promise(promise, {
       loading: 'Probing Z…',
-      success: `Z zero set (plate ${prefs.probePlateThickness} mm)`,
-      error: err => `Probe failed: ${err instanceof Error ? err.message : err}`,
+      success: translate('Z zero set (plate {{value1}} mm)', { value1: prefs.probePlateThickness }),
+      error: err => translate('Probe failed: {{value1}}', { value1: err instanceof Error ? err.message : err }),
     });
     await promise.catch(() => {});
     setBusy(false);

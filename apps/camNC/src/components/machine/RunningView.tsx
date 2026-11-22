@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { errorText, isJobOfToolpath, runningJobTitle, stopJob } from '@/lib/machine/jobs';
 import { runningJobName } from '@/lib/machine/jobRecovery';
@@ -78,13 +79,13 @@ function HoldExplanation() {
   if (status?.state === 'Door')
     return (
       <p className="text-sm rounded-md bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-100 p-2">
-        Safety door open. Close it, then Resume.
+        {translate('Safety door open. Close it, then Resume. ')}
       </p>
     );
   if (status?.state === 'Hold' && status.subState === 1) {
     return (
       <p className="text-sm rounded-md bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-100 p-2">
-        Pausing… the machine is slowing down.
+        {translate('Pausing… the machine is slowing down. ')}
       </p>
     );
   }
@@ -100,10 +101,16 @@ function HoldExplanation() {
           {hint.next && <p className="font-medium">{hint.next}</p>}
         </>
       ) : (
-        <p>{ours ? 'Paused with Hold.' : 'Paused.'} Resume continues the job; Stop ends it.</p>
+        <p>
+          {ours ? translate('Paused with Hold.') : translate('Paused.')}
+          {translate(' Resume continues the job; Stop ends it.')}
+        </p>
       )}
       {lastMessage && !hint?.reason.includes(lastMessage.replace(/^INFO:\s*(MSG,)?/i, '')) && (
-        <p className="text-xs font-mono text-amber-800 dark:text-amber-200/80">Controller: {lastMessage}</p>
+        <p className="text-xs font-mono text-amber-800 dark:text-amber-200/80">
+          {translate('Controller: ')}
+          {lastMessage}
+        </p>
       )}
     </div>
   );
@@ -122,8 +129,17 @@ function OverridesFold() {
     <Collapsible open={open} onOpenChange={setOpen} className="flex flex-col gap-2">
       <CollapsibleTrigger asChild>
         <Button variant="ghost" size="sm" className="-ml-1 self-start px-1 text-muted-foreground">
-          <ChevronRight className={cn('transition-transform', open && 'rotate-90')} /> Overrides
-          <span className="text-xs">{changed ? `feed ${o.feed} · spindle ${o.spindle} · rapids ${o.rapid} %` : 'all at 100 %'}</span>
+          <ChevronRight className={cn('transition-transform', open && 'rotate-90')} />
+          {translate(' Overrides ')}
+          <span className="text-xs">
+            {changed
+              ? translate('feed {{value1}} · spindle {{value2}} · rapids {{value3}} %', {
+                  value1: o.feed,
+                  value2: o.spindle,
+                  value3: o.rapid,
+                })
+              : translate('all at 100 %')}
+          </span>
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>{open && <OverridesPanel />}</CollapsibleContent>
@@ -147,7 +163,7 @@ export function RunningView({ onShowConsole }: { onShowConsole?: () => void } = 
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-row justify-between items-baseline gap-2">
           <span className="font-medium truncate" title={job?.file}>
-            {title ?? 'Running'}
+            {title ?? translate('Running')}
           </span>
           {job && <span className="text-2xl font-semibold tabular-nums">{job.percent.toFixed(1)}%</span>}
         </div>
@@ -155,7 +171,14 @@ export function RunningView({ onShowConsole }: { onShowConsole?: () => void } = 
           <div className="h-full bg-primary transition-[width]" style={{ width: `${job?.percent ?? 0}%` }} />
         </div>
         <div className="text-xs text-muted-foreground">
-          {time ? `${formatDuration(time.elapsed)} elapsed · about ${formatDuration(time.left)} left` : holding ? '' : 'Estimating…'}
+          {time
+            ? translate('{{value1}} elapsed · about {{value2}} left', {
+                value1: formatDuration(time.elapsed),
+                value2: formatDuration(time.left),
+              })
+            : holding
+              ? ''
+              : translate('Estimating…')}
         </div>
       </div>
 
@@ -163,16 +186,21 @@ export function RunningView({ onShowConsole }: { onShowConsole?: () => void } = 
 
       <div className="grid grid-cols-2 gap-2">
         {holding ? (
-          <Button size="lg" onClick={() => api.resume().catch(err => toast.error('Resume failed', { description: errorText(err) }))}>
-            <Play /> Resume
+          <Button
+            size="lg"
+            onClick={() => api.resume().catch(err => toast.error(translate('Resume failed'), { description: errorText(err) }))}>
+            <Play />
+            {translate(' Resume ')}
           </Button>
         ) : (
           <Button size="lg" variant="outline" onClick={() => api.feedHold()}>
-            <Pause /> Pause
+            <Pause />
+            {translate(' Pause ')}
           </Button>
         )}
         <Button size="lg" variant="destructive" onClick={() => void stopJob()}>
-          <Square /> Stop
+          <Square />
+          {translate(' Stop ')}
         </Button>
       </div>
 

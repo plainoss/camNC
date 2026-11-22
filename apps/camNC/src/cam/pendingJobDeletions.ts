@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { toast } from '@wbcnc/ui/components/sonner';
 import { useSyncExternalStore } from 'react';
 import { deleteJob } from './jobDb';
@@ -72,11 +73,11 @@ export function deleteJobWithUndo({ id, name }: { id: string; name: string }, re
   markJobDeleted(id);
   const commit = () =>
     commitJobDeletion(id, removed).catch((e: unknown) =>
-      toast.error(`${name} could not be deleted`, { description: e instanceof Error ? e.message : String(e) })
+      toast.error(translate('{{name}} could not be deleted', { name: name }), { description: e instanceof Error ? e.message : String(e) })
     );
   toast(`Deleted ${name}`, {
     duration: kUndoDeleteMs,
-    action: { label: 'Undo', onClick: () => undoJobDeletion(id) },
+    action: { label: translate('Undo'), onClick: () => undoJobDeletion(id) },
     onAutoClose: () => void commit(),
     onDismiss: () => void commit(),
   });

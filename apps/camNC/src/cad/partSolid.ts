@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   evaluateCadFeatures,
   evaluateCadPart,
@@ -49,7 +50,7 @@ export function partSolid(
     const source = geometry.document.parts.find(source => source.id === part.id);
     const material = geometry.parts.find(shape => shape.partId === part.id);
     if (!source || !material || (copyId && !source.copies?.some(copy => copy.id === copyId)))
-      return { problem: 'This physical part or copy is not available at this step.' };
+      return { problem: translate('This physical part or copy is not available at this step.') };
     try {
       // The stage already owns the occupied material. The local face editor retains unreflected sketch axes.
       const shape = copyId ? evaluatedPartCopy(material, { id: copyId }) : material;
@@ -64,7 +65,7 @@ export function partSolid(
     }
   }
   const { part: profile } = evaluateCadPart(part);
-  if (!profile) return { problem: 'This part can’t be shown until its sketch is fixed.' };
+  if (!profile) return { problem: translate('This part can’t be shown until its sketch is fixed.') };
   // A cut with an error is left out and explained, so the part stays on screen while it's put right.
   const { part: evaluated, diagnostics } = evaluateCadFeatures(part, profile, copyId),
     problem = diagnostics.find(diagnostic => diagnostic.severity === 'error')?.message;

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { smallestCornerRelief, solveCadDocument, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
 import { studioCutParts } from '@/cad/studioGeometry';
 import { profileFeatures, summarizePart, type FlatPart, type MeshRound, type PartFeatures } from '@wbcnc/cam';
@@ -27,7 +28,7 @@ export function nativePart(source: EvaluatedCadPart): {
   below?: PartFeatures;
 } {
   const { features, below, turned, holeSources, offset, size, problem } = profileFeatures(source);
-  if (problem) throw new Error(`${source.name}: ${problem}`);
+  if (problem) throw new Error(translate('{{value1}}: {{problem}}', { value1: source.name, problem: problem }));
   const outer = features.outlines[0]!;
   const holeLoops = source.loops.filter(loop => loop.kind === 'hole').map(loop => loop.id);
   let positions: Float64Array, indices: Uint32Array;
@@ -150,7 +151,8 @@ function laidFlatPart(
 export async function nativeCadModel(document: CadDocument): Promise<{ model: ModelImport; entries: Map<string, NativeCadEntry> }> {
   const started = performance.now();
   const solved = await solveCadDocument(document);
-  if (solved.status !== 'solved') throw new Error(solved.diagnostics.map(d => d.message).join(' ') || 'The design could not be solved.');
+  if (solved.status !== 'solved')
+    throw new Error(solved.diagnostics.map(d => d.message).join(' ') || translate('The design could not be solved.'));
   const parts = studioCutParts(solved).map(({ part, names }) => {
     const native = nativePart(asMilled(part));
     native.info.names = names;

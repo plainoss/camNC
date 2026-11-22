@@ -1,7 +1,8 @@
+import { t as translate } from '@wbcnc/i18n';
 import { parseCadDocument, type CadDocument } from '@wbcnc/cad';
 import { inspectCadDocument, type CadEditResult } from '@wbcnc/cad-script';
 
-const stopped = (document: CadDocument, message = 'The candidate check was stopped.'): CadEditResult => ({
+const stopped = (document: CadDocument, message = translate('The candidate check was stopped.')): CadEditResult => ({
   ok: false,
   document,
   parts: [],
@@ -26,6 +27,6 @@ export async function finalizeBrowserCandidate(
     trusted.report.warnings.push(...retained.filter(warning => !known.has(JSON.stringify(warning))));
     return { ...trusted, ok: trusted.report.ok };
   } catch (error) {
-    return stopped(checked.document, error instanceof Error ? error.message : 'The full candidate check failed.');
+    return stopped(checked.document, error instanceof Error ? error.message : translate('The full candidate check failed.'));
   }
 }

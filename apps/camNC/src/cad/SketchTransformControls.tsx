@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadPoint } from '@wbcnc/cad';
 import type { PointerEvent } from 'react';
 import { CadValueInput } from './CadValueInput';
@@ -20,15 +21,15 @@ export function SketchTransformControls({
   const fields = [
     ['dx', 'Translate X'],
     ['dy', 'Translate Y'],
-    ['angle', 'Rotate angle'],
-    ['scale', 'Scale factor'],
+    ['angle', translate('Rotate angle')],
+    ['scale', translate('Scale factor')],
     ['pivotX', 'Pivot X'],
     ['pivotY', 'Pivot Y'],
   ] as const;
   return (
     <form
       className="cad-create-size cad-transform-editor"
-      aria-label="Transform selection"
+      aria-label={translate('Transform selection')}
       onSubmit={event => {
         event.preventDefault();
         onApply();
@@ -69,24 +70,29 @@ export function SketchTransformControls({
       <label>
         <input
           type="checkbox"
-          aria-label="Copy selection"
+          aria-label={translate('Copy selection')}
           checked={parameters.copy}
           onChange={event => onChange({ ...parameters, copy: event.target.checked })}
         />
-        Copy
+        {translate('Copy ')}
       </label>
       <button type="submit" disabled={!!error}>
-        Apply transform
+        {translate('Apply transform ')}
       </button>
       <button type="button" onClick={onCancel}>
-        Cancel transform
+        {translate('Cancel transform ')}
       </button>
       {error && (
         <span role="alert" className="cad-error">
           {error}
         </span>
       )}
-      {releasedCount > 0 && <span role="status">{releasedCount} external or directed relations will be released.</span>}
+      {releasedCount > 0 && (
+        <span role="status">
+          {releasedCount}
+          {translate(' external or directed relations will be released.')}
+        </span>
+      )}
     </form>
   );
 }
@@ -121,7 +127,7 @@ export function SketchTransformManipulator({
         fill="#2467d133"
         style={{ cursor: 'move' }}
         onPointerDown={start('translate')}>
-        <title>Translate selection</title>
+        <title>{translate('Translate selection')}</title>
       </rect>
       <path
         data-transform-handle="rotate"
@@ -130,17 +136,17 @@ export function SketchTransformManipulator({
         strokeWidth={8 * k}
         style={{ cursor: 'grab' }}
         onPointerDown={start('rotate')}>
-        <title>Rotate selection</title>
+        <title>{translate('Rotate selection')}</title>
       </path>
       <path
         data-transform-handle="scale"
         d={`M${43 * k} ${31 * k}l${14 * k} ${14 * k}h${-14 * k}z`}
         style={{ cursor: 'nwse-resize' }}
         onPointerDown={start('scale')}>
-        <title>Scale selection</title>
+        <title>{translate('Scale selection')}</title>
       </path>
       <circle data-transform-handle="pivot" r={5 * k} style={{ cursor: 'move' }} onPointerDown={start('pivot')}>
-        <title>Move transform pivot</title>
+        <title>{translate('Move transform pivot')}</title>
       </circle>
     </g>
   );

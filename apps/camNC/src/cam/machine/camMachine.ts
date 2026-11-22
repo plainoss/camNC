@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { demoStorage } from '@/lib/demo/demo-storage';
 import { hasWork } from '../carving';
 import { orderBoardQueue } from '@wbcnc/cam/board';
@@ -241,9 +242,9 @@ export function machineQueue(boards: JobBoard[], plans: (PlanResult | undefined)
     const none = (kind: NoProgramEntry['kind'], why: string): NoProgramEntry[] => [
       { key: `${id}:${kind}`, doneId: `${id}:${kind}`, board, kind, program: 0, firstOfBoard: false, blocked: why },
     ];
-    if (error) return none('error', `Couldn’t be planned: ${error}`);
-    if (!plan) return blocked ? none('error', blocked) : none('pending', 'Making its programs…');
-    if (!plan.programs.length) return none('error', blocked ?? 'Nothing to cut.');
+    if (error) return none('error', translate('Couldn’t be planned: {{value1}}', { value1: error }));
+    if (!plan) return blocked ? none('error', blocked) : none('pending', translate('Making its programs…'));
+    if (!plan.programs.length) return none('error', blocked ?? translate('Nothing to cut.'));
     const common = { board, plan, blocked, sourceKey: plan.sourceKey };
     return [
       ...plan.programs.map(
@@ -496,10 +497,14 @@ export function entryHolds(
 /** "Board A · T2 ⌀6", "Board B · ⌀3.175", "Board A · remove tabs". */
 export function entryTitle(e: QueueEntry) {
   const board = `Board ${e.board.board.name}`;
-  if (!e.plan) return e.kind === 'error' ? `${board} · can’t be cut` : `${board} · being planned`;
-  if (e.kind === 'tabs') return `${board} · remove tabs`;
-  if (e.kind === 'flip') return `${board} · turn over`;
-  if (e.kind === 'free') return `${board} · ${e.board.request.holdDown === 'fixture-tape' ? 'cut free' : 'free parts'}`;
+  if (!e.plan)
+    return e.kind === 'error'
+      ? translate('{{value1}} · can’t be cut', { value1: board })
+      : translate('{{value1}} · being planned', { value1: board });
+  if (e.kind === 'tabs') return translate('{{value1}} · remove tabs', { value1: board });
+  if (e.kind === 'flip') return translate('{{value1}} · turn over', { value1: board });
+  if (e.kind === 'free')
+    return `${board} · ${e.board.request.holdDown === 'fixture-tape' ? translate('cut free') : translate('free parts')}`;
   const p = e.plan.programs[e.program];
   const side = e.sideB ? ' side B' : '';
   const number = e.plan.programs.filter(program => program.tool === p.tool).length > 1 ? `P${e.program + 1} ` : '';

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useBoardPlans, useCamJob, useCamModel } from '@/cam/camQueries';
 import { layoutBlock, planBlock } from '@/cam/boardBlock';
 import { kDefaultPlan } from '@/cam/planSettings';
@@ -23,19 +24,22 @@ export function CamJobRehearsal({ jobId, boardId }: { jobId: string; boardId?: s
     active.length > 0 &&
     !boards.some(b => layoutBlock(b, { bit: settings.bit.diameter, missing })) &&
     plans.every(p => p.data && !p.isPlaceholderData && !planBlock(p.data));
-  if (isPending) return <p role="status">Loading your CAM project…</p>;
+  if (isPending) return <p role="status">{translate('Loading your CAM project…')}</p>;
   if (!job)
     return (
       <p role="alert">
-        This CAM project is no longer available.{' '}
+        {translate('This CAM project is no longer available.')}{' '}
         <Link to="/cam" className="underline">
-          Open CAM
+          {translate('Open CAM ')}
         </Link>
       </p>
     );
   return (
     <div className="flex flex-col items-start gap-3">
-      <p className="text-sm">{job.name} · Rehearse the whole job with a simulated controller. Your saved project stays unchanged.</p>
+      <p className="text-sm">
+        {job.name}
+        {translate(' · Rehearse the whole job with a simulated controller. Your saved project stays unchanged.')}
+      </p>
       {model.isError && (
         <p role="alert" className="text-sm text-destructive">
           {model.error.message}
@@ -43,7 +47,7 @@ export function CamJobRehearsal({ jobId, boardId }: { jobId: string; boardId?: s
       )}
       <RehearsalButton job={job} boards={boards.map(b => freezeRehearsalBoard(b.board, b.nest))} ready={ready} boardId={boardId} />
       <Link to="/cam/$jobId/plan" params={{ jobId }} search={{ board: boardId }} className="text-sm underline">
-        ← Back to Plan
+        {translate('← Back to Plan ')}
       </Link>
     </div>
   );

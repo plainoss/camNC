@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { ProviderConfig } from './provider';
 
 export type ConnectionPresetId = 'anthropic' | 'openai' | 'gemini' | 'other';
@@ -14,25 +15,25 @@ export interface ConnectionPreset {
 export const connectionPresets: ConnectionPreset[] = [
   {
     id: 'anthropic',
-    label: 'Anthropic',
+    label: translate('Anthropic'),
     config: { kind: 'anthropic', endpoint: 'https://api.anthropic.com/v1', protocol: 'chat', tools: true, images: true },
     models: [
-      { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (recommended)' },
-      { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (most capable, slower)' },
-      { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 (fastest, cheapest)' },
+      { id: 'claude-sonnet-5-5', label: translate('Claude Sonnet 5.5 (recommended)') },
+      { id: 'claude-opus-5-5', label: translate('Claude Opus 5.5 (most capable, slower)') },
+      { id: 'claude-haiku-5-5', label: translate('Claude Haiku 5.5 (fastest, cheapest)') },
     ],
     keyPlaceholder: 'sk-ant-…',
   },
   {
     id: 'openai',
-    label: 'OpenAI',
+    label: translate('OpenAI'),
     config: { kind: 'compatible', endpoint: 'https://api.openai.com/v1', protocol: 'responses', tools: true, images: true },
     models: [],
     keyPlaceholder: 'sk-…',
   },
   {
     id: 'gemini',
-    label: 'Gemini',
+    label: translate('Gemini'),
     // Gemini's OpenAI-compatible API: chat completions with tools and image input, plus image generation for Carve.
     config: {
       kind: 'compatible',
@@ -46,10 +47,10 @@ export const connectionPresets: ConnectionPreset[] = [
   },
   {
     id: 'other',
-    label: 'Other…',
+    label: translate('Other…'),
     config: { kind: 'compatible', endpoint: 'https://', protocol: 'chat', tools: true, images: false },
     models: [],
-    keyPlaceholder: 'API key',
+    keyPlaceholder: translate('API key'),
   },
 ];
 

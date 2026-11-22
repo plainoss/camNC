@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { PageHeader } from '@/components/page-header';
 import { CamPage } from '@/cam/CamPage';
 import { camKeys, useCamJob, useCamModel, useSaveCamJob } from '@/cam/camQueries';
@@ -39,7 +40,7 @@ function ModelStep() {
   const explosion = useExplodedView(view, setView);
 
   if (jobPending) return <Shell />;
-  if (!job) return <Shell message="This job doesn't exist (any more)." />;
+  if (!job) return <Shell message={translate("This job doesn't exist (any more).")} />;
   if (job.design) return <Navigate to="/cam/$jobId/design" params={{ jobId }} replace />;
 
   const replace = async () => {
@@ -49,7 +50,7 @@ function ModelStep() {
       if (!kModelFile.test(file.name)) return toastNotAModel(file.name);
       queryClient.setQueryData(camKeys.job(job.id), await replaceModel(job, file));
     } catch (error) {
-      toast.error('Could not replace the model', { description: error instanceof Error ? error.message : String(error) });
+      toast.error(translate('Could not replace the model'), { description: error instanceof Error ? error.message : String(error) });
       await queryClient.invalidateQueries({ queryKey: camKeys.job(job.id) });
     }
   };
@@ -61,30 +62,30 @@ function ModelStep() {
   const milled = (id: string) => milledById.get(id) ?? true;
   // Nothing to arrange: the model can't be read, or every part is unticked.
   const nextBlocked = model.isError
-    ? 'The model could not be read: there are no parts to arrange.'
+    ? translate('The model could not be read: there are no parts to arrange.')
     : model.data && !model.data.parts.some(p => milled(p.id))
-      ? 'No part is milled: tick at least one part to arrange it on boards.'
+      ? translate('No part is milled: tick at least one part to arrange it on boards.')
       : null;
   const bar = (
     <CamJobBar
       job={job}
       actions={
         <>
-          <Hint text="Open a new version of the model (STEP or STL). The job keeps its boards and settings.">
+          <Hint text={translate('Open a new version of the model (STEP or STL). The job keeps its boards and settings.')}>
             <Button size="sm" variant="outline" onClick={() => void replace()}>
-              Replace model…
+              {translate('Replace model… ')}
             </Button>
           </Hint>
           {nextBlocked ? (
             <Hint text={nextBlocked} wrap>
               <Button size="sm" disabled>
-                Next: Boards
+                {translate('Next: Boards ')}
               </Button>
             </Hint>
           ) : (
             <Button size="sm" asChild>
               <Link to="/cam/$jobId/boards" params={{ jobId: job.id }}>
-                Next: Boards
+                {translate('Next: Boards ')}
               </Link>
             </Button>
           )}
@@ -97,14 +98,14 @@ function ModelStep() {
     return (
       <Shell bar={bar}>
         <div role="alert" className="m-8 flex max-w-xl flex-col gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
-          <p className="font-medium">This model could not be read</p>
+          <p className="font-medium">{translate('This model could not be read')}</p>
           <p className="text-sm text-muted-foreground">{model.error.message}</p>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => void replace()}>
-              Open another file…
+              {translate('Open another file… ')}
             </Button>
             <Button size="sm" variant="ghost" onClick={remove}>
-              Delete job
+              {translate('Delete job ')}
             </Button>
           </div>
         </div>
@@ -115,8 +116,11 @@ function ModelStep() {
       <Shell bar={bar}>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
           <LoadingSpinner />
-          <p>Reading {job.fileName}…</p>
-          <p className="text-xs">The first model loads the CAD kernel (2.3 MB).</p>
+          <p>
+            {translate('Reading ')}
+            {job.fileName}…
+          </p>
+          <p className="text-xs">{translate('The first model loads the CAD kernel (2.3 MB).')}</p>
         </div>
       </Shell>
     );
@@ -138,7 +142,7 @@ function ModelStep() {
         <div role="alert" className="flex items-start gap-3 border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm">
           <p className="grow">{job.replaceWarning}</p>
           <Button size="sm" variant="ghost" onClick={() => save.mutate({ ...job, replaceWarning: undefined })}>
-            Dismiss
+            {translate('Dismiss ')}
           </Button>
         </div>
       )}
@@ -153,7 +157,7 @@ function ModelStep() {
         />
         <main className="relative flex min-h-[320px] flex-col bg-muted/30">
           <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-            <div role="group" aria-label="View" className="flex shrink-0 overflow-hidden rounded-md border">
+            <div role="group" aria-label={translate('View')} className="flex shrink-0 overflow-hidden rounded-md border">
               {(['assembled', 'exploded', 'flat'] as ModelView[]).map(v => (
                 <Hint key={v} text={kViewHints[v]} side="bottom">
                   <button
@@ -168,7 +172,8 @@ function ModelStep() {
             {view === 'exploded' && <ExplosionSlider progress={explosion.progress} onChange={explosion.scrub} />}
             <span className="grow" />
             <span className="text-xs text-muted-foreground">
-              {view === 'flat' ? 'Each part is turned so its machined side faces up. ' : ''}Right-drag to turn, middle-drag to pan.
+              {view === 'flat' ? translate('Each part is turned so its machined side faces up. ') : ''}
+              {translate('Right-drag to turn, middle-drag to pan. ')}
             </span>
           </div>
           <div className="min-h-0 flex-1">
@@ -196,17 +201,17 @@ function ModelStep() {
   );
 }
 
-const kViewNames: Record<ModelView, string> = { assembled: 'As modeled', exploded: 'Exploded', flat: 'Laid flat' };
+const kViewNames: Record<ModelView, string> = { assembled: translate('As modeled'), exploded: 'Exploded', flat: translate('Laid flat') };
 const kViewHints: Record<ModelView, string> = {
-  assembled: 'The parts where they sit in your model.',
-  exploded: 'The parts pulled apart from the middle, so you can see how they fit together.',
-  flat: 'Each part turned so its machined side faces up, the way it lies on the board.',
+  assembled: translate('The parts where they sit in your model.'),
+  exploded: translate('The parts pulled apart from the middle, so you can see how they fit together.'),
+  flat: translate('Each part turned so its machined side faces up, the way it lies on the board.'),
 };
 
 function Shell({ bar, message, children }: { bar?: React.ReactNode; message?: string; children?: React.ReactNode }) {
   return (
     <CamPage className="min-h-dvh md:h-dvh">
-      {bar ?? <PageHeader title="Projects" />}
+      {bar ?? <PageHeader title={translate('Projects')} />}
       {message && <p className="m-8 text-muted-foreground">{message}</p>}
       {children}
     </CamPage>

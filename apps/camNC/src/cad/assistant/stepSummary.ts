@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { AssistantMessage, AssistantToolCall } from './provider';
 import { checkWarningMessages } from './proposalWarnings';
 
@@ -43,26 +44,43 @@ export function describeStep({ call, result }: AssistantWorkStep, running: boole
   const pending: Outcome = result ? 'done' : running ? 'working' : 'missing';
   switch (call.name) {
     case 'cad_script_guide':
-      return { text: named(args.section) ? `Read the guide on ${args.section}` : 'Read the script guide', outcome: pending };
+      return {
+        text: named(args.section)
+          ? translate('Read the guide on {{value1}}', { value1: args.section })
+          : translate('Read the script guide'),
+        outcome: pending,
+      };
     case 'cad_script_example':
-      return { text: `Looked at the ${named(args.name) ?? ''} example`.replace('  ', ' '), outcome: pending };
+      return {
+        text: translate('Looked at the {{value1}} example', { value1: named(args.name) ?? '' }).replace('  ', ' '),
+        outcome: pending,
+      };
     case 'read_design_report':
-      return { text: named(args.section) ? `Read the design report: ${args.section}` : 'Read the design report', outcome: pending };
+      return {
+        text: named(args.section)
+          ? translate('Read the design report: {{value1}}', { value1: args.section })
+          : translate('Read the design report'),
+        outcome: pending,
+      };
     case 'read_design':
-      return { text: 'Re-read the last checked script', outcome: pending };
+      return { text: translate('Re-read the last checked script'), outcome: pending };
     case 'finalize_design':
     case 'check_design':
     case 'check_svg': {
       const what =
         call.name === 'finalize_design'
-          ? 'Ran the complete final check'
+          ? translate('Ran the complete final check')
           : call.name === 'check_svg'
-            ? 'Checked SVG outlines as sketch curves'
+            ? translate('Checked SVG outlines as sketch curves')
             : named(args.recipe)
-              ? `Built from the ${args.recipe} recipe`
+              ? translate('Built from the {{value1}} recipe', { value1: args.recipe })
               : named(args.scriptId)
-                ? `Repaired the script${Array.isArray(args.patches) ? ` (${args.patches.length} ${args.patches.length === 1 ? 'edit' : 'edits'})` : ''}`
-                : 'Wrote and checked a design script';
+                ? translate('Repaired the script{{value1}}', {
+                    value1: Array.isArray(args.patches)
+                      ? ` (${args.patches.length} ${args.patches.length === 1 ? translate('edit') : translate('edits')})`
+                      : '',
+                  })
+                : translate('Wrote and checked a design script');
       if (!result) return { text: what, outcome: pending };
       if (!parsed) return { text: what, outcome: 'failed', note: short(result.text) };
       if (parsed.ok === true) {
@@ -72,11 +90,17 @@ export function describeStep({ call, result }: AssistantWorkStep, running: boole
           return {
             text: what,
             outcome: 'warned',
-            note: short(`${warnings.length === 1 ? 'Passed with a warning' : `Passed with ${warnings.length} warnings`}: ${warnings[0]}`),
+            note: short(
+              `${warnings.length === 1 ? translate('Passed with a warning') : translate('Passed with {{value1}} warnings', { value1: warnings.length })}: ${warnings[0]}`
+            ),
           };
-        return { text: what, outcome: 'passed', note: call.name === 'finalize_design' ? 'Ready to review' : 'Check passed' };
+        return {
+          text: what,
+          outcome: 'passed',
+          note: call.name === 'finalize_design' ? translate('Ready to review') : translate('Check passed'),
+        };
       }
-      return { text: what, outcome: 'failed', note: short(failure(parsed) ?? 'Needs repair') };
+      return { text: what, outcome: 'failed', note: short(failure(parsed) ?? translate('Needs repair')) };
     }
     default:
       return { text: call.name.replaceAll('_', ' '), outcome: pending };

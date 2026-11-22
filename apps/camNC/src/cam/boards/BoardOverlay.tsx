@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { placedRect, type BoardNest, type PartInstance } from '../boards';
@@ -223,7 +224,8 @@ export function BoardOverlay({
           className="!pointer-events-none absolute border-l border-dashed border-emerald-500"
           style={{ left: padPx + px(start.current.tight.w), top: padPx - 24, height: px(h) + 72 }}>
           <span className="absolute top-full ml-1 whitespace-nowrap text-[11px] text-emerald-600 dark:text-emerald-400">
-            Every part fits down to {start.current.tight.w}
+            {translate('Every part fits down to ')}
+            {start.current.tight.w}
           </span>
         </div>
       )}
@@ -233,7 +235,8 @@ export function BoardOverlay({
           className="!pointer-events-none absolute border-t border-dashed border-emerald-500"
           style={{ top: padPx + px(start.current.tight.h), left: padPx - 24, width: px(w) + 72 }}>
           <span className="absolute left-full ml-1 -translate-y-1/2 whitespace-nowrap text-[11px] text-emerald-600 dark:text-emerald-400">
-            Every part fits down to {start.current.tight.h}
+            {translate('Every part fits down to ')}
+            {start.current.tight.h}
           </span>
         </div>
       )}
@@ -241,7 +244,7 @@ export function BoardOverlay({
         <>
           <Chip
             id="board-margin"
-            label="margin"
+            label={translate('margin')}
             name="Edge margin"
             hint="Free border inside the board edge, so the outline cut and its lead-in stay on the board: about the bit plus 2 mm, more with tabs."
             value={nest.margin}
@@ -255,7 +258,7 @@ export function BoardOverlay({
           {gap && (
             <Chip
               id="board-gap"
-              label="gap"
+              label={translate('gap')}
               name="Gap between parts"
               hint="Space between parts, so neighbouring outline cuts never meet. At least the bit; with tabs, room for a strip of stock that holds them."
               value={nest.gap}
@@ -272,12 +275,16 @@ export function BoardOverlay({
             <div
               ref={offerRef}
               role="toolbar"
-              aria-label="Apply spacing to all boards"
+              aria-label={translate('Apply spacing to all boards')}
               data-spacing-offer
               style={{ left: padPx, top: Math.max(2, padPx - 36) }}
               className="absolute z-20 flex w-max max-w-full flex-wrap items-center gap-1.5 rounded-lg border bg-background px-2 py-1 text-xs shadow-lg">
               <span className="font-mono text-[11px] whitespace-nowrap text-muted-foreground">
-                margin {nest.margin} · gap {nest.gap} mm:
+                {translate('margin ')}
+                {nest.margin}
+                {translate(' · gap ')}
+                {nest.gap}
+                {translate(' mm: ')}
               </span>
               <button
                 type="button"
@@ -286,7 +293,7 @@ export function BoardOverlay({
                   onApplyAll(true);
                 }}
                 className="rounded border border-primary/50 bg-primary/10 px-1.5 py-0.5 font-medium whitespace-nowrap text-primary hover:border-primary hover:bg-primary/20">
-                Apply to all boards & re-layout
+                {translate('Apply to all boards & re-layout ')}
               </button>
               <button
                 type="button"
@@ -295,7 +302,7 @@ export function BoardOverlay({
                   onApplyAll(false);
                 }}
                 className="rounded border bg-muted/40 px-1.5 py-0.5 whitespace-nowrap text-primary hover:border-primary">
-                Apply to all boards
+                {translate('Apply to all boards ')}
               </button>
             </div>
           )}
@@ -303,7 +310,7 @@ export function BoardOverlay({
       )}
       <div
         {...handle('w')}
-        title="Drag to change the board's width"
+        title={translate("Drag to change the board's width")}
         className={cn(
           'absolute h-9 w-1.5 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize touch-none rounded-full bg-primary ring-1 ring-background'
         )}
@@ -311,13 +318,13 @@ export function BoardOverlay({
       />
       <div
         {...handle('h')}
-        title="Drag to change the board's height"
+        title={translate("Drag to change the board's height")}
         className="absolute h-1.5 w-9 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize touch-none rounded-full bg-primary ring-1 ring-background"
         style={{ left: padPx + px(w) / 2, top: bottom + kGripOff }}
       />
       <div
         {...handle('wh')}
-        title="Drag to change the board's size"
+        title={translate("Drag to change the board's size")}
         className="absolute size-3 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize touch-none rounded-full bg-primary ring-1 ring-background"
         style={{ left: right + kGripOff, top: bottom + kGripOff }}
       />

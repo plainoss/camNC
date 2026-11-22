@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { CadDocument } from '@wbcnc/cad';
 import { applyCadProposal, cadProposalRefusal, compareCadProposal, type CadProposal } from '@wbcnc/cad-editor/proposal';
@@ -57,7 +58,7 @@ export function ProposalReview({
   const warnings = useMemo(() => [...new Set([...proposalCheckWarnings(proposal), ...comparison.newWarnings])], [proposal, comparison]);
   const stale = JSON.stringify(currentDocument) !== JSON.stringify(proposal.base);
   const refusal = disabled
-    ? 'Finish or cancel the current edit before applying this design.'
+    ? translate('Finish or cancel the current edit before applying this design.')
     : (requirementProposalRefusal(proposal) ?? cadProposalRefusal(session, proposal));
   useEffect(() => {
     const element = dialog.current!;
@@ -87,8 +88,8 @@ export function ProposalReview({
         if (event.key === 'Escape') dialog.current?.close();
       }}>
       <div className="cad-proposal-body">
-        <aside aria-label="Changes in this proposal">
-          <h2 id="cad-proposal-title">Review design change</h2>
+        <aside aria-label={translate('Changes in this proposal')}>
+          <h2 id="cad-proposal-title">{translate('Review design change')}</h2>
           {(['added', 'changed', 'removed'] as const).map(kind => (
             <section key={kind} data-kind={kind}>
               <h3>
@@ -101,7 +102,7 @@ export function ProposalReview({
               </ul>
             </section>
           ))}
-          <h3>Cost of this change</h3>
+          <h3>{translate('Cost of this change')}</h3>
           {comparison.costs.length ? (
             <ul>
               {comparison.costs.map(cost => (
@@ -109,11 +110,14 @@ export function ProposalReview({
               ))}
             </ul>
           ) : (
-            <p>No lost cuts or joints detected.</p>
+            <p>{translate('No lost cuts or joints detected.')}</p>
           )}
           {warnings.length > 0 && (
             <>
-              <h3>Warnings ({warnings.length})</h3>
+              <h3>
+                {translate('Warnings (')}
+                {warnings.length})
+              </h3>
               <ul className="cad-proposal-warnings">
                 {warnings.map(warning => (
                   <li key={warning}>{warning}</li>
@@ -123,7 +127,7 @@ export function ProposalReview({
           )}
           {comparison.errors.length > 0 && (
             <>
-              <h3>Needs repair</h3>
+              <h3>{translate('Needs repair')}</h3>
               <ul>
                 {comparison.errors.map(message => (
                   <li key={message}>{message}</li>
@@ -133,7 +137,7 @@ export function ProposalReview({
           )}
         </aside>
         <div className="cad-proposal-view">
-          <Suspense fallback={<p>Opening preview…</p>}>
+          <Suspense fallback={<p>{translate('Opening preview…')}</p>}>
             <WorkspaceView
               document={mode === 'before' ? proposal.base : proposal.document}
               selectedId={null}
@@ -156,26 +160,30 @@ export function ProposalReview({
         </div>
       </div>
       <footer>
-        <div className="cad-proposal-modes" role="radiogroup" aria-label="Show">
+        <div className="cad-proposal-modes" role="radiogroup" aria-label={translate('Show')}>
           {(['before', 'changes', 'after'] as const).map(value => (
             <button key={value} type="button" role="radio" aria-checked={mode === value} onClick={() => setMode(value)}>
-              {value === 'before' ? 'Before' : value === 'changes' ? 'Changes' : 'After'}
+              {value === 'before' ? translate('Before') : value === 'changes' ? translate('Changes') : translate('After')}
             </button>
           ))}
         </div>
         <span className="cad-proposal-summary">
-          {summary || 'No step changes'}
-          {warnings.length > 0 && ` · ⚠ ${warnings.length} ${warnings.length === 1 ? 'warning' : 'warnings'}`}
+          {summary || translate('No step changes')}
+          {warnings.length > 0 &&
+            translate(' · ⚠ {{value1}} {{value2}}', {
+              value1: warnings.length,
+              value2: warnings.length === 1 ? translate('warning') : translate('warnings'),
+            })}
         </span>
         {(refusal || error) && <p role="status">{refusal || error}</p>}
         <span className="cad-proposal-spacer" />
         {onDiscard && (
           <button type="button" onClick={onDiscard}>
-            Discard proposal
+            {translate('Discard proposal ')}
           </button>
         )}
         <button type="button" onClick={() => dialog.current?.close()}>
-          {onDiscard ? 'Close' : 'Discard'}
+          {onDiscard ? translate('Close') : translate('Discard')}
         </button>
         <button
           type="button"
@@ -190,10 +198,10 @@ export function ProposalReview({
               onApply(applyCadProposal(session, proposal));
               dialog.current?.close();
             } catch (cause) {
-              setError(cause instanceof Error ? cause.message : 'Unable to apply this proposal.');
+              setError(cause instanceof Error ? cause.message : translate('Unable to apply this proposal.'));
             }
           }}>
-          Apply as one undo step
+          {translate('Apply as one undo step ')}
         </button>
       </footer>
     </dialog>

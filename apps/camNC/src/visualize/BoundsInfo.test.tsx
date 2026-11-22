@@ -1,3 +1,4 @@
+import { i18n } from '@wbcnc/i18n';
 import { cleanup, render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -18,6 +19,7 @@ vi.mock('@tanstack/react-router', () => ({
 vi.mock('./RecomputePnpButton', () => ({ RecomputePnpButton: () => null }));
 
 afterEach(() => {
+  void i18n.changeLanguage('en');
   cleanup();
   camera.ready = true;
   vi.restoreAllMocks();
@@ -39,11 +41,12 @@ describe('relative-time locale', () => {
 
 describe('BoundsInfo relative time', () => {
   it.each([
-    { language: 'en-US@posix', expectedLocale: 'en' },
-    { language: 'de-AT', expectedLocale: 'de-AT' },
-  ])('renders real TimeAgo with browser locale $language', ({ language, expectedLocale }) => {
-    vi.spyOn(navigator, 'language', 'get').mockReturnValue(language);
-    vi.spyOn(navigator, 'languages', 'get').mockReturnValue([language]);
+    { language: 'en', expectedLocale: 'en' },
+    { language: 'fr', expectedLocale: 'fr' },
+  ])('renders relative time in application language $language', async ({ language, expectedLocale }) => {
+    await i18n.changeLanguage(language);
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('de-AT');
+    vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['de-AT']);
     pnpResult.lastPnPTime = Date.now() - 120_000;
 
     const { container } = render(<BoundsInfo />);

@@ -12,7 +12,8 @@
     "lint": "oxlint --max-warnings 0"
   },
   "dependencies": {
-    "@wbcnc/cam": "workspace:*"
+    "@wbcnc/cam": "workspace:*",
+    "@wbcnc/i18n": "workspace:*"
   },
   "devDependencies": {
     "@mergifyio/vitest": "catalog:",

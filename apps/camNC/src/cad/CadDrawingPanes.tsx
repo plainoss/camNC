@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Suspense, lazy, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import type { CadDocument, CadDrawnOn } from '@wbcnc/cad';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
@@ -61,39 +62,39 @@ export function CadCanvasBar({
     <div className="cad-canvas-bar">
       {showWorkspace ? (
         <span>
-          <strong>PART STUDIO</strong> · {physicalPartCount === 1 ? 'one part' : `${physicalPartCount} parts`}
+          <strong>{translate('PART STUDIO')}</strong> · {translate('partCount', { count: physicalPartCount })}
         </span>
       ) : studioSession && part ? (
         <span>
-          <strong>SKETCH</strong> · {part.name}{' '}
-          <span className="cad-muted">/ on {part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'the top plane'}</span>
+          <strong>{translate('SKETCH')}</strong> · {part.name}{' '}
+          <span className="cad-muted">/ on {part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : translate('the top plane')}</span>
         </span>
       ) : (
         <span>
-          <strong>{faceSketch?.below ? 'BOTTOM' : 'TOP'}</strong> · {part?.name ?? 'Sketch'}{' '}
-          <span className="cad-muted">/ {faceSketch?.label ?? 'XY plane'}</span>
+          <strong>{faceSketch?.below ? translate('BOTTOM') : translate('TOP')}</strong> · {part?.name ?? translate('Sketch')}{' '}
+          <span className="cad-muted">/ {faceSketch?.label ?? translate('XY plane')}</span>
         </span>
       )}
       <div>
         {!faceSketch && !(studioSession && showWorkspace) && (
-          <div className="cad-view-switch" role="group" aria-label="Show">
+          <div className="cad-view-switch" role="group" aria-label={translate('Show')}>
             <button
               type="button"
               aria-pressed={!show3D && !showWorkspace}
-              title="The sketch, to draw on"
+              title={translate('The sketch, to draw on')}
               onClick={() => {
                 // Back on the drawing, its keys work straight away.
                 requestAnimationFrame(() => focusSketchCanvas(svg.current));
                 setShow3D(false);
                 setShowWorkspace(false);
               }}>
-              Drawing
+              {translate('Drawing ')}
             </button>
             <button
               type="button"
               aria-pressed={show3D && !showWorkspace}
               disabled={!partHasOutline}
-              title="This part in 3D, to set its cuts"
+              title={translate('This part in 3D, to set its cuts')}
               onClick={() => {
                 chooseTool('select');
                 setShowWorkspace(false);
@@ -106,27 +107,28 @@ export function CadCanvasBar({
                 type="button"
                 aria-pressed={showWorkspace}
                 disabled={!doc.parts.length}
-                title="Every part where it sits"
+                title={translate('Every part where it sits')}
                 onClick={() => {
                   chooseTool('select');
                   setShowWorkspace(true);
                 }}>
-                All parts
+                {translate('All parts ')}
               </button>
             )}
           </div>
         )}
         {!show3D && !showWorkspace && (
           <>
-            <button type="button" className="cad-bar-button" title="Zoom to show the whole sketch" onClick={() => fit()}>
-              Fit <kbd>F</kbd>
+            <button type="button" className="cad-bar-button" title={translate('Zoom to show the whole sketch')} onClick={() => fit()}>
+              {translate('Fit ')}
+              <kbd>F</kbd>
             </button>
             <button
               type="button"
               role="switch"
               className="cad-switch"
               aria-checked={snap}
-              title="Snap to points, lines and the grid while drawing"
+              title={translate('Snap to points, lines and the grid while drawing')}
               onClick={() => {
                 setSnap(value => !value);
                 setDrawingCue(null);
@@ -134,7 +136,7 @@ export function CadCanvasBar({
                 hoveredReferences.current = [];
                 svg.current?.focus();
               }}>
-              Snap
+              {translate('Snap ')}
               <span className="cad-switch-track" aria-hidden="true" />
             </button>
           </>

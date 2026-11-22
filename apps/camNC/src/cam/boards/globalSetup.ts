@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   holdSettingsOf,
   isCut,
@@ -46,7 +47,11 @@ export function setupDiffers(selected: JobBoard, boards: JobBoard[]): boolean {
 /** Short summary of a board's spacing and hold settings: "1 mm margin, 4 mm gap, bottom skin". */
 export function setupSummary(board: BoardV1, nest: Pick<BoardNest, 'margin' | 'gap'>): string {
   const hold = kRetentionLabels[board.retention].toLowerCase();
-  return `${fmt(nest.margin)} mm margin, ${fmt(nest.gap)} mm gap, ${board.taped ? `${hold} and tape` : hold}`;
+  return translate('{{value1}} mm margin, {{value2}} mm gap, {{value3}}', {
+    value1: fmt(nest.margin),
+    value2: fmt(nest.gap),
+    value3: board.taped ? translate('{{value1}} and tape', { value1: hold }) : hold,
+  });
 }
 
 /** Applies `from`'s spacing and holding settings to every uncut board in-place, keeping each board's parts on it. */

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   CAD_CHORD_TOLERANCE,
   evaluateCadPart,
@@ -35,7 +36,7 @@ export function startExtrude(
     const problem = faceExtrudeProblem(before, from.face);
     if (problem) return { refusal: problem };
     const made = newExtrudeOnFace(before, from.face, `Part ${before.parts.length + 1}`);
-    if (!evaluateCadPart(made).part) return { refusal: 'Pick a planar face that can be extruded.' };
+    if (!evaluateCadPart(made).part) return { refusal: translate('Pick a planar face that can be extruded.') };
     return { document: { ...before, revision: before.revision + 1, parts: [...before.parts, made] }, partId: made.id };
   }
   const { part } = from;
@@ -50,7 +51,7 @@ export function startExtrude(
       !openLines &&
       !sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).length &&
       evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
-    if (problem) return { refusal: `Can’t extrude this sketch yet: ${problem.message}` };
+    if (problem) return { refusal: translate('Can’t extrude this sketch yet: {{value1}}', { value1: problem.message }) };
     // Unless all of it is asked for, nothing is picked yet: its regions are picked in the view, the selection active.
     const started = (p: CadPart) => {
       const made = extrudedSketch(before, p, pickAll);

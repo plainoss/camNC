@@ -1,12 +1,13 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { ReactNode } from 'react';
 import { CadValueInput } from './CadValueInput';
 import { forDrillSize, kDrillSizes, kTerminations, type HoleKind, type HoleSettings } from './holeSettings';
 
-const kUnsupported = 'Not available yet';
+const kUnsupported = translate('Not available yet');
 const kKinds: { id: HoleKind; label: string }[] = [
-  { id: 'simple', label: 'Simple' },
-  { id: 'counterbore', label: 'Counterbore' },
-  { id: 'countersink', label: 'Countersink' },
+  { id: 'simple', label: translate('Simple') },
+  { id: 'counterbore', label: translate('Counterbore') },
+  { id: 'countersink', label: translate('Countersink') },
 ];
 
 /**
@@ -51,7 +52,7 @@ export function HoleFields({
   const blind = settings.termination === 'blind';
   return (
     <>
-      <div className="cad-feature-tabs" role="tablist" aria-label="Hole standard">
+      <div className="cad-feature-tabs" role="tablist" aria-label={translate('Hole standard')}>
         {['Inch', 'Metric'].map(choice => (
           <button
             key={choice}
@@ -64,7 +65,7 @@ export function HoleFields({
           </button>
         ))}
       </div>
-      <div className="cad-feature-tabs" role="tablist" aria-label="Hole style">
+      <div className="cad-feature-tabs" role="tablist" aria-label={translate('Hole style')}>
         {kKinds.map(kind => (
           <button
             key={kind.id}
@@ -78,15 +79,15 @@ export function HoleFields({
       </div>
       {picks}
       <label className="cad-number-field">
-        Hole type
-        <select aria-label="Hole type" value="drilled" disabled title={kUnsupported}>
-          <option value="drilled">Drilled</option>
+        {translate('Hole type ')}
+        <select aria-label={translate('Hole type')} value="drilled" disabled title={kUnsupported}>
+          <option value="drilled">{translate('Drilled')}</option>
         </select>
       </label>
       <label className="cad-number-field">
-        Drill size
+        {translate('Drill size ')}
         <select
-          aria-label="Drill size"
+          aria-label={translate('Drill size')}
           value={settings.drillSize}
           onChange={event => {
             const next = forDrillSize(settings, Number(event.target.value));
@@ -103,19 +104,19 @@ export function HoleFields({
       {field('Diameter', 'diameter', lengthUnit)}
       {overridden && (
         <p role="note" className="cad-dialog-note">
-          Parameters have been overridden. Check input.
+          {translate('Parameters have been overridden. Check input. ')}
         </p>
       )}
       <label className="cad-number-field">
-        Start plane
-        <select aria-label="Start plane" value="part" disabled title={kUnsupported}>
-          <option value="part">Start from part</option>
+        {translate('Start plane ')}
+        <select aria-label={translate('Start plane')} value="part" disabled title={kUnsupported}>
+          <option value="part">{translate('Start from part')}</option>
         </select>
       </label>
       <label className="cad-number-field">
-        Termination
+        {translate('Termination ')}
         <select
-          aria-label="Termination"
+          aria-label={translate('Termination')}
           value={settings.termination}
           onChange={event => set({ termination: event.target.value as HoleSettings['termination'] }, true)}>
           {kTerminations.map(option => (
@@ -127,20 +128,20 @@ export function HoleFields({
       </label>
       {settings.kind === 'counterbore' && (
         <>
-          {field('Counterbore diameter', 'counterboreDiameter', lengthUnit)}
-          {field('Counterbore depth', 'counterboreDepth', lengthUnit)}
+          {field(translate('Counterbore diameter'), 'counterboreDiameter', lengthUnit)}
+          {field(translate('Counterbore depth'), 'counterboreDepth', lengthUnit)}
         </>
       )}
       {settings.kind === 'countersink' && (
         <>
-          {field('Countersink diameter', 'countersinkDiameter', lengthUnit)}
-          {field('Countersink angle', 'countersinkAngle', 'deg')}
+          {field(translate('Countersink diameter'), 'countersinkDiameter', lengthUnit)}
+          {field(translate('Countersink angle'), 'countersinkAngle', 'deg')}
         </>
       )}
       {blind && (
         <>
-          {field('Hole depth', 'depth', lengthUnit)}
-          {field('Tip angle', 'tipAngle', 'deg')}
+          {field(translate('Hole depth'), 'depth', lengthUnit)}
+          {field(translate('Tip angle'), 'tipAngle', 'deg')}
         </>
       )}
     </>

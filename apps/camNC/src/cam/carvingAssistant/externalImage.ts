@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { buildRasterArtPrompt } from './nativeImage';
 import type { CarvingDetail } from './prepare';
 import type { CarvingStyle } from './session';
@@ -6,8 +7,12 @@ import type { CarvingStyle } from './session';
 export function externalImagePrompt(subject: string, style: CarvingStyle, detail: CarvingDetail): string {
   // Imported artwork is described as "Line art from <file>"; that names a file, not a motif.
   const motif = /^line art from /i.test(subject.trim()) ? '' : subject.trim();
-  const base = buildRasterArtPrompt(motif || 'a simple motif', detail);
-  return `${base} ${style === 'bold' ? 'Bold, broad filled shapes with few interior lines.' : 'Clean line art with filled strokes.'} Square image.`;
+  const base = buildRasterArtPrompt(motif || translate('a simple motif'), detail);
+  return translate('{{value1}} {{value2}} Square image.', {
+    value1: base,
+    value2:
+      style === 'bold' ? translate('Bold, broad filled shapes with few interior lines.') : translate('Clean line art with filled strokes.'),
+  });
 }
 
 const kMaxBytes = 2_000_000;
@@ -51,18 +56,18 @@ export function imageHeaderSize(bytes: Uint8Array): { width: number; height: num
  * here as a PNG no larger than needed, so a dropped or pasted image traces like a generated one.
  */
 export async function carvingPngFromImage(file: File): Promise<File> {
-  if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) throw new Error('Drop or paste an image: PNG, JPEG, WebP or GIF.');
-  if (file.size > kMaxInputBytes) throw new Error('This image is larger than 25 MB. Save a smaller version and try again.');
+  if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) throw new Error(translate('Drop or paste an image: PNG, JPEG, WebP or GIF.'));
+  if (file.size > kMaxInputBytes) throw new Error(translate('This image is larger than 25 MB. Save a smaller version and try again.'));
   const size = imageHeaderSize(new Uint8Array(await file.arrayBuffer()));
-  if (!size || !size.width || !size.height) throw new Error('This file could not be read as an image.');
+  if (!size || !size.width || !size.height) throw new Error(translate('This file could not be read as an image.'));
   if (size.width * size.height > kMaxInputPixels)
-    throw new Error('This image has more than 40 megapixels. Save a smaller version and try again.');
+    throw new Error(translate('This image has more than 40 megapixels. Save a smaller version and try again.'));
   if (file.type === 'image/png' && file.size <= kMaxBytes) return file;
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    throw new Error('This file could not be read as an image.');
+    throw new Error(translate('This file could not be read as an image.'));
   }
   try {
     for (const side of [kMaxSide, 1200, 900]) {
@@ -82,7 +87,7 @@ export async function carvingPngFromImage(file: File): Promise<File> {
   } finally {
     bitmap.close();
   }
-  throw new Error('This image is too detailed to trace. Ask the chat for simpler black and white line art.');
+  throw new Error(translate('This image is too detailed to trace. Ask the chat for simpler black and white line art.'));
 }
 
 /** The first image in a paste or drop, if any. */

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadPoint, CadSketch } from '@wbcnc/cad';
 import type { CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
 import type { InlineConstraintKind } from '@wbcnc/cad-editor/inlineConstraintLayout';
@@ -74,7 +75,7 @@ export function DrawingInferencePreview({
         <g
           key={kind}
           data-inferred-constraint={kind}
-          aria-label={`Infer ${kind}`}
+          aria-label={translate('Infer {{kind}}', { kind: kind })}
           transform={`translate(${inference.point.x + (18 + index * 22) / scale} ${-inference.point.y + 24 / scale}) scale(${1 / scale})`}
           stroke="#3d4043"
           strokeWidth={1.5}

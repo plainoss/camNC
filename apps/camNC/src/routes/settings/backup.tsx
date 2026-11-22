@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { PageHeader } from '@/components/page-header';
 import { cameraSourceLabel, isDirectNetworkCamera } from '@/lib/camera/source-label';
 import { isDesktopApp } from '@/lib/desktop/is-desktop';
@@ -65,7 +66,8 @@ function CameraSummary({ camera }: { camera: ICamSource }) {
       </span>
       {calibrated && (
         <span className="flex flex-row items-center gap-1 text-muted-foreground">
-          <Check className="size-4" /> calibrated
+          <Check className="size-4" />
+          {translate(' calibrated ')}
         </span>
       )}
     </li>
@@ -96,12 +98,12 @@ function RestoreCard() {
     const cam = state.activeCamId ? state.camSources[state.activeCamId] : null;
     if (isDesktopApp() && cam && !isDirectNetworkCamera(cam.url)) {
       // The usual reason to restore in the app: moving from the browser, where the camera went through go2rtc.
-      toast.success('Settings restored. To use the camera directly, switch it to Network camera; its calibration is kept.', {
+      toast.success(translate('Settings restored. To use the camera directly, switch it to Network camera; its calibration is kept.'), {
         duration: 10_000,
       });
       navigate({ to: '/setup/url-entry' });
     } else {
-      toast.success('Settings restored.');
+      toast.success(translate('Settings restored.'));
       navigate({ to: '/' });
     }
   }
@@ -113,8 +115,8 @@ function RestoreCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Restore</CardTitle>
-        <CardDescription>Load a backup made here, in the browser version or in the desktop app.</CardDescription>
+        <CardTitle>{translate('Restore')}</CardTitle>
+        <CardDescription>{translate('Load a backup made here, in the browser version or in the desktop app.')}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {backup && (
@@ -126,32 +128,38 @@ function RestoreCard() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground">No cameras.</p>
+              <p className="text-sm text-muted-foreground">{translate('No cameras.')}</p>
             )}
-            {machineHost && <p className="text-sm text-muted-foreground">Machine: {machineHost}</p>}
+            {machineHost && (
+              <p className="text-sm text-muted-foreground">
+                {translate('Machine: ')}
+                {machineHost}
+              </p>
+            )}
           </div>
         )}
         <div className="flex flex-row flex-wrap gap-2">
           <Button variant={backup ? 'outline' : 'default'} onClick={chooseFile}>
-            <Upload className="size-4" /> {backup ? 'Choose another file…' : 'Choose backup file…'}
+            <Upload className="size-4" /> {backup ? translate('Choose another file…') : translate('Choose backup file…')}
           </Button>
-          {backup && !replaces && <Button onClick={restore}>Restore</Button>}
+          {backup && !replaces && <Button onClick={restore}>{translate('Restore')}</Button>}
           {backup && replaces && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button>Restore</Button>
+                <Button>{translate('Restore')}</Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Replace your settings?</AlertDialogTitle>
+                  <AlertDialogTitle>{translate('Replace your settings?')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Your current cameras, calibration and machine settings are replaced by the backup. Download a backup first if you may
-                    want them back.
+                    {translate(
+                      'Your current cameras, calibration and machine settings are replaced by the backup. Download a backup first if you may want them back. '
+                    )}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={restore}>Replace</AlertDialogAction>
+                  <AlertDialogCancel>{translate('Cancel')}</AlertDialogCancel>
+                  <AlertDialogAction onClick={restore}>{translate('Replace')}</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -165,20 +173,22 @@ function RestoreCard() {
 function BackupComponent() {
   return (
     <div className="w-full h-full">
-      <PageHeader title="Backup & restore" />
+      <PageHeader title={translate('Backup & restore')} />
       <div className="flex justify-center p-1 flex-row">
         <div className="max-w-xl gap-4 flex flex-1 flex-col pb-8">
           <Card>
             <CardHeader>
-              <CardTitle>Back up</CardTitle>
+              <CardTitle>{translate('Back up')}</CardTitle>
               <CardDescription>
-                Saves your cameras with their calibration and markers, the machine connection and bounds, and macros to a file. Use it to
-                move your setup between the browser and the desktop app, or to another computer.
+                {translate(
+                  'Saves your cameras with their calibration and markers, the machine connection and bounds, and macros to a file. Use it to move your setup between the browser and the desktop app, or to another computer. '
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button onClick={downloadBackup}>
-                <Download className="size-4" /> Download backup
+                <Download className="size-4" />
+                {translate(' Download backup ')}
               </Button>
             </CardContent>
           </Card>

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cadFaceFrame, designStepLabel, type CadDocument, type CadPart } from '@wbcnc/cad';
 
 /** How near, in mm, a click must land to a sketch point for Hole to take it. */
@@ -39,4 +40,4 @@ export function holePointAt(
 
 /** A picked point as the dialog lists it: Vertex of Sketch 2. */
 export const holePointName = (document: CadDocument, sketchId: string) =>
-  `Vertex of ${designStepLabel(document, `${sketchId}:sketch`) ?? 'a sketch'}`;
+  translate('Vertex of {{value1}}', { value1: designStepLabel(document, `${sketchId}:sketch`) ?? 'a sketch' });

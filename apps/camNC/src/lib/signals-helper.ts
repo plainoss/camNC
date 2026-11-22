@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 /**
  * Resolve when the provided getter returns a non-nullish value.
  * Useful for awaiting the next signal/computed update.
@@ -22,7 +23,7 @@ export function waitForSignal<T>(getter: () => T | undefined | null, timeoutMs?:
     if (timeoutMs !== undefined) {
       timer = setTimeout(() => {
         stop();
-        reject(new Error(`Timed out after ${timeoutMs}ms waiting for signal`));
+        reject(new Error(translate('Timed out after {{timeoutMs}}ms waiting for signal', { timeoutMs: timeoutMs })));
       }, timeoutMs);
     }
   });

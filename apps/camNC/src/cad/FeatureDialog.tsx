@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { finalPreviewNow, subscribeFinalPreview } from './finalPreview';
 import { fieldsSettled } from './variableFields';
@@ -121,7 +122,7 @@ export function FeatureDialog({
       <div className="cad-feature-dialog-head">
         <h3
           className={failing ? 'cad-feature-dialog-failing' : undefined}
-          title={failing ? `${title} did not regenerate properly: ${failing}` : undefined}>
+          title={failing ? translate('{{title}} did not regenerate properly: {{failing}}', { title: title, failing: failing }) : undefined}>
           {title}
         </h3>
         {final && (
@@ -129,16 +130,19 @@ export function FeatureDialog({
             type="button"
             className="cad-feature-final"
             aria-pressed={final.shown}
-            title="Show the whole design, with this change, rather than only as far as this step"
+            title={translate('Show the whole design, with this change, rather than only as far as this step')}
             onClick={final.toggle}>
-            Final
+            {translate('Final ')}
           </button>
         )}
         <button
           type="button"
           className="cad-feature-ok"
           aria-label={okLabel}
-          title={(okDisabled && okReason) || (okShortcut ? `${okLabel} (${okShortcut.label})` : okLabel)}
+          title={
+            (okDisabled && okReason) ||
+            (okShortcut ? translate('{{okLabel}} ({{value2}})', { okLabel: okLabel, value2: okShortcut.label }) : okLabel)
+          }
           aria-keyshortcuts={okShortcut?.keys}
           aria-description={(okDisabled && okReason) || undefined}
           disabled={okDisabled}
@@ -150,8 +154,8 @@ export function FeatureDialog({
         <button
           type="button"
           className="cad-feature-cancel"
-          aria-label="Cancel"
-          title="Cancel"
+          aria-label={translate('Cancel')}
+          title={translate('Cancel')}
           // Moving focus here would let a blur-accepting field save before Cancel gets its click.
           onMouseDown={event => event.preventDefault()}
           onClick={onCancel}>

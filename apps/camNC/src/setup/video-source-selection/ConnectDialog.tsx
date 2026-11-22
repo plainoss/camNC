@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useTimeout } from '@/hooks/useTimeout';
 import { buildConnectionUrl, RtcConnectionParams } from '@wbcnc/go2webrtc/url-helpers';
 import { VideoDimensions } from '@wbcnc/go2webrtc/video-source';
@@ -39,12 +40,14 @@ export function ConnectDialog({
         if (!v) onCancel();
       }}>
       <DialogContent className="max-w-none max-h-none sm:max-w-none sm:max-h-none w-full h-full md:w-[90%] md:h-[90%] flex flex-col">
-        <DialogTitle>Video Source Preview</DialogTitle>
+        <DialogTitle>{translate('Video Source Preview')}</DialogTitle>
         <DialogDescription>
-          {hasError && <span className="text-red-500">Failed to connect.</span>}
-          {slowWarning && <span className="text-red-500">This is taking longer than expected. Something might be wrong.</span>}
-          {!hasError && !slowWarning && !isPlaying && <span>Please wait while we connect to the video source.</span>}
-          {isPlaying && <span>Confirm to use this video source.</span>}
+          {hasError && <span className="text-red-500">{translate('Failed to connect.')}</span>}
+          {slowWarning && (
+            <span className="text-red-500">{translate('This is taking longer than expected. Something might be wrong.')}</span>
+          )}
+          {!hasError && !slowWarning && !isPlaying && <span>{translate('Please wait while we connect to the video source.')}</span>}
+          {isPlaying && <span>{translate('Confirm to use this video source.')}</span>}
         </DialogDescription>
         <div className="flex justify-center items-center flex-grow overflow-hidden">
           <VideoPreview
@@ -57,11 +60,11 @@ export function ConnectDialog({
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="secondary">Cancel</Button>
+            <Button variant="secondary">{translate('Cancel')}</Button>
           </DialogClose>
           <DialogClose asChild>
             <Button disabled={!isPlaying} onClick={() => onConfirm(videoPreviewRef.current!.getMaxResolution())}>
-              Confirm Video Source
+              {translate('Confirm Video Source ')}
             </Button>
           </DialogClose>
         </DialogFooter>

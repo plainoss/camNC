@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@wbcnc/ui/components/sheet';
 import { MachinePanelContent } from './MachinePanelContent';
 
@@ -6,8 +7,8 @@ export function MachinePanel({ open, onOpenChange }: { open: boolean; onOpenChan
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent side="right" className="w-full sm:max-w-sm p-0 gap-0 [&>button]:hidden" onInteractOutside={e => e.preventDefault()}>
-        <SheetTitle className="sr-only">Machine</SheetTitle>
-        <SheetDescription className="sr-only">Machine control</SheetDescription>
+        <SheetTitle className="sr-only">{translate('Machine')}</SheetTitle>
+        <SheetDescription className="sr-only">{translate('Machine control')}</SheetDescription>
         <MachinePanelContent onClose={() => onOpenChange(false)} />
       </SheetContent>
     </Sheet>

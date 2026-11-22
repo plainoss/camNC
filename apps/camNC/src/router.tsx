@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 // src/router.tsx
 import { createRouter as createTanStackRouter } from '@tanstack/react-router';
 import { routeTree } from './routeTree.gen';
@@ -16,7 +17,7 @@ export function createRouter() {
     defaultPreloadStaleTime: 0, // Let React Query handle all caching, see https://tanstack.com/router/latest/docs/framework/react/guide/data-loading
     defaultPendingComponent: DefaultLoadingOverlay,
     defaultErrorComponent: err => <p>{err.error.stack}</p>,
-    defaultNotFoundComponent: () => <p>not found</p>,
+    defaultNotFoundComponent: () => <p>{translate('not found')}</p>,
     context: { queryClient },
     // Optionally, we can use `Wrap` to wrap our router in the loader client provider
     Wrap: ({ children }) => {

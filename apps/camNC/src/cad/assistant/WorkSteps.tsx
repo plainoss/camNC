@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { describeStep, turnOutcome, type AssistantWorkStep, type Outcome } from './stepSummary';
 
 const icons: Record<Outcome, string> = { done: '✓', passed: '✓', warned: '⚠', failed: '↻', working: '◌', missing: '–' };
@@ -16,11 +17,15 @@ export function WorkSteps({ steps, running, activity }: { steps: AssistantWorkSt
         </span>
         <span>
           {running
-            ? activity || 'Working…'
-            : `${steps.length} ${steps.length === 1 ? 'step' : 'steps'}${checks ? ` · ${checks} ${checks === 1 ? 'check' : 'checks'}` : ''}`}
+            ? activity || translate('Working…')
+            : translate('{{value1}} {{value2}}{{value3}}', {
+                value1: steps.length,
+                value2: steps.length === 1 ? translate('step') : translate('steps'),
+                value3: checks ? ` · ${checks} ${checks === 1 ? translate('check') : translate('checks')}` : '',
+              })}
         </span>
       </summary>
-      <ol aria-label="Assistant steps">
+      <ol aria-label={translate('Assistant steps')}>
         {described.map((step, index) => (
           <li key={`${steps[index]!.call.id}-${index}`} data-outcome={step.outcome}>
             <span aria-hidden="true">{icons[step.outcome]}</span>
@@ -31,16 +36,26 @@ export function WorkSteps({ steps, running, activity }: { steps: AssistantWorkSt
           </li>
         ))}
       </ol>
-      {images.length > 0 && <small>{images.length} design views were checked.</small>}
+      {images.length > 0 && (
+        <small>
+          {images.length}
+          {translate(' design views were checked.')}
+        </small>
+      )}
       <details className="cad-assistant-work-details">
-        <summary>Details</summary>
-        <ol aria-label="Tool activity">
+        <summary>{translate('Details')}</summary>
+        <ol aria-label={translate('Tool activity')}>
           {steps.map(({ call, result }, index) => (
             <li key={`${call.id}-${index}`}>
               <strong>{call.name}</strong>
               <pre>{JSON.stringify(call.arguments, null, 2)}</pre>
               {result && <pre>{formatResult(result.text)}</pre>}
-              {!!result?.images?.length && <small>{result.images.length} design views returned; image data omitted.</small>}
+              {!!result?.images?.length && (
+                <small>
+                  {result.images.length}
+                  {translate(' design views returned; image data omitted.')}
+                </small>
+              )}
             </li>
           ))}
         </ol>

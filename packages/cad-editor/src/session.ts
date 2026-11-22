@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadDocument } from '@wbcnc/cad';
 
 /** Route changes and Finish keep undo; explicit Cancel discards the current edit session. */
@@ -50,14 +51,14 @@ export function cadSession(document: CadDocument): CadSession {
 
 /** A successful guarded save advances the expected source without disturbing newer local commands. */
 export function acknowledgeCadSession(session: CadSession, document: CadDocument) {
-  if (document.id !== session.document.id) throw new Error('Cannot acknowledge a different CAD document into this session.');
+  if (document.id !== session.document.id) throw new Error(translate('Cannot acknowledge a different CAD document into this session.'));
   session.saved = copy(document);
   delete session.conflict;
 }
 
 /** Accepting a sketch updates Cancel's baseline without turning route navigation into an undo boundary. */
 export function acceptCadSession(session: CadSession, document: CadDocument): CadDocument {
-  if (document.id !== session.document.id) throw new Error('Cannot accept a different CAD document into this session.');
+  if (document.id !== session.document.id) throw new Error(translate('Cannot accept a different CAD document into this session.'));
   session.document = copy(document);
   session.entry = copy(document);
   session.resumeAccepted = true;
@@ -138,7 +139,7 @@ export function markCadSession(session: CadSession): CadHistoryMark {
  * nor redone, and Undo steps back from the last change kept before the dialog opened.
  */
 export function restoreCadSession(session: CadSession, mark: CadHistoryMark): CadDocument {
-  if (mark.document.id !== session.document.id) throw new Error('Cannot restore a different CAD document into this session.');
+  if (mark.document.id !== session.document.id) throw new Error(translate('Cannot restore a different CAD document into this session.'));
   session.past = [...mark.past];
   session.future = [...mark.future];
   session.document = { ...copy(mark.document), revision: session.document.revision + 1 };

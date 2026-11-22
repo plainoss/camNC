@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   addCenterRectangle,
   addRectangle,
@@ -13,7 +14,9 @@ export type RectangleTool = 'rectangle' | 'centerRectangle';
 export const isRectangleTool = (tool: string): tool is RectangleTool => tool === 'rectangle' || tool === 'centerRectangle';
 
 export const rectanglePrompt = (tool: RectangleTool) =>
-  `Click or drag from the ${tool === 'centerRectangle' ? 'center' : 'first corner'} to the opposite corner. Or enter sizes below.`;
+  translate('Click or drag from the {{value1}} to the opposite corner. Or enter sizes below.', {
+    value1: tool === 'centerRectangle' ? translate('center') : translate('first corner'),
+  });
 
 export interface RectangleInput {
   lengthUnit?: CadLengthUnit;
@@ -45,13 +48,13 @@ export function createRectangle(sketch: CadSketch, input: RectangleInput): Recta
   const heightValue = end
     ? null
     : parseCadValue(input.height ?? '', { unit: 'mm', variables: input.variables, lengthUnit: input.lengthUnit });
-  if (widthValue && 'error' in widthValue) return { error: `Rectangle width: ${widthValue.error}` };
-  if (heightValue && 'error' in heightValue) return { error: `Rectangle height: ${heightValue.error}` };
+  if (widthValue && 'error' in widthValue) return { error: translate('Rectangle width: {{value1}}', { value1: widthValue.error }) };
+  if (heightValue && 'error' in heightValue) return { error: translate('Rectangle height: {{value1}}', { value1: heightValue.error }) };
   const w = end ? (end.x - start.x) * (centered ? 2 : 1) : widthValue!.value;
   const h = end ? (end.y - start.y) * (centered ? 2 : 1) : heightValue!.value;
-  if (!end && (w <= 0 || h <= 0)) return { error: 'Rectangle width and height must be greater than zero.' };
+  if (!end && (w <= 0 || h <= 0)) return { error: translate('Rectangle width and height must be greater than zero.') };
   if (!Number.isFinite(w) || !Number.isFinite(h) || Math.abs(w) < 0.1 || Math.abs(h) < 0.1)
-    return { error: 'Width and height must be greater than zero.' };
+    return { error: translate('Width and height must be greater than zero.') };
   const next = (centered ? addCenterRectangle : addRectangle)(sketch, {
     x: centered ? start.x : Math.min(start.x, start.x + w),
     y: centered ? start.y : Math.min(start.y, start.y + h),

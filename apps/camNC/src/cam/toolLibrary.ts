@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { demoStorage } from '@/lib/demo/demo-storage';
 import type { LibraryTool } from '@wbcnc/cam';
 import { readFusionToolLibrary, selectToolPreset } from '@wbcnc/cam/tools';
@@ -115,7 +116,7 @@ export type LibraryImport =
 export async function readLibraryFile(file: File): Promise<LibraryImport> {
   try {
     const { tools, skipped } = readFusionToolLibrary(await fusionLibraryText(file));
-    if (!tools.length) return { ok: false, error: `No flat or ball end mills in ${file.name}.` };
+    if (!tools.length) return { ok: false, error: translate('No flat or ball end mills in {{value1}}.', { value1: file.name }) };
     return { ok: true, file: file.name, tools, skipped };
   } catch (e) {
     return { ok: false, error: `${file.name}: ${e instanceof Error ? e.message : String(e)}` };

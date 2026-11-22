@@ -1,3 +1,4 @@
+import { t as translate, getLanguage } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { workOffsetCommand } from '@/lib/fluidnc/work-offset';
 import { dismissInterruptedJob, interruptedJob } from '@/lib/machine/jobRecovery';
@@ -24,7 +25,7 @@ const fmt = (n: number) => n.toFixed(2);
 const kZeroTolerance = 0.01;
 
 function report(promise: Promise<unknown>, what: string) {
-  return promise.catch(err => toast.error(`${what} failed`, { description: errorText(err) }));
+  return promise.catch(err => toast.error(translate('{{what}} failed', { what: what }), { description: errorText(err) }));
 }
 
 const passLabel = (p: PassStart) => `${p.opName}, pass ${p.pass} of ${p.passCount} (Z${p.z})`;
@@ -99,12 +100,19 @@ export function ResumeJobCard() {
     return (
       <div className="rounded-md border border-amber-400 p-3 text-sm flex flex-col gap-2" data-testid="resume-card">
         <div className="flex items-center justify-between gap-2">
-          <b>Interrupted job on {job.record.host}</b>
-          <Button size="icon" variant="ghost" aria-label="Dismiss interrupted job" onClick={dismissInterruptedJob}>
+          <b>
+            {translate('Interrupted job on ')}
+            {job.record.host}
+          </b>
+          <Button size="icon" variant="ghost" aria-label={translate('Dismiss interrupted job')} onClick={dismissInterruptedJob}>
             <X />
           </Button>
         </div>
-        <p>Reconnect to {job.record.host} and clear any alarm to resume this job, or dismiss its recovery offer.</p>
+        <p>
+          {translate('Reconnect to ')}
+          {job.record.host}
+          {translate(' and clear any alarm to resume this job, or dismiss its recovery offer.')}
+        </p>
         <p>{job.reason}</p>
       </div>
     );
@@ -119,7 +127,7 @@ export function ResumeJobCard() {
   const wcs = api.currentOffsetModal.value ?? 'G54';
   const p = Number(wcs.slice(1)) - 53;
   const restore = (axes: ('x' | 'y' | 'z')[]) =>
-    report(api.send(workOffsetCommand(Object.fromEntries(axes.map(a => [a, saved[a]])), p)), 'Restoring the zero').then(() =>
+    report(api.send(workOffsetCommand(Object.fromEntries(axes.map(a => [a, saved[a]])), p)), translate('Restoring the zero')).then(() =>
       api.getCurrentZero().catch(() => {})
     );
   const restartLine = line !== null ? program.lines[line] : null;
@@ -133,19 +141,22 @@ export function ResumeJobCard() {
       <div className="flex flex-row items-start justify-between gap-2">
         <div className="flex flex-col gap-0.5 min-w-0">
           <b className="truncate" title={name}>
-            Resume {name}?
+            {translate('Resume ')}
+            {name}?
           </b>
           <span>{job.reason}</span>
           <span className="text-xs text-muted-foreground font-mono">
-            Last seen {new Date(job.progress.at).toLocaleTimeString()} at work X {fmt(lastWorkPos.x)} Y {fmt(lastWorkPos.y)} Z{' '}
-            {fmt(lastWorkPos.z)}
+            {translate('Last seen ')}
+            {new Date(job.progress.at).toLocaleTimeString(getLanguage())}
+            {translate(' at work X ')}
+            {fmt(lastWorkPos.x)} Y {fmt(lastWorkPos.y)} Z {fmt(lastWorkPos.z)}
           </span>
         </div>
         <Button
           size="icon"
           variant="ghost"
           className="size-7 shrink-0"
-          aria-label="Dismiss interrupted job"
+          aria-label={translate('Dismiss interrupted job')}
           onClick={dismissInterruptedJob}>
           <X />
         </Button>
@@ -157,68 +168,82 @@ export function ResumeJobCard() {
         </p>
       )}
       <ol className="flex flex-col gap-3">
-        <Step ok={homedOk} title={homedOk ? 'Homed' : 'Home the machine'}>
+        <Step ok={homedOk} title={homedOk ? translate('Homed') : translate('Home the machine')}>
           {!homedOk && (
             <>
               <span className="text-xs text-muted-foreground">
-                After a power cycle or reset the machine position is only known again after homing.
+                {translate('After a power cycle or reset the machine position is only known again after homing. ')}
               </span>
               <div className="flex flex-row flex-wrap gap-1">
                 <Button size="sm" disabled={!idle} onClick={() => report(api.home(), 'Homing')}>
-                  <Home /> Home
+                  <Home />
+                  {translate(' Home ')}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setSkipHoming(true)}>
-                  No homing switches
+                  {translate('No homing switches ')}
                 </Button>
               </div>
             </>
           )}
         </Step>
 
-        <Step ok={xyOk && zOk} title={xyOk && zOk ? 'Same work zero as the job' : 'Get the job’s work zero back'}>
+        <Step ok={xyOk && zOk} title={xyOk && zOk ? translate('Same work zero as the job') : translate('Get the job’s work zero back')}>
           {delta && !(xyOk && zOk) && (
             <>
               <span className="text-xs text-muted-foreground font-mono">
-                Now off by X {fmt(delta.x)} Y {fmt(delta.y)} Z {zReZeroed ? '(re-zeroed)' : fmt(delta.z)}
+                {translate('Now off by X ')}
+                {fmt(delta.x)} Y {fmt(delta.y)} Z {zReZeroed ? translate('(re-zeroed)') : fmt(delta.z)}
               </span>
               <div className="flex flex-row flex-wrap gap-1">
                 <Button
                   size="sm"
                   disabled={!idle || !homedOk}
                   onClick={() => restore(['x', 'y', 'z'])}
-                  title={`G10 L2 P${p} with the job's offset`}>
-                  Restore XY and Z
+                  title={translate("G10 L2 P{{p}} with the job's offset", { p: p })}>
+                  {translate('Restore XY and Z ')}
                 </Button>
                 {!xyOk && (
                   <Button size="sm" variant="outline" disabled={!idle || !homedOk} onClick={() => restore(['x', 'y'])}>
-                    Restore XY only
+                    {translate('Restore XY only ')}
                   </Button>
                 )}
               </div>
               <span className="text-xs text-muted-foreground">
-                Restoring needs the machine homed the same way as for the job. If Z may have changed (bit slipped, tool swapped), restore XY
-                only and probe or zero Z below.
+                {translate(
+                  'Restoring needs the machine homed the same way as for the job. If Z may have changed (bit slipped, tool swapped), restore XY only and probe or zero Z below. '
+                )}
               </span>
             </>
           )}
         </Step>
 
-        <Step ok={!!restartLine?.motion} title="Restart point">
+        <Step ok={!!restartLine?.motion} title={translate('Restart point')}>
           {thisPass && found && (
             <>
-              <span className="text-xs">Stopped in {passLabel(thisPass)}.</span>
-              <div className="flex flex-col gap-1 text-xs" role="radiogroup" aria-label="Restart at">
+              <span className="text-xs">
+                {translate('Stopped in ')}
+                {passLabel(thisPass)}.
+              </span>
+              <div className="flex flex-col gap-1 text-xs" role="radiogroup" aria-label={translate('Restart at')}>
                 {[
-                  { label: `Start of this pass (line ${thisPass.line + 1})`, at: thisPass.line },
+                  { label: translate('Start of this pass (line {{value1}})', { value1: thisPass.line + 1 }), at: thisPass.line },
                   ...(previousPass
                     ? [
                         {
-                          label: `Start of the previous pass: ${previousPass.opName === thisPass.opName ? `pass ${previousPass.pass}` : passLabel(previousPass)} (line ${previousPass.line + 1})`,
+                          label: translate('Start of the previous pass: {{value1}} (line {{value2}})', {
+                            value1:
+                              previousPass.opName === thisPass.opName
+                                ? translate('pass {{value1}}', { value1: previousPass.pass })
+                                : passLabel(previousPass),
+                            value2: previousPass.line + 1,
+                          }),
                           at: previousPass.line,
                         },
                       ]
                     : []),
-                  ...(found.line !== thisPass.line ? [{ label: `Where it stopped (line ${found.line + 1})`, at: found.line }] : []),
+                  ...(found.line !== thisPass.line
+                    ? [{ label: translate('Where it stopped (line {{value1}})', { value1: found.line + 1 }), at: found.line }]
+                    : []),
                 ].map(option => (
                   <label key={option.at} className="flex flex-row items-center gap-2">
                     <input type="radio" name="resume-at" checked={line === option.at} onChange={() => setLine(option.at)} />
@@ -229,37 +254,43 @@ export function ResumeJobCard() {
             </>
           )}
           <div className="flex flex-row items-center gap-2">
-            <span className="text-xs">Line</span>
+            <span className="text-xs">{translate('Line')}</span>
             <Input
               type="number"
               min={1}
               max={program.lines.length}
               className="h-7 w-24"
-              aria-label="Restart line"
+              aria-label={translate('Restart line')}
               value={line !== null ? line + 1 : ''}
               onChange={e => {
                 const value = Number(e.target.value);
                 if (Number.isInteger(value) && value >= 1 && value <= program.lines.length) setLine(value - 1);
               }}
             />
-            <span className="text-xs text-muted-foreground">of {program.lines.length}</span>
+            <span className="text-xs text-muted-foreground">
+              {translate('of ')}
+              {program.lines.length}
+            </span>
           </div>
           {restartLine && (
             <code className="text-xs truncate" title={restartLine.raw}>
-              {restartLine.raw || '(empty line)'}
+              {restartLine.raw || translate('(empty line)')}
             </code>
           )}
           <span className="text-xs text-muted-foreground">
             {thisPass && line === thisPass.line
-              ? 'Runs this pass again from its start: the tool re-cuts what the pass already cut.'
+              ? translate('Runs this pass again from its start: the tool re-cuts what the pass already cut.')
               : previousPass && line === previousPass.line
-                ? 'Runs the previous pass again, then this one.'
+                ? translate('Runs the previous pass again, then this one.')
                 : found && line === found.line
-                  ? `The move the tool was on (${fmt(found.distance)} mm from the last position). Restarting at its start re-cuts a little air.`
+                  ? translate(
+                      'The move the tool was on ({{value1}} mm from the last position). Restarting at its start re-cuts a little air.',
+                      { value1: fmt(found.distance) }
+                    )
                   : found
-                    ? `camNC suggested line ${(suggested ?? found.line) + 1}.`
-                    : 'camNC could not tell where the tool was. Pick the line to restart at.'}
-            {restartLine && !restartLine.motion && ' This line is not a move: pick a line with a move.'}
+                    ? translate('camNC suggested line {{value1}}.', { value1: (suggested ?? found.line) + 1 })
+                    : translate('camNC could not tell where the tool was. Pick the line to restart at.')}
+            {restartLine && !restartLine.motion && translate(' This line is not a move: pick a line with a move.')}
           </span>
         </Step>
       </ol>
@@ -270,22 +301,27 @@ export function ResumeJobCard() {
           setResumeError(null);
           setConfirmOpen(true);
         }}>
-        <RotateCcw /> Preview and resume…
+        <RotateCcw />
+        {translate(' Preview and resume… ')}
       </Button>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         {/* A single column that may shrink: otherwise the long G-code lines widen the grid past the dialog. */}
         <AlertDialogContent className="grid-cols-[minmax(0,1fr)] sm:max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>Resume from line {line !== null ? line + 1 : '?'}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {translate('Resume from line ')}
+              {line !== null ? line + 1 : '?'}?
+            </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="flex flex-col gap-2 text-sm">
                 {preview?.ok === false && <p className="text-red-700 dark:text-red-400">{preview.error}</p>}
                 {preview?.ok && (
                   <>
                     <p>
-                      Uploads a unique execution file to the SD card and starts it. It retracts Z, moves over the restart point and pauses:
-                      check the bit is clear, then press Resume to start the spindle, plunge and continue.
+                      {translate(
+                        'Uploads a unique execution file to the SD card and starts it. It retracts Z, moves over the restart point and pauses: check the bit is clear, then press Resume to start the spindle, plunge and continue. '
+                      )}
                     </p>
                     <pre className="text-xs bg-muted rounded p-2 whitespace-pre-wrap break-words overflow-y-auto max-h-48">
                       {preview.gcode
@@ -308,7 +344,7 @@ export function ResumeJobCard() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{translate('Cancel')}</AlertDialogCancel>
             <AlertDialogAction
               disabled={!preview?.ok || !!preview.travel?.blocking || submitting}
               onClick={() => {
@@ -319,11 +355,11 @@ export function ResumeJobCard() {
                   .catch(err => {
                     const message = errorText(err);
                     setResumeError(message);
-                    toast.error('Resume failed', { description: message });
+                    toast.error(translate('Resume failed'), { description: message });
                   })
                   .finally(() => setSubmitting(false));
               }}>
-              Resume job
+              {translate('Resume job ')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

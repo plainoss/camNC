@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { Point } from './cadEditorShared';
 import { cadSketchFrame, entityPointIds as curvePointIds } from '@wbcnc/cad';
 import type { MouseEvent } from 'react';
@@ -51,30 +52,31 @@ export function editSketchPattern(editor: SketchEditorInput, id: string) {
   if (pattern.type === 'linearPattern') setLinearParameters(linearPatternParameters(pattern, lengthUnit));
   else setCircularParameters(circularPatternParameters(pattern, sketch!, lengthUnit));
   setSelected(editablePatternSources(pattern));
-  setMessage('Edit the pattern counts, spacing or direction. Deleted instances remain excluded.');
+  setMessage(translate('Edit the pattern counts, spacing or direction. Deleted instances remain excluded.'));
 }
 
 export function acceptSketchSlot(editor: SketchEditorInput) {
   const { slotPreview, setMessage, changeSketch, setSharedSlotWidth, setSelected, svg } = editor;
-  if (!slotPreview?.ok) return setMessage(slotPreview?.message ?? 'Select source curves for a slot.');
+  if (!slotPreview?.ok) return setMessage(slotPreview?.message ?? translate('Select source curves for a slot.'));
   const group = slotPreview.sketch.constraints.find(c => c.id === slotPreview.slotId);
   changeSketch(slotPreview.sketch);
   if (group?.type === 'slot') setSharedSlotWidth(group.widthEntityId);
   setSelected([]);
-  setMessage('Slot created. Select more source curves to share its width, or press Escape.');
+  setMessage(translate('Slot created. Select more source curves to share its width, or press Escape.'));
   svg.current?.focus();
 }
 
 export function acceptSketchTransform(editor: SketchEditorInput) {
   const { transformPreview, setMessage, changeSketch, chooseTool, setSelected, setTransformNotice } = editor;
-  if (!transformPreview?.ok) return setMessage(transformPreview?.message ?? 'Select geometry to transform.');
+  if (!transformPreview?.ok) return setMessage(transformPreview?.message ?? translate('Select geometry to transform.'));
   if (transformPreview.changed) changeSketch(transformPreview.sketch);
   const ids = transformPreview.entityIds,
     released = transformPreview.releasedConstraintIds.length;
   chooseTool('select');
   setSelected(ids);
-  if (released) setTransformNotice(`${released} external or directed relations were released by the transform.`);
-  setMessage(transformPreview.changed ? 'Transform applied.' : 'Transform closed without changes.');
+  if (released)
+    setTransformNotice(translate('{{value1}} external or directed relations were released by the transform.', { value1: released }));
+  setMessage(transformPreview.changed ? translate('Transform applied.') : translate('Transform closed without changes.'));
 }
 
 export function openSketchContext(editor: SketchEditorInput, target: SketchContextTarget, position: Point) {
@@ -119,7 +121,7 @@ export function toggleSketchFix(editor: SketchEditorInput) {
   if (!selected.length) {
     chooseTool('select');
     setFixMode(true);
-    setMessage('Click geometry to fix or unfix it. Escape ends Fix.');
+    setMessage(translate('Click geometry to fix or unfix it. Escape ends Fix.'));
     svg.current?.focus();
     return;
   }
@@ -140,7 +142,7 @@ export function toggleSketchConstruction(editor: SketchEditorInput) {
   if (sketch && selected.length) {
     const next = toggleContextConstruction(sketch, selected);
     if (next === sketch)
-      setMessage('Spline tangent handles remain construction geometry. Select the curve to change its construction state.');
+      setMessage(translate('Spline tangent handles remain construction geometry. Select the curve to change its construction state.'));
     else changeSketch(next);
   } else setConstruction(value => !value);
 }

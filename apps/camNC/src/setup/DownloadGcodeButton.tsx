@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Button } from '@wbcnc/ui/components/button';
 import { getPocketsGcode } from './arucoPocketsGcode';
 
@@ -17,7 +18,8 @@ export function DownloadGcodeButton({ points, tagSize }: { points: { x: number; 
   const disabled = tagSize !== 30;
   return (
     <Button variant="secondary" onClick={handleClick} disabled={disabled}>
-      Generate pockets gcode {disabled ? '(30mm only)' : ''}
+      {translate('Generate pockets gcode ')}
+      {disabled ? translate('(30mm only)') : ''}
     </Button>
   );
 }

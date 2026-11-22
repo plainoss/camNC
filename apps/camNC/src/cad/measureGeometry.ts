@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 /** Coordinates in the assembly's millimetre frame, before exploded/flat display offsets. */
 export type MeasureVec3 = [number, number, number];
 export type MeasureTriangle = [MeasureVec3, MeasureVec3, MeasureVec3];
@@ -335,7 +336,7 @@ const axes = ['x', 'y', 'z'] as const;
 function positionRows(point: MeasureVec3, prefix: string): MeasureRow[] {
   return axes.map((axis, i) => ({
     id: `position-${axis}`,
-    label: `${prefix} ${axis.toUpperCase()}`,
+    label: translate('{{prefix}} {{value2}}', { prefix: prefix, value2: axis.toUpperCase() }),
     value: point[i]!,
     kind: 'position',
     axis,
@@ -347,7 +348,7 @@ function deltaRows(witness: MeasureWitness, prefix: string): MeasureRow[] {
     end[i] = witness.b[i]!;
     const row: MeasureRow = {
       id: `delta-${axis}`,
-      label: `${prefix}${axis.toUpperCase()}`,
+      label: translate('{{prefix}}{{value2}}', { prefix: prefix, value2: axis.toUpperCase() }),
       value: witness.b[i]! - witness.a[i]!,
       kind: 'position',
       axis,
@@ -376,9 +377,9 @@ export function measureEntities(entities: readonly MeasureEntity[]): MeasureResu
       !pointsOf(entity).every(finitePoint) ||
       (entity.kind === 'face' && (!finitePoint(entity.normal) || !length(entity.normal) || !Number.isFinite(length(entity.normal))))
     )
-      return { rows: [], problem: 'The selected geometry has invalid coordinates.' };
+      return { rows: [], problem: translate('The selected geometry has invalid coordinates.') };
     if (entity.kind === 'face' && (!entity.triangles.length || !entity.triangles.some(triangle => triangleArea(triangle) > 0)))
-      return { rows: [], problem: 'The selected face has no measurable area.' };
+      return { rows: [], problem: translate('The selected face has no measurable area.') };
   }
   const rows: MeasureRow[] = [];
   const edges = entities.filter((entity): entity is Extract<MeasureEntity, { kind: 'edge' }> => entity.kind === 'edge');
@@ -386,17 +387,17 @@ export function measureEntities(entities: readonly MeasureEntity[]): MeasureResu
   if (edges.length)
     rows.push({
       id: 'length',
-      label: edges.length > 1 ? 'Total length' : 'Length',
+      label: edges.length > 1 ? translate('Total length') : translate('Length'),
       value: edges.reduce((sum, edge) => sum + distance(edge.a, edge.b), 0),
       kind: 'length',
       ...(edges.length === 1 && { witness: { a: edges[0]!.a, b: edges[0]!.b } }),
     });
   if (faces.length === 1 && faces[0]!.cylinder && entities.length === 1)
-    rows.push({ id: 'diameter', label: 'Diameter', value: faces[0]!.cylinder.radius * 2, kind: 'length' });
+    rows.push({ id: 'diameter', label: translate('Diameter'), value: faces[0]!.cylinder.radius * 2, kind: 'length' });
   if (faces.length)
     rows.push({
       id: 'area',
-      label: faces.length > 1 ? 'Total area' : 'Area',
+      label: faces.length > 1 ? translate('Total area') : translate('Area'),
       value: faces.reduce(
         (sum, face) => sum + (face.area ?? face.triangles.reduce((area, triangle) => area + triangleArea(triangle), 0)),
         0
@@ -409,13 +410,13 @@ export function measureEntities(entities: readonly MeasureEntity[]): MeasureResu
     const [first, second] = entities as readonly [MeasureEntity, MeasureEntity];
     const center: MeasureWitness = { a: centerOf(first), b: centerOf(second) };
     if (first.kind === 'vertex' && second.kind === 'vertex') {
-      rows.push({ id: 'distance', label: 'Distance', value: distance(center.a, center.b), kind: 'length', witness: center });
+      rows.push({ id: 'distance', label: translate('Distance'), value: distance(center.a, center.b), kind: 'length', witness: center });
       rows.push(...deltaRows(center, 'Δ'));
     } else {
       for (const [id, label, witness] of [
-        ['min-distance', 'Min distance', minimumPair(first, second)],
-        ['max-distance', 'Max distance', maximumPair(first, second)],
-        ['center-distance', 'Center distance', center],
+        ['min-distance', translate('Min distance'), minimumPair(first, second)],
+        ['max-distance', translate('Max distance'), maximumPair(first, second)],
+        ['center-distance', translate('Center distance'), center],
       ] as const)
         rows.push({ id, label, value: distance(witness.a, witness.b), kind: 'length', witness });
       rows.push(...deltaRows(center, 'Center Δ'));
@@ -435,7 +436,7 @@ export function measureEntities(entities: readonly MeasureEntity[]): MeasureResu
             ? directionAngle(first.normal, second.normal, false)
             : null;
     if (angle !== null) {
-      const label = round === 1 ? 'Perp axes angle' : round === 2 ? 'Axes angle' : 'Angle';
+      const label = round === 1 ? translate('Perp axes angle') : round === 2 ? translate('Axes angle') : 'Angle';
       // With a round face the angle is what the pair is picked for, so it leads the quick readout.
       if (round) rows.unshift({ id: 'angle', label, value: angle, kind: 'angle' });
       else rows.push({ id: 'angle', label, value: angle, kind: 'angle' });
@@ -443,6 +444,6 @@ export function measureEntities(entities: readonly MeasureEntity[]): MeasureResu
     }
   }
   if (rows.some(row => !Number.isFinite(row.value) || (row.witness && (!finitePoint(row.witness.a) || !finitePoint(row.witness.b)))))
-    return { rows: [], problem: 'The selected geometry is outside the measurable numeric range.' };
+    return { rows: [], problem: translate('The selected geometry is outside the measurable numeric range.') };
   return { rows, ...(parallel !== undefined && { parallel }) };
 }

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useMemo, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { carvingPath } from '../carvingView';
 import { sanitizeCarvingSvg } from './sanitize';
@@ -66,7 +67,7 @@ export function CarvingAssistantBoardLayer({ session, height }: { session: Carvi
       {placed && (
         <path
           d={carvingPath(placed, height)}
-          aria-label="Proposed artwork on the board"
+          aria-label={translate('Proposed artwork on the board')}
           role="img"
           className="pointer-events-none fill-violet-700/80 dark:fill-violet-400/80"
           fillRule="nonzero"
@@ -96,7 +97,7 @@ export function CarvingAssistantBoardLayer({ session, height }: { session: Carvi
         />
       ))}
       <rect
-        aria-label="Artwork box: drag to move"
+        aria-label={translate('Artwork box: drag to move')}
         x={x0}
         y={top}
         width={target.w}
@@ -107,7 +108,7 @@ export function CarvingAssistantBoardLayer({ session, height }: { session: Carvi
         onPointerDown={begin('move')}
       />
       <rect
-        aria-label="Drag to size the artwork box"
+        aria-label={translate('Drag to size the artwork box')}
         x={x0 + target.w - grip / 2}
         y={top + target.h - grip / 2}
         width={grip}
@@ -117,7 +118,8 @@ export function CarvingAssistantBoardLayer({ session, height }: { session: Carvi
         onPointerDown={begin('size')}
       />
       <text x={x0} y={top - 2} className="pointer-events-none fill-violet-600 text-[4px] dark:fill-violet-300">
-        {Math.round(target.w)} × {Math.round(target.h)} mm
+        {Math.round(target.w)} × {Math.round(target.h)}
+        {translate(' mm ')}
       </text>
     </g>
   );

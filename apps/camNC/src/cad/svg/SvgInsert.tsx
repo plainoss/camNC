@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { CadDocument } from '@wbcnc/cad';
@@ -32,15 +33,16 @@ export function SvgInsert({
   const review = async (selection: SvgImportSelection) => {
     const token = ++generation.current,
       base = structuredClone(document);
-    if (latest.current.disabled) throw new Error('Finish or cancel the current edit before importing SVG.');
+    if (latest.current.disabled) throw new Error(translate('Finish or cancel the current edit before importing SVG.'));
     const store = svgAssetsForDocument(base.id),
       summary = store.register(selection.source, selection.name);
     const result = await checkSvgCandidate(base, store, { handle: summary.handle, placement: selection.placement, toolpaths: true });
     // A cancelled or replaced import must never open a late proposal.
     if (token !== generation.current) return;
     if (latest.current.disabled || JSON.stringify(latest.current.document) !== JSON.stringify(base))
-      throw new Error('The design changed while SVG was checked. Review the import again.');
-    if (!result.ok) throw new Error(result.report.errors.map(issue => issue.message).join(' ') || 'The imported SVG is not a valid part.');
+      throw new Error(translate('The design changed while SVG was checked. Review the import again.'));
+    if (!result.ok)
+      throw new Error(result.report.errors.map(issue => issue.message).join(' ') || translate('The imported SVG is not a valid part.'));
     onProposal(cadProposal(base, result.document));
   };
   return (
@@ -52,7 +54,7 @@ export function SvgInsert({
           event.currentTarget.closest('details')?.removeAttribute('open');
           setOpen(true);
         }}>
-        SVG…
+        {translate('SVG… ')}
       </button>
       {open && createPortal(<SvgImportDialog onImport={review} onClose={close} />, globalThis.document.body)}
     </>

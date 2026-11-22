@@ -1,0 +1,1 @@
+{ "extends": "@wbcnc/typescript-config/base.json", "compilerOptions": { "resolveJsonModule": true }, "include": ["src"] }

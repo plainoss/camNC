@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadDocument } from '@wbcnc/cad';
 import { cadProposal, type CadProposal } from '@wbcnc/cad-editor/proposal';
 import type { AssistantProposalOrigin } from './loop';
@@ -36,14 +37,17 @@ export async function recheckAssistantCandidate(
   const brief = readRequirements(base.id);
   const checked = await checkScriptInBrowser(structuredClone(base), source, { signal, toolpaths: false });
   if (signal.aborted) throw new DOMException('Stopped', 'AbortError');
-  if (!checked.ok) throw new Error(checked.scriptError ?? checked.report.errors[0]?.message ?? 'The design no longer checks.');
+  if (!checked.ok) throw new Error(checked.scriptError ?? checked.report.errors[0]?.message ?? translate('The design no longer checks.'));
   const full = await finalizeBrowserCandidate(checked, signal);
   if (signal.aborted) throw new DOMException('Stopped', 'AbortError');
-  if (!full.ok) throw new Error(full.scriptError ?? full.report.errors[0]?.message ?? 'The complete check failed.');
+  if (!full.ok) throw new Error(full.scriptError ?? full.report.errors[0]?.message ?? translate('The complete check failed.'));
   if (Object.keys(brief.requirements).length) {
     const acceptance = checkAssistantRequirements(brief.requirements, base, full.document, full.report, full.parts ?? []);
     const failed = acceptance.checks.find(check => !check.passed);
-    if (!acceptance.ok) throw new Error(failed?.message ?? `The brief's ${failed?.requirement ?? 'requirements'} no longer hold.`);
+    if (!acceptance.ok)
+      throw new Error(
+        failed?.message ?? translate("The brief's {{value1}} no longer hold.", { value1: failed?.requirement ?? 'requirements' })
+      );
   }
   const proposal = cadProposal(base, full.document);
   bindProposalRequirements(proposal, brief.revision);

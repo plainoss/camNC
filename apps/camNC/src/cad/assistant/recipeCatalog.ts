@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import pebbleTraySource from '../../../../../packages/cad-script/examples/pebble-tray.cad.ts?raw';
 
 export type AssistantRecipeName = 'pebble-tray' | 'cupboard';
@@ -43,24 +44,27 @@ export const assistantRecipeCatalog: readonly AssistantRecipe[] = [
 
 export function plainAssistantData(input: unknown, what: string): Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input) || ![Object.prototype, null].includes(Object.getPrototypeOf(input)))
-    throw new Error(`${what} must be a plain data object.`);
+    throw new Error(translate('{{what}} must be a plain data object.', { what: what }));
   for (const key of Reflect.ownKeys(input)) {
     const descriptor = Object.getOwnPropertyDescriptor(input, key)!;
     if (typeof key !== 'string' || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value'))
-      throw new Error(`${what} must contain only JSON data fields.`);
+      throw new Error(translate('{{what}} must contain only JSON data fields.', { what: what }));
   }
   return input as Record<string, unknown>;
 }
 
 /** Copy dense JSON arrays without invoking model-supplied accessors or custom iterators. */
 export function assistantDataArray(input: unknown, what: string): unknown[] {
-  if (!Array.isArray(input) || Object.getPrototypeOf(input) !== Array.prototype) throw new Error(`${what} must be a plain JSON array.`);
+  if (!Array.isArray(input) || Object.getPrototypeOf(input) !== Array.prototype)
+    throw new Error(translate('{{what}} must be a plain JSON array.', { what: what }));
   const keys = Reflect.ownKeys(input);
-  if (keys.length !== input.length + 1) throw new Error(`${what} must be a dense JSON array with no extra fields.`);
+  if (keys.length !== input.length + 1)
+    throw new Error(translate('{{what}} must be a dense JSON array with no extra fields.', { what: what }));
   const result: unknown[] = [];
   for (let index = 0; index < input.length; index++) {
     const descriptor = Object.getOwnPropertyDescriptor(input, String(index));
-    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) throw new Error(`${what} must contain only JSON data fields.`);
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value'))
+      throw new Error(translate('{{what}} must contain only JSON data fields.', { what: what }));
     result.push(descriptor.value);
   }
   return result;
@@ -74,9 +78,16 @@ function parametersFor(recipe: AssistantRecipeName, input: unknown): AssistantRe
       : { width: 600, height: 720, depth: 300, board: 18, shelves: 3, folderName: 'Cupboard', at: [0, 0, 0] };
   for (const [name, value] of Object.entries(supplied)) {
     if (!Object.hasOwn(defaults, name))
-      throw new Error(`Unknown ${recipe} parameter ${name}. Available: ${Object.keys(defaults).join(', ')}.`);
+      throw new Error(
+        translate('Unknown {{recipe}} parameter {{name}}. Available: {{value3}}.', {
+          recipe: recipe,
+          name: name,
+          value3: Object.keys(defaults).join(', '),
+        })
+      );
     if (name === 'folderName') {
-      if (typeof value !== 'string' || !value.trim() || value.length > 120) throw new Error('folderName must be 1–120 characters.');
+      if (typeof value !== 'string' || !value.trim() || value.length > 120)
+        throw new Error(translate('folderName must be 1–120 characters.'));
       defaults[name] = value.trim();
     } else if (name === 'at') {
       const coordinates = assistantDataArray(value, 'at');
@@ -84,7 +95,7 @@ function parametersFor(recipe: AssistantRecipeName, input: unknown): AssistantRe
         coordinates.length !== 3 ||
         coordinates.some(entry => typeof entry !== 'number' || !Number.isFinite(entry) || Math.abs(entry) > 100_000)
       )
-        throw new Error('at must contain three finite millimetre coordinates between -100000 and 100000.');
+        throw new Error(translate('at must contain three finite millimetre coordinates between -100000 and 100000.'));
       defaults[name] = Object.freeze(coordinates as number[]);
     } else {
       if (
@@ -95,25 +106,29 @@ function parametersFor(recipe: AssistantRecipeName, input: unknown): AssistantRe
         (name === 'shelves' && !Number.isInteger(value))
       )
         throw new Error(
-          `${name} must be a positive ${name === 'shelves' ? 'integer up to 200' : 'finite millimetre dimension up to 10000'}.`
+          translate('{{name}} must be a positive {{value2}}.', {
+            name: name,
+            value2: name === 'shelves' ? translate('integer up to 200') : translate('finite millimetre dimension up to 10000'),
+          })
         );
       defaults[name] = value;
     }
   }
   if (recipe === 'pebble-tray') {
-    if (!(Number(defaults.width) > Number(defaults.height))) throw new Error('A pebble tray needs width > height.');
-    if (!(Number(defaults.wall) < Number(defaults.height) * 0.32)) throw new Error('A pebble tray needs wall < 0.32*height.');
+    if (!(Number(defaults.width) > Number(defaults.height))) throw new Error(translate('A pebble tray needs width > height.'));
+    if (!(Number(defaults.wall) < Number(defaults.height) * 0.32)) throw new Error(translate('A pebble tray needs wall < 0.32*height.'));
     if (!(Number(defaults.pocketDepth) < Number(defaults.blank)))
-      throw new Error('A tray pocket must leave a positive floor: pocketDepth < blank.');
+      throw new Error(translate('A tray pocket must leave a positive floor: pocketDepth < blank.'));
   } else {
-    if (!(Number(defaults.board) > 12)) throw new Error('This cupboard recipe needs board > 12 mm for its fixed-depth pin holes.');
+    if (!(Number(defaults.board) > 12))
+      throw new Error(translate('This cupboard recipe needs board > 12 mm for its fixed-depth pin holes.'));
     if (!(Number(defaults.width) > 2 * Number(defaults.board) + 2))
-      throw new Error('Cupboard width must leave room between its side boards.');
+      throw new Error(translate('Cupboard width must leave room between its side boards.'));
     if (!(Number(defaults.height) > 2 * Number(defaults.board) + 160))
-      throw new Error('Cupboard height must leave room for its pin-row margins.');
+      throw new Error(translate('Cupboard height must leave room for its pin-row margins.'));
     if (Number(defaults.height) < 3 * Number(defaults.board) + 82.5 + (Number(defaults.shelves) - 1) * 32)
-      throw new Error('Cupboard height cannot fit that many shelves at the minimum 32 mm pin pitch.');
-    if (!(Number(defaults.depth) > 90)) throw new Error('Cupboard depth must exceed 90 mm for its back and two pin rows.');
+      throw new Error(translate('Cupboard height cannot fit that many shelves at the minimum 32 mm pin pitch.'));
+    if (!(Number(defaults.depth) > 90)) throw new Error(translate('Cupboard depth must exceed 90 mm for its back and two pin rows.'));
   }
   for (const value of Object.values(defaults)) if (Array.isArray(value)) Object.freeze(value);
   return Object.freeze(defaults);
@@ -125,10 +140,10 @@ function trustedPebbleExpression(): string {
   const start = pebbleTraySource.indexOf(marker);
   // Only the bundled, reviewed example is wrapped. Model text never participates in source extraction.
   if (!pebbleTraySource.startsWith(header) || start < header.length || pebbleTraySource.indexOf(marker, start + marker.length) >= 0)
-    throw new Error('The bundled pebble example no longer has the expected module shape.');
+    throw new Error(translate('The bundled pebble example no longer has the expected module shape.'));
   const expression = pebbleTraySource.slice(start + marker.length).trim();
   if (!expression.startsWith('design(') || !expression.endsWith(');'))
-    throw new Error('The bundled pebble example has no design expression.');
+    throw new Error(translate('The bundled pebble example has no design expression.'));
   return expression.slice(0, -1);
 }
 
@@ -137,7 +152,9 @@ export function buildAssistantRecipe(
   input?: unknown
 ): { recipe: AssistantRecipeName; parameters: AssistantRecipeParameters; source: string } {
   if (name !== 'pebble-tray' && name !== 'cupboard')
-    throw new Error(`Unknown recipe. Available: ${assistantRecipeCatalog.map(recipe => recipe.name).join(', ')}.`);
+    throw new Error(
+      translate('Unknown recipe. Available: {{value1}}.', { value1: assistantRecipeCatalog.map(recipe => recipe.name).join(', ') })
+    );
   const parameters = parametersFor(name, input);
   let source: string;
   if (name === 'cupboard') {

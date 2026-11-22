@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   evaluateSegment,
@@ -94,7 +95,7 @@ export function SvgImportDialog({
         onSubmit={async event => {
           event.preventDefault();
           if (!selected || !preview) {
-            setError('Choose a supported SVG and enter positive, finite dimensions.');
+            setError(translate('Choose a supported SVG and enter positive, finite dimensions.'));
             return;
           }
           setBusy(true);
@@ -109,13 +110,13 @@ export function SvgImportDialog({
           }
         }}>
         <header>
-          <h2 id={`${id}-title`}>Import SVG into sketch</h2>
+          <h2 id={`${id}-title`}>{translate('Import SVG into sketch')}</h2>
           <button type="button" onClick={() => dialog.current?.close()}>
-            Cancel
+            {translate('Cancel ')}
           </button>
         </header>
-        <p>Import closed filled outlines as editable curves. Convert strokes and text to outlines before importing.</p>
-        <label htmlFor={`${id}-file`}>SVG file</label>
+        <p>{translate('Import closed filled outlines as editable curves. Convert strokes and text to outlines before importing.')}</p>
+        <label htmlFor={`${id}-file`}>{translate('SVG file')}</label>
         <input
           id={`${id}-file`}
           name="svg"
@@ -133,7 +134,7 @@ export function SvgImportDialog({
             if (!file) return;
             setReading(true);
             try {
-              if (file.size > SVG_LIMITS.bytes) throw new Error('SVG exceeds the 1 MB input limit.');
+              if (file.size > SVG_LIMITS.bytes) throw new Error(translate('SVG exceeds the 1 MB input limit.'));
               const source = await file.text();
               // An older read must not replace a newer selection or reopen an unmounted dialog.
               if (version !== readVersion.current) return;
@@ -149,8 +150,8 @@ export function SvgImportDialog({
           }}
         />
         <fieldset>
-          <legend>Size and placement (mm)</legend>
-          <label htmlFor={`${id}-width`}>Width</label>
+          <legend>{translate('Size and placement (mm)')}</legend>
+          <label htmlFor={`${id}-width`}>{translate('Width')}</label>
           <input
             id={`${id}-width`}
             name="width"
@@ -165,7 +166,7 @@ export function SvgImportDialog({
               setError(null);
             }}
           />
-          <label htmlFor={`${id}-height`}>Height</label>
+          <label htmlFor={`${id}-height`}>{translate('Height')}</label>
           <input
             id={`${id}-height`}
             name="height"
@@ -182,9 +183,9 @@ export function SvgImportDialog({
           />
           <div className="cad-svg-aspect">
             <input id={`${id}-aspect`} name="aspect" type="checkbox" checked={preserve} onChange={e => setPreserve(e.target.checked)} />
-            <label htmlFor={`${id}-aspect`}>Keep proportions (fit within width and height)</label>
+            <label htmlFor={`${id}-aspect`}>{translate('Keep proportions (fit within width and height)')}</label>
           </div>
-          <label htmlFor={`${id}-x`}>Lower-left X</label>
+          <label htmlFor={`${id}-x`}>{translate('Lower-left X')}</label>
           <input
             id={`${id}-x`}
             name="x"
@@ -196,7 +197,7 @@ export function SvgImportDialog({
             value={x}
             onChange={e => setX(e.target.value)}
           />
-          <label htmlFor={`${id}-y`}>Lower-left Y</label>
+          <label htmlFor={`${id}-y`}>{translate('Lower-left Y')}</label>
           <input
             id={`${id}-y`}
             name="y"
@@ -211,11 +212,14 @@ export function SvgImportDialog({
         </fieldset>
         {preview && (
           <figure>
-            <svg viewBox={preview.viewBox} aria-label="Imported geometry preview">
+            <svg viewBox={preview.viewBox} aria-label={translate('Imported geometry preview')}>
               <path d={preview.d} fillRule="evenodd" />
             </svg>
             <figcaption>
-              {preview.bounds.size.map(n => n.toFixed(3)).join(' × ')} mm · {selected?.asset.contours.length} closed contours
+              {preview.bounds.size.map(n => n.toFixed(3)).join(' × ')}
+              {translate(' mm · ')}
+              {selected?.asset.contours.length}
+              {translate(' closed contours ')}
             </figcaption>
           </figure>
         )}
@@ -224,12 +228,13 @@ export function SvgImportDialog({
         ))}
         <p id={`${id}-status`} role="status">
           {reading
-            ? 'Reading SVG…'
-            : (error ?? 'Size uses the drawn geometry. Imported dimensions preserve control points; CAD relationships are not inferred.')}
+            ? translate('Reading SVG…')
+            : (error ??
+              translate('Size uses the drawn geometry. Imported dimensions preserve control points; CAD relationships are not inferred.'))}
         </p>
         <footer>
           <button type="submit" disabled={reading || busy}>
-            {busy ? 'Checking…' : 'Review import'}
+            {busy ? translate('Checking…') : translate('Review import')}
           </button>
         </footer>
       </form>

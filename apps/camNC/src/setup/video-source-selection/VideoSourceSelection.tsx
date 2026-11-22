@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Hint } from '@/components/Hint';
 import { suggestCameraName } from '@/lib/camera/source-label';
 import { isDesktopApp, kDesktopDownloadUrl } from '@/lib/desktop/is-desktop';
@@ -80,51 +81,55 @@ export function VideoSourceSelection({ value = '', onChange }: { value?: string;
 
   return (
     <>
-      <Hint title="Camera Setup">
+      <Hint title={translate('Camera Setup')}>
         <p className="mb-1">
-          Position a camera above the machine so the full working area is visible. Repurposing an old phone works well and you can 3D print
+          {translate(
+            'Position a camera above the machine so the full working area is visible. Repurposing an old phone works well and you can 3D print '
+          )}
           <a
             href="https://makerworld.com/en/models/1455114-ceiling-top-down-phone-mount-with-ball-joint#profileId-1516416"
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-500 hover:underline mx-1">
-            this mount
+            {translate('this mount ')}
           </a>
-          for an easy setup.
+          {translate('for an easy setup. ')}
         </p>
         <p className="mb-1">
-          A Reolink E1 Zoom is also suitable
+          {translate('A Reolink E1 Zoom is also suitable ')}
           <a
             href="https://makerworld.com/en/models/1461605-reolink-e1-zoom-ceiling-down-mount-looking-down#profileId-1524062"
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-500 hover:underline mx-1">
-            (mount)
+            {translate('(mount) ')}
           </a>
           {isDesktopApp() ? (
-            <>, and the desktop app connects to it directly under Network camera.</>
+            <>{translate(', and the desktop app connects to it directly under Network camera.')}</>
           ) : (
             <>
-              , but it requires running
+              {translate(', but it requires running ')}
               <a
                 href="https://github.com/AlexxIT/go2rtc"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:underline mx-1">
-                go2rtc
+                {translate('go2rtc ')}
               </a>
-              as a gateway, e.g. on a Raspberry&nbsp;Pi&nbsp;Zero. The
+              {translate('as a gateway, e.g. on a Raspberry Pi Zero. The ')}
               <a href={kDesktopDownloadUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline mx-1">
-                camNC desktop app
+                {translate('camNC desktop app ')}
               </a>
-              connects to it directly, without go2rtc.
+              {translate('connects to it directly, without go2rtc. ')}
             </>
           )}
         </p>
         {!isDesktopApp() && (
           <p className="mb-1">
-            <strong>Note:</strong> Prefer the local go2rtc version when possible, since it has lower connection latency and does not depend
-            on torrent tracker uptime.
+            <strong>{translate('Note:')}</strong>
+            {translate(
+              ' Prefer the local go2rtc version when possible, since it has lower connection latency and does not depend on torrent tracker uptime. '
+            )}
           </p>
         )}
       </Hint>
@@ -133,27 +138,27 @@ export function VideoSourceSelection({ value = '', onChange }: { value?: string;
         <TabsList className="w-full">
           {isDesktopApp() && (
             <TabsTrigger value="rtsp" className="flex-auto whitespace-normal">
-              Network camera
+              {translate('Network camera ')}
             </TabsTrigger>
           )}
           <TabsTrigger value="webcam" className="flex-auto whitespace-normal">
-            Webcam
+            {translate('Webcam ')}
           </TabsTrigger>
           <TabsTrigger value="webrtc" className="flex-auto whitespace-normal">
-            Phone
+            {translate('Phone ')}
           </TabsTrigger>
           {showGo2rtc && (
             <TabsTrigger value="go2rtc" className="flex-auto whitespace-normal">
-              go2rtc (local)
+              {translate('go2rtc (local) ')}
             </TabsTrigger>
           )}
           {showWebtorrent && (
             <TabsTrigger value="webtorrent" className="flex-auto whitespace-normal">
-              go2rtc (webtorrent)
+              {translate('go2rtc (webtorrent) ')}
             </TabsTrigger>
           )}
           <TabsTrigger value="url" className="flex-auto whitespace-normal">
-            URL
+            {translate('URL ')}
           </TabsTrigger>
         </TabsList>
         {isDesktopApp() && (

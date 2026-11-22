@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { Locate, LocateOff } from 'lucide-react';
 import { useMemo } from 'react';
@@ -27,14 +28,14 @@ export function JobFollowControl({ toolpath }: { toolpath: ParsedToolpath }) {
         )}
         onClick={() => setFollowCamera(!follow)}>
         {follow ? <Locate className="size-3.5" /> : <LocateOff className="size-3.5" />}
-        {follow ? 'Following part' : 'Resume follow'}
+        {follow ? translate('Following part') : translate('Resume follow')}
       </button>
       {follow && customView && (
         <button
           type="button"
           className="rounded px-1.5 py-0.5 text-muted-foreground hover:bg-white/10"
           onClick={() => setFollowCustomView(false)}>
-          Reset view
+          {translate('Reset view ')}
         </button>
       )}
     </div>

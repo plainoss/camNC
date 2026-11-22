@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   cadFieldVariableExpression,
   cadVariableScope,
@@ -12,16 +13,17 @@ import { CadValueInput } from './CadValueInput';
 import { useDesignUnits } from './designUnits';
 import { FeatureDialog } from './FeatureDialog';
 import { formatCadValue } from './valueExpressions';
+import { localizeCadValueError } from './localizeCadValueError';
 import { useDialogPreview } from './useDialogPreview';
 
 type VariableType = 'length' | 'angle' | 'number' | 'any';
 const kTypes: { id: VariableType; label: string }[] = [
-  { id: 'length', label: 'Length' },
-  { id: 'angle', label: 'Angle' },
-  { id: 'number', label: 'Number' },
-  { id: 'any', label: 'Any' },
+  { id: 'length', label: translate('Length') },
+  { id: 'angle', label: translate('Angle') },
+  { id: 'number', label: translate('variableType.number') },
+  { id: 'any', label: translate('Any') },
 ];
-const kUnsupported = 'Not available yet';
+const kUnsupported = translate('Not available yet');
 const isBare = (text: string) => /^[-+]?(\d+\.?\d*|\.\d+)$/.test(text.trim());
 
 /**
@@ -77,25 +79,29 @@ export function VariableDialog({
     ? `${value.kind === 'length' ? formatLength(value.value) : formatCadValue(value.value)}${value.kind === 'length' ? ` ${lengthUnit}` : value.kind === 'angle' ? ' deg' : ''}`
     : `${expression.trim() || '0'}${unit}`;
   const save = () => {
-    if ('error' in result) return setError(result.error);
+    if ('error' in result) return setError(localizeCadValueError(result.error));
     onSave(result.document);
   };
   return (
     <FeatureDialog title={`#${name.trim() || '?'} = ${shown}`} okDisabled={!name.trim()} onOk={save} onCancel={onCancel}>
-      <div className="cad-feature-tabs" role="tablist" aria-label="Variable source">
-        {['Assigned', 'Measured', 'From import'].map(choice => (
+      <div className="cad-feature-tabs" role="tablist" aria-label={translate('Variable source')}>
+        {[
+          { id: 'Assigned', label: translate('Assigned') },
+          { id: 'Measured', label: translate('Measured') },
+          { id: 'From import', label: translate('From import') },
+        ].map(choice => (
           <button
-            key={choice}
+            key={choice.id}
             type="button"
             role="tab"
-            aria-selected={choice === 'Assigned'}
-            disabled={choice !== 'Assigned'}
-            title={choice === 'Assigned' ? undefined : kUnsupported}>
-            {choice}
+            aria-selected={choice.id === 'Assigned'}
+            disabled={choice.id !== 'Assigned'}
+            title={choice.id === 'Assigned' ? undefined : kUnsupported}>
+            {choice.label}
           </button>
         ))}
       </div>
-      <div className="cad-feature-tabs" role="tablist" aria-label="Variable type">
+      <div className="cad-feature-tabs" role="tablist" aria-label={translate('Variable type')}>
         {kTypes.map(choice => (
           <button key={choice.id} type="button" role="tab" aria-selected={type === choice.id} onClick={() => setType(choice.id)}>
             {choice.label}
@@ -103,20 +109,20 @@ export function VariableDialog({
         ))}
       </div>
       <label className="cad-number-field" htmlFor={`${id}-name`}>
-        Name
+        {translate('Name ')}
         <span>
           <input id={`${id}-name`} value={name} spellCheck={false} onChange={event => setName(event.target.value)} />
         </span>
       </label>
       <label className="cad-number-field" htmlFor={`${id}-value`}>
-        Value
+        {translate('Value ')}
         <span>
           <CadValueInput
             bare
             id={`${id}-value`}
             value={expression}
             spellCheck={false}
-            placeholder="18 mm"
+            placeholder={translate('18 mm')}
             aria-invalid={error ? true : undefined}
             onChange={event => setExpression(event.target.value)}
           />
@@ -124,7 +130,7 @@ export function VariableDialog({
         {isBare(expression) && unit.trim()}
       </label>
       <label className="cad-number-field" htmlFor={`${id}-description`}>
-        Description
+        {translate('Description')}
         <span>
           <input id={`${id}-description`} value={description} onChange={event => setDescription(event.target.value)} />
         </span>

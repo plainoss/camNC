@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { DefaultLoadingOverlay } from '@/components/DefaultLoadingOverlay';
 import { setServerSettings } from '@/store/store-storage';
 import { useStore } from '@/store/store';
@@ -32,7 +33,7 @@ export function SettingsSyncGate({ children, onReady }: { children: ReactNode; o
     syncSettings({ uploadLocal: !isFirstSync.current })
       .catch(err => {
         console.error(err);
-        toast.error('Could not load your saved settings, using the settings on this device.');
+        toast.error(translate('Could not load your saved settings, using the settings on this device.'));
       })
       .finally(() => {
         if (cancelled) return;

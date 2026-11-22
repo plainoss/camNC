@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useState } from 'react';
 import type { CadDocument, CadLengthUnit } from '@wbcnc/cad';
 import { Button } from '@wbcnc/ui/components/button';
@@ -19,7 +20,7 @@ export function DesignName({ name, onRename }: { name: string; onRename: (name: 
   };
   return editing ? (
     <input
-      aria-label="Design name"
+      aria-label={translate('Design name')}
       className="w-full min-w-0 rounded border bg-background px-1 text-sm text-foreground"
       autoFocus
       value={text}
@@ -43,8 +44,8 @@ export function DesignName({ name, onRename }: { name: string; onRename: (name: 
     <button
       type="button"
       className="truncate text-left hover:text-foreground"
-      aria-label={`Rename design: ${name}`}
-      title="Rename design"
+      aria-label={translate('Rename design: {{name}}', { name: name })}
+      title={translate('Rename design')}
       onClick={() => {
         setText(name);
         setEditing(true);
@@ -68,14 +69,14 @@ export function DesignSettings({ value, onSave }: { value: DesignSettingsValue; 
           setUnit(value.lengthUnit ?? 'mm');
           setOpen(true);
         }}>
-        Design settings
+        {translate('Design settings ')}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Design settings</DialogTitle>
+            <DialogTitle>{translate('Design settings')}</DialogTitle>
             <DialogDescription>
-              Choose the name and length unit for this design. Changing units keeps every part the same size.
+              {translate('Choose the name and length unit for this design. Changing units keeps every part the same size. ')}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -85,7 +86,7 @@ export function DesignSettings({ value, onSave }: { value: DesignSettingsValue; 
               if (name.trim() && onSave({ name: name.trim(), lengthUnit: unit })) setOpen(false);
             }}>
             <label className="grid gap-1">
-              Design name
+              {translate('Design name ')}
               <input
                 className="rounded border bg-background px-2 py-1"
                 required
@@ -94,19 +95,19 @@ export function DesignSettings({ value, onSave }: { value: DesignSettingsValue; 
               />
             </label>
             <label className="grid gap-1">
-              Length unit
+              {translate('Length unit ')}
               <select
                 className="rounded border bg-background px-2 py-1"
                 value={unit}
                 onChange={event => setUnit(event.target.value as CadLengthUnit)}>
-                <option value="mm">Millimeters (mm)</option>
-                <option value="cm">Centimeters (cm)</option>
-                <option value="m">Meters (m)</option>
-                <option value="in">Inches (in)</option>
-                <option value="ft">Feet (ft)</option>
+                <option value="mm">{translate('Millimeters (mm)')}</option>
+                <option value="cm">{translate('Centimeters (cm)')}</option>
+                <option value="m">{translate('Meters (m)')}</option>
+                <option value="in">{translate('Inches (in)')}</option>
+                <option value="ft">{translate('Feet (ft)')}</option>
               </select>
             </label>
-            <Button type="submit">Save settings</Button>
+            <Button type="submit">{translate('Save settings')}</Button>
           </form>
         </DialogContent>
       </Dialog>

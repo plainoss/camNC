@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { useStore } from '@/store/store';
 import { toast } from '@wbcnc/ui/components/sonner';
@@ -119,7 +120,10 @@ function Editor() {
   const cutHere = !!current && queue.some(e => e.board.board.id === current.board.board.id && done.includes(e.doneId));
   const locked =
     board && (isCut(board) || cutHere)
-      ? `Board ${board.name} is ${cutLabel(board).toLowerCase()}: its parts and holds stay as they are`
+      ? translate('Board {{value1}} is {{value2}}: its parts and holds stay as they are', {
+          value1: board.name,
+          value2: cutLabel(board).toLowerCase(),
+        })
       : null;
   const nest = current?.board.nest;
   const parts: BedPart[] =
@@ -216,7 +220,7 @@ function Editor() {
       else
         useBedEdit
           .getState()
-          .setNote({ at: { x: p.x, y: p.y }, text: 'No room there: too close to a part, a hold or the edge', tone: 'warn' });
+          .setNote({ at: { x: p.x, y: p.y }, text: translate('No room there: too close to a part, a hold or the edge'), tone: 'warn' });
     } else if (!sel) {
       const s = useStore.getState();
       const at = { x: s.toolpathOffset.x + d.x, y: s.toolpathOffset.y + d.y };
@@ -286,14 +290,19 @@ function Editor() {
   const name = clamp ? 'clamp' : 'screw';
   const blocked = busy || !!locked;
   const note = busy
-    ? (lockReason ?? 'This setup is protected.')
+    ? (lockReason ?? translate('This setup is protected.'))
     : locked
-      ? `${locked}. Start over in Boards to change them.`
+      ? translate('{{value1}}. Start over in Boards to change them.', { value1: locked })
       : mode === 'add'
-        ? `Tap the board where another ${name} goes`
+        ? translate('Tap the board where another {{value1}} goes', { value1: name })
         : selected
-          ? `Drag the handle to move it${selected.kind === 'hold' ? ', Delete removes it' : ''}${jogKeys ? '' : ', arrow keys nudge it'}. Esc deselects.`
-          : `Drag to move the board (Shift: X or Y only), the knob turns it. Tap a ${holdsHere ? name : 'part'} to select it.`;
+          ? translate('Drag the handle to move it{{value1}}{{value2}}. Esc deselects.', {
+              value1: selected.kind === 'hold' ? translate(', Delete removes it') : '',
+              value2: jogKeys ? '' : translate(', arrow keys nudge it'),
+            })
+          : translate('Drag to move the board (Shift: X or Y only), the knob turns it. Tap a {{value1}} to select it.', {
+              value1: holdsHere ? name : translate('part'),
+            });
   const canUndo = !blocked && undo.current.length > 0;
   const undoRef = useRef(undoLast);
   undoRef.current = undoLast;

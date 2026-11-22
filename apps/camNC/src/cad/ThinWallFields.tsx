@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadPart, CadThinWall, CadValueScope } from '@wbcnc/cad';
 import { useState } from 'react';
 import { CadValueInput } from './CadValueInput';
@@ -24,7 +25,7 @@ export function ThinWallFields({
     const parsed = parseCadValue(text, { unit: 'mm', variables });
     if ('error' in parsed) return setError(parsed.error);
     const other = key === 'thickness1' ? wall.thickness2 : wall.thickness1;
-    if (parsed.value < 0 || parsed.value + other <= 0) return setError('A thin wall needs some thickness.');
+    if (parsed.value < 0 || parsed.value + other <= 0) return setError(translate('A thin wall needs some thickness.'));
     setError(null);
     onChange(part => {
       const next: CadThinWall = { ...part.thinWall!, [key]: parsed.value };
@@ -64,7 +65,7 @@ export function ThinWallFields({
             })
           }
         />
-        Mid plane
+        {translate('Mid plane ')}
       </label>
       {field('thickness1', 'Thickness 1')}
       {/* Centred, the one thickness reaches both ways. */}

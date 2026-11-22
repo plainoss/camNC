@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { CAD_MAX_PART_PATTERN, type CadPartPattern, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CadConnectorPick } from './PartFeatureDialogs';
@@ -71,13 +72,16 @@ export function CircularPartPatternField({
     const parsedCount = parseCadValue(count, { unit: 'scalar', variables });
     if ('error' in parsedCount) return parsedCount.error;
     if (!Number.isInteger(parsedCount.value) || parsedCount.value < 1 || parsedCount.value > CAD_MAX_PART_PATTERN)
-      return `Instance count must be a whole number from 1 to ${CAD_MAX_PART_PATTERN}, including the original part.`;
+      return translate('Instance count must be a whole number from 1 to {{value1}}, including the original part.', {
+        value1: CAD_MAX_PART_PATTERN,
+      });
     const parsedAngle = parseCadValue(angle, { unit: 'deg', variables });
     if ('error' in parsedAngle) return parsedAngle.error;
-    if (parsedAngle.value <= 0 || parsedAngle.value > 360) return 'Angle must be greater than 0° and no more than 360°.';
+    if (parsedAngle.value <= 0 || parsedAngle.value > 360) return translate('Angle must be greater than 0° and no more than 360°.');
     const parsedOrigin = originText.map(text => parseCadValue(text, { unit: 'mm' }));
-    for (const coordinate of parsedOrigin) if ('error' in coordinate) return `Axis origin: ${coordinate.error}`;
-    if (!axis.every(Number.isFinite) || Math.hypot(...axis) < 1e-9) return 'Pick a straight edge or a face for the axis.';
+    for (const coordinate of parsedOrigin)
+      if ('error' in coordinate) return translate('Axis origin: {{value1}}', { value1: coordinate.error });
+    if (!axis.every(Number.isFinite) || Math.hypot(...axis) < 1e-9) return translate('Pick a straight edge or a face for the axis.');
     return {
       axis: pattern.axis,
       spacing: pattern.spacing,
@@ -95,7 +99,9 @@ export function CircularPartPatternField({
   };
   const parsed = parse();
   const problem =
-    typeof parsed === 'string' ? parsed : (pickProblem ?? (axisPending ? 'Pick an edge or a face for the axis of pattern.' : null));
+    typeof parsed === 'string'
+      ? parsed
+      : (pickProblem ?? (axisPending ? translate('Pick an edge or a face for the axis of pattern.') : null));
   useEffect(() => onValidityChange?.(problem), [problem, onValidityChange]);
   useEffect(() => () => onValidityChange?.(null), [onValidityChange]);
 
@@ -162,7 +168,7 @@ export function CircularPartPatternField({
           type="button"
           className="cad-feature-selection"
           data-active={picking ? '' : undefined}
-          aria-label="Axis of pattern"
+          aria-label={translate('Axis of pattern')}
           onClick={() => {
             const generation = ++pickGeneration.current;
             setPicking(true);
@@ -175,7 +181,7 @@ export function CircularPartPatternField({
               const along = pick.edge ? (pick.edge.b.map((value, i) => value - pick.edge!.a[i]!) as Vec3) : pick.normal;
               const length = Math.hypot(...along);
               if (!point.every(Number.isFinite) || !Number.isFinite(length) || length < 1e-9)
-                return setPickProblem('Pick a straight edge or a face for the axis.');
+                return setPickProblem(translate('Pick a straight edge or a face for the axis.'));
               const axis = along.map(value => value / length) as Vec3;
               const originText = point.map(lengthText) as [string, string, string];
               // Keep the complete picked line while another draft field is invalid, ready to apply when corrected.
@@ -185,18 +191,21 @@ export function CircularPartPatternField({
               latestApply.current({ origin: point, axis }, originText, true);
             });
           }}>
-          <small>Axis of pattern</small>
+          <small>{translate('Axis of pattern')}</small>
           <span>
             {picking
-              ? 'Pick an edge or a face'
+              ? translate('Pick an edge or a face')
               : axisPending
                 ? ''
-                : `${selectedAxis?.toUpperCase() ?? `(${coordinates(draftAxis)})`} through (${origin.join(', ')})`}
+                : translate('{{value1}} through ({{value2}})', {
+                    value1: selectedAxis?.toUpperCase() ?? `(${coordinates(draftAxis)})`,
+                    value2: origin.join(', '),
+                  })}
           </span>
         </button>
       )}
       <label htmlFor={`${id}-axis`} className="cad-number-field">
-        Axis direction
+        {translate('Axis direction ')}
         <span>
           <select
             id={`${id}-axis`}
@@ -211,10 +220,10 @@ export function CircularPartPatternField({
             }}>
             {axisPending && (
               <option value="" disabled>
-                Pick an axis
+                {translate('Pick an axis ')}
               </option>
             )}
-            {!axisPending && !selectedAxis && <option value="picked">Picked axis</option>}
+            {!axisPending && !selectedAxis && <option value="picked">{translate('Picked axis')}</option>}
             <option value="x">X</option>
             <option value="y">Y</option>
             <option value="z">Z</option>
@@ -222,11 +231,11 @@ export function CircularPartPatternField({
         </span>
       </label>
       <label htmlFor={`${id}-angle`} className="cad-number-field">
-        Angle
+        {translate('Angle ')}
         <span>
           <CadValueInput
             id={`${id}-angle`}
-            aria-label="Angle"
+            aria-label={translate('Angle')}
             unit="deg"
             value={angle}
             spellCheck={false}
@@ -238,7 +247,7 @@ export function CircularPartPatternField({
         </span>
       </label>
       <label htmlFor={`${id}-count`} className="cad-number-field">
-        Instance count
+        {translate('Instance count ')}
         <span>
           <CadValueInput
             bare
@@ -259,35 +268,35 @@ export function CircularPartPatternField({
           checked={circular.equalSpacing !== false}
           onChange={event => apply({ equalSpacing: event.currentTarget.checked })}
         />
-        Equal spacing
+        {translate('Equal spacing ')}
       </label>
       <label className="cad-circular-pattern-option">
         <input type="checkbox" checked={!!circular.opposite} onChange={event => apply({ opposite: event.currentTarget.checked })} />
-        Opposite direction
+        {translate('Opposite direction ')}
       </label>
-      <label className="cad-circular-pattern-option" title="Not available yet">
+      <label className="cad-circular-pattern-option" title={translate('Not available yet')}>
         <input type="checkbox" disabled />
-        Centered
+        {translate('Centered ')}
       </label>
-      <label className="cad-circular-pattern-option" title="Not available yet">
+      <label className="cad-circular-pattern-option" title={translate('Not available yet')}>
         <input type="checkbox" disabled />
-        Skip instances
+        {translate('Skip instances ')}
       </label>
       <p className="cad-feature-hint">
         {circular.equalSpacing !== false
-          ? 'Spread instances within the angle. A full circle has no duplicate at 360°.'
-          : 'Use the angle between each instance.'}{' '}
-        The count includes the original part.
+          ? translate('Spread instances within the angle. A full circle has no duplicate at 360°.')
+          : translate('Use the angle between each instance.')}{' '}
+        {translate('The count includes the original part. ')}
       </p>
       <details>
-        <summary>Axis origin</summary>
+        <summary>{translate('Axis origin')}</summary>
         {(['X', 'Y', 'Z'] as const).map((axis, index) => (
           <label key={axis} htmlFor={`${id}-origin-${axis}`} className="cad-number-field">
             {axis}
             <span>
               <CadValueInput
                 id={`${id}-origin-${axis}`}
-                aria-label={`Axis origin ${axis}`}
+                aria-label={translate('Axis origin {{axis}}', { axis: axis })}
                 value={origin[index]}
                 spellCheck={false}
                 onChange={edit(

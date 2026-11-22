@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 /** The part field: a button to make active while the part can still change, or the part's name otherwise. */
 export function DialogPartField({
   label,
@@ -29,7 +30,7 @@ export function DialogPartField({
         onClick={onActivate}>
         <small>{label}</small>
         <span>{name}</span>
-        {pick.active && <span className="cad-feature-hint">Click a part in the view or the parts list</span>}
+        {pick.active && <span className="cad-feature-hint">{translate('Click a part in the view or the parts list')}</span>}
       </button>
       {pick.problem && <p role="alert">{pick.problem}</p>}
     </>

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { AssistantCredentials } from './keyStore';
 import { AssistantProviderError, providerUrl, type ProviderConfig } from './provider';
 import type { ConnectionPresetId } from './connectionPresets';
@@ -75,7 +76,7 @@ export async function listProviderModels(
           : { authorization: `Bearer ${key}` },
     });
     if (response.status === 400 || response.status === 401 || response.status === 403)
-      throw new AssistantProviderError('http', 'The provider rejected this key.', 401);
+      throw new AssistantProviderError('http', translate('The provider rejected this key.'), 401);
     if (!response.ok) return null;
     const body = (await response.json()) as { data?: { id?: unknown }[] };
     const ids = (body.data ?? [])
@@ -88,7 +89,7 @@ export async function listProviderModels(
     if (signal.aborted) throw new DOMException('Stopped', 'AbortError');
     if (cause instanceof AssistantProviderError) throw cause;
     // fetch rejects for network failures and for responses the browser blocks (CORS); a bad body is just no list.
-    if (cause instanceof TypeError) throw new AssistantProviderError('network', 'The browser could not reach this provider.');
+    if (cause instanceof TypeError) throw new AssistantProviderError('network', translate('The browser could not reach this provider.'));
     return null;
   }
 }

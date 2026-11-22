@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { numeric, type Point } from './cadEditorShared';
 import { addConstraint, type CadSolveOptions } from '@wbcnc/cad';
 import { type PointerEvent } from 'react';
@@ -173,7 +174,7 @@ export async function solveSketchDrag(editor: SketchEditorInput, moving: DragGes
   if (moving.working || (moving.failure && !moving.ended)) return;
   moving.working = true;
   const fail = (reason: string) => {
-    moving.failure = `Drag cancelled. ${reason}`;
+    moving.failure = translate('Drag cancelled. {{value1}}', { value1: reason });
     moving.preview = moving.document;
     documentRef.current = moving.document;
     setDocument(moving.document);
@@ -218,7 +219,7 @@ export async function solveSketchDrag(editor: SketchEditorInput, moving: DragGes
   } catch (error) {
     if (drag.current === moving) {
       const reason = error instanceof Error ? error.message : String(error);
-      fail(`${reason} Your sketch is unchanged; try dragging again.`);
+      fail(translate('{{value1}} Your sketch is unchanged; try dragging again.', { value1: reason }));
     }
   } finally {
     moving.working = false;
@@ -249,14 +250,18 @@ export async function solveSketchDrag(editor: SketchEditorInput, moving: DragGes
               const restarted = result.diagnostics.find(diagnostic => diagnostic.code === 'solver-restarted');
               setMessage(
                 restarted
-                  ? 'Point moved. The solver engine reset, so the automatic constraint was not applied. Try snapping the point again.'
-                  : 'Point moved. The automatic constraint could not be applied; adjust the geometry and try again.'
+                  ? translate(
+                      'Point moved. The solver engine reset, so the automatic constraint was not applied. Try snapping the point again.'
+                    )
+                  : translate('Point moved. The automatic constraint could not be applied; adjust the geometry and try again.')
               );
             }
           } catch (error) {
             if (drag.current === moving)
               setMessage(
-                `Point moved. The automatic constraint was not applied. ${error instanceof Error ? error.message : String(error)}`
+                translate('Point moved. The automatic constraint was not applied. {{value1}}', {
+                  value1: error instanceof Error ? error.message : String(error),
+                })
               );
           }
         }
@@ -269,7 +274,8 @@ export async function solveSketchDrag(editor: SketchEditorInput, moving: DragGes
           setDocument(moving.document);
           requestSketchCheck();
           setMessage(
-            moving.failure ?? 'The current constraints keep this geometry in place. Edit a dimension or remove a constraint to move it.'
+            moving.failure ??
+              translate('The current constraints keep this geometry in place. Edit a dimension or remove a constraint to move it.')
           );
         }
         setBusy(false);

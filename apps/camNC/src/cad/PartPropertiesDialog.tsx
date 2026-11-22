@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadPart } from '@wbcnc/cad';
 import { partCenterOfMass, partMass } from './materialLibrary';
 import { FeatureDialog } from './FeatureDialog';
@@ -9,7 +10,7 @@ import './materialPanel.css';
  */
 export function PartPropertiesDialog({ part, name, onClose }: { part: CadPart; name: string; onClose: () => void }) {
   const unkept = (label: string) => (
-    <label key={label} className="cad-number-field" title="Not available yet">
+    <label key={label} className="cad-number-field" title={translate('Not available yet')}>
       {label}
       <span>
         <input disabled value="" readOnly />
@@ -17,58 +18,69 @@ export function PartPropertiesDialog({ part, name, onClose }: { part: CadPart; n
     </label>
   );
   return (
-    <FeatureDialog title={name} className="cad-part-properties" okLabel="Close" onOk={onClose} onCancel={onClose}>
+    <FeatureDialog title={name} className="cad-part-properties" okLabel={translate('Close')} onOk={onClose} onCancel={onClose}>
       <label className="cad-number-field">
-        Name
+        {translate('Name ')}
         <span>
           <input readOnly value={name} />
         </span>
       </label>
-      {unkept('Description')}
+      {unkept(translate('Description'))}
       <label className="cad-number-field">
-        Category
+        {translate('Category ')}
         <span>
-          <input readOnly value="Part" />
+          <input readOnly value={translate('Part')} />
         </span>
       </label>
-      {['Part number', 'Revision', 'State', 'Vendor', 'Project', 'Product line'].map(unkept)}
+      {[
+        translate('Part number'),
+        translate('Revision'),
+        translate('State'),
+        translate('Vendor'),
+        translate('Project'),
+        translate('Product line'),
+      ].map(unkept)}
       <label className="cad-number-field">
-        Material
+        {translate('Material ')}
         <span>
-          <input readOnly value={part.material?.name ?? 'None'} />
+          <input readOnly value={part.material?.name ?? translate('None')} />
         </span>
       </label>
-      {['Title 1', 'Title 2', 'Title 3'].map(unkept)}
-      <label title="Not available yet">
+      {[translate('Title 1'), translate('Title 2'), translate('Title 3')].map(unkept)}
+      <label title={translate('Not available yet')}>
         <input type="checkbox" disabled />
-        Not revision managed
+        {translate('Not revision managed ')}
       </label>
-      <label title="Not available yet">
+      <label title={translate('Not available yet')}>
         <input type="checkbox" disabled />
-        Exclude from all BOMs
+        {translate('Exclude from all BOMs ')}
       </label>
       <label className="cad-number-field">
-        Unit of measure
+        {translate('Unit of measure ')}
         <span>
           <input readOnly value="Each" />
         </span>
       </label>
-      <label title="Not available yet">
+      <label title={translate('Not available yet')}>
         <input type="checkbox" disabled />
-        Override mass
+        {translate('Override mass ')}
       </label>
       <p className="cad-feature-hint">
         {(() => {
           const mass = partMass(part);
-          return mass === null ? 'Mass: assign a material to compute it' : `Mass: ${mass.toFixed(3)} kg, computed from its material`;
+          return mass === null
+            ? translate('Mass: assign a material to compute it')
+            : translate('Mass: {{value1}} kg, computed from its material', { value1: mass.toFixed(3) });
         })()}
       </p>
       {(() => {
         const center = partCenterOfMass(part);
         return (
           center && (
-            <p className="cad-feature-hint" aria-label="Center of mass">
-              Center of mass: ({center.map(value => +value.toFixed(2)).join(', ')}) mm, in the part’s sketch
+            <p className="cad-feature-hint" aria-label={translate('Center of mass')}>
+              {translate('Center of mass: (')}
+              {center.map(value => +value.toFixed(2)).join(', ')}
+              {translate(') mm, in the part’s sketch ')}
             </p>
           )
         );

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   cadFaceFrame,
   designSteps,
@@ -409,7 +410,7 @@ export function newStudioPartOn(editor: StudioNavigationInput, on: CadDrawnOn['o
   commit(made.document);
   if (made.inserted) setRolledTo(`${drawn.id}:sketch`);
   const onName = (datum && pickedPlane(documentRef.current, datum)?.name) || drawnOnName(documentRef.current, on);
-  setMessage(`Draw the new part's outline on ${onName}, then finish to see it in place.`);
+  setMessage(translate("Draw the new part's outline on {{value1}}, then finish to see it in place.", { value1: onName }));
   if (studioSession) return openStudioSketch(editor, drawn.id, before);
   setPartId(drawn.id);
   setSelected([]);

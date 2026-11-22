@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Button } from '@wbcnc/ui/components/button';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { ChevronRight, Eye, EyeOff } from 'lucide-react';
@@ -43,7 +44,9 @@ export function OpList({
         return (
           <li key={g.key} className={cn('rounded-md', isSelected && 'bg-muted')}>
             {firstProgram && (
-              <p className="mt-1 border-t px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground">After the cutting, at the machine</p>
+              <p className="mt-1 border-t px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground">
+                {translate('After the cutting, at the machine')}
+              </p>
             )}
             <div className="flex items-center">
               <button
@@ -61,8 +64,9 @@ export function OpList({
                     {g.count > 1 && !g.note && <span className="text-muted-foreground"> ×{g.count}</span>}
                   </span>
                   <span className="block text-xs text-muted-foreground">
-                    ⌀{g.op.tool.diameter} · {formatDuration(ops.reduce((t, o) => t + o.end - o.start, 0))} sim
-                    {mode !== 'toolpath' && status && ` · ${status}`}
+                    ⌀{g.op.tool.diameter} · {formatDuration(ops.reduce((t, o) => t + o.end - o.start, 0))}
+                    {translate(' sim ')}
+                    {mode !== 'toolpath' && status && translate(' · {{status}}', { status: status })}
                   </span>
                   {g.note && <span className="block text-xs text-muted-foreground">{g.note}</span>}
                 </span>
@@ -76,11 +80,14 @@ export function OpList({
                   side="left"
                   text={
                     isHidden
-                      ? 'Hidden in this view only: it is still cut. Click to show it.'
-                      : 'Hide it in this view only: it is still cut.'
+                      ? translate('Hidden in this view only: it is still cut. Click to show it.')
+                      : translate('Hide it in this view only: it is still cut.')
                   }>
                   <button
-                    aria-label={`${isHidden ? 'Show' : 'Hide'} ${g.label}`}
+                    aria-label={translate('{{value1}} {{value2}}', {
+                      value1: isHidden ? translate('Show') : translate('Hide'),
+                      value2: g.label,
+                    })}
                     aria-pressed={!isHidden}
                     className="mr-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                     onClick={() => toggleHidden(n)}>
@@ -95,10 +102,10 @@ export function OpList({
                 {mode !== 'toolpath' && (
                   <div className="flex gap-1">
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => jump(start)}>
-                      Jump to start
+                      {translate('Jump to start ')}
                     </Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => jump(end)}>
-                      Jump to end
+                      {translate('Jump to end ')}
                     </Button>
                   </div>
                 )}

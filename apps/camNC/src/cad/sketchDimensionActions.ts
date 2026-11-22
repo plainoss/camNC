@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { numeric } from './cadEditorShared';
 import {
   addBezier,
@@ -44,7 +45,7 @@ export async function placeSketchDimension(editor: SketchEditorInput, placed: Ca
     const result = await prepareDimensionCreation(part, placed);
     if (!mounted.current) return;
     if (JSON.stringify(documentRef.current) !== snapshot) {
-      setMessage('The sketch changed while the dimension was checked. Select geometry again.');
+      setMessage(translate('The sketch changed while the dimension was checked. Select geometry again.'));
       return;
     }
     if (!result.ok) {
@@ -56,11 +57,11 @@ export async function placeSketchDimension(editor: SketchEditorInput, placed: Ca
     // A reference dimension opens with the length it measures, and Enter takes it as it is.
     if (result.driven) {
       setDimension(placed.id);
-      setMessage('Reference dimension created. Existing constraints already determine this measurement.');
+      setMessage(translate('Reference dimension created. Existing constraints already determine this measurement.'));
     } else {
       newDimensionCommand.current = { id: placed.id, checkpoint: cadCommandCheckpoint(session) };
       setDimension(placed.id);
-      setMessage('Enter a dimension. Enter applies it; Escape cancels.');
+      setMessage(translate('Enter a dimension. Enter applies it; Escape cancels.'));
     }
   } catch (error) {
     if (mounted.current) setMessage(error instanceof Error ? error.message : String(error));
@@ -89,12 +90,12 @@ export function applySketchDimensionValue(editor: SketchEditorInput): string | n
   if (!currentDimension || !numeric(currentDimension)) return null;
   if (currentDimension.driven) {
     setDimension(null);
-    setMessage('Reference dimension kept. It follows the geometry.');
+    setMessage(translate('Reference dimension kept. It follows the geometry.'));
     svg.current?.focus();
     return null;
   }
   const input = dimensionInput.current;
-  if (!input?.value.trim()) return rejectValue('Enter a dimension value.', input);
+  if (!input?.value.trim()) return rejectValue(translate('Enter a dimension value.'), input);
   const parsed = parseCadValue(input.value, { unit: currentDimension.type === 'angle' ? 'deg' : 'mm', variables: variableScope });
   if ('error' in parsed) return rejectValue(parsed.error, input);
   const valueError = dimensionValueError(currentDimension, parsed.value);
@@ -112,7 +113,7 @@ export function applySketchDimensionValue(editor: SketchEditorInput): string | n
   else commit(next);
   newDimensionCommand.current = null;
   setDimension(null);
-  setMessage('Dimension applied. Select geometry or choose a tool.');
+  setMessage(translate('Dimension applied. Select geometry or choose a tool.'));
   svg.current?.focus();
   return null;
 }
@@ -131,7 +132,7 @@ export function applySketchDimensionEvent(editor: SketchEditorInput, event: Dime
     const placed = transition.effect.constraint;
     if (!constraintEntityIds(placed).every(id => sketch.entities.some(entity => entity.id === id))) {
       cancelDimensionEdit();
-      setMessage('The dimension geometry changed. Select geometry again to create a dimension.');
+      setMessage(translate('The dimension geometry changed. Select geometry again to create a dimension.'));
       return;
     }
     void placeDimension(placed);
@@ -163,12 +164,12 @@ export function editSketchDimension(editor: SketchEditorInput, id: string) {
   const constraint = sketch?.constraints.find(c => c.id === id);
   if (constraint && numeric(constraint) && constraint.driven) {
     setDimension(null);
-    setMessage('Reference dimensions follow the geometry. Change it to driving from its context menu to edit the value.');
+    setMessage(translate('Reference dimensions follow the geometry. Change it to driving from its context menu to edit the value.'));
     svg.current?.focus();
     return;
   }
   setDimension(id);
-  setMessage('Enter a dimension. Enter applies it; Escape cancels.');
+  setMessage(translate('Enter a dimension. Enter applies it; Escape cancels.'));
 }
 
 export function finishSketchSpline(editor: SketchEditorInput, keepTool: boolean) {
@@ -194,7 +195,11 @@ export function finishSketchSpline(editor: SketchEditorInput, keepTool: boolean)
     chooseTool('select');
     if (keepTool) setTool(tool);
     setSelected(curve ? [curve.id] : []);
-    setMessage(`${tool === 'spline' ? 'Spline' : 'Bezier'} created. Drag its visible points to edit the curve.`);
+    setMessage(
+      translate('{{value1}} created. Drag its visible points to edit the curve.', {
+        value1: tool === 'spline' ? translate('Spline') : translate('Bezier'),
+      })
+    );
   } catch (error) {
     setMessage(error instanceof Error ? error.message : String(error));
   }
@@ -210,8 +215,8 @@ export function cancelSketchDimensionEdit(editor: SketchEditorInput) {
   if (dimensionDraft) setSelectedConstraints(ids => ids.filter(id => id !== dimensionDraft.id));
   setMessage(
     placed
-      ? 'Dimension value unchanged. Select geometry or choose a tool.'
-      : 'Dimension creation cancelled. Select geometry or choose a tool.'
+      ? translate('Dimension value unchanged. Select geometry or choose a tool.')
+      : translate('Dimension creation cancelled. Select geometry or choose a tool.')
   );
   svg.current?.focus();
 }
@@ -223,7 +228,7 @@ export function selectSketchDimension(editor: SketchEditorInput, id: string, add
   setDimension(null);
   setSelectedConstraints(ids => (additive ? (ids.includes(id) ? ids.filter(existing => existing !== id) : [...ids, id]) : [id]));
   setSelected([]);
-  setMessage('Dimension selected. Double-click or press Enter to edit; Delete removes it.');
+  setMessage(translate('Dimension selected. Double-click or press Enter to edit; Delete removes it.'));
 }
 
 export function applySketchCreationValue(editor: SketchEditorInput, { advance = true } = {}): string | null {
@@ -246,7 +251,7 @@ export function applySketchCreationValue(editor: SketchEditorInput, { advance = 
   } = editor;
   if (!creationValues || !part || !sketch || creationValues.partId !== part.id) return null;
   const current = creationValueAt(creationValues, sketch);
-  if (!current) return rejectValue('This drawing value no longer applies. Select its geometry again.', creationInput.current);
+  if (!current) return rejectValue(translate('This drawing value no longer applies. Select its geometry again.'), creationInput.current);
   const parsed = parseCadValue(
     creationValues.editing ? cadFieldText(creationInput.current, creationValues.text) : lengthText(current.constraint.value),
     { unit: 'mm', variables: variableScope }
@@ -262,7 +267,7 @@ export function applySketchCreationValue(editor: SketchEditorInput, { advance = 
     changeSketch(addConstraint(sketch, position ? withDimensionPlacement(sketch, constraint, position) : constraint));
   }
   setCreationValues(advance ? advanceCreationValue(creationValues) : null);
-  setMessage('Drawing dimension applied. Type the next value or keep drawing.');
+  setMessage(translate('Drawing dimension applied. Type the next value or keep drawing.'));
   svg.current?.focus();
   return null;
 }

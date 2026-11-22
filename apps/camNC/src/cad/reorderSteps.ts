@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cadFolderForPart, cadFolderIssue, designSteps, isCadBody, isSpatialRemoval, type CadDocument, type CadPart } from '@wbcnc/cad';
 import type { DesignStep } from '@wbcnc/cad';
 
@@ -29,7 +30,11 @@ function lostRemoval(document: CadDocument, parts: CadPart[]): string | null {
     if (!remover.remove || remover.remove.targets || (on && 'partId' in on)) continue;
     for (const body of document.parts)
       if (isCadBody(document, body) && before.get(body.id)! < before.get(remover.id)! && after.get(body.id)! > after.get(remover.id)!)
-        return `${label(remover)} cuts ${body.name}, so ${body.name} comes before it.`;
+        return translate('{{value1}} cuts {{value2}}, so {{value3}} comes before it.', {
+          value1: label(remover),
+          value2: body.name,
+          value3: body.name,
+        });
   }
   return null;
 }
@@ -52,7 +57,8 @@ export function reorderedSteps(
 ): { document: CadDocument } | { error: string } {
   const name = (id: string) => document.parts.find(part => part.id === id)?.name ?? 'a part';
   // A Cut parts step's row follows the last of the parts it uses, so it's no part's place to drop on.
-  if (target.kind === 'partCut') return { error: 'A Cut parts step comes after the parts it uses, so steps can’t be dropped on it.' };
+  if (target.kind === 'partCut')
+    return { error: translate('A Cut parts step comes after the parts it uses, so steps can’t be dropped on it.') };
   // A part's sketch, extrude, transform and copies keep their places among its own steps.
   if (partLevel(dragged) && dragged.partId === target.partId) return { document };
   if (movesPart(dragged) && dragged.partId !== target.partId) {
@@ -60,7 +66,7 @@ export function reorderedSteps(
     const targetFolder = cadFolderForPart(document, target.partId);
     // Moving one member out, or inserting into the middle, would split a saved contiguous group.
     if (sourceFolder?.id !== targetFolder?.id && (sourceFolder || (targetFolder?.partIds[0] !== target.partId && targetFolder)))
-      return { error: 'Move the folder as a group, or unpack it before moving its parts.' };
+      return { error: translate('Move the folder as a group, or unpack it before moving its parts.') };
     // The parts its extrude made too move with it.
     const moving = document.parts.filter(part => part.id === dragged.partId || part.extrudedWith === dragged.partId);
     const rest = document.parts.filter(part => !moving.includes(part));
@@ -71,7 +77,9 @@ export function reorderedSteps(
     for (const part of parts)
       for (const base of builtOn(part))
         if ((index.get(base) ?? -1) > index.get(part.id)!)
-          return { error: `${part.name} is built on ${name(base)}, so it comes after it.` };
+          return {
+            error: translate('{{value1}} is built on {{value2}}, so it comes after it.', { value1: part.name, value2: name(base) }),
+          };
     const lost = lostRemoval(document, parts);
     if (lost) return { error: lost };
     const next = {
@@ -95,22 +103,41 @@ export function reorderedSteps(
   const made = own.filter(step => step.kind === 'sketch' || step.kind === 'extrude' || (step.kind as string) === 'move').at(-1);
   if (featureLevel(dragged)) {
     if (dragged.partId !== target.partId)
-      return { error: `${dragged.label} is on ${part.name}’s faces, so it stays with ${part.name}’s steps.` };
+      return {
+        error: translate('{{value1}} is on {{value2}}’s faces, so it stays with {{value3}}’s steps.', {
+          value1: dragged.label,
+          value2: part.name,
+          value3: part.name,
+        }),
+      };
     if (featureLevel(target)) return movedFeature(document, part, dragged.id, target.id);
     // Dropped on a later step of its part, a fillet, copy or pattern, it goes last of the part's sketches and cuts.
     if (target.kind === 'fillet' || target.kind === 'copy' || target.kind === 'pattern')
       return movedFeature(document, part, dragged.id, null);
-    return { error: `${dragged.label} is on ${part.name}’s faces, so it comes after ${made?.label ?? extrude}.` };
+    return {
+      error: translate('{{value1}} is on {{value2}}’s faces, so it comes after {{value3}}.', {
+        value1: dragged.label,
+        value2: part.name,
+        value3: made?.label ?? extrude,
+      }),
+    };
   }
   if (dragged.kind === 'fillet') {
     if (target.kind === 'fillet') return movedFillet(document, part, dragged.id, target.id);
     // Copies and patterns copy the rounded part, so a fillet dropped on one goes last of the part's fillets.
     if (target.kind === 'copy' || target.kind === 'pattern') return movedFillet(document, part, dragged.id, null);
     if (target.kind === 'sketch' || target.kind === 'extrude')
-      return { error: `${dragged.label} rounds the edges ${extrude} makes, so it comes after it.` };
-    return { error: `${dragged.label} rounds ${part.name}’s outline, so it moves only among its fillets.` };
+      return {
+        error: translate('{{value1}} rounds the edges {{value2}} makes, so it comes after it.', { value1: dragged.label, value2: extrude }),
+      };
+    return {
+      error: translate('{{value1}} rounds {{value2}}’s outline, so it moves only among its fillets.', {
+        value1: dragged.label,
+        value2: part.name,
+      }),
+    };
   }
-  return { error: 'That step can’t go there: a part’s steps move together.' };
+  return { error: translate('That step can’t go there: a part’s steps move together.') };
 }
 
 const withPart = (document: CadDocument, part: CadPart): CadDocument => ({
@@ -136,9 +163,10 @@ function movedFeature(
   const sketchAt = new Map(next.flatMap((feature, i) => (feature.type === 'sketch' ? [[feature.sketch.id, i] as const] : [])));
   const cutAt = new Map(next.flatMap((feature, i) => (feature.type === 'cut' ? [[feature.id, i] as const] : [])));
   for (const [i, feature] of next.entries()) {
-    if (feature.type === 'cut' && (sketchAt.get(feature.sketchId) ?? -1) > i) return { error: 'A cut comes after the sketch it cuts.' };
+    if (feature.type === 'cut' && (sketchAt.get(feature.sketchId) ?? -1) > i)
+      return { error: translate('A cut comes after the sketch it cuts.') };
     if (feature.type === 'sketch' && typeof feature.on === 'object' && (cutAt.get(feature.on.floorOf) ?? -1) > i)
-      return { error: 'A sketch on a pocket’s floor comes after the cut that makes the floor.' };
+      return { error: translate('A sketch on a pocket’s floor comes after the cut that makes the floor.') };
   }
   return { document: withPart(document, { ...part, features: next }) };
 }

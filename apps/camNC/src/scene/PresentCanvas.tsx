@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useViewPortToMachineScale, useViewportToVideoScale } from '@/calibration/scaleHooks';
 import { LoadingVideoOverlay } from '@/components/LoadingVideoOverlay';
 import { useCamResolution, useMachineCenter } from '@/store/store';
@@ -18,7 +19,7 @@ const FallbackContent = ({ error }: { error: Error }) => (
     <planeGeometry args={[2, 2]} />
     <meshBasicMaterial color="red" />
     <Text position={[0, 0, 0.1]} fontSize={0.1} color="white">
-      {error.message || 'Error loading video texture'}
+      {error.message || translate('Error loading video texture')}
     </Text>
   </mesh>
 );

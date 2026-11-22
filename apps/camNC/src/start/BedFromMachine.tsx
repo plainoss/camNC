@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { MachineBoundsForm, MachineBoundsValues } from '@/setup/MachineBoundsForm';
 import { Alert, AlertDescription, AlertTitle } from '@wbcnc/ui/components/alert';
@@ -57,8 +58,8 @@ export function BedFromMachine({
     return (
       <p className="text-sm text-muted-foreground" data-testid="bed-reading">
         {readable
-          ? 'Reading the axis travel from the controller…'
-          : `Waiting for the machine to be idle (${api.state.value ?? 'unknown'})…`}
+          ? translate('Reading the axis travel from the controller…')
+          : translate('Waiting for the machine to be idle ({{value1}})…', { value1: api.state.value ?? 'unknown' })}
       </p>
     );
   }
@@ -67,7 +68,17 @@ export function BedFromMachine({
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm" data-testid="bed-read">
-          Your bed: X {xmin} to {xmax} mm, Y {ymin} to {ymax} mm ({xmax - xmin} × {ymax - ymin} mm), read from the controller.
+          {translate('Your bed: X ')}
+          {xmin}
+          {translate(' to ')}
+          {xmax}
+          {translate(' mm, Y ')}
+          {ymin}
+          {translate(' to ')}
+          {ymax}
+          {translate(' mm (')}
+          {xmax - xmin} × {ymax - ymin}
+          {translate(' mm), read from the controller. ')}
         </p>
         <div className="flex flex-row gap-2">
           <Button
@@ -75,10 +86,10 @@ export function BedFromMachine({
               setMachineBounds(xmin, ymin, xmax, ymax);
               onConfirmed();
             }}>
-            Open workspace
+            {translate('Open workspace ')}
           </Button>
           <Button variant="outline" onClick={() => setEditing(true)}>
-            Adjust
+            {translate('Adjust ')}
           </Button>
         </div>
         <HomingHint />
@@ -89,11 +100,12 @@ export function BedFromMachine({
     <div className="flex flex-col gap-3">
       {read.kind === 'failed' && (
         <Alert>
-          <AlertTitle>Could not read the bed size</AlertTitle>
+          <AlertTitle>{translate('Could not read the bed size')}</AlertTitle>
           <AlertDescription>
-            {read.message}. Enter it below, or{' '}
+            {read.message}
+            {translate('. Enter it below, or')}{' '}
             <Button variant="link" className="h-auto p-0" onClick={() => setAttempt(a => a + 1)}>
-              try again
+              {translate('try again ')}
             </Button>
             .
           </AlertDescription>
@@ -113,7 +125,7 @@ export function BedFromMachine({
 function HomingHint() {
   return (
     <p className="text-xs text-muted-foreground">
-      Machine coordinates match the controller after homing. Home the machine before you double-click to jog.
+      {translate('Machine coordinates match the controller after homing. Home the machine before you double-click to jog. ')}
     </p>
   );
 }

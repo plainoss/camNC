@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { generatePassword, WebtorrentConnectionParams } from '@wbcnc/go2webrtc/url-helpers';
 import { Button } from '@wbcnc/ui/components/button';
@@ -43,7 +44,7 @@ function Rtc2GoConfigTextarea({ form }: { form: UseFormReturn<z.infer<typeof go2
 
   return (
     <div className="grid w-full items-center gap-1.5">
-      <div className="text-sm text-muted-foreground">Your go2rtc config should include the following:</div>
+      <div className="text-sm text-muted-foreground">{translate('Your go2rtc config should include the following:')}</div>
       <Textarea readOnly className="h-36" value={getGo2rtcConfig()} />
     </div>
   );
@@ -73,15 +74,15 @@ export function Go2RtcWebtorrentTab({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>go2rtc (webtorrent)</CardTitle>
+        <CardTitle>{translate('go2rtc (webtorrent)')}</CardTitle>
         <CardDescription>
-          Use any IP camera via{' '}
+          {translate('Use any IP camera via')}{' '}
           <a
             className="text-blue-500 hover:underline"
             href="https://github.com/AlexxIT/go2rtc?tab=readme-ov-file#module-webtorrent"
             target="_blank"
             rel="noreferrer">
-            go2rtc&apos;s webtorrent module
+            {translate("go2rtc's webtorrent module ")}
             <ExternalLink className="size-4 inline-block" />
           </a>
           .
@@ -96,9 +97,9 @@ export function Go2RtcWebtorrentTab({
               name="share"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Share Name</FormLabel>
+                  <FormLabel>{translate('Share Name')}</FormLabel>
                   <FormControl>
-                    <Input placeholder="globally unique string" {...field} />
+                    <Input placeholder={translate('globally unique string')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -109,9 +110,9 @@ export function Go2RtcWebtorrentTab({
               name="pwd"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>{translate('Password')}</FormLabel>
                   <FormControl>
-                    <Input placeholder="password" {...field} />
+                    <Input placeholder={translate('password')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -120,9 +121,9 @@ export function Go2RtcWebtorrentTab({
 
             <Rtc2GoConfigTextarea form={form} />
             <div className="flex gap-2">
-              <Button type="submit">Connect</Button>
+              <Button type="submit">{translate('Connect')}</Button>
               <Button onClick={onGenerateRandom} variant="secondary">
-                Generate Random
+                {translate('Generate Random ')}
               </Button>
             </div>
           </form>

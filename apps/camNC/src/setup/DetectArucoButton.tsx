@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { detectMarkersInStillFrame } from '@/store/store-p3p';
 import { Button } from '@wbcnc/ui/components/button';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
@@ -20,7 +21,8 @@ export function DetectArucosButton({ onMarkersDetected }: { onMarkersDetected: (
 
   return (
     <Button onClick={handleClick} disabled={isDetecting}>
-      {isDetecting ? <LoadingSpinner /> : <ScanQrCode />} Detect Arucos
+      {isDetecting ? <LoadingSpinner /> : <ScanQrCode />}
+      {translate(' Detect Arucos ')}
     </Button>
   );
 }

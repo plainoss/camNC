@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 import type { ReactNode } from 'react';
 import { boardLabel, boardSizeLabel, isCut, type BoardNest, type BoardV1 } from '../boards';
@@ -44,11 +45,23 @@ export function BoardLabel({
       <span className="font-medium">{boardLabel(board)}</span>
       {isCut(board) && <CutBadge board={board} />}
       <span className="!shrink min-w-0 truncate text-muted-foreground">
-        {fmt(board.thickness)} mm · <span className="font-mono text-[11px]">{boardSizeLabel(sized, nest)}</span>
+        {fmt(board.thickness)}
+        {translate(' mm · ')}
+        <span className="font-mono text-[11px]">{boardSizeLabel(sized, nest)}</span>
       </span>
-      {nest.unplaced.length > 0 && <span className="font-medium text-amber-600 dark:text-amber-400">{nest.unplaced.length} off it</span>}
-      {unheld > 0 && <span className="font-medium text-destructive">{unheld} can’t hold</span>}
-      {nutHits && <span className="font-medium text-destructive">collet nut hits</span>}
+      {nest.unplaced.length > 0 && (
+        <span className="font-medium text-amber-600 dark:text-amber-400">
+          {nest.unplaced.length}
+          {translate(' off it')}
+        </span>
+      )}
+      {unheld > 0 && (
+        <span className="font-medium text-destructive">
+          {unheld}
+          {translate(' can’t hold')}
+        </span>
+      )}
+      {nutHits && <span className="font-medium text-destructive">{translate('collet nut hits')}</span>}
       {fetching && <LoadingSpinner className="size-3" />}
       {children}
     </div>

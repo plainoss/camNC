@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Button } from '@heroui/react';
 import { Kbd } from '@wbcnc/ui/components/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@wbcnc/ui/components/tooltip';
@@ -37,7 +38,7 @@ function ViewButton({
       </TooltipTrigger>
       <TooltipContent>
         <div className="flex items-center gap-2">
-          {disabled ? `${name}: open a gcode file first` : name} <Kbd shortcut={shortcut} />
+          {disabled ? translate('{{name}}: open a gcode file first', { name: name }) : name} <Kbd shortcut={shortcut} />
         </div>
       </TooltipContent>
     </Tooltip>
@@ -55,7 +56,7 @@ export function ViewSwitcher({
   onSelect: (view: ViewMode) => void;
 }) {
   return (
-    <div className="flex items-center gap-0.5 rounded-lg bg-black/5 p-0.5 dark:bg-white/10" role="group" aria-label="View">
+    <div className="flex items-center gap-0.5 rounded-lg bg-black/5 p-0.5 dark:bg-white/10" role="group" aria-label={translate('View')}>
       {kViewModes.map(v => (
         <ViewButton key={v} view={v} active={view === v} disabled={v !== 'top' && !hasToolpath} onSelect={onSelect} />
       ))}

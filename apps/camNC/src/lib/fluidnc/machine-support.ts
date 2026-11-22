@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { isDesktopApp } from '@/lib/desktop/is-desktop';
 import { normalizeHost } from '@wbcnc/fluidnc';
@@ -38,9 +39,15 @@ export function machineSupport(
   // The demo machine is simulated in the page, so it works in every browser. The desktop app connects from Rust.
   if (isDemoMode() || isDesktopApp() || protocol === 'http:') return { supported: true };
   const version = chromiumVersion(nav);
-  if (version === null) return { supported: false, reason: 'Machine control needs Chrome or Edge (version 147 or later).' };
+  if (version === null) return { supported: false, reason: translate('Machine control needs Chrome or Edge (version 147 or later).') };
   if (version < kMinChromeVersion) {
-    return { supported: false, reason: `Machine control needs Chrome or Edge ${kMinChromeVersion} or later (you have ${version}).` };
+    return {
+      supported: false,
+      reason: translate('Machine control needs Chrome or Edge {{kMinChromeVersion}} or later (you have {{version}}).', {
+        kMinChromeVersion: kMinChromeVersion,
+        version: version,
+      }),
+    };
   }
   return { supported: true };
 }
@@ -78,7 +85,10 @@ export function hostBlockedReason(input: string, protocol = location.protocol): 
   const host = hostname(input);
   if (!host) return null;
   if (host === 'localhost' || host.endsWith('.local') || isPrivateIpv4(host) || isPrivateIpv6(host)) return null;
-  return `Chrome blocks "${host}" from the HTTPS app: only a local IP address (like 192.168.1.20) or a .local name is allowed. Enter the controller's IP address instead (shown on the FluidNC WebUI or in your router).`;
+  return translate(
+    'Chrome blocks "{{value1}}" from the HTTPS app: only a local IP address (like 192.168.1.20) or a .local name is allowed. Enter the controller\'s IP address instead (shown on the FluidNC WebUI or in your router).',
+    { value1: host }
+  );
 }
 
 /** LAN name suffixes the desktop app's HTTP scope allows (`apps/camnc-desktop/src-tauri/capabilities/default.json`). */

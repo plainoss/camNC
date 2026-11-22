@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { ComponentProps, Dispatch, ReactNode, RefObject, SetStateAction } from 'react';
 import type { CadPart, CadSketch } from '@wbcnc/cad';
 import { dimensionAnchor } from '@wbcnc/cad-editor/dimensionGeometry';
@@ -209,7 +210,11 @@ export function CadSketchOverlays({
         }}
         onMirrorPicking={picking => {
           setModification(previous => transitionModification(previous, { type: 'mirrorPicking', picking }));
-          setMessage(picking === 'axis' ? 'Select the mirror line.' : 'Select entities to mirror; Shift-click adds to selection.');
+          setMessage(
+            picking === 'axis'
+              ? translate('Select the mirror line.')
+              : translate('Select entities to mirror; Shift-click adds to selection.')
+          );
           svg.current?.focus();
         }}
       />
@@ -260,7 +265,7 @@ export function CadSketchOverlays({
       />
       {palette && !searchMode && (
         <div className="cad-command-palette cad-quick-tools">
-          <h3>Sketch tools</h3>
+          <h3>{translate('Sketch tools')}</h3>
           {tools.map(t => (
             <button type="button" key={t.id} onClick={() => chooseTool(t.id)}>
               {t.label}
@@ -351,8 +356,10 @@ export function CadSketchOverlays({
         </span>
         <span>
           {sketchBackdrop
-            ? 'Scroll to zoom · middle-drag to pan · right-drag to turn · N to look straight at it · U uses parts’ edges and vertices'
-            : 'Scroll to zoom · right-drag to pan'}
+            ? translate(
+                'Scroll to zoom · middle-drag to pan · right-drag to turn · N to look straight at it · U uses parts’ edges and vertices'
+              )
+            : translate('Scroll to zoom · right-drag to pan')}
         </span>
         {sketch && (
           <SelectionReadout

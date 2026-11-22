@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Popover, PopoverContent, PopoverTrigger } from '@wbcnc/ui/components/popover';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { Layers } from 'lucide-react';
@@ -7,12 +8,16 @@ import { useCamMachine } from './camMachine';
 import type { ShowInTopView } from './partGhost';
 
 const kChoices: { value: ShowInTopView; label: string; hint: string }[] = [
-  { value: 'program', label: 'This program', hint: 'Only the loaded program.' },
-  { value: 'parts', label: '+ Parts', hint: 'The whole parts under it, faint: something to line a slot or a few holes up against.' },
+  { value: 'program', label: translate('This program'), hint: translate('Only the loaded program.') },
+  {
+    value: 'parts',
+    label: translate('+ Parts'),
+    hint: translate('The whole parts under it, faint: something to line a slot or a few holes up against.'),
+  },
   {
     value: 'all',
-    label: '+ All programs',
-    hint: 'The parts and every program on this side of the board, faint. Also while a program runs.',
+    label: translate('+ All programs'),
+    hint: translate('The parts and every program on this side of the board, faint. Also while a program runs.'),
   },
 ];
 
@@ -32,15 +37,15 @@ export function CamTopViewShow() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <span className="relative inline-flex">
-          <TooltipIconButton label="Show in the top view" icon={<Layers />} onClick={() => setOpen(true)} />
+          <TooltipIconButton label={translate('Show in the top view')} icon={<Layers />} onClick={() => setOpen(true)} />
           {show !== 'program' && (
             <span aria-hidden className="pointer-events-none absolute top-2 right-1.5 size-1.5 rounded-full bg-primary" />
           )}
         </span>
       </PopoverTrigger>
       <PopoverContent align="start" className="dark w-72 p-1 text-foreground">
-        <div role="radiogroup" aria-label="Show in the top view" className="flex flex-col">
-          <div className="px-2 pt-1 pb-1.5 text-xs font-medium text-muted-foreground">Show in the top view</div>
+        <div role="radiogroup" aria-label={translate('Show in the top view')} className="flex flex-col">
+          <div className="px-2 pt-1 pb-1.5 text-xs font-medium text-muted-foreground">{translate('Show in the top view')}</div>
           {kChoices.map(c => (
             <button
               key={c.value}

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CadLengthUnit } from '@wbcnc/cad';
 import type { MeasureEntity, MeasureResult, MeasureRow } from './measureGeometry';
@@ -32,12 +33,12 @@ type AngleUnit = 'deg' | 'rad';
 type MeasureType = 'all' | 'distance' | 'length' | 'position' | 'angle' | 'area';
 const lengthScales: Record<LengthUnit, number> = { mm: 1, cm: 10, m: 1000, in: 25.4, ft: 304.8, yd: 914.4 };
 const measureTypes: { value: MeasureType; label: string }[] = [
-  { value: 'all', label: 'Show all' },
-  { value: 'distance', label: 'Distance' },
-  { value: 'length', label: 'Length' },
-  { value: 'position', label: 'Position' },
-  { value: 'angle', label: 'Angle' },
-  { value: 'area', label: 'Surface area' },
+  { value: 'all', label: translate('Show all') },
+  { value: 'distance', label: translate('Distance') },
+  { value: 'length', label: translate('Length') },
+  { value: 'position', label: translate('Position') },
+  { value: 'angle', label: translate('Angle') },
+  { value: 'area', label: translate('Surface area') },
 ];
 
 const rowType = (row: MeasureRow): MeasureType => (row.id.includes('distance') ? 'distance' : row.kind);
@@ -120,19 +121,24 @@ export function StudioMeasurePanel({
     try {
       await copyText(text);
       if (request !== copyRequest.current) return;
-      setCopyStatus(`${row.label} copied at ${full ? 'full' : 'displayed'} precision.`);
+      setCopyStatus(
+        translate('{{value1}} copied at {{value2}} precision.', {
+          value1: row.label,
+          value2: full ? translate('full') : translate('displayed'),
+        })
+      );
     } catch {
       if (request !== copyRequest.current) return;
       // A denied clipboard write must stay visible so the user can select the value or retry.
       lastCopy.current = null;
-      setCopyStatus('Copy failed. Clipboard access is unavailable.');
+      setCopyStatus(translate('Copy failed. Clipboard access is unavailable.'));
     }
     feedbackTimer.current = setTimeout(() => setCopyStatus(''), 4000);
   };
   const resultRows = (
     <dl
       className="cad-studio-measure-results"
-      aria-label="Measured values"
+      aria-label={translate('Measured values')}
       aria-live={expanded ? undefined : 'polite'}
       aria-atomic={expanded ? undefined : true}>
       {visibleRows.map(row => (
@@ -141,9 +147,13 @@ export function StudioMeasurePanel({
           <dd>
             <button
               type="button"
-              aria-label={`${row.label}: ${formatCadValue(valueOf(row))}${unitOf(row)}`}
+              aria-label={translate('{{value1}}: {{value2}}{{value3}}', {
+                value1: row.label,
+                value2: formatCadValue(valueOf(row)),
+                value3: unitOf(row),
+              })}
               aria-pressed={selectedRowId === row.id}
-              title="Show the measurement and copy its full precision value. Click again to copy displayed precision."
+              title={translate('Show the measurement and copy its full precision value. Click again to copy displayed precision.')}
               onClick={() => void copyValue(row)}>
               {formatCadValue(valueOf(row))}
               {unitOf(row)}
@@ -161,16 +171,17 @@ export function StudioMeasurePanel({
 
   if (!expanded)
     return (
-      <section className="cad-studio-measure cad-studio-measure-quick" aria-label="Selection measurements">
+      <section className="cad-studio-measure cad-studio-measure-quick" aria-label={translate('Selection measurements')}>
         <div className="cad-studio-measure-head">
-          <button type="button" title="Measure ([)" onClick={onExpand}>
-            Measure <kbd>[</kbd>
+          <button type="button" title={translate('Measure ([)')} onClick={onExpand}>
+            {translate('Measure ')}
+            <kbd>[</kbd>
           </button>
           <button
             type="button"
             className="cad-studio-measure-icon"
-            aria-label="Clear measurements"
-            title="Clear measurements"
+            aria-label={translate('Clear measurements')}
+            title={translate('Clear measurements')}
             onClick={onClear}>
             ×
           </button>
@@ -178,7 +189,10 @@ export function StudioMeasurePanel({
         {result.problem && <p className="cad-studio-measure-problem">{result.problem}</p>}
         {resultRows}
         {rows.length > visibleRows.length && (
-          <span className="cad-studio-measure-more">{rows.length - visibleRows.length} more in Measure</span>
+          <span className="cad-studio-measure-more">
+            {rows.length - visibleRows.length}
+            {translate(' more in Measure')}
+          </span>
         )}
         {feedback}
       </section>
@@ -195,30 +209,36 @@ export function StudioMeasurePanel({
         if (event.key === 'Escape') onClose();
       }}>
       <div className="cad-studio-measure-head">
-        <h3 id={`${id}-title`}>Measure</h3>
-        <button type="button" className="cad-studio-measure-icon" aria-label="Close Measure" title="Close Measure" onClick={onClose}>
+        <h3 id={`${id}-title`}>{translate('Measure')}</h3>
+        <button
+          type="button"
+          className="cad-studio-measure-icon"
+          aria-label={translate('Close Measure')}
+          title={translate('Close Measure')}
+          onClick={onClose}>
           ×
         </button>
       </div>
       <div className="cad-studio-measure-body">
         <div className="cad-studio-measure-selection-head">
           <span>
-            {selection.length} {selection.length === 1 ? 'entity' : 'entities'} selected
+            {selection.length} {selection.length === 1 ? translate('entity') : translate('entities')}
+            {translate(' selected ')}
           </span>
           <button type="button" disabled={!selection.length} onClick={onClear}>
-            Clear
+            {translate('Clear ')}
           </button>
         </div>
         {selection.length ? (
-          <ul aria-label="Measured entities" className="cad-studio-measure-selection">
+          <ul aria-label={translate('Measured entities')} className="cad-studio-measure-selection">
             {selection.map(selected => (
               <li key={selected.key}>
                 <span>{selected.label}</span>
                 <button
                   type="button"
                   className="cad-studio-measure-icon"
-                  aria-label={`Remove ${selected.label}`}
-                  title={`Remove ${selected.label}`}
+                  aria-label={translate('Remove {{value1}}', { value1: selected.label })}
+                  title={translate('Remove {{value1}}', { value1: selected.label })}
                   onClick={() => onRemove(selected.key)}>
                   ×
                 </button>
@@ -227,11 +247,11 @@ export function StudioMeasurePanel({
           </ul>
         ) : (
           <p className="cad-studio-measure-hint">
-            Select a vertex, straight edge or face. Each click adds to the selection; click empty space to clear it.
+            {translate('Select a vertex, straight edge or face. Each click adds to the selection; click empty space to clear it. ')}
           </p>
         )}
         <div className="cad-studio-measure-options">
-          <label htmlFor={`${id}-type`}>Measure type</label>
+          <label htmlFor={`${id}-type`}>{translate('Measure type')}</label>
           <select id={`${id}-type`} value={effectiveFilter} onChange={event => setFilter(event.currentTarget.value as MeasureType)}>
             {measureTypes
               .filter(type => type.value === 'all' || available.has(type.value))
@@ -241,7 +261,7 @@ export function StudioMeasurePanel({
                 </option>
               ))}
           </select>
-          <label htmlFor={`${id}-length`}>Length unit</label>
+          <label htmlFor={`${id}-length`}>{translate('Length unit')}</label>
           <select id={`${id}-length`} value={lengthUnit} onChange={event => setLengthUnit(event.currentTarget.value as LengthUnit)}>
             {(Object.keys(lengthScales) as LengthUnit[]).map(unit => (
               <option key={unit} value={unit}>
@@ -249,10 +269,10 @@ export function StudioMeasurePanel({
               </option>
             ))}
           </select>
-          <label htmlFor={`${id}-angle`}>Angle unit</label>
+          <label htmlFor={`${id}-angle`}>{translate('Angle unit')}</label>
           <select id={`${id}-angle`} value={angleUnit} onChange={event => setAngleUnit(event.currentTarget.value as AngleUnit)}>
-            <option value="deg">deg</option>
-            <option value="rad">rad</option>
+            <option value="deg">{translate('deg')}</option>
+            <option value="rad">{translate('rad')}</option>
           </select>
         </div>
         {result.problem && (
@@ -260,9 +280,11 @@ export function StudioMeasurePanel({
             {result.problem}
           </p>
         )}
-        {result.parallel !== undefined && <p className="cad-studio-measure-hint">{result.parallel ? 'Parallel' : 'Not parallel'}</p>}
+        {result.parallel !== undefined && (
+          <p className="cad-studio-measure-hint">{result.parallel ? translate('Parallel') : translate('Not parallel')}</p>
+        )}
         {resultRows}
-        <p className="cad-studio-measure-hint">Curved outlines use a faceted approximation.</p>
+        <p className="cad-studio-measure-hint">{translate('Curved outlines use a faceted approximation.')}</p>
         {feedback}
       </div>
     </dialog>

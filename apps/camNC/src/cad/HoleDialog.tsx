@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import { extrudeStepProblem, holeSketch, type CadDocument, type CadPart, type CadValueScope } from '@wbcnc/cad';
 import { useState } from 'react';
@@ -48,7 +49,9 @@ export function HoleDialog({
   const diameter = 'error' in spec ? null : spec.hole!.diameter;
   const depth = 'error' in spec || spec.remove!.depth === 'through' ? null : (spec.remove!.depth as number);
   const refusal = holeKindRefusal(settings);
-  const problem = part.hole ? extrudeStepProblem(document, part) : `Hole drills at the points of a sketch, not into ${part.name} itself.`;
+  const problem = part.hole
+    ? extrudeStepProblem(document, part)
+    : translate('Hole drills at the points of a sketch, not into {{value1}} itself.', { value1: part.name });
   const on = part.drawnOn?.on;
   const board = on && 'partId' in on ? document.parts.find(candidate => candidate.id === on.partId) : undefined;
   const points = part.hole ? holeSketch(part).entities.filter(entity => entity.type === 'point') : [];
@@ -73,13 +76,13 @@ export function HoleDialog({
         picks={
           <>
             <div className="cad-feature-selection">
-              <small>Sketch points to place holes</small>
+              <small>{translate('Sketch points to place holes')}</small>
               {points.map(point => (
                 <span key={point.id}>{holePointName(document, part.id)}</span>
               ))}
             </div>
             <div className="cad-feature-selection">
-              <small>Merge scope</small>
+              <small>{translate('Merge scope')}</small>
               {board && <span>{board.name}</span>}
             </div>
           </>

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Label } from '@wbcnc/ui/components/label';
 
 import { jobCutting, type MaterialKey, type PlanSettingsV1 } from '../planSettings';
@@ -25,15 +26,21 @@ export function PlanSettingsPanel({
     <div className="flex flex-col gap-4">
       <BitSettings value={value} onChange={onChange} />
 
-      <section className="flex flex-col gap-1.5" aria-label="Cutting data">
+      <section className="flex flex-col gap-1.5" aria-label={translate('Cutting data')}>
         <h3 className="text-sm font-medium">
-          Cutting data · ⌀{value.bit.diameter} in {material}
+          {translate('Cutting data · ⌀')}
+          {value.bit.diameter}
+          {translate(' in ')}
+          {material}
         </h3>
         <CuttingDataEditor bit={value.bit} material={material} job={jobCutting(value)} onJobChange={cutting => set({ cutting })} />
         {value.smallBit && value.smallBit.diameter < value.bit.diameter && (
           <>
             <h3 className="pt-2 text-sm font-medium">
-              Second bit · ⌀{value.smallBit.diameter} in {material}
+              {translate('Second bit · ⌀')}
+              {value.smallBit.diameter}
+              {translate(' in ')}
+              {material}
             </h3>
             <CuttingDataEditor bit={value.smallBit} material={material} />
           </>
@@ -41,7 +48,7 @@ export function PlanSettingsPanel({
       </section>
 
       <section className="flex flex-col gap-1.5">
-        <Label htmlFor="plan-cut-below">Cut through to (mm below the board)</Label>
+        <Label htmlFor="plan-cut-below">{translate('Cut through to (mm below the board)')}</Label>
         <NumberInput
           id="plan-cut-below"
           min={0}
@@ -53,12 +60,16 @@ export function PlanSettingsPanel({
           aria-describedby="plan-cut-below-help"
         />
         <p id="plan-cut-below-help" className="text-xs text-muted-foreground">
-          0–2 mm. The final pass ends at Z−{value.cutBelow}, in the spoilboard.
+          {translate('0–2 mm. The final pass ends at Z−')}
+          {value.cutBelow}
+          {translate(', in the spoilboard. ')}
         </p>
       </section>
 
       <p className="rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
-        Defaults: Z0 at the bottom of the board, ramped entry, depth-limited roughing and finishing, 0.1 mm outline allowance, climb cut.
+        {translate(
+          'Defaults: Z0 at the bottom of the board, ramped entry, depth-limited roughing and finishing, 0.1 mm outline allowance, climb cut. '
+        )}
       </p>
     </div>
   );

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@wbcnc/ui/components/dropdown-menu';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { AlertTriangle, Check, ChevronDown, ChevronRight } from 'lucide-react';
@@ -8,14 +9,14 @@ export type StepState = 'done' | 'todo' | 'warn';
 function StepIcon({ state, n }: { state: StepState; n?: number }) {
   if (state === 'done')
     return (
-      <span className="grid size-5 shrink-0 place-items-center rounded-full bg-green-600 text-white" aria-label="Done">
+      <span className="grid size-5 shrink-0 place-items-center rounded-full bg-green-600 text-white" aria-label={translate('Done')}>
         <Check className="size-3" strokeWidth={3} />
       </span>
     );
-  if (state === 'warn') return <AlertTriangle aria-label="To do" className="size-5 shrink-0 text-amber-500" />;
+  if (state === 'warn') return <AlertTriangle aria-label={translate('To do')} className="size-5 shrink-0 text-amber-500" />;
   return (
     <span
-      aria-label="To do"
+      aria-label={translate('To do')}
       className="grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] border-primary text-[11px] font-semibold text-primary">
       {n ?? ''}
     </span>
@@ -41,13 +42,15 @@ export function DoneMenu({
     <DropdownMenu>
       <DropdownMenuTrigger
         disabled={disabled}
-        aria-label={`${label}: ${done ? 'done' : 'not done'}, options`}
+        aria-label={translate('{{label}}: {{value2}}, options', { label: label, value2: done ? translate('done') : translate('not done') })}
         className="-mx-1 flex shrink-0 items-center gap-1 rounded-md px-1 py-0.5 hover:bg-muted disabled:pointer-events-none">
         {children}
         {!disabled && <ChevronDown className="size-3 text-muted-foreground" />}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        <DropdownMenuItem onClick={() => onChange(!done)}>{done ? 'Mark as not done' : 'Already done before'}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onChange(!done)}>
+          {done ? translate('Mark as not done') : translate('Already done before')}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -97,7 +100,7 @@ export function SetupStep({
       className={cn('flex flex-col gap-2 rounded-lg border px-3 py-2', open && state !== 'done' && 'border-primary/30 bg-primary/[0.03]')}>
       <div className="flex min-h-7 flex-row items-center gap-2.5">
         {markable ? (
-          <DoneMenu done={marked} label={label ?? 'Step'} onChange={setMarked}>
+          <DoneMenu done={marked} label={label ?? translate('Step')} onChange={setMarked}>
             <StepIcon state={state} n={n} />
           </DoneMenu>
         ) : (

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Html, Line } from '@react-three/drei';
 import { CanvasLabel } from '@/scene/CanvasLabel';
 import { useThree, type ThreeEvent } from '@react-three/fiber';
@@ -249,18 +250,23 @@ export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverla
         if (!moved) return;
         if (hold && selected.kind === 'hold') {
           const to = { x: hold.x + d.x, y: hold.y + d.y };
-          if (!onBoard(to, holdsOn, 40)) return say({ at: hold, text: `${holdName(selected.i)}: off the board`, tone: 'bad' });
+          if (!onBoard(to, holdsOn, 40))
+            return say({ at: hold, text: translate('{{value1}}: off the board', { value1: holdName(selected.i) }), tone: 'bad' });
           apply?.(moveHold(holds, selected.i, to, holdsOn, bed.boardId));
-          say({ at: to, text: `${holdName(selected.i)} moved: planning again`, tone: 'info' });
+          say({ at: to, text: translate('{{value1}} moved: planning again', { value1: holdName(selected.i) }), tone: 'info' });
         } else if (part) {
           const at = { x: part.x + d.x, y: part.y + d.y, rotated: part.rotated };
           const r = bed.drop(part.id, at);
           say(
             r === 'exact'
-              ? { at, text: `${part.name} moved: planning again`, tone: 'info' }
+              ? { at, text: translate('{{value1}} moved: planning again', { value1: part.name }), tone: 'info' }
               : r === 'moved'
-                ? { at, text: `${part.name}: too close there, moved to the nearest free spot`, tone: 'warn' }
-                : { at: part, text: `${part.name} doesn’t fit there`, tone: 'bad' }
+                ? {
+                    at,
+                    text: translate('{{value1}}: too close there, moved to the nearest free spot', { value1: part.name }),
+                    tone: 'warn',
+                  }
+                : { at: part, text: translate('{{value1}} doesn’t fit there', { value1: part.name }), tone: 'bad' }
           );
         }
       },
@@ -324,9 +330,11 @@ export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverla
           lineWidth={2.5}
         />
       )}
-      {movedHold && holdHits && <Note note={{ at: movedHold, text: 'The bit would hit it here', tone: 'bad' }} />}
-      {partAt && partStatus === 'taken' && <Note note={{ at: partAt, text: 'Too close: goes to the nearest free spot', tone: 'warn' }} />}
-      {partAt && partStatus === 'off' && <Note note={{ at: partAt, text: 'Off the board', tone: 'bad' }} />}
+      {movedHold && holdHits && <Note note={{ at: movedHold, text: translate('The bit would hit it here'), tone: 'bad' }} />}
+      {partAt && partStatus === 'taken' && (
+        <Note note={{ at: partAt, text: translate('Too close: goes to the nearest free spot'), tone: 'warn' }} />
+      )}
+      {partAt && partStatus === 'off' && <Note note={{ at: partAt, text: translate('Off the board'), tone: 'bad' }} />}
 
       {/* Its move handle: the one way to move it. */}
       {canMove && handleAt && (
@@ -347,26 +355,29 @@ export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverla
           <BedToolbar item={name}>
             {hold && editable && selected.kind === 'hold' && (
               <button
-                title="Remove it (Delete)"
+                title={translate('Remove it (Delete)')}
                 className={kBedButton}
                 onClick={() => {
                   apply?.(removeHold(holds, selected.i, bed.boardId));
                   useBedEdit.getState().setSelected(null);
                 }}>
-                <Trash2 className="size-3.5" /> Remove
+                <Trash2 className="size-3.5" />
+                {translate(' Remove ')}
               </button>
             )}
             <button
-              title="Change this board's layout, parts and holds in the CAM job's Boards step"
+              title={translate("Change this board's layout, parts and holds in the CAM job's Boards step")}
               className={kBedButton}
               onClick={() => bed.openInCam('layout')}>
-              <Pencil className="size-3.5" /> Layout in CAM
+              <Pencil className="size-3.5" />
+              {translate(' Layout in CAM ')}
             </button>
             <button
-              title="Change this board's toolpaths in the CAM job's Plan step"
+              title={translate("Change this board's toolpaths in the CAM job's Plan step")}
               className={kBedButton}
               onClick={() => bed.openInCam('toolpaths')}>
-              <Pencil className="size-3.5" /> Toolpaths in CAM
+              <Pencil className="size-3.5" />
+              {translate(' Toolpaths in CAM ')}
             </button>
           </BedToolbar>
         </CanvasLabel>

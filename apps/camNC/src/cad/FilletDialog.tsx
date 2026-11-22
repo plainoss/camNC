@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import { designStepLabel, filletProblems, newCadId, type CadDocument, type CadEdgeFillet, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useMemo, useState } from 'react';
@@ -8,7 +9,7 @@ import { useDialogPreview } from './useDialogPreview';
 import type { CadConnectorPick } from './PartFeatureDialogs';
 import { pickedOf, pickKey, type Picked } from './edgePicks';
 
-const kUnsupported = 'Not available yet';
+const kUnsupported = translate('Not available yet');
 
 /**
  * A Fillet step: edges through a part's thickness, and edges along its faces, picked in the view, rounded to a radius.
@@ -108,8 +109,8 @@ export function FilletDialog({
   const save = () => {
     const radius = parseCadValue(radiusText, { unit: 'mm', variables });
     if ('error' in radius) return setError(radius.error);
-    if (!(radius.value > 0)) return setError('A fillet needs a radius.');
-    if (!owner || !picked.length) return setError('Pick the edges to round.');
+    if (!(radius.value > 0)) return setError(translate('A fillet needs a radius.'));
+    if (!owner || !picked.length) return setError(translate('Pick the edges to round.'));
     if (candidate) onSave(candidate);
   };
   // An edge is named for the feature that made it, as Edge of Extrude 1, and a face too; where it stands tells picked
@@ -127,11 +128,15 @@ export function FilletDialog({
   const edgeName = (pick: Picked) =>
     'rim' in pick
       ? pick.rim.face
-        ? `Face of ${madeBy(pick.partId)}`
-        : `Edge of ${madeBy(pick.partId, pick.rim.loops[0])}`
-      : `Edge of ${madeBy(pick.partId)}`;
+        ? translate('Face of {{value1}}', { value1: madeBy(pick.partId) })
+        : translate('Edge of {{value1}}', { value1: madeBy(pick.partId, pick.rim.loops[0]) })
+      : translate('Edge of {{value1}}', { value1: madeBy(pick.partId) });
   const edgeAt = (pick: Picked, index: number) => {
-    if ('rim' in pick) return `on the ${pick.rim.side === 'top' ? 'top' : 'underside'} ${index + 1}`;
+    if ('rim' in pick)
+      return translate('on the {{value1}} {{value2}}', {
+        value1: pick.rim.side === 'top' ? translate('top') : translate('underside'),
+        value2: index + 1,
+      });
     const part = document.parts.find(part => part.id === pick.partId);
     const point = part?.sketch.entities.find(entity => entity.type === 'point' && entity.id === pick.corner);
     return point?.type === 'point' ? `at ${formatLength(point.x)}, ${formatLength(point.y)} ${lengthUnit}` : `${index + 1}`;
@@ -141,27 +146,27 @@ export function FilletDialog({
       // Once an edge is picked the fillet has its place among its part's steps, and the number that goes with it.
       title={designStepLabel(candidate ?? document, featureId) ?? nextFilletLabel(document)}
       okDisabled={!picked.length}
-      failing={refusal && /overlap/.test(refusal) ? 'Overlapping fillets.' : refusal}
+      failing={refusal && /overlap/.test(refusal) ? translate('Overlapping fillets.') : refusal}
       onOk={save}
       onCancel={onCancel}>
-      <div className="cad-feature-tabs" role="tablist" aria-label="Fillet type">
+      <div className="cad-feature-tabs" role="tablist" aria-label={translate('Fillet type')}>
         {['Edge', 'Full round'].map(choice => (
           <button
-            key={choice}
+            key={choice === 'Edge' ? translate('Edge') : translate('Full round')}
             type="button"
             role="tab"
             aria-selected={choice === 'Edge'}
             disabled={choice !== 'Edge'}
             title={choice === 'Edge' ? undefined : kUnsupported}>
-            {choice}
+            {choice === 'Edge' ? translate('Edge') : translate('Full round')}
           </button>
         ))}
       </div>
       <div className="cad-feature-selection" data-active="">
-        <small>Entities to fillet</small>
+        <small>{translate('Entities to fillet')}</small>
         {/* Rounded previews replace the original edges, so each selection also needs an explicit removal control. */}
         {!!picked.length && (
-          <ul aria-label="Selected edges" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          <ul aria-label={translate('Selected edges')} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {picked.map((pick, index) => {
               const label = `${edgeName(pick)} ${edgeAt(pick, index)}`;
               return (
@@ -171,12 +176,15 @@ export function FilletDialog({
                   <span title={label}>{edgeName(pick)}</span>
                   <button
                     type="button"
-                    aria-label={`Remove selected ${'rim' in pick && pick.rim.face ? 'face' : 'edge'}: ${label}`}
+                    aria-label={translate('Remove selected {{value1}}: {{label}}', {
+                      value1: 'rim' in pick && pick.rim.face ? translate('face') : translate('edge'),
+                      label: label,
+                    })}
                     onClick={() => {
                       setError(null);
                       setPicked(current => current.filter(edge => edge.partId !== pick.partId || pickKey(edge) !== pickKey(pick)));
                     }}>
-                    Remove
+                    {translate('Remove ')}
                   </button>
                 </li>
               );
@@ -187,23 +195,23 @@ export function FilletDialog({
       {/* An edge through the board meets its neighbours at a sharp corner, so there's no tangent chain to carry on along. */}
       <label title={kUnsupported}>
         <input type="checkbox" checked disabled readOnly />
-        Tangent propagation
+        {translate('Tangent propagation ')}
       </label>
       <label className="cad-number-field">
-        Measurement
+        {translate('Measurement ')}
         <select value="radius" disabled title={kUnsupported}>
-          <option value="radius">Radius</option>
-          <option value="distance">Control distance</option>
+          <option value="radius">{translate('Radius')}</option>
+          <option value="distance">{translate('Control distance')}</option>
         </select>
       </label>
       <label className="cad-number-field">
-        Radius
+        {translate('Radius ')}
         <span>
-          <CadValueInput bare aria-label="Radius" value={radiusText} onChange={event => setRadiusText(event.target.value)} />
+          <CadValueInput bare aria-label={translate('Radius')} value={radiusText} onChange={event => setRadiusText(event.target.value)} />
         </span>
         {lengthUnit}
       </label>
-      {['Asymmetric', 'Partial fillet', 'Variable fillet'].map(option => (
+      {['Asymmetric', translate('Partial fillet'), translate('Variable fillet')].map(option => (
         <label key={option} title={kUnsupported}>
           <input type="checkbox" disabled />
           {option}
@@ -211,11 +219,11 @@ export function FilletDialog({
       ))}
       <label title={kUnsupported}>
         <input type="checkbox" checked disabled readOnly />
-        Allow edge overflow
+        {translate('Allow edge overflow ')}
       </label>
       <label title={kUnsupported}>
         <input type="checkbox" disabled />
-        Smooth fillet corners
+        {translate('Smooth fillet corners ')}
       </label>
       {/* A failing round says why on its title and row; only a pick that can't be taken says so here. */}
       {error && (

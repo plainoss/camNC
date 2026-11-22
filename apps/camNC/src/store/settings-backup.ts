@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import superjson from 'superjson';
 // Registers the superjson types for three.js values used in the settings.
 import './store-storage';
@@ -26,11 +27,11 @@ export function parseSettingsBackup(text: string): SettingsBackup {
   try {
     data = superjson.parse(text);
   } catch {
-    throw new Error('This file is not a camNC settings backup.');
+    throw new Error(translate('This file is not a camNC settings backup.'));
   }
   const backup = data as { format?: string; settings?: unknown } | null;
   if (backup?.format === kBackupFormat && backup.settings && typeof backup.settings === 'object') return backup.settings as SettingsBackup;
-  throw new Error('This file is not a camNC settings backup.');
+  throw new Error(translate('This file is not a camNC settings backup.'));
 }
 
 /** The cameras in a backup, for showing what restoring it brings. */

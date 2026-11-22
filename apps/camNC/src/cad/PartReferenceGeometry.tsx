@@ -1,10 +1,11 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { PartEdge } from './partEdges';
 import { partVertices } from './partVertices';
 
 /** Vertices follow edges in paint order so a corner can be picked without selecting its incident edge. */
 export function PartReferenceGeometry({ edges, picked, pixelScale }: { edges: PartEdge[]; picked: string[]; pixelScale: number }) {
   return (
-    <g className="cad-part-edges" aria-label="Edges and vertices of the parts behind the sketch">
+    <g className="cad-part-edges" aria-label={translate('Edges and vertices of the parts behind the sketch')}>
       {edges.map(edge => (
         <line
           key={edge.key}

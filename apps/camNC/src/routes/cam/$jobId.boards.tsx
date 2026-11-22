@@ -1,3 +1,4 @@
+import { t as translate, getLanguage } from '@wbcnc/i18n';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { PageHeader } from '@/components/page-header';
 import { CamPage } from '@/cam/CamPage';
@@ -104,14 +105,14 @@ function BoardsStep() {
   }, [job?.id, changed]);
 
   if (isPending) return <Shell />;
-  if (!job) return <Shell message="This job doesn't exist (any more)." />;
+  if (!job) return <Shell message={translate("This job doesn't exist (any more).")} />;
   const bar = (
     <CamJobBar
       job={job}
       actions={
         <>
           {instances.length > 0 && boards.length > 0 && (
-            <p role="status" aria-label="Layout result" className="text-xs text-muted-foreground">
+            <p role="status" aria-label={translate('Layout result')} className="text-xs text-muted-foreground">
               {layoutSummary(boards)}
             </p>
           )}
@@ -126,15 +127,15 @@ function BoardsStep() {
             }}
           />
           {model.data && !instances.length ? (
-            <Hint text="No part is milled: tick parts in the Model step to plan their toolpaths." wrap>
+            <Hint text={translate('No part is milled: tick parts in the Model step to plan their toolpaths.')} wrap>
               <Button size="sm" disabled>
-                Next: Plan
+                {translate('Next: Plan ')}
               </Button>
             </Hint>
           ) : (
             <Button size="sm" asChild>
               <Link to="/cam/$jobId/plan" params={{ jobId: job.id }}>
-                Next: Plan
+                {translate('Next: Plan ')}
               </Link>
             </Button>
           )}
@@ -209,7 +210,10 @@ function BoardsEditor({
     const cut = boards.find(b => changesCutBoard(b.board, byNewId.get(b.board.id)));
     if (cut) {
       setNote(
-        `Board ${cut.board.name} is ${cutLabel(cut.board).toLowerCase()}: its parts and holds stay as they are. Start over to change them.`
+        translate('Board {{value1}} is {{value2}}: its parts and holds stay as they are. Start over to change them.', {
+          value1: cut.board.name,
+          value2: cutLabel(cut.board).toLowerCase(),
+        })
       );
       return false;
     }
@@ -221,7 +225,7 @@ function BoardsEditor({
   const nestOptions = { stickout: plan.bit.stickout, hardware, machine, preserveLayout: !!job.design };
   const startOver = (board: BoardV1) => {
     if (isManufacturingLocked()) {
-      setNote('Review or dismiss the machine job before starting over.');
+      setNote(translate('Review or dismiss the machine job before starting over.'));
       return;
     }
     const { cut } = board;
@@ -231,12 +235,15 @@ function BoardsEditor({
     save({ ...job, boards: boards.map(b => (b.board.id === board.id ? rest : b.board)) });
     forgetCut(job.id, board.id);
     setNote(
-      `Board ${board.name} can be changed again. What was cut on it is forgotten: at the machine, all its programs are to cut again.`,
+      translate(
+        'Board {{value1}} can be changed again. What was cut on it is forgotten: at the machine, all its programs are to cut again.',
+        { value1: board.name }
+      ),
       () => {
         const latest = queryClient.getQueryData<CamJobV1>(camKeys.job(job.id)) ?? job;
         const current = latest.boards?.find(b => b.id === board.id);
         if (!current || physicalSheetIdOf(current) !== physicalSheetIdOf(rest) || isCut(current)) {
-          setNote('This replacement sheet has changed or been used. Its physical history cannot be undone.');
+          setNote(translate('This replacement sheet has changed or been used. Its physical history cannot be undone.'));
           return false;
         }
         save({
@@ -267,9 +274,17 @@ function BoardsEditor({
     const nested = nestBoard(next, instances, plan.bit.diameter, nestOptions);
     const off = nested.unplaced.filter(id => !next.setAside?.[id]).map(id => byId.get(id)?.name ?? id);
     setNote(
-      `${boardLabel(next)} is fixed at ${nested.board.w} × ${nested.board.h} mm.${
-        off.length ? ` ${off.join(', ')} ${off.length === 1 ? 'doesn’t' : 'don’t'} fit and moved off it.` : ''
-      }`,
+      translate('{{value1}} is fixed at {{value2}} × {{value3}} mm.{{value4}}', {
+        value1: boardLabel(next),
+        value2: nested.board.w,
+        value3: nested.board.h,
+        value4: off.length
+          ? translate(' {{value1}} {{value2}} fit and moved off it.', {
+              value1: off.join(', '),
+              value2: off.length === 1 ? translate('doesn’t') : translate('don’t'),
+            })
+          : '',
+      }),
       undoTo(before)
     );
   };
@@ -354,7 +369,14 @@ function BoardsEditor({
     const inst = byId.get(itemId);
     if (!target || !inst) return false;
     if (+inst.thickness.toFixed(1) !== target.thickness) {
-      setNote(`${inst.name} is ${+inst.thickness.toFixed(1)} mm thick, board ${target.name} is ${target.thickness} mm.`);
+      setNote(
+        translate('{{value1}} is {{value2}} mm thick, board {{value3}} is {{value4}} mm.', {
+          value1: inst.name,
+          value2: +inst.thickness.toFixed(1),
+          value3: target.name,
+          value4: target.thickness,
+        })
+      );
       return false;
     }
     // Moved by hand: pinned to the target board, so auto-fill leaves it there. Onto a full board it stays put.
@@ -372,7 +394,7 @@ function BoardsEditor({
   const setAside = (itemId: string, at: PartPosition) => {
     const from = boards.find(b => b.board.items.includes(itemId))?.board;
     if (from && updateBoard(setAsidePart(from, itemId, at)))
-      setNote(`${byId.get(itemId)?.name ?? itemId} is off the board and won’t be cut.`);
+      setNote(translate('{{value1}} is off the board and won’t be cut.', { value1: byId.get(itemId)?.name ?? itemId }));
   };
 
   /** Every part off a board that isn't cut, onto a board or a new one; a part too big for the machine stays. */
@@ -391,7 +413,7 @@ function BoardsEditor({
     if (!inst || !from) return;
     // A new board wouldn't hold it either: no empty board, the reason instead.
     const big = tooBigForMachine(from, itemId, instances, plan.bit.diameter, nestOptions, inst.thickness);
-    if (big && machine) return setNote(`${tooBigReason(inst, machine, big.margin)} It stays where it is.`);
+    if (big && machine) return setNote(translate('{{value1}} It stays where it is.', { value1: tooBigReason(inst, machine, big.margin) }));
     const b = freshBoardFor(
       boards.map(x => x.board),
       from,
@@ -415,11 +437,18 @@ function BoardsEditor({
     const inst = byId.get(itemId);
     if (!target || !inst) return;
     if (+inst.thickness.toFixed(1) !== target.thickness) {
-      setNote(`${inst.name} is ${+inst.thickness.toFixed(1)} mm thick, board ${target.name} is ${target.thickness} mm.`);
+      setNote(
+        translate('{{value1}} is {{value2}} mm thick, board {{value3}} is {{value4}} mm.', {
+          value1: inst.name,
+          value2: +inst.thickness.toFixed(1),
+          value3: target.name,
+          value4: target.thickness,
+        })
+      );
       return;
     }
     if (!drop) {
-      setNote(`${inst.name} doesn’t fit on board ${target.name}.`);
+      setNote(translate('{{value1}} doesn’t fit on board {{value2}}.', { value1: inst.name, value2: target.name }));
       return;
     }
     place(itemId, drop.board);
@@ -444,7 +473,7 @@ function BoardsEditor({
   const relayout = (board: BoardV1) => {
     const before = boards.map(b => b.board);
     if (!saveBoards(before.map(b => (b.id === board.id ? relayoutBoard(b, instances, plan.bit.diameter, nestOptions) : b)))) return;
-    setNote(`Board ${board.name} laid out again.`, undoTo(before));
+    setNote(translate('Board {{value1}} laid out again.', { value1: board.name }), undoTo(before));
   };
   /** Everything unpinned, then nested from scratch: from the stock list when there is one. */
   const relayoutAll = () => {
@@ -452,12 +481,12 @@ function BoardsEditor({
     const free = before.map(b => (isCut(b) ? b : relayoutBoard(b, instances, plan.bit.diameter, nestOptions)));
     if (!(job.stock ?? []).length) {
       saveBoards(free);
-      return setNote('All boards laid out again.', undoTo(before));
+      return setNote(translate('All boards laid out again.'), undoTo(before));
     }
     autoFill(free, before);
   };
   const autoFill = (start = boards.map(b => b.board), before = start, stock = job.stock ?? []) => {
-    if (!stock.length) return setNote('Add the boards you have to the stock list first.');
+    if (!stock.length) return setNote(translate('Add the boards you have to the stock list first.'));
     // Cut boards stay as they are, with their parts: the rest is filled around them.
     const kept = start.filter(isCut);
     const onKept = new Set(kept.flatMap(b => b.items));
@@ -484,15 +513,26 @@ function BoardsEditor({
             nestBoard(b, instances, plan.bit.diameter, nestOptions).placements.some(p => p.id === id)
         )
       );
-    const returnedNote = returned.length ? ` Set-aside parts brought back onto boards: ${names(returned)}.` : '';
+    const returnedNote = returned.length
+      ? translate(' Set-aside parts brought back onto boards: {{value1}}.', { value1: names(returned) })
+      : '';
     const problems = [
-      res.tooBig.length && `${names(res.tooBig)}: too big for every stock board${machine ? ' and the machine' : ''}, even turned.`,
-      res.short.length && `${names(res.short)}: not enough stock left, put on more boards of the stock's sizes.`,
+      res.tooBig.length &&
+        translate('{{value1}}: too big for every stock board{{value2}}, even turned.', {
+          value1: names(res.tooBig),
+          value2: machine ? translate(' and the machine') : '',
+        }),
+      res.short.length &&
+        translate("{{value1}}: not enough stock left, put on more boards of the stock's sizes.", { value1: names(res.short) }),
     ].filter(Boolean);
     const stockBoards = res.boards.filter(b => !b.size.fit && stock.some(s => +s.thickness.toFixed(1) === b.thickness)).length;
     setNote(
-      (problems.length ? problems.join(' ') : `Parts placed on ${stockBoards} ${stockBoards === 1 ? 'board' : 'boards'} from stock.`) +
-        returnedNote,
+      (problems.length
+        ? problems.join(' ')
+        : translate('Parts placed on {{value1}} {{value2}} from stock.', {
+            value1: stockBoards,
+            value2: stockBoards === 1 ? translate('board') : translate('boards'),
+          })) + returnedNote,
       undoTo(before)
     );
   };
@@ -503,7 +543,7 @@ function BoardsEditor({
     if (!relayout) {
       const next = applySetupToAll(boards, selected.board, instances, plan.bit.diameter, nestOptions);
       if (saveBoards(next)) {
-        setNote(`Applied ${boardLabel(selected.board)}’s setup to all boards.`, undoTo(before));
+        setNote(translate('Applied {{value1}}’s setup to all boards.', { value1: boardLabel(selected.board) }), undoTo(before));
       }
       return;
     }
@@ -517,7 +557,10 @@ function BoardsEditor({
     );
     if (!effectiveStock.length) {
       saveBoards(free);
-      return setNote(`Applied ${boardLabel(selected.board)}’s setup and laid out all boards again.`, undoTo(before));
+      return setNote(
+        translate('Applied {{value1}}’s setup and laid out all boards again.', { value1: boardLabel(selected.board) }),
+        undoTo(before)
+      );
     }
     autoFill(free, before, effectiveStock);
   };
@@ -603,69 +646,83 @@ function BoardsEditor({
     <>
       {missingReferences.map(id => (
         <p key={id} role="alert" className="flex flex-wrap items-center gap-2 text-xs text-destructive">
-          {job.parts.find(p => p.id === id.split('#')[0])?.name ?? 'A part'} was removed from Design. Its board settings are kept until
-          repaired.
+          {job.parts.find(p => p.id === id.split('#')[0])?.name ?? translate('A part')}
+          {translate(' was removed from Design. Its board settings are kept until repaired. ')}
           <Button
             size="sm"
             variant="outline"
             className="h-6 px-2 text-xs"
             disabled={isCut(sel)}
             onClick={() => updateBoard(without(sel, id))}>
-            Remove reference
+            {translate('Remove reference ')}
           </Button>
         </p>
       ))}
       {changedThickness.map(id => (
         <p key={id} role="alert" className="flex flex-wrap items-center gap-2 text-xs text-destructive">
-          {byId.get(id)!.name} is now {byId.get(id)!.thickness} mm thick. This board is {sel.thickness} mm.
+          {byId.get(id)!.name}
+          {translate(' is now ')}
+          {byId.get(id)!.thickness}
+          {translate(' mm thick. This board is ')}
+          {sel.thickness}
+          {translate(' mm. ')}
           <Button size="sm" variant="outline" className="h-6 px-2 text-xs" disabled={isCut(sel)} onClick={() => toNewBoard(id)}>
-            Move to new board
+            {translate('Move to new board ')}
           </Button>
         </p>
       ))}
       {tabRepairs.map(([id, issue]) => (
         <p key={id} role="alert" className="flex flex-wrap items-center gap-2 text-xs text-destructive">
-          {byId.get(id)?.name ?? 'Part'}: {issue}
+          {byId.get(id)?.name ?? translate('Part')}: {issue}
           <Button
             size="sm"
             variant="outline"
             className="h-6 px-2 text-xs"
             disabled={isCut(sel)}
             onClick={() => partMenu(selected, id).onTabsReset?.()}>
-            Reset tabs
+            {translate('Reset tabs ')}
           </Button>
         </p>
       ))}
       {tooBigNotes.map(({ id, text }) => (
         <p key={id} role="alert" className="text-xs text-amber-700 dark:text-amber-400">
-          {`${text} It won’t be cut.`}
+          {translate('{{text}} It won’t be cut.', { text: text })}
         </p>
       ))}
       {unplacedNames.length > 0 && (
         <p role="alert" className="flex flex-wrap items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
-          {`${unplacedNames.join(', ')} ${unplacedNames.length === 1 ? 'is' : 'are'} off the boards and won’t be cut.`}
+          {translate('{{value1}} {{value2}} off the boards and won’t be cut.', {
+            value1: unplacedNames.join(', '),
+            value2: unplacedNames.length === 1 ? translate('is') : translate('are'),
+          })}
           <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={placeOffBoard}>
-            Place on boards
+            {translate('Place on boards ')}
           </Button>
         </p>
       )}
       {selNest.nutAbove < 0 && (
         <p role="alert" className="text-xs text-destructive">
-          {`The bit's stick-out (${selNest.stickout} mm) is shorter than the deepest cut (${+(stockTopOf(sel) + 0.3).toFixed(1)} mm): the collet nut would hit the board. Check it with the bit, or here:`}{' '}
+          {translate(
+            "The bit's stick-out ({{value1}} mm) is shorter than the deepest cut ({{value2}} mm): the collet nut would hit the board. Check it with the bit, or here:",
+            { value1: selNest.stickout, value2: +(stockTopOf(sel) + 0.3).toFixed(1) }
+          )}{' '}
           <button type="button" className="pointer-events-auto underline" onClick={() => setHoldSizes(true)}>
-            Clamp and screw sizes…
+            {translate('Clamp and screw sizes… ')}
           </button>
         </p>
       )}
       {cantHold.length > 0 && (
         <p role="alert" className="flex flex-wrap items-center gap-2 text-xs text-destructive">
-          {`${cantHold.join(', ')}: no edge where tabs would hold, so the job waits. ${tabRoomFix(selNest, plan.bit.diameter, cantHold.length)}, or`}
+          {translate('{{value1}}: no edge where tabs would hold, so the job waits. {{value2}}, or', {
+            value1: cantHold.join(', '),
+            value2: tabRoomFix(selNest, plan.bit.diameter, cantHold.length),
+          })}
           <Button
             size="sm"
             variant="outline"
             className="h-6 px-2 text-xs"
             onClick={() => updateBoard(respaceBoard(sel, { ...sel, retention: 'skin' }, instances, plan.bit.diameter, nestOptions))}>
-            Use a bottom skin
+            {translate('Use a bottom skin ')}
           </Button>
         </p>
       )}
@@ -684,7 +741,7 @@ function BoardsEditor({
 
   const status = (
     <div
-      aria-label={`${boardLabel(sel)} status`}
+      aria-label={translate('{{value1}} status', { value1: boardLabel(sel) })}
       className={cn(
         // Always this tall, empty or not: a message coming or going never rescales the drawing, and it covers none of it.
         'flex h-20 shrink-0 items-start gap-2 overflow-y-auto border-t bg-background px-4 py-1.5 pr-44 text-[13px]',
@@ -703,7 +760,7 @@ function BoardsEditor({
                 onClick={() => {
                   if (notice.undo!() !== false) setNote('Undone.');
                 }}>
-                Undo that
+                {translate('Undo that ')}
               </Button>
             )}
           </p>
@@ -718,7 +775,7 @@ function BoardsEditor({
       {note && (
         <button
           type="button"
-          aria-label="Dismiss this message"
+          aria-label={translate('Dismiss this message')}
           className="mt-0.5 text-muted-foreground hover:text-foreground"
           onClick={() => setNote('')}>
           <X className="size-3.5" />
@@ -734,19 +791,20 @@ function BoardsEditor({
         {isCut(sel) && (
           <div
             role="note"
-            aria-label={`${boardLabel(sel)} is cut`}
+            aria-label={translate('{{value1}} is cut', { value1: boardLabel(sel) })}
             className="mx-4 mt-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
             <span className="font-medium">
               {boardLabel(sel)}: {cutLabel(sel).toLowerCase()}
             </span>
             <span className="text-muted-foreground">
-              {sel.cut!.keys.length} {sel.cut!.keys.length === 1 ? 'program' : 'programs'} ran at the machine, since{' '}
-              {new Date(sel.cut!.at).toLocaleString()}. Its parts and holds stay as they were cut.
+              {sel.cut!.keys.length} {sel.cut!.keys.length === 1 ? translate('program') : translate('programs')}
+              {translate(' ran at the machine, since')} {new Date(sel.cut!.at).toLocaleString(getLanguage())}
+              {translate('. Its parts and holds stay as they were cut. ')}
             </span>
             <span className="grow" />
-            <Hint text="Unlocks the board's layout and holds, and forgets what was cut: for a new sheet of the same parts.">
+            <Hint text={translate("Unlocks the board's layout and holds, and forgets what was cut: for a new sheet of the same parts.")}>
               <Button size="sm" variant="outline" onClick={() => startOver(sel)}>
-                Start over
+                {translate('Start over ')}
               </Button>
             </Hint>
           </div>
@@ -783,7 +841,7 @@ function BoardsEditor({
               (b, index) =>
                 b.request.parts.some(part => part.partId === partId) && (plans[index].isFetching || plans[index].isPlaceholderData)
             );
-            if (pending) return setNote('Wait for the current hole toolpaths before changing this setting.');
+            if (pending) return setNote(translate('Wait for the current hole toolpaths before changing this setting.'));
             const cut = cutBoardWith(
               boards.map(b => b.board),
               instances,
@@ -793,7 +851,8 @@ function BoardsEditor({
             else {
               const part = parts.find(part => part.id === partId);
               const key = part && holeChoiceKey(part, hole);
-              if (key === undefined) return setNote('This hole changed. Wait for its current toolpaths before choosing a setting.');
+              if (key === undefined)
+                return setNote(translate('This hole changed. Wait for its current toolpaths before choosing a setting.'));
               save({ ...job, plan: withHoleChoice(plan, partId, key, choice) });
             }
           }}
@@ -883,7 +942,7 @@ function Shell({
 }) {
   return (
     <CamPage className="min-h-dvh md:h-dvh">
-      {bar ?? <PageHeader title="Projects" />}
+      {bar ?? <PageHeader title={translate('Projects')} />}
       {message && <p className="m-8 text-muted-foreground">{message}</p>}
       {loading && (
         <div className="flex flex-1 items-center justify-center gap-2 text-muted-foreground">

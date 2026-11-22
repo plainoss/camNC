@@ -1,19 +1,24 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cadPartReference, cadPartReferenceName, designStepLabel, designSteps, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { isBlank } from './editorHelpers';
 import type { StudioDialog } from './studioDialog';
 
-const kPlaneNames = { top: 'the top plane', front: 'the front plane', right: 'the right plane' } as const;
+const kPlaneNames = { top: translate('the top plane'), front: translate('the front plane'), right: translate('the right plane') } as const;
 
 /** What a part is drawn on, said the way a person would. */
 export function drawnOnName(document: CadDocument, on: CadDrawnOn['on']): string {
   if ('plane' in on) return kPlaneNames[on.plane];
-  const support = cadPartReferenceName(document, cadPartReference(on.partId, on.copyId)) ?? 'a removed part';
-  return on.face === 'top' ? `the top of ${support}` : on.face === 'underside' ? `the underside of ${support}` : `an edge of ${support}`;
+  const support = cadPartReferenceName(document, cadPartReference(on.partId, on.copyId)) ?? translate('a removed part');
+  return on.face === 'top'
+    ? translate('the top of {{value1}}', { value1: support })
+    : on.face === 'underside'
+      ? translate('the underside of {{value1}}', { value1: support })
+      : translate('an edge of {{value1}}', { value1: support });
 }
 
 /** The Sketch dialog's plane field: a plane by its name, or a face named for the feature that made it, as Face of Extrude 1. */
 export function sketchPlaneName(document: CadDocument, drawnOn: CadDrawnOn | undefined): string {
-  if (!drawnOn) return 'Top plane';
+  if (!drawnOn) return translate('Top plane');
   const { on, datum } = drawnOn;
   const plane = datum && document.planes?.find(candidate => candidate.id === datum)?.name;
   if (plane) return plane;
@@ -22,7 +27,7 @@ export function sketchPlaneName(document: CadDocument, drawnOn: CadDrawnOn | und
   if (on.copyId) return drawnOnName(document, on);
   const part = document.parts.find(candidate => candidate.id === on.partId);
   const made = designStepLabel(document, `${part?.extrudedWith ?? on.partId}:extrude`);
-  return made ? `Face of ${made}` : drawnOnName(document, on);
+  return made ? translate('Face of {{value1}}', { value1: made }) : drawnOnName(document, on);
 }
 
 /**
@@ -55,7 +60,7 @@ export function pendingRow(document: CadDocument, dialog: StudioDialog | null, c
   if (dialog?.kind === 'chamfer' && !dialog.filletId) return { kind: 'fillet' as const, label: nextChamferLabel(document) };
   if (dialog?.kind === 'transform' && !dialog.copyId && !dialog.move) {
     const made = designSteps(document).filter(step => step.label.startsWith('Transform')).length;
-    return { kind: 'copy' as const, label: `Transform ${made + 1}` };
+    return { kind: 'copy' as const, label: translate('Transform {{value1}}', { value1: made + 1 }) };
   }
   return undefined;
 }

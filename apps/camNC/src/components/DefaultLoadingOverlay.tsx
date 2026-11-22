@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 
 export function DefaultLoadingOverlay() {
@@ -5,7 +6,7 @@ export function DefaultLoadingOverlay() {
     <div className="dark flex h-app w-full items-center justify-center bg-background">
       <div className="flex flex-col items-center justify-center gap-4">
         <LoadingSpinner className="size-10" />
-        <div className="text-gray-500 text-xl">Loading...</div>
+        <div className="text-gray-500 text-xl">{translate('Loading...')}</div>
       </div>
     </div>
   );

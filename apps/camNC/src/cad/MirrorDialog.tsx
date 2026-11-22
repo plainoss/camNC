@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   designStepLabel,
   designSteps,
@@ -76,7 +77,7 @@ export function MirrorDialog({
   const [error, setError] = useState<string | null>(null);
   // Automatic display positions are not persisted; an unresolved face must never create a stale or unplaced mirror.
   const frame = across && cadMirrorPlaneFrame(document, across);
-  const planeError = across && (!frame ? 'That plane cannot be resolved.' : 'error' in frame ? frame.error : null);
+  const planeError = across && (!frame ? translate('That plane cannot be resolved.') : 'error' in frame ? frame.error : null);
   const issue = error ?? planeError;
   const pick = () => {
     if (!pickPlane) return;
@@ -85,7 +86,7 @@ export function MirrorDialog({
     pickPlane((on, datum) => {
       // A copy cannot define its own mirror plane: regeneration would keep reflecting it about its previous position.
       if (copyId && cadMirrorPlaneWouldCycle(document, partId, copyId, on)) {
-        setError('Choose a face that does not depend on this mirror.');
+        setError(translate('Choose a face that does not depend on this mirror.'));
         setPicking(false);
         return;
       }
@@ -141,23 +142,23 @@ export function MirrorDialog({
     designStepLabel(document, join?.id ?? '') ?? `Mirror ${designSteps(document).filter(step => step.kind === 'mirror').length + 1}`;
   return (
     <FeatureDialog title={title} okDisabled={!across || !part || !!issue} onOk={save} onCancel={onCancel} acceptFromPartsList>
-      <div className="cad-feature-tabs" role="tablist" aria-label="Mirror operation">
+      <div className="cad-feature-tabs" role="tablist" aria-label={translate('Mirror operation')}>
         {(['New', 'Add', 'Remove', 'Intersect'] as const).map(choice => (
           <button
-            key={choice}
+            key={{ New: translate('New'), Add: translate('Add'), Remove: translate('Remove'), Intersect: translate('Intersect') }[choice]}
             type="button"
             role="tab"
             aria-selected={choice === chosen}
             // An existing step stays what it is; Remove and Intersect need a solid kernel.
             disabled={(choice !== 'New' && choice !== 'Add') || ((!!copy || !!join) && choice !== chosen)}
-            title={choice === 'Remove' || choice === 'Intersect' ? 'Not available yet' : undefined}
+            title={choice === 'Remove' || choice === 'Intersect' ? translate('Not available yet') : undefined}
             onClick={() => setOperation(choice as 'New' | 'Add')}>
-            {choice}
+            {{ New: translate('New'), Add: translate('Add'), Remove: translate('Remove'), Intersect: translate('Intersect') }[choice]}
           </button>
         ))}
       </div>
       <DialogPartField
-        label="Entities to mirror"
+        label={translate('Entities to mirror')}
         name={part?.name ?? 'Select a part'}
         pick={copyId || joinId ? null : partPick}
         onActivate={() => {
@@ -169,20 +170,20 @@ export function MirrorDialog({
       <button
         type="button"
         className="cad-feature-selection"
-        aria-label="Mirror plane"
+        aria-label={translate('Mirror plane')}
         data-active={(picking || !across) && !partPick.active ? '' : undefined}
         onClick={pick}>
-        <small>Mirror plane</small>
+        <small>{translate('Mirror plane')}</small>
         <span>{name ?? ''}</span>
       </button>
       {chosen === 'Add' && (
         <>
-          <label title="Not available yet">
+          <label title={translate('Not available yet')}>
             <input type="checkbox" disabled />
-            Merge with all
+            {translate('Merge with all ')}
           </label>
           <div className="cad-feature-selection">
-            <small>Merge scope</small>
+            <small>{translate('Merge scope')}</small>
             <span>{part?.name ?? ''}</span>
           </div>
         </>

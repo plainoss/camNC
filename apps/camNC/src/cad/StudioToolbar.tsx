@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@wbcnc/ui/components/dropdown-menu';
 import { SketchToolGlyph, ToolHint } from './SketchToolbar';
@@ -65,8 +66,10 @@ export function StudioToolbar({
     <header
       className="cad-toolbar cad-studio-toolbar"
       role="toolbar"
-      aria-label="Part Studio toolbar"
-      title="Views: Shift+1 Front, Shift+2 Back, Shift+3 Left, Shift+4 Right, Shift+5 Top, Shift+6 Bottom, Shift+7 Isometric. F fits the model. P toggles base planes. Y hides the part under the pointer, Shift+T toggles transparency, Shift+Y shows all, Shift+I isolates the selected part.">
+      aria-label={translate('Part Studio toolbar')}
+      title={translate(
+        'Views: Shift+1 Front, Shift+2 Back, Shift+3 Left, Shift+4 Right, Shift+5 Top, Shift+6 Bottom, Shift+7 Isometric. F fits the model. P toggles base planes. Y hides the part under the pointer, Shift+T toggles transparency, Shift+Y shows all, Shift+I isolates the selected part.'
+      )}>
       {/* What every command and the More control take, measured even while they are in the menu. */}
       <div className="cad-studio-command-sizes" aria-hidden="true" inert>
         <div ref={overflow.measureRef}>
@@ -77,7 +80,7 @@ export function StudioToolbar({
             </button>
           ))}
           <button type="button" tabIndex={-1} className="cad-studio-command cad-studio-more">
-            More
+            {translate('More ')}
             <MoreGlyph />
           </button>
         </div>
@@ -87,7 +90,7 @@ export function StudioToolbar({
         ref={overflow.ref}
         className="cad-tool-group cad-drawing-tools cad-studio-commands"
         role="group"
-        aria-label="Part Studio features"
+        aria-label={translate('Part Studio features')}
         inert={busy}>
         {shown.map(command => (
           <ToolHint key={command.id} label={disabled[command.id] ?? command.hint}>
@@ -105,21 +108,21 @@ export function StudioToolbar({
         ))}
         {hidden.length > 0 && (
           <DropdownMenu modal={false} open={(moreOpen || searchOpensMore) && !busy} onOpenChange={setMoreOpen}>
-            <ToolHint label={`More features: ${hidden.map(command => command.label).join(', ')}`}>
+            <ToolHint label={translate('More features: {{value1}}', { value1: hidden.map(command => command.label).join(', ') })}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   className="cad-studio-command cad-studio-more"
                   data-active={activeHidden ? true : undefined}
                   aria-describedby={activeHidden ? moreDescription : undefined}>
-                  More
+                  {translate('More ')}
                   <MoreGlyph />
                 </button>
               </DropdownMenuTrigger>
             </ToolHint>
             {activeHidden && (
               <span id={moreDescription} hidden>
-                {`${activeHidden.label} is open`}
+                {translate('{{value1}} is open', { value1: activeHidden.label })}
               </span>
             )}
             <DropdownMenuContent
@@ -169,41 +172,42 @@ export function StudioToolbar({
       </div>
       {onSearch && (
         <button type="button" className="cad-search-trigger" disabled={busy} onClick={onSearch} aria-keyshortcuts="Alt+C">
-          Search tools… <kbd>alt/⌥ C</kbd>
+          {translate('Search tools… ')}
+          <kbd>{translate('alt/⌥ C')}</kbd>
         </button>
       )}
-      <div className="cad-tool-group cad-session-actions" aria-label="Design actions" role="group">
+      <div className="cad-tool-group cad-session-actions" aria-label={translate('Design actions')} role="group">
         {children}
-        <ToolHint label="Undo (Ctrl or Command Z)">
+        <ToolHint label={translate('Undo (Ctrl or Command Z)')}>
           <button
             type="button"
             className="cad-icon-button"
-            aria-label="Undo (Ctrl or Command Z)"
+            aria-label={translate('Undo (Ctrl or Command Z)')}
             disabled={!canUndo || busy}
             onClick={onUndo}>
             <SketchToolGlyph kind="undo" />
           </button>
         </ToolHint>
-        <ToolHint label="Redo (Ctrl or Command Shift Z)">
+        <ToolHint label={translate('Redo (Ctrl or Command Shift Z)')}>
           <button
             type="button"
             className="cad-icon-button"
-            aria-label="Redo (Ctrl or Command Shift Z)"
+            aria-label={translate('Redo (Ctrl or Command Shift Z)')}
             disabled={!canRedo || busy}
             onClick={onRedo}>
             <SketchToolGlyph kind="redo" />
           </button>
         </ToolHint>
         <span className="cad-toolbar-divider" aria-hidden="true" />
-        <ToolHint label="Leave the design without these changes">
-          <button type="button" className="cad-icon-button cad-cancel" aria-label="Cancel" disabled={busy} onClick={onCancel}>
+        <ToolHint label={translate('Leave the design without these changes')}>
+          <button type="button" className="cad-icon-button cad-cancel" aria-label={translate('Cancel')} disabled={busy} onClick={onCancel}>
             <SketchToolGlyph kind="cancel" />
           </button>
         </ToolHint>
-        <ToolHint label="Keep the design and lay its parts out on boards">
+        <ToolHint label={translate('Keep the design and lay its parts out on boards')}>
           <button type="button" className="cad-studio-done cad-finish" disabled={busy || !canFinish} onClick={onFinish}>
             <SketchToolGlyph kind="finish" />
-            Done
+            {translate('Done ')}
           </button>
         </ToolHint>
       </div>

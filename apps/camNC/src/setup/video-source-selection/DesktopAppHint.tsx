@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { isDesktopApp, kDesktopDownloadUrl } from '@/lib/desktop/is-desktop';
 import { Alert, AlertDescription } from '@wbcnc/ui/components/alert';
 import { MonitorDown } from 'lucide-react';
@@ -10,11 +11,11 @@ export function DesktopAppHint() {
       <MonitorDown />
       <AlertDescription>
         <p>
-          No go2rtc setup needed with the{' '}
+          {translate('No go2rtc setup needed with the')}{' '}
           <a className="text-blue-500 hover:underline" href={kDesktopDownloadUrl} target="_blank" rel="noreferrer">
-            camNC desktop app
+            {translate('camNC desktop app ')}
           </a>
-          : it finds IP cameras on your network and connects to them directly, without a Raspberry Pi or other gateway.
+          {translate(': it finds IP cameras on your network and connects to them directly, without a Raspberry Pi or other gateway. ')}
         </p>
       </AlertDescription>
     </Alert>

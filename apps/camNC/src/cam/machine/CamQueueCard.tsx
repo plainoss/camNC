@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { useStore } from '@/store/store';
 import { Button } from '@wbcnc/ui/components/button';
@@ -33,7 +34,8 @@ import { captureManufacturingSnapshot } from './manufacturingSnapshot';
 const fmt = (v: number) => `${+v.toFixed(2)}`;
 
 /** "Clamp it", "Screw it down": what the board is held with. */
-const holdKindName = (e: QueueEntry) => (e.board.request?.holdPoints?.[0]?.kind === 'clamp' ? 'Clamp it' : 'Screw it down');
+const holdKindName = (e: QueueEntry) =>
+  e.board.request?.holdPoints?.[0]?.kind === 'clamp' ? translate('Clamp it') : translate('Screw it down');
 
 /**
  * The CAM job at the machine, in the machine panel: one line for the current entry of the queue of programs (boards in
@@ -181,28 +183,28 @@ export function CamQueueCard() {
     program?.name && /V-bit/.test(program.name)
       ? program.name
       : program?.shape === 'ball'
-        ? `⌀${program.diameter} mm ball end`
+        ? translate('⌀{{value1}} mm ball end', { value1: program.diameter })
         : program?.shape === 'roundover'
-          ? (program.name ?? `⌀${program.diameter} mm roundover bit`)
+          ? (program.name ?? translate('⌀{{value1}} mm roundover bit', { value1: program.diameter }))
           : undefined;
   const swap =
     bit !== undefined &&
     (bit !== current?.bitBefore || (!!vBit && current?.toolBefore !== undefined && program?.tool !== current.toolBefore));
   const swapText =
     current?.bitBefore === undefined
-      ? `Put in the ${vBit ?? `⌀${bit} mm bit`}`
+      ? translate('Put in the {{value1}}', { value1: vBit ?? `⌀${bit} mm bit` })
       : vBit
-        ? `Swap the bit to the ${vBit}`
-        : `Swap the bit to ⌀${bit} mm`;
+        ? translate('Swap the bit to the {{value1}}', { value1: vBit })
+        : translate('Swap the bit to ⌀{{value1}} mm', { value1: bit });
   const onCamera = current?.flip?.registration === 'camera';
   const at = current ? queue.indexOf(current) : -1;
   const blockedCount = queue.filter(e => e.kind !== 'pending' && e.blocked).length;
-  const stripTitle = current ? entryTitle(current) : (job?.name ?? 'CAM job');
+  const stripTitle = current ? entryTitle(current) : (job?.name ?? translate('CAM job'));
   // Loaded already: there's nothing for the button to do, and the panel needs the room.
   const loaded = !!current && active === current.key && !!loadedGcode && loadedGcode === gcodeOf(current);
 
   return (
-    <section aria-label="CAM job" className="flex flex-col gap-2">
+    <section aria-label={translate('CAM job')} className="flex flex-col gap-2">
       <div className="flex items-center gap-1 rounded-lg border p-1">
         <Popover open={queueOpen} onOpenChange={setQueueOpen}>
           <PopoverTrigger asChild>
@@ -210,7 +212,7 @@ export function CamQueueCard() {
               variant="ghost"
               size="sm"
               className="min-w-0 flex-1 justify-start gap-1 px-1.5 text-[13px] font-medium"
-              aria-label={`Board queue: ${stripTitle}`}>
+              aria-label={translate('Board queue: {{stripTitle}}', { stripTitle: stripTitle })}>
               <span className="truncate">{stripTitle}</span>
               {at >= 0 && (
                 <span className="shrink-0 font-mono text-xs font-normal text-muted-foreground">
@@ -218,7 +220,9 @@ export function CamQueueCard() {
                 </span>
               )}
               {blockedCount > 0 && (
-                <span className="flex shrink-0 items-center gap-0.5 text-xs text-destructive" title={`${blockedCount} blocked`}>
+                <span
+                  className="flex shrink-0 items-center gap-0.5 text-xs text-destructive"
+                  title={translate('{{blockedCount}} blocked', { blockedCount: blockedCount })}>
                   <AlertTriangle className="size-3.5" />
                   {blockedCount}
                 </span>
@@ -229,21 +233,21 @@ export function CamQueueCard() {
           {/* Not onto Leave, the first button: Enter would close the job. */}
           <PopoverContent align="start" className="flex w-80 flex-col gap-1 p-2" onOpenAutoFocus={e => e.preventDefault()}>
             <div className="flex items-center gap-2 px-1">
-              <h3 className="truncate text-sm font-semibold">{job ? job.name : 'CAM job'}</h3>
+              <h3 className="truncate text-sm font-semibold">{job ? job.name : translate('CAM job')}</h3>
               <span className="grow" />
-              <Hint text="Closes the queue here. Which boards are done is forgotten; the job itself stays.">
+              <Hint text={translate('Closes the queue here. Which boards are done is forgotten; the job itself stays.')}>
                 <Button
                   size="icon"
                   variant="ghost"
                   className="size-6"
-                  aria-label="Leave the CAM job"
+                  aria-label={translate('Leave the CAM job')}
                   disabled={setupLocked || reviewing}
                   onClick={leave}>
                   <X className="size-3.5" />
                 </Button>
               </Hint>
             </div>
-            <ol className="flex flex-col gap-0.5 rounded-lg border p-1 text-[13px]" aria-label="Board queue">
+            <ol className="flex flex-col gap-0.5 rounded-lg border p-1 text-[13px]" aria-label={translate('Board queue')}>
               {queue.map(e => {
                 const isDone = done.includes(e.doneId);
                 const isNow = e === current;
@@ -262,7 +266,7 @@ export function CamQueueCard() {
                       )}>
                       <span className="w-4">
                         {e.kind !== 'pending' && e.blocked ? (
-                          <AlertTriangle aria-label="Blocked" className="size-3.5 text-destructive" />
+                          <AlertTriangle aria-label={translate('Blocked')} className="size-3.5 text-destructive" />
                         ) : isDone ? (
                           <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                         ) : isNow ? (
@@ -276,8 +280,13 @@ export function CamQueueCard() {
                         {!e.plan || e.kind === 'flip'
                           ? ''
                           : e.release
-                            ? `${e.release.parts ? `${e.release.parts.length} parts` : `${e.release.tabs?.length ?? 0} tabs`} · ≈${Math.ceil(e.release.timeMin)} min auto`
-                            : `≈${Math.ceil(e.plan.programs[e.program].timeMin)} min auto`}
+                            ? translate('{{value1}} · ≈{{value2}} min auto', {
+                                value1: e.release.parts
+                                  ? translate('{{value1}} parts', { value1: e.release.parts.length })
+                                  : translate('{{value1}} tabs', { value1: e.release.tabs?.length ?? 0 }),
+                                value2: Math.ceil(e.release.timeMin),
+                              })
+                            : translate('≈{{value1}} min auto', { value1: Math.ceil(e.plan.programs[e.program].timeMin) })}
                       </span>
                     </button>
                   </li>
@@ -290,7 +299,7 @@ export function CamQueueCard() {
           size="icon"
           variant="ghost"
           className="size-7"
-          aria-label="Previous board"
+          aria-label={translate('Previous board')}
           disabled={setupLocked || reviewing || at <= 0}
           onClick={() => load(queue[at - 1]!)}>
           <ChevronLeft />
@@ -299,13 +308,13 @@ export function CamQueueCard() {
           size="icon"
           variant="ghost"
           className="size-7"
-          aria-label="Next board"
+          aria-label={translate('Next board')}
           disabled={setupLocked || reviewing || at < 0 || at >= queue.length - 1}
           onClick={() => load(queue[at + 1]!)}>
           <ChevronRight />
         </Button>
         {current && (
-          <Hint text="Marks this one as cut and loads the next program in the queue.">
+          <Hint text={translate('Marks this one as cut and loads the next program in the queue.')}>
             {/* Only for what could be loaded: a program not there yet, or blocked, wasn't cut. Not while one runs: what's loaded stays. */}
             <Button
               size="sm"
@@ -320,12 +329,12 @@ export function CamQueueCard() {
                 !!stale?.has(current.board.board.id)
               }
               onClick={next}>
-              {current.kind === 'flip' ? 'Turned over, next' : 'Done, next'}
+              {current.kind === 'flip' ? translate('Turned over, next') : translate('Done, next')}
             </Button>
           </Hint>
         )}
       </div>
-      {loading && !queue.length && <p className="text-xs text-muted-foreground">Making the programs…</p>}
+      {loading && !queue.length && <p className="text-xs text-muted-foreground">{translate('Making the programs…')}</p>}
       {modelError && (
         <p role="alert" className="text-[13px] text-destructive">
           {modelError}
@@ -333,10 +342,12 @@ export function CamQueueCard() {
       )}
       {recoveryPending.value && (
         <p role="status" className="text-xs text-muted-foreground">
-          Checking the original machine setup…
+          {translate('Checking the original machine setup… ')}
         </p>
       )}
-      {busy && <p className="text-xs text-muted-foreground">A program is running or paused: the queue goes on when it’s done.</p>}
+      {busy && (
+        <p className="text-xs text-muted-foreground">{translate('A program is running or paused: the queue goes on when it’s done.')}</p>
+      )}
       {runPreparationError && (
         <p role="alert" className="text-xs text-destructive">
           {runPreparationError}
@@ -345,24 +356,35 @@ export function CamQueueCard() {
       {snapshot && (
         <p role="status" className="text-xs text-muted-foreground">
           {runPreparationError
-            ? 'Preparation needs review'
+            ? translate('Preparation needs review')
             : busy
-              ? 'Running or resumable setup'
+              ? translate('Running or resumable setup')
               : runReview
-                ? `Run review: ${runReview === 'finished' ? 'finished' : runReview === 'stopped' ? 'stopped' : 'execution was requested'}`
-                : 'Protected setup'}{' '}
-          · design revision {snapshot.designRevision}.
-          {designChanged && ` Current design is revision ${job?.design?.acceptedRevision}. This setup keeps its original programs.`}
+                ? translate('Run review: {{value1}}', {
+                    value1:
+                      runReview === 'finished'
+                        ? translate('finished')
+                        : runReview === 'stopped'
+                          ? translate('stopped')
+                          : translate('execution was requested'),
+                  })
+                : translate('Protected setup')}{' '}
+          {translate('· design revision ')}
+          {snapshot.designRevision}.
+          {designChanged &&
+            translate(' Current design is revision {{value1}}. This setup keeps its original programs.', {
+              value1: job?.design?.acceptedRevision,
+            })}
         </p>
       )}
       {designChanged && (
         <Button size="sm" variant="outline" disabled={busy || reviewing} onClick={closeSetup}>
-          Use current design with a new setup
+          {translate('Use current design with a new setup ')}
         </Button>
       )}
       {snapshot && !designChanged && !busy && (
         <Button size="sm" variant="outline" disabled={reviewing} onClick={closeSetup}>
-          {runReview ? 'Close run review and use current setup' : 'Close this machining setup'}
+          {runReview ? translate('Close run review and use current setup') : translate('Close this machining setup')}
         </Button>
       )}
 
@@ -375,7 +397,7 @@ export function CamQueueCard() {
               {current.kind !== 'pending' && <AlertTriangle className="mt-0.5 size-4 shrink-0" />}
               <span>
                 {current.blocked}
-                {current.kind !== 'pending' && ' Fix it on the Plan step: this can’t be loaded until then.'}
+                {current.kind !== 'pending' && translate(' Fix it on the Plan step: this can’t be loaded until then.')}
               </span>
             </p>
           )}
@@ -385,18 +407,20 @@ export function CamQueueCard() {
               state="todo"
               markable
               startFolded={board.measuredThickness !== undefined}
-              label="Board"
-              title={<span className="whitespace-nowrap">{`Board ${board.name} on the bed`}</span>}
+              label={translate('Board')}
+              title={<span className="whitespace-nowrap">{translate('Board {{value1}} on the bed', { value1: board.name })}</span>}
               summary={`${fmt(current.plan.size[0])} × ${fmt(current.plan.size[1])} × ${fmt(stockTopOf(board))} mm`}>
               <div className="flex flex-col gap-1.5">
                 <p>
-                  <span className="font-medium">1. Measure its thickness</span>
-                  {board.measuredThickness === undefined ? ` (assumed parts + ${kStockAllowance} mm):` : ':'}
+                  <span className="font-medium">{translate('1. Measure its thickness')}</span>
+                  {board.measuredThickness === undefined
+                    ? translate(' (assumed parts + {{kStockAllowance}} mm):', { kStockAllowance: kStockAllowance })
+                    : ':'}
                 </p>
                 <div className="flex w-40 flex-col gap-1">
                   <NumberInput
                     id={`queue-stock-${board.id}`}
-                    aria-label={`Stock thickness of board ${board.name}, mm`}
+                    aria-label={translate('Stock thickness of board {{value1}}, mm', { value1: board.name })}
                     value={stockTopOf(board)}
                     min={board.thickness}
                     unit="mm"
@@ -405,46 +429,64 @@ export function CamQueueCard() {
                 </div>
               </div>
               <p>
-                <span className="font-medium">2. Place it</span> on the bed.
+                <span className="font-medium">{translate('2. Place it')}</span>
+                {translate(' on the bed. ')}
               </p>
               <p>
-                <span className="font-medium">3. Line up the outline</span> with the board in the camera view.
+                <span className="font-medium">{translate('3. Line up the outline')}</span>
+                {translate(' with the board in the camera view. ')}
               </p>
               {!!current.board.request?.holdPoints?.length && (
                 <p>
-                  <span className="font-medium">4. {holdKindName(current)}</span> on the blue marks.
+                  <span className="font-medium">4. {holdKindName(current)}</span>
+                  {translate(' on the blue marks. ')}
                 </p>
               )}
-              {!swap && <p className="text-muted-foreground">Z0 is the bottom of the board: zero Z on the spoilboard below.</p>}
+              {!swap && (
+                <p className="text-muted-foreground">{translate('Z0 is the bottom of the board: zero Z on the spoilboard below.')}</p>
+              )}
             </SetupStep>
           )}
           {current.kind === 'flip' && (
-            <SetupStep state="todo" label="Turn over" title={`Turn board ${board.name} over`} summary="top to bottom">
+            <SetupStep
+              state="todo"
+              label={translate('Turn over')}
+              title={translate('Turn board {{value1}} over', { value1: board.name })}
+              summary="top to bottom">
               <p>
-                The front edge goes to the back.{' '}
+                {translate('The front edge goes to the back.')}{' '}
                 {current.flip?.registration === 'dowels'
-                  ? `Put the ⌀${current.flip.dowelDiameter} dowel pins into the holes side A drilled, and drop the board onto them.`
+                  ? translate('Put the ⌀{{value1}} dowel pins into the holes side A drilled, and drop the board onto them.', {
+                      value1: current.flip.dowelDiameter,
+                    })
                   : current.flip?.registration === 'fence'
-                    ? 'Push it against the fence and the stop again, as for side A.'
-                    : 'You’ll drag the dashed outline onto it in the camera view on the next step, with side B’s program loaded.'}
+                    ? translate('Push it against the fence and the stop again, as for side A.')
+                    : translate(
+                        'You’ll drag the dashed outline onto it in the camera view on the next step, with side B’s program loaded.'
+                      )}
               </p>
               <p>
-                <span className="font-medium">Refit the screws, clamps or tape</span> where side B needs them: they have to stay clear of
-                side B’s cuts, which the checks don’t know about.
+                <span className="font-medium">{translate('Refit the screws, clamps or tape')}</span>
+                {translate(' where side B needs them: they have to stay clear of side B’s cuts, which the checks don’t know about. ')}
               </p>
               <p className="text-muted-foreground">
                 {onCamera
-                  ? 'Z stays: it’s measured from the spoilboard.'
-                  : 'Don’t touch the XY zero: side B is mirrored to it. Z stays: it’s measured from the spoilboard.'}
+                  ? translate('Z stays: it’s measured from the spoilboard.')
+                  : translate('Don’t touch the XY zero: side B is mirrored to it. Z stays: it’s measured from the spoilboard.')}
               </p>
             </SetupStep>
           )}
           {current.kind === 'bit' && current.sideB && current.program === 0 && (
-            <SetupStep state="todo" label="Side B" title="Side B" summary={`⌀${current.plan.programs[0].diameter} mm, the undersides`}>
-              <p>The parts’ undersides, not cut through.</p>
+            <SetupStep
+              state="todo"
+              label={translate('Side B')}
+              title={translate('Side B')}
+              summary={`⌀${current.plan.programs[0].diameter} mm, the undersides`}>
+              <p>{translate('The parts’ undersides, not cut through.')}</p>
               {onCamera && (
                 <p>
-                  <span className="font-medium">Line up the outline</span> with the turned board in the camera view.
+                  <span className="font-medium">{translate('Line up the outline')}</span>
+                  {translate(' with the turned board in the camera view. ')}
                 </p>
               )}
             </SetupStep>
@@ -455,74 +497,89 @@ export function CamQueueCard() {
               state="todo"
               markable
               startFolded={current.firstOfBoard}
-              label="Bit"
+              label={translate('Bit')}
               title={<span className="whitespace-nowrap">{swapText}</span>}
-              summary={current.firstOfBoard ? 'Z0: board bottom' : undefined}>
+              summary={current.firstOfBoard ? translate('Z0: board bottom') : undefined}>
               <p>
                 {current.firstOfBoard
-                  ? 'Then zero Z on the spoilboard below: Z0 is the bottom of the board.'
-                  : 'Then zero Z again below. Don’t move the board: XY stays.'}
+                  ? translate('Then zero Z on the spoilboard below: Z0 is the bottom of the board.')
+                  : translate('Then zero Z again below. Don’t move the board: XY stays.')}
               </p>
             </SetupStep>
           )}
           {current.kind === 'free' && current.board.request?.holdDown === 'fixture-tape' && (
-            <SetupStep state="todo" label="Cut the parts free" title="Cut the parts free" summary="no pauses">
-              <p>Cuts the bottom skin of all parts in one go, smallest first. Take the parts off the tape when it’s done.</p>
+            <SetupStep state="todo" label={translate('Cut the parts free')} title={translate('Cut the parts free')} summary="no pauses">
+              <p>{translate('Cuts the bottom skin of all parts in one go, smallest first. Take the parts off the tape when it’s done.')}</p>
             </SetupStep>
           )}
           {current.kind === 'free' && current.board.request?.holdDown !== 'fixture-tape' && (
             <SetupStep
               state="todo"
-              label="Cut the parts free"
-              title="Cut the parts free"
-              summary={current.release?.parts ? `one per pause, ${current.release.parts.length} parts` : 'one per pause'}>
+              label={translate('Cut the parts free')}
+              title={translate('Cut the parts free')}
+              summary={current.release?.parts ? `one per pause, ${current.release.parts.length} parts` : translate('one per pause')}>
               <p>
-                Hold down the part ringed green while it’s cut free. At each pause, take out the amber one, hold down the next green one,
-                then Resume.
+                {translate(
+                  'Hold down the part ringed green while it’s cut free. At each pause, take out the amber one, hold down the next green one, then Resume. '
+                )}
               </p>
               <HowItWorks>
-                The program cuts one part’s bottom skin at a time, then lifts the bit, stops the spindle and pauses. The spindle starts
-                again on Resume, before the next one. A router you switch by hand: switch it off at each pause, back on before Resume.
+                {translate(
+                  'The program cuts one part’s bottom skin at a time, then lifts the bit, stops the spindle and pauses. The spindle starts again on Resume, before the next one. A router you switch by hand: switch it off at each pause, back on before Resume. '
+                )}
               </HowItWorks>
             </SetupStep>
           )}
           {current.kind === 'tabs' && (
             <SetupStep
               state="todo"
-              label="Remove the tabs"
-              title="Remove the tabs"
-              summary={pauseEachTab ? 'a pause before each tab' : 'a pause per part'}>
+              label={translate('Remove the tabs')}
+              title={translate('Remove the tabs')}
+              summary={pauseEachTab ? translate('a pause before each tab') : translate('a pause per part')}>
               <p>
                 {pauseEachTab
-                  ? 'At each pause, hold the part at the green ring, away from the bit, then Resume.'
-                  : 'At each pause, take out the part marked amber, then Resume.'}
+                  ? translate('At each pause, hold the part at the green ring, away from the bit, then Resume.')
+                  : translate('At each pause, take out the part marked amber, then Resume.')}
               </p>
               <HowItWorks>
                 {pauseEachTab
-                  ? 'The program lifts the bit, stops the spindle and pauses before each tab. The spindle starts again on Resume.'
-                  : 'The program cuts all of a part’s tabs in a row, the last one slower, then lifts the bit, stops the spindle and pauses. The spindle starts again on Resume, before the next part.'}{' '}
-                {spindle === 'hand' && ' A router you switch by hand: switch it off at each pause, back on before Resume.'}
+                  ? translate(
+                      'The program lifts the bit, stops the spindle and pauses before each tab. The spindle starts again on Resume.'
+                    )
+                  : translate(
+                      'The program cuts all of a part’s tabs in a row, the last one slower, then lifts the bit, stops the spindle and pauses. The spindle starts again on Resume, before the next part.'
+                    )}{' '}
+                {spindle === 'hand' && translate(' A router you switch by hand: switch it off at each pause, back on before Resume.')}
               </HowItWorks>
               <label className="flex items-center gap-2 text-[13px]">
-                <Checkbox checked={pauseEachTab} onCheckedChange={v => setPauseEachTab(v === true)} aria-label="Pause before each tab" />
-                Pause before each tab
+                <Checkbox
+                  checked={pauseEachTab}
+                  onCheckedChange={v => setPauseEachTab(v === true)}
+                  aria-label={translate('Pause before each tab')}
+                />
+                {translate('Pause before each tab ')}
               </label>
             </SetupStep>
           )}
           {current.plan && current.kind !== 'flip' && !loaded && (
-            <Hint text="Puts this program in the machine view, ready to run.">
+            <Hint text={translate('Puts this program in the machine view, ready to run.')}>
               <Button
                 size="sm"
                 className="self-start"
                 disabled={setupLocked || reviewing || !gcodeOf(current)}
                 onClick={() => load(current)}>
-                Load {current.kind === 'tabs' ? 'tab removal' : current.kind === 'free' ? 'parts freeing' : 'program'}
+                {translate('Load ')}
+                {current.kind === 'tabs'
+                  ? translate('tab removal')
+                  : current.kind === 'free'
+                    ? translate('parts freeing')
+                    : translate('program')}
               </Button>
             </Hint>
           )}
         </fieldset>
       )}
-      {!current && queue.length > 0 && <p className="text-[13px]">All boards are cut.</p>}
+      {!current && queue.length > 0 && <p className="text-[13px]">{translate('All boards are cut.')}</p>}
     </section>
   );
 }
@@ -537,7 +594,7 @@ function HowItWorks({ children }: { children: React.ReactNode }) {
         className="self-start text-xs text-muted-foreground underline"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}>
-        How it works
+        {translate('How it works ')}
       </button>
       {open && <p className="text-xs text-muted-foreground">{children}</p>}
     </div>

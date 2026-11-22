@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useId, useMemo } from 'react';
 import { Button } from '@wbcnc/ui/components/button';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
@@ -23,7 +24,12 @@ import './panel.css';
 
 const kDetails: CarvingDetail[] = ['simple', 'balanced', 'detailed'];
 const kDetailNames: Record<CarvingDetail, string> = { simple: 'Simple', balanced: 'Balanced', detailed: 'Detailed' };
-const kIdeas = ['An owl reading a book', 'An oak leaf with its veins', 'Mountains at sunrise', 'A ship anchor with rope'];
+const kIdeas = [
+  translate('An owl reading a book'),
+  translate('An oak leaf with its veins'),
+  translate('Mountains at sunrise'),
+  translate('A ship anchor with rope'),
+];
 const kIdeaNames = ['Owl', 'Leaf', 'Mountains', 'Anchor'];
 const kSeg =
   'flex-1 rounded px-2 py-1 text-xs whitespace-nowrap text-muted-foreground aria-checked:bg-violet-500/15 aria-checked:text-violet-700 dark:aria-checked:text-violet-300';
@@ -49,7 +55,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
       return null;
     }
   }, [shown]);
-  const applyLabel = session.applied ? 'Applied' : session.replace.on ? 'Replace on board' : 'Add to board';
+  const applyLabel = session.applied ? 'Applied' : session.replace.on ? translate('Replace on board') : translate('Add to board');
   return (
     <div
       className={cn(
@@ -58,25 +64,32 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
       )}
       {...drop.handlers}>
       <CarvePanelHeader
-        title="AI artwork"
+        title={translate('AI artwork')}
         icon={<Sparkles className="size-4 text-violet-500" />}
         onClose={onClose}
         actions={
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Assistant settings"
-            title={connection.credentials ? `Settings · ${connectionLabel(connection.credentials.config)}` : 'Settings'}
+            aria-label={translate('Assistant settings')}
+            title={
+              connection.credentials
+                ? translate('Settings · {{value1}}', { value1: connectionLabel(connection.credentials.config) })
+                : translate('Settings')
+            }
             onClick={() => settings.show()}>
             <Settings />
           </Button>
         }
       />
       <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-violet-500 p-2 text-xs text-muted-foreground">
-        <span className="min-w-0 flex-1" title="Drag the box on the board to move it, or its corner to resize it.">
-          Dashed box on the board
+        <span className="min-w-0 flex-1" title={translate('Drag the box on the board to move it, or its corner to resize it.')}>
+          {translate('Dashed box on the board ')}
           <span className="block">
-            {job.carving?.vBit.name} · deepest {job.carving?.maxDepth} mm
+            {job.carving?.vBit.name}
+            {translate(' · deepest ')}
+            {job.carving?.maxDepth}
+            {translate(' mm ')}
           </span>
         </span>
         <span className="flex items-center gap-1">
@@ -85,7 +98,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
               {i > 0 && '×'}
               <NumberInput
                 id={`${id}-${side}`}
-                aria-label={`Box ${side === 'w' ? 'width' : 'height'}`}
+                aria-label={translate('Box {{value1}}', { value1: side === 'w' ? translate('width') : translate('height') })}
                 className="h-7 w-14 px-1 text-xs"
                 value={Math.round(session.target[side])}
                 min={10}
@@ -95,22 +108,22 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
               />
             </span>
           ))}
-          mm
+          {translate('mm ')}
         </span>
       </div>
       {!connection.credentials && (
         <p className="text-xs text-muted-foreground">
           <button type="button" className="underline" onClick={() => settings.show('connection')}>
-            Connect an AI provider
+            {translate('Connect an AI provider ')}
           </button>{' '}
-          to generate here, or use another chat below.
+          {translate('to generate here, or use another chat below. ')}
         </p>
       )}
       {connection.credentials && connection.needsImageProvider && (
         <p className="text-xs text-amber-700 dark:text-amber-300">
-          This connection can&rsquo;t make images:{' '}
+          {translate('This connection can’t make images:')}{' '}
           <button type="button" className="underline" onClick={() => settings.show('images')}>
-            add an image provider
+            {translate('add an image provider ')}
           </button>
           ,{' '}
           <button
@@ -121,13 +134,13 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
               // This notice goes away with the button: carry on in the prompt rather than drop focus to the page.
               requestAnimationFrame(() => document.getElementById(`${id}-prompt`)?.focus());
             }}>
-            use Text SVG
+            {translate('use Text SVG ')}
           </button>
-          , or use another chat below.
+          {translate(', or use another chat below. ')}
         </p>
       )}
       <form
-        aria-label="Describe carving artwork"
+        aria-label={translate('Describe carving artwork')}
         className="grid gap-3"
         onSubmit={event => {
           event.preventDefault();
@@ -135,14 +148,14 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
         }}>
         <div className="grid gap-1.5">
           <label htmlFor={`${id}-prompt`} className="text-xs text-muted-foreground">
-            What should it show?
+            {translate('What should it show? ')}
           </label>
           <textarea
             id={`${id}-prompt`}
             rows={2}
             maxLength={4000}
             className="min-h-16 w-full resize-y rounded-md border bg-background p-2 text-sm"
-            placeholder={refinable ? 'Describe a change, or a new idea' : 'e.g. an owl reading a book'}
+            placeholder={refinable ? translate('Describe a change, or a new idea') : translate('e.g. an owl reading a book')}
             value={request.prompt}
             disabled={session.generating}
             onChange={event => request.setPrompt(event.target.value)}
@@ -155,7 +168,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
             }}
           />
           {!request.prompt.trim() && (
-            <div className="flex flex-wrap gap-1" aria-label="Ideas">
+            <div className="flex flex-wrap gap-1" aria-label={translate('Ideas')}>
               {kIdeas.map((idea, i) => (
                 <button
                   key={idea}
@@ -168,19 +181,19 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
             </div>
           )}
         </div>
-        <div role="radiogroup" aria-label="Style" className="grid grid-cols-2 gap-2">
+        <div role="radiogroup" aria-label={translate('Style')} className="grid grid-cols-2 gap-2">
           {(['line', 'bold'] as const).map(value => (
             <StyleSwatch key={value} value={value} checked={request.style === value} onPick={() => request.setStyle(value)} />
           ))}
         </div>
-        <div role="radiogroup" aria-label="Detail" className="flex gap-0.5 rounded-md border p-0.5">
+        <div role="radiogroup" aria-label={translate('Detail')} className="flex gap-0.5 rounded-md border p-0.5">
           {kDetails.map(level => (
             <button
               key={level}
               type="button"
               role="radio"
               aria-checked={session.detail === level}
-              title={`Smallest detail about ${carvingDetailMm[level]} mm`}
+              title={translate('Smallest detail about {{value1}} mm', { value1: carvingDetailMm[level] })}
               className={kSeg}
               onClick={() => session.setDetail(level)}>
               {kDetailNames[level]}
@@ -190,28 +203,29 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
         <div className="flex flex-wrap gap-2">
           {session.generating ? (
             <Button type="button" variant="outline" className="flex-1" onClick={request.stop}>
-              <LoadingSpinner className="size-3" /> Stop
+              <LoadingSpinner className="size-3" />
+              {translate(' Stop ')}
             </Button>
           ) : (
             <>
               <Button type="submit" className="flex-1" disabled={!request.canGenerate}>
-                {session.variants.length ? 'New ideas' : 'Generate'}
+                {session.variants.length ? translate('New ideas') : translate('Generate')}
               </Button>
               {refinable && (
                 <Button type="button" variant="outline" disabled={!request.canGenerate} onClick={() => void request.generate(true)}>
-                  Refine picked
+                  {translate('Refine picked ')}
                 </Button>
               )}
             </>
           )}
           <select
-            aria-label="Variants"
+            aria-label={translate('Variants')}
             className="rounded-md border bg-background px-1 text-xs"
             value={request.count}
             onChange={event => request.setCount(Number(event.target.value))}>
             {kVariantCounts.map(n => (
               <option key={n} value={n}>
-                {n} {n === 1 ? 'idea' : 'ideas'}
+                {n} {n === 1 ? translate('idea') : translate('ideas')}
               </option>
             ))}
           </select>
@@ -221,12 +235,13 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
       {session.replace.available && (
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" checked={session.replace.on} onChange={event => session.replace.set(event.target.checked)} />
-          Replace {session.replace.name}
+          {translate('Replace ')}
+          {session.replace.name}
         </label>
       )}
       {(session.preparing || session.status) && (
         <p role="status" className="text-sm">
-          {session.preparing ? 'Preparing at this size…' : session.status}
+          {session.preparing ? translate('Preparing at this size…') : session.status}
         </p>
       )}
       {session.error && (
@@ -237,16 +252,23 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
       <VariantGrid session={session} />
       {current && report && (
         <div className="space-y-2">
-          <p className="text-sm font-medium">{current.asset.title ?? 'Artwork'}</p>
+          <p className="text-sm font-medium">{current.asset.title ?? translate('Artwork')}</p>
           {report.ok && !current.refusal ? (
             <p className="rounded-md border border-emerald-600/40 bg-emerald-500/10 p-2 text-sm">
-              Ready · {prepared.width.toFixed(0)} × {prepared.height.toFixed(0)} mm
+              {translate('Ready · ')}
+              {prepared.width.toFixed(0)} × {prepared.height.toFixed(0)}
+              {translate(' mm ')}
               {problems
-                ? ` · ${problems} thin or lost ${problems === 1 ? 'spot is' : 'spots are'} circled on the board`
-                : ' · no thin spots'}
+                ? translate(' · {{problems}} thin or lost {{value2}} circled on the board', {
+                    problems: problems,
+                    value2: problems === 1 ? translate('spot is') : translate('spots are'),
+                  })
+                : translate(' · no thin spots')}
             </p>
           ) : (
-            <ul className="list-disc rounded-md border border-amber-600/40 bg-amber-500/10 py-2 pr-2 pl-6 text-sm" aria-label="Problems">
+            <ul
+              className="list-disc rounded-md border border-amber-600/40 bg-amber-500/10 py-2 pr-2 pl-6 text-sm"
+              aria-label={translate('Problems')}>
               {[...report.errors, ...(current.refusal ? [current.refusal] : [])].map((message, i) => (
                 <li key={i}>{message}</li>
               ))}
@@ -255,7 +277,8 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
           {!!report.warnings.length && (
             <details>
               <summary className="cursor-pointer text-xs text-muted-foreground">
-                {report.warnings.length} {report.warnings.length === 1 ? 'note' : 'notes'} from the checks
+                {report.warnings.length} {report.warnings.length === 1 ? translate('note') : translate('notes')}
+                {translate(' from the checks ')}
               </summary>
               <ul className="list-disc pl-5 text-xs">
                 {report.warnings.map((message, i) => (
@@ -267,7 +290,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
           {!!prepared.operations.length && <Toolpaths prepared={prepared} />}
           {sourceVector && (
             <a className="inline-block text-xs text-muted-foreground underline" href={sourceVector} download="carving-source.svg">
-              Download the source SVG
+              {translate('Download the source SVG ')}
             </a>
           )}
           <div className="flex flex-wrap gap-2">
@@ -275,7 +298,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
               {applyLabel}
             </Button>
             <Button variant="outline" onClick={() => session.picked && session.discard(session.picked)}>
-              Discard
+              {translate('Discard ')}
             </Button>
           </div>
         </div>
@@ -288,7 +311,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
         sections={[
           {
             id: 'connection',
-            label: 'Connection',
+            label: translate('Connection'),
             content: (
               <ProviderSettings
                 value={connection.credentials}
@@ -301,11 +324,11 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
           },
           {
             id: 'images',
-            label: 'Images',
+            label: translate('Images'),
             content: (
               <>
                 <fieldset disabled={session.generating} className="flex flex-wrap gap-x-4">
-                  <legend className="text-sm">Method</legend>
+                  <legend className="text-sm">{translate('Method')}</legend>
                   <label>
                     <input
                       type="radio"
@@ -313,7 +336,9 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
                       checked={connection.generationMode === 'native'}
                       onChange={() => connection.setGenerationMode('native')}
                     />{' '}
-                    {connection.sharedImageModel ? `Image model · ${connection.sharedImageModel}` : 'Image generation'}
+                    {connection.sharedImageModel
+                      ? translate('Image model · {{value1}}', { value1: connection.sharedImageModel })
+                      : translate('Image generation')}
                   </label>
                   <label>
                     <input
@@ -322,15 +347,15 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
                       checked={connection.generationMode === 'text'}
                       onChange={() => connection.setGenerationMode('text')}
                     />{' '}
-                    Text SVG
+                    {translate('Text SVG ')}
                   </label>
                 </fieldset>
                 {connection.generationMode === 'native' && (
                   <>
                     <p className="text-xs text-muted-foreground">
                       {connection.sharedImageModel
-                        ? 'Uses your connected key. The image is traced into filled regions on this device.'
-                        : 'Your connection has no image model. Connect an OpenAI key, or enter an image provider below.'}
+                        ? translate('Uses your connected key. The image is traced into filled regions on this device.')
+                        : translate('Your connection has no image model. Connect an OpenAI key, or enter an image provider below.')}
                     </p>
                     {connection.sharedImageModel && (
                       <label className="flex items-start gap-2 text-sm">
@@ -340,7 +365,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
                           disabled={session.generating}
                           onChange={event => connection.setSeparateImage(event.target.checked)}
                         />
-                        Use a different image provider
+                        {translate('Use a different image provider ')}
                       </label>
                     )}
                     {connection.separateImage && (
@@ -353,7 +378,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
           },
           {
             id: 'usage',
-            label: 'Cost and limits',
+            label: translate('Cost and limits'),
             content: (
               <RunSettings
                 value={connection.runSettings}
@@ -394,7 +419,7 @@ function StyleSwatch({ value, checked, onPick }: { value: CarvingStyle; checked:
           </g>
         )}
       </svg>
-      {value === 'line' ? 'Line art' : 'Bold shapes'}
+      {value === 'line' ? translate('Line art') : translate('Bold shapes')}
     </button>
   );
 }
@@ -407,10 +432,10 @@ function Toolpaths({ prepared }: { prepared: PreparedCarvingArt }) {
     y1 = Math.max(...pts.map(p => p.y));
   return (
     <details>
-      <summary className="cursor-pointer text-xs text-muted-foreground">Cutting paths</summary>
+      <summary className="cursor-pointer text-xs text-muted-foreground">{translate('Cutting paths')}</summary>
       <svg
         role="img"
-        aria-label="Checked carving toolpaths"
+        aria-label={translate('Checked carving toolpaths')}
         className="max-h-48 w-full border bg-white"
         viewBox={`${x0 - 2} ${-y1 - 2} ${x1 - x0 + 4} ${y1 - y0 + 4}`}>
         {prepared.operations.map((operation, index) => (

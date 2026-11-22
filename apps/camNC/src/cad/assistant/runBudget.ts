@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { AssistantMessage } from './provider';
 
 export interface AssistantLimits {
@@ -47,22 +48,22 @@ export function validateAssistantBudget(limits: AssistantLimits, pricing?: Assis
   for (const [key, value] of Object.entries(limits)) {
     if (value === undefined) continue;
     if (!Number.isFinite(value) || value <= 0 || (key !== 'maxCostUsd' && !Number.isSafeInteger(value)))
-      throw new Error('Assistant budgets must be positive finite numbers; counts and durations must be integers.');
+      throw new Error(translate('Assistant budgets must be positive finite numbers; counts and durations must be integers.'));
   }
   if (pricing) {
     for (const key of ['inputUsdPerMillion', 'outputUsdPerMillion'] as const)
       if (!Number.isFinite(pricing[key]) || pricing[key] < 0)
-        throw new Error('Enter both input and output prices as non-negative finite numbers.');
+        throw new Error(translate('Enter both input and output prices as non-negative finite numbers.'));
     for (const [key, value] of Object.entries(pricing)) {
       if (key === 'cacheWritesAtInputPrice') {
-        if (typeof value !== 'boolean') throw new Error('Choose whether cache writes use the input price.');
+        if (typeof value !== 'boolean') throw new Error(translate('Choose whether cache writes use the input price.'));
         continue;
       }
       if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0))
-        throw new Error('Assistant prices must be non-negative finite numbers.');
+        throw new Error(translate('Assistant prices must be non-negative finite numbers.'));
     }
   }
-  if (limits.maxCostUsd !== undefined && !pricing) throw new Error('Enter model pricing before setting a dollar budget.');
+  if (limits.maxCostUsd !== undefined && !pricing) throw new Error(translate('Enter model pricing before setting a dollar budget.'));
 }
 export function recordAssistantUsage(total: AssistantRunUsage, message: AssistantMessage, pricing?: AssistantPricing) {
   total.calls++;
@@ -98,15 +99,17 @@ export function recordAssistantUsage(total: AssistantRunUsage, message: Assistan
 export function assistantBudgetStop(usage: AssistantRunUsage, limits: AssistantLimits): string | undefined {
   if (limits.maxInputTokens !== undefined && (usage.inputTokens === null || usage.inputTokens >= limits.maxInputTokens))
     return usage.inputTokens === null
-      ? 'Provider input usage is unknown; cannot continue within the token budget.'
-      : 'Input token budget reached.';
+      ? translate('Provider input usage is unknown; cannot continue within the token budget.')
+      : translate('Input token budget reached.');
   if (
     limits.maxTotalTokens !== undefined &&
     (usage.inputTokens === null || usage.outputTokens === null || usage.inputTokens + usage.outputTokens >= limits.maxTotalTokens)
   )
     return usage.inputTokens === null || usage.outputTokens === null
-      ? 'Provider usage is unknown; cannot continue within the token budget.'
-      : 'Total token budget reached.';
+      ? translate('Provider usage is unknown; cannot continue within the token budget.')
+      : translate('Total token budget reached.');
   if (limits.maxCostUsd !== undefined && (usage.costUsd === null || usage.costUsd >= limits.maxCostUsd))
-    return usage.costUsd === null ? 'Provider cost is unknown; cannot continue within the dollar budget.' : 'Dollar budget reached.';
+    return usage.costUsd === null
+      ? translate('Provider cost is unknown; cannot continue within the dollar budget.')
+      : translate('Dollar budget reached.');
 }

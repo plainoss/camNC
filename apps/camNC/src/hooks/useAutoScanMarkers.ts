@@ -1,3 +1,4 @@
+import { workerLanguageName } from '@wbcnc/i18n';
 import * as Comlink from 'comlink';
 import { useCallback, useEffect, useRef } from 'react';
 
@@ -105,6 +106,7 @@ class MarkerScannerService {
       // Spawn worker as ESM
       const worker = new Worker(new URL('../workers/markerScanner.worker.ts', import.meta.url), {
         type: 'module',
+        name: workerLanguageName(),
       });
       cleanups.push(() => worker.terminate());
       const proxy = Comlink.wrap<MarkerScannerWorkerAPI>(worker);

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { MachineConnectionForm } from '@/components/machine/MachineConnectionForm';
 import { SpindleSetting } from '@/components/machine/controls';
 import { PageHeader } from '@/components/page-header';
@@ -25,14 +26,15 @@ function RouteComponent() {
   const next = nextStep(useCamSource(), !!useMachineBoundsOrNull());
   return (
     <div className="w-full h-full">
-      <PageHeader title="Machine" />
+      <PageHeader title={translate('Machine')} />
       <div className="flex justify-center p-1 flex-row">
         <Card className="w-full max-w-xl">
           <CardHeader>
-            <CardTitle>Connect to FluidNC</CardTitle>
+            <CardTitle>{translate('Connect to FluidNC')}</CardTitle>
             <CardDescription>
-              camNC talks to your FluidNC controller (3.9.9 or 4.1.x) directly over your local network, for jogging, zeroing and running
-              jobs. This is optional, you can also continue without a machine connection.
+              {translate(
+                'camNC talks to your FluidNC controller (3.9.9 or 4.1.x) directly over your local network, for jogging, zeroing and running jobs. This is optional, you can also continue without a machine connection. '
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -40,7 +42,9 @@ function RouteComponent() {
               <MachineConnectionForm />
               <div className="flex flex-row gap-2 justify-end">
                 {/* Connecting a machine should not walk through steps that are already done. */}
-                <Button onClick={() => navigate({ to: next })}>{next === '/visualize/2DView' ? 'Continue to top view' : 'Continue'}</Button>
+                <Button onClick={() => navigate({ to: next })}>
+                  {next === '/visualize/2DView' ? translate('Continue to top view') : translate('Continue')}
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -49,10 +53,11 @@ function RouteComponent() {
       <div className="flex justify-center p-1 flex-row">
         <Card className="w-full max-w-xl">
           <CardHeader>
-            <CardTitle>Spindle</CardTitle>
+            <CardTitle>{translate('Spindle')}</CardTitle>
             <CardDescription>
-              By hand: every pause in a CAM program tells you to switch the router off, and on again before Resume. By the controller: the
-              program&apos;s M3 and M5 do it, and the pauses don&apos;t mention it.
+              {translate(
+                "By hand: every pause in a CAM program tells you to switch the router off, and on again before Resume. By the controller: the program's M3 and M5 do it, and the pauses don't mention it. "
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cutoutSilhouette, unionPaths, type BoardCarving, type BoardRequest, type CutoutShape, type LibraryTool } from '@wbcnc/cam';
 import type { BoardV1 } from './boards';
 import type { CamJobV1 } from './jobDb';
@@ -5,9 +6,9 @@ import { kDefaultPlan, type PlanSettingsV1 } from './planSettings';
 
 /** Fonts every browser has; the outlines are saved with the job, so a font another computer lacks changes nothing cut. */
 export const kCarvingFonts = {
-  sans: { label: 'Sans, bold', css: '700 {size}px Arial, Helvetica, sans-serif' },
-  serif: { label: 'Serif, bold', css: '700 {size}px Georgia, "Times New Roman", serif' },
-  slab: { label: 'Slab', css: '700 {size}px Rockwell, "Courier New", monospace' },
+  sans: { label: translate('Sans, bold'), css: '700 {size}px Arial, Helvetica, sans-serif' },
+  serif: { label: translate('Serif, bold'), css: '700 {size}px Georgia, "Times New Roman", serif' },
+  slab: { label: translate('Slab'), css: '700 {size}px Rockwell, "Courier New", monospace' },
 } as const;
 export type CarvingFont = keyof typeof kCarvingFonts;
 
@@ -98,7 +99,7 @@ export function placeItem(item: CarvingItemV1): Loop[] {
 
 export const carvingRegion = (items: CarvingItemV1[]): Loop[] => unionPaths(items.flatMap(placeItem));
 /** Why an empty carving can't be planned; the Carve step's empty board shows the ways to start instead. */
-export const kEmptyCarving = 'Add text or an SVG to carve.';
+export const kEmptyCarving = translate('Add text or an SVG to carve.');
 export const itemName = (item: CarvingItemV1): string => (item.art.kind === 'text' ? `"${item.art.text}"` : item.art.fileName);
 /** The carving with these items. Tabs placed on the cut line move, turn and scale with the artwork they are next to. */
 export const withItems = (carving: CarvingV1, items: CarvingItemV1[]): CarvingV1 => {
@@ -235,8 +236,9 @@ export function carvingBoard(size: { w: number; h: number; thickness: number }):
 /** Problems that stop the carving from being planned, for people. */
 export function carvingProblem(carving: CarvingV1, board: Pick<BoardV1, 'thickness'>): string | null {
   if (!carving.items.length) return kEmptyCarving;
-  if (carving.items.some(item => item.art.kind === 'text' && !item.art.text.trim())) return 'Type something to carve.';
-  if (!carving.region.length) return 'The artwork has no filled shapes to carve.';
-  if (carving.maxDepth >= board.thickness) return `The depth must be less than the board's ${board.thickness} mm.`;
+  if (carving.items.some(item => item.art.kind === 'text' && !item.art.text.trim())) return translate('Type something to carve.');
+  if (!carving.region.length) return translate('The artwork has no filled shapes to carve.');
+  if (carving.maxDepth >= board.thickness)
+    return translate("The depth must be less than the board's {{value1}} mm.", { value1: board.thickness });
   return null;
 }

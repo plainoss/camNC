@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 const kOpposite: Record<string, string> = { Top: 'Bottom', Bottom: 'Top', Front: 'Back', Back: 'Front', Right: 'Left', Left: 'Right' };
 
 /**
@@ -7,5 +8,5 @@ const kOpposite: Record<string, string> = { Top: 'Bottom', Bottom: 'Top', Front:
 export function sectionPlaneName(label: string, offset: string, flipped: boolean) {
   const moved = parseFloat(offset.replace(',', '.'));
   const opposite = (Number.isFinite(moved) && moved < 0) !== flipped;
-  return `Section plane 1 (${opposite ? (kOpposite[label] ?? label) : label})`;
+  return translate('Section plane 1 ({{value1}})', { value1: opposite ? (kOpposite[label] ?? label) : label });
 }

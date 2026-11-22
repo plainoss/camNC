@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import {
   designStepLabel,
@@ -16,9 +17,9 @@ import { useDialogPreview } from './useDialogPreview';
 import type { CadConnectorPick } from './PartFeatureDialogs';
 import { pickedOf, pickKey, type Picked } from './edgePicks';
 
-const kUnsupported = 'Not available yet';
-const kThrough = 'A chamfer cuts edges along a part’s top or underside: an edge through the part can’t be chamfered yet.';
-const kTypes = ['Equal distance', 'Two distances', 'Distance and angle'] as const;
+const kUnsupported = translate('Not available yet');
+const kThrough = translate('A chamfer cuts edges along a part’s top or underside: an edge through the part can’t be chamfered yet.');
+const kTypes = [translate('Equal distance'), translate('Two distances'), translate('Distance and angle')] as const;
 
 /** The picked edges as the step's rims: a loop's stretches picked one by one stay one rim, a whole loop wins. */
 function rimsOf(picked: Picked[]): CadFilletRim[] {
@@ -134,8 +135,8 @@ export function ChamferDialog({
   const save = () => {
     const distance = parseCadValue(distanceText, { unit: 'mm', variables });
     if ('error' in distance) return setError(distance.error);
-    if (!(distance.value > 0)) return setError('A chamfer needs a distance.');
-    if (!owner || !picked.length) return setError('Pick the edges to chamfer.');
+    if (!(distance.value > 0)) return setError(translate('A chamfer needs a distance.'));
+    if (!owner || !picked.length) return setError(translate('Pick the edges to chamfer.'));
     if (candidate) onSave(candidate);
   };
   const madeBy = (partId: string, loopId?: string) => {
@@ -150,8 +151,8 @@ export function ChamferDialog({
   };
   const edgeName = (pick: Picked) =>
     'rim' in pick && pick.rim.face
-      ? `Face of ${madeBy(pick.partId)}`
-      : `Edge of ${madeBy(pick.partId, 'rim' in pick ? pick.rim.loops[0] : undefined)}`;
+      ? translate('Face of {{value1}}', { value1: madeBy(pick.partId) })
+      : translate('Edge of {{value1}}', { value1: madeBy(pick.partId, 'rim' in pick ? pick.rim.loops[0] : undefined) });
   return (
     <FeatureDialog
       title={designStepLabel(candidate ?? document, featureId) ?? nextChamferLabel(document)}
@@ -160,9 +161,9 @@ export function ChamferDialog({
       onOk={save}
       onCancel={onCancel}>
       <div className="cad-feature-selection" data-active="">
-        <small>Entities to chamfer</small>
+        <small>{translate('Entities to chamfer')}</small>
         {!!picked.length && (
-          <ul aria-label="Selected edges" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          <ul aria-label={translate('Selected edges')} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {picked.map((pick, index) => {
               const label = `${edgeName(pick)} ${index + 1}`;
               return (
@@ -172,12 +173,15 @@ export function ChamferDialog({
                   <span title={label}>{edgeName(pick)}</span>
                   <button
                     type="button"
-                    aria-label={`Remove selected ${'rim' in pick && pick.rim.face ? 'face' : 'edge'}: ${label}`}
+                    aria-label={translate('Remove selected {{value1}}: {{label}}', {
+                      value1: 'rim' in pick && pick.rim.face ? translate('face') : translate('edge'),
+                      label: label,
+                    })}
                     onClick={() => {
                       setError(null);
                       setPicked(current => current.filter(edge => edge.partId !== pick.partId || pickKey(edge) !== pickKey(pick)));
                     }}>
-                    Remove
+                    {translate('Remove ')}
                   </button>
                 </li>
               );
@@ -187,17 +191,17 @@ export function ChamferDialog({
       </div>
       <label title={kUnsupported}>
         <input type="checkbox" checked disabled readOnly />
-        Tangent propagation
+        {translate('Tangent propagation ')}
       </label>
       <label className="cad-number-field">
-        Measurement
+        {translate('Measurement ')}
         <select value="offset" disabled title={kUnsupported}>
-          <option value="offset">Offset</option>
+          <option value="offset">{translate('Offset')}</option>
         </select>
       </label>
       <label className="cad-number-field">
-        Chamfer type
-        <select aria-label="Chamfer type" value={kTypes[0]} onChange={() => {}}>
+        {translate('Chamfer type ')}
+        <select aria-label={translate('Chamfer type')} value={kTypes[0]} onChange={() => {}}>
           {kTypes.map(type => (
             <option key={type} value={type} disabled={type !== kTypes[0]} title={type === kTypes[0] ? undefined : kUnsupported}>
               {type}
@@ -206,9 +210,14 @@ export function ChamferDialog({
         </select>
       </label>
       <label className="cad-number-field">
-        Distance
+        {translate('Distance ')}
         <span>
-          <CadValueInput bare aria-label="Distance" value={distanceText} onChange={event => setDistanceText(event.target.value)} />
+          <CadValueInput
+            bare
+            aria-label={translate('Distance')}
+            value={distanceText}
+            onChange={event => setDistanceText(event.target.value)}
+          />
         </span>
         {lengthUnit}
       </label>

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { edgeDir, holdBox, holdClashes, snapClamp, type HoldPoint } from '@wbcnc/cam/holdPoints';
 import { create } from 'zustand';
 import { useHoldHardware } from '../holdHardware';
@@ -207,7 +208,7 @@ function holdPatch(points: HoldPoint[]): BoardPatch {
 export function placeBoard(board: Pick<BoardV1, 'id' | 'bed'>, side: 'a' | 'b', at: BedSpot): BedEdit {
   const deg = board.bed?.[side]?.deg;
   const spot = { x: round(at.x), y: round(at.y), ...(deg !== undefined && { deg }) };
-  return { boardId: board.id, what: 'Board placed', patch: { bed: { ...board.bed, [side]: spot } } };
+  return { boardId: board.id, what: translate('Board placed'), patch: { bed: { ...board.bed, [side]: spot } } };
 }
 
 /** Where a board's XY zero goes when it turns from `from` to `to` degrees about its middle, so it stays where it lies. */
@@ -221,7 +222,11 @@ export function turnAboutMiddle(at: P2, size: { w: number; h: number }, from: nu
 /** The board's angle on the bed for one side, and its spot at that angle (`at`, its XY zero), saved with the job. */
 export function turnBoard(board: Pick<BoardV1, 'id' | 'bed'>, side: 'a' | 'b', deg: number, at: { x: number; y: number }): BedEdit {
   const spot = { x: round(at.x), y: round(at.y), deg };
-  return { boardId: board.id, what: `Board turned to ${deg}°`, patch: { bed: { ...board.bed, [side]: spot } } };
+  return {
+    boardId: board.id,
+    what: translate('Board turned to {{value1}}°', { value1: deg }),
+    patch: { bed: { ...board.bed, [side]: spot } },
+  };
 }
 
 /**
@@ -268,7 +273,7 @@ export function movePart(
   const { size, layout, pinned } = drop.board;
   return {
     boardId: board.id,
-    what: drop.exact ? `${name} moved` : `${name} moved to a free spot`,
+    what: drop.exact ? `${name} moved` : translate('{{value1}} moved to a free spot', { value1: name }),
     exact: drop.exact,
     patch: { size, layout, pinned },
   };

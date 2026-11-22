@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@wbcnc/ui/components/button';
 import { cn } from '@wbcnc/ui/lib/utils';
@@ -43,27 +44,27 @@ export function ExternalChatImage({ session, dropping }: { session: CarvingAssis
   return (
     <>
       <div className="grid gap-1.5 rounded-md border p-2 text-xs">
-        <span className="text-muted-foreground">Or make it in another chat, such as ChatGPT or Gemini:</span>
+        <span className="text-muted-foreground">{translate('Or make it in another chat, such as ChatGPT or Gemini:')}</span>
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => void copyPrompt()}>
-            <ClipboardCopy /> {copied ? 'Prompt copied' : 'Copy prompt'}
+            <ClipboardCopy /> {copied ? translate('Prompt copied') : translate('Copy prompt')}
           </Button>
           <button
             type="button"
-            aria-label="Drop, paste or choose the image"
+            aria-label={translate('Drop, paste or choose the image')}
             className={cn(
               'flex flex-1 items-center justify-center gap-1 rounded-md border border-dashed px-2 text-muted-foreground',
               dropping && 'border-violet-500 bg-violet-500/10 text-foreground'
             )}
             disabled={session.generating}
             onClick={() => pngInput.current?.click()}>
-            <ImageDown className="size-4" /> {dropping ? 'Drop to trace' : 'Drop or paste image'}
+            <ImageDown className="size-4" /> {dropping ? translate('Drop to trace') : translate('Drop or paste image')}
           </button>
         </div>
         {manual && (
           <textarea
             readOnly
-            aria-label="Prompt to copy"
+            aria-label={translate('Prompt to copy')}
             className="rounded border bg-background p-1"
             rows={3}
             value={manual}
@@ -72,7 +73,7 @@ export function ExternalChatImage({ session, dropping }: { session: CarvingAssis
         )}
         {copied && (
           <span className="text-muted-foreground">
-            Paste it into the chat, then drop or paste the picture here. It is traced on this device.
+            {translate('Paste it into the chat, then drop or paste the picture here. It is traced on this device. ')}
           </span>
         )}
       </div>
@@ -80,7 +81,7 @@ export function ExternalChatImage({ session, dropping }: { session: CarvingAssis
         ref={pngInput}
         type="file"
         accept="image/png,image/jpeg,image/webp,image/gif"
-        aria-label="Image to trace"
+        aria-label={translate('Image to trace')}
         hidden
         onChange={event => {
           const file = event.target.files?.[0];

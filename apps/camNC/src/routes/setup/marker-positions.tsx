@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { EnsureHasCamSource } from '@/components/EnsureHasCamSource';
 import { EnsureHasMachineBounds } from '@/components/EnsureHasMachineBounds';
 import { PageHeader } from '@/components/page-header';
@@ -19,11 +20,11 @@ function RouteComponent() {
   const navigate = useNavigate();
   return (
     <div className="w-full h-full">
-      <PageHeader title="Marker Positions" />
+      <PageHeader title={translate('Marker Positions')} />
       <div className="flex justify-center p-1 flex-row">
         <Card className="w-full max-w-xl">
           <CardHeader>
-            <CardTitle>Marker Positions</CardTitle>
+            <CardTitle>{translate('Marker Positions')}</CardTitle>
           </CardHeader>
           <CardContent>
             <MarkerPositionsForm onConfirmed={() => navigate({ to: '/setup/point-selection' })} />

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadSketch } from '@wbcnc/cad';
 import { useState } from 'react';
 import { INLINE_CONSTRAINT_SIZE, layoutInlineConstraints, type InlineConstraintKind } from '@wbcnc/cad-editor/inlineConstraintLayout';
@@ -120,10 +121,12 @@ export function InlineConstraints({
             data-conflict={conflict ? 'true' : undefined}
             role="button"
             tabIndex={interactive ? 0 : -1}
-            aria-label={`${glyph.label} constraint`}
+            aria-label={translate('{{value1}} constraint', { value1: glyph.label })}
             aria-pressed={active}
             aria-disabled={!interactive}
-            aria-description={conflict ? 'Conflicting constraint. Select, then Delete to remove and resolve the sketch.' : undefined}
+            aria-description={
+              conflict ? translate('Conflicting constraint. Select, then Delete to remove and resolve the sketch.') : undefined
+            }
             transform={`translate(${glyph.position.x} ${-glyph.position.y}) scale(${1 / zoom})`}
             style={{
               cursor: interactive ? 'pointer' : undefined,
@@ -175,8 +178,9 @@ export function InlineConstraints({
               if (interactive) onHover?.(null, []);
             }}>
             <title>
-              {conflict ? 'Conflicting ' : ''}
-              {glyph.label} constraint — select, then Delete to remove
+              {conflict ? translate('Conflicting ') : ''}
+              {glyph.label}
+              {translate(' constraint — select, then Delete to remove ')}
             </title>
             <rect
               x={-INLINE_CONSTRAINT_SIZE / 2}

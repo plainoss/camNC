@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { Pause, Play, Radio, SkipBack, Undo2 } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
@@ -104,12 +105,12 @@ export function SimTimeline({ toolpath }: { toolpath: ParsedToolpath }) {
     <div
       className="dark pointer-events-auto grid gap-1 rounded-xl border border-white/10 bg-slate-900/80 px-3 py-2 text-foreground shadow-xl shadow-black/30 backdrop-blur-md"
       role="region"
-      aria-label="Job timeline">
+      aria-label={translate('Job timeline')}>
       <div className="flex items-center gap-2">
         <button
           type="button"
           className="grid size-7 shrink-0 place-items-center rounded-md hover:bg-white/10"
-          aria-label="Back to start"
+          aria-label={translate('Back to start')}
           onClick={() => {
             setSimPlaying(false);
             setSimFollowJob(false);
@@ -120,14 +121,14 @@ export function SimTimeline({ toolpath }: { toolpath: ParsedToolpath }) {
         <button
           type="button"
           className="grid size-7 shrink-0 place-items-center rounded-md bg-white/90 text-slate-900 hover:bg-white"
-          aria-label={playing ? 'Pause' : 'Play'}
+          aria-label={playing ? translate('Pause') : translate('Play')}
           onClick={togglePlay}>
           {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
         </button>
         <div className="relative min-w-0 flex-1">
           <input
             type="range"
-            aria-label="Job time"
+            aria-label={translate('Job time')}
             className="block w-full accent-sky-400"
             min={0}
             max={total || 1}
@@ -163,7 +164,7 @@ export function SimTimeline({ toolpath }: { toolpath: ParsedToolpath }) {
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground" title={lineText}>
-          {line ? `${line}: ${lineText}` : 'Start'}
+          {line ? translate('{{line}}: {{lineText}}', { line: line, lineText: lineText }) : translate('Start')}
         </span>
         <div className="flex items-center gap-1">
           {jobActive && (
@@ -175,10 +176,11 @@ export function SimTimeline({ toolpath }: { toolpath: ParsedToolpath }) {
                 follow ? 'bg-emerald-500/25 text-emerald-200 ring-1 ring-emerald-400/50' : 'text-muted-foreground hover:bg-white/10'
               )}
               onClick={() => setSimFollowJob(!follow)}>
-              {follow ? <Radio className="size-3" /> : <Undo2 className="size-3" />} {follow ? 'Following job' : 'Back to live'}
+              {follow ? <Radio className="size-3" /> : <Undo2 className="size-3" />}{' '}
+              {follow ? translate('Following job') : translate('Back to live')}
             </button>
           )}
-          <div className="flex gap-0.5" role="group" aria-label="Playback speed">
+          <div className="flex gap-0.5" role="group" aria-label={translate('Playback speed')}>
             {kSpeeds.map(s => (
               <button
                 key={s}

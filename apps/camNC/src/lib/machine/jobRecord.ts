@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { isDemoMode } from '../demo/demo-mode';
 import type { MachineStatus, Position } from '@wbcnc/fluidnc';
 import type { AlarmRecord } from './alarms';
@@ -92,13 +93,19 @@ export function recoveryAction(input: {
   }
   if (!job) return { kind: 'none' };
   if (!job.file.endsWith(record.sdFile)) {
-    return { kind: 'mismatch', reason: `The controller runs ${job.file}, not the job camNC started (${record.sdFile}).` };
+    return {
+      kind: 'mismatch',
+      reason: translate('The controller runs {{value1}}, not the job camNC started ({{value2}}).', {
+        value1: job.file,
+        value2: record.sdFile,
+      }),
+    };
   }
   if (!sameWco(status.wco, record.wco)) {
-    return { kind: 'mismatch', reason: 'The work offset changed since camNC started this job, so its toolpath may not match.' };
+    return { kind: 'mismatch', reason: translate('The work offset changed since camNC started this job, so its toolpath may not match.') };
   }
   if (lastAlarm && lastAlarm.at > record.startedAt) {
-    return { kind: 'mismatch', reason: 'There was an alarm since camNC started this job, so its position may not match.' };
+    return { kind: 'mismatch', reason: translate('There was an alarm since camNC started this job, so its position may not match.') };
   }
   if (currentGcode && currentGcode !== record.gcode) return { kind: 'ask' };
   return { kind: 'restore' };
@@ -116,8 +123,8 @@ export function jobEnding(input: {
 }): { finished: true } | { finished: false; reason: string } {
   const at = input.lastPercent !== null ? ` at ${input.lastPercent.toFixed(1)}%` : '';
   if (input.alarmSinceStart || input.state === 'Alarm')
-    return { finished: false, reason: `The controller stopped the job with an alarm${at}.` };
-  if (input.stopRequested) return { finished: false, reason: `You stopped the job${at}.` };
+    return { finished: false, reason: translate('The controller stopped the job with an alarm{{at}}.', { at: at }) };
+  if (input.stopRequested) return { finished: false, reason: translate('You stopped the job{{at}}.', { at: at }) };
   return { finished: true };
 }
 
@@ -185,7 +192,7 @@ async function withStore<T>(name: string, mode: IDBTransactionMode, fn: (store: 
       };
       request.onerror = () => reject(request.error);
       transaction.oncomplete = () => resolve(result);
-      transaction.onabort = () => reject(transaction.error ?? new Error('The job record could not be saved.'));
+      transaction.onabort = () => reject(transaction.error ?? new Error(translate('The job record could not be saved.')));
       transaction.onerror = () => reject(transaction.error);
     });
   } finally {
@@ -238,13 +245,13 @@ export async function readJobRecordHead(host: string, demo = isDemoMode()): Prom
   const stored = demo
     ? structuredClone(demoRecords.get(host) ?? null)
     : ((await withStore<JobRecord | undefined>(kStore, 'readonly', store => store.get(host))) ?? null);
-  if (!sameMarker(marker, recoveryMarker(key))) throw new Error('Job recovery changed while it was being read. Try again.');
+  if (!sameMarker(marker, recoveryMarker(key))) throw new Error(translate('Job recovery changed while it was being read. Try again.'));
   return { host, demo, stored, record: marker.memory === undefined && marker.stored === null ? eligibleRecord(stored) : null, marker };
 }
 
 /** A new preparation must match both the receipt and its phase; a stale prepared reader cannot replace an active run. */
 export async function saveJobRecordAtHead(head: JobRecordHead, replacement: JobRecord | null): Promise<boolean> {
-  if (replacement && replacement.host !== head.host) throw new Error('A recovery receipt cannot change controllers.');
+  if (replacement && replacement.host !== head.host) throw new Error(translate('A recovery receipt cannot change controllers.'));
   const key = recoveryMarkerKey(head.host, head.demo);
   const matches = (current: JobRecord | null | undefined) =>
     sameMarker(head.marker, recoveryMarker(key)) &&
@@ -264,7 +271,7 @@ export function sameJobExecution(a: JobRecord | null | undefined, b: JobRecord):
 
 /** Compare and replace/delete a receipt atomically; deleting its progress is part of the same transaction. */
 export async function compareAndSaveJobRecord(expected: JobRecord, replacement: JobRecord | null, demo = isDemoMode()): Promise<boolean> {
-  if (replacement && replacement.host !== expected.host) throw new Error('A recovery receipt cannot change controllers.');
+  if (replacement && replacement.host !== expected.host) throw new Error(translate('A recovery receipt cannot change controllers.'));
   const key = recoveryMarkerKey(expected.host, demo);
   return mutateReceipt(expected.host, demo, current => !recoveryInvalidated(key) && sameJobExecution(current, expected), replacement);
 }
@@ -302,7 +309,7 @@ async function mutateReceipt(
       };
       reading.onerror = () => reject(reading.error);
       transaction.oncomplete = () => resolve(changed);
-      transaction.onabort = () => reject(transaction.error ?? new Error('The recovery receipt could not be updated.'));
+      transaction.onabort = () => reject(transaction.error ?? new Error(translate('The recovery receipt could not be updated.')));
       transaction.onerror = () => reject(transaction.error);
     });
   } finally {
@@ -332,7 +339,9 @@ export async function invalidateJobRecovery(host: string, demo = isDemoMode()) {
       // If the marker cannot persist, deleting the old record is also safe after a reload.
       await deleteRecordIn(host, demo);
     } catch (cause) {
-      throw new Error('Cannot start: browser storage could not safely discard the previous program’s recovery record.', { cause });
+      throw new Error(translate('Cannot start: browser storage could not safely discard the previous program’s recovery record.'), {
+        cause,
+      });
     }
     await clearProgressIn(host, demo).catch(() => {});
   }
@@ -355,7 +364,7 @@ export function saveJobProgress(progress: JobProgressLog, demo = isDemoMode()) {
 
 /** Stale samples cannot replace a later execution's progress. Receipt and progress are checked in one transaction. */
 export async function saveJobProgressForRecord(progress: JobProgressLog, expected: JobRecord, demo = isDemoMode()): Promise<boolean> {
-  if (progress.host !== expected.host) throw new Error('Job progress cannot change controllers.');
+  if (progress.host !== expected.host) throw new Error(translate('Job progress cannot change controllers.'));
   const key = recoveryMarkerKey(expected.host, demo);
   const matches = (current: JobRecord | undefined) =>
     !recoveryInvalidated(key) && current?.execution !== 'prepared' && sameJobExecution(current, expected);
@@ -378,7 +387,7 @@ export async function saveJobProgressForRecord(progress: JobProgressLog, expecte
       };
       reading.onerror = () => reject(reading.error);
       transaction.oncomplete = () => resolve(changed);
-      transaction.onabort = () => reject(transaction.error ?? new Error('Job progress could not be saved.'));
+      transaction.onabort = () => reject(transaction.error ?? new Error(translate('Job progress could not be saved.')));
       transaction.onerror = () => reject(transaction.error);
     });
   } finally {

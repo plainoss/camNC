@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { batch, computed, signal } from '@preact/signals-react';
 import {
   BuildInfo,
@@ -378,7 +379,7 @@ export class CncApi {
 
   private get api() {
     if (!this.protocol || !this.isConnected.value) {
-      throw new Error('Machine not connected');
+      throw new Error(translate('Machine not connected'));
     }
     return this.protocol;
   }
@@ -500,7 +501,7 @@ export class CncApi {
   async moveIntoTravel() {
     const mpos = this.status.value?.mpos;
     const travel = this.travel.value;
-    if (!mpos || !travel) throw new Error('The machine position or travel is not known yet');
+    if (!mpos || !travel) throw new Error(translate('The machine position or travel is not known yet'));
     return this.jogInto(outsideTravel(mpos, travel));
   }
 

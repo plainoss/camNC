@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 /* eslint-disable react-refresh/only-export-components */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@wbcnc/ui/components/button';
@@ -75,13 +76,13 @@ export function MarkerBoundsButton({ bounds, arucoTagSize, onApply }: MarkerBoun
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="secondary" type="button">
-          Use machine bounds + margin
+          {translate('Use machine bounds + margin ')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Set marker margin</DialogTitle>
-          <DialogDescription>Choose how far inward from the machine bounds to place the markers.</DialogDescription>
+          <DialogTitle>{translate('Set marker margin')}</DialogTitle>
+          <DialogDescription>{translate('Choose how far inward from the machine bounds to place the markers.')}</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -90,20 +91,22 @@ export function MarkerBoundsButton({ bounds, arucoTagSize, onApply }: MarkerBoun
               name="margin"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Margin (mm)</FormLabel>
+                  <FormLabel>{translate('Margin (mm)')}</FormLabel>
                   <FormControl>
                     <Input {...field} type="number" placeholder={String(defaultMargin)} />
                   </FormControl>
-                  <p className="text-xs text-muted-foreground">{`Default: ${defaultMargin}mm (tag size/2 + 5mm clearance)`}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {translate('Default: {{defaultMargin}}mm (tag size/2 + 5mm clearance)', { defaultMargin: defaultMargin })}
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <DialogFooter>
               <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
-                Cancel
+                {translate('Cancel ')}
               </Button>
-              <Button type="submit">Apply</Button>
+              <Button type="submit">{translate('Apply')}</Button>
             </DialogFooter>
           </form>
         </Form>

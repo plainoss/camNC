@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi, getExistingCncApi } from '@/lib/fluidnc/machine';
 import { useCamMachine } from './camMachine';
 import { interruptedJob, recoveryPending } from '@/lib/machine/jobRecovery';
@@ -31,17 +32,17 @@ export function useMachineLockReason(connect = true): string | null {
   'use no memo';
   const api = connect ? getCncApi() : getExistingCncApi();
   const state = useCamMachine(s => s);
-  if (state.preparingRun) return 'Preparing a program. Wait for preparation to finish.';
-  if (recoveryPending.value) return 'Checking the saved machine job before replacing this setup.';
-  if (api && (api.jobProgress.value !== null || api.jobStartedAt.value !== null)) return 'Locked while the program runs.';
+  if (state.preparingRun) return translate('Preparing a program. Wait for preparation to finish.');
+  if (recoveryPending.value) return translate('Checking the saved machine job before replacing this setup.');
+  if (api && (api.jobProgress.value !== null || api.jobStartedAt.value !== null)) return translate('Locked while the program runs.');
   if (matchesResumableSetup(state, interruptedJob.value?.record.camSnapshot))
-    return 'An interrupted program can resume. Resume or dismiss it before changing this setup.';
+    return translate('An interrupted program can resume. Resume or dismiss it before changing this setup.');
   if (state.runReview && state.runSnapshot) {
     if (state.runPreparationError) return state.runPreparationError;
     if (state.runReview === 'finished')
-      return 'The program finished. Review its original setup and close the review before starting another program.';
-    if (state.runReview === 'stopped') return 'The program stopped. Review its original setup before changing it.';
-    return 'Review the original execution before changing this setup.';
+      return translate('The program finished. Review its original setup and close the review before starting another program.');
+    if (state.runReview === 'stopped') return translate('The program stopped. Review its original setup before changing it.');
+    return translate('Review the original execution before changing this setup.');
   }
   return null;
 }

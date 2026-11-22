@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { RehearsalButton } from '@/lib/rehearsal/RehearsalButton';
 import { hasWork } from '@/cam/carving';
 import { freezeRehearsalBoard } from '@/lib/rehearsal/boardSnapshot';
@@ -8,7 +9,7 @@ import { useBoardPlans, useCamJob, useCamModel, useSaveCamJob } from '@/cam/camQ
 import type { BoardRequest, CamPartInfo, OpSummary, PlanResult, ReleaseProgram } from '@/cam/camTypes';
 import type { FlipRegistration, LibraryTool } from '@wbcnc/cam';
 import { missingParts, useJobBoards, type MissingPart } from '@/cam/useJobBoards';
-import { boardSizeProblem, layoutBlock, loose, planBlock, releaseProblems, unstable } from '@/cam/boardBlock';
+import { boardSizeProblem, cutFromEarlierDesign, layoutBlock, loose, planBlock, releaseProblems, unstable } from '@/cam/boardBlock';
 import { boardGeometryKey } from '@/cam/cadDesign';
 import { cutBoardWith, edgeNote, freezeSpacing, isCut, spacingProblem } from '@/cam/boards';
 import { CutBadge } from '@/cam/boards/CutBadge';
@@ -79,7 +80,7 @@ function PlanStep() {
   }, [rehearsed, isPending, job, navigate]);
 
   if (isPending) return <Shell />;
-  if (!job) return <Shell message="This job doesn't exist (any more)." />;
+  if (!job) return <Shell message={translate("This job doesn't exist (any more).")} />;
   const emptyBar = <CamJobBar job={job} />;
   if (model.isError) return <Shell bar={emptyBar} message={model.error.message} />;
   if (!model.data) return <Shell bar={emptyBar} loading={`Reading ${job.fileName}…`} />;
@@ -108,6 +109,16 @@ function PlanStep() {
           b.request.parts.map(p => p.partId)
         ),
       }) ?? []
+  );
+  const carvingProblem = boards.find(b => b.carvingProblem)?.carvingProblem;
+  const earlierDesign = boards.some(b =>
+    cutFromEarlierDesign(
+      b,
+      boardGeometryKey(
+        job,
+        b.request.parts.map(p => p.partId)
+      )
+    )
   );
   const blocked = layoutProblems.length > 0;
   // The last programs stay shown while settings change, but only fresh ones go to the machine or a file.
@@ -221,7 +232,7 @@ function PlanStep() {
     <CamJobBar
       job={job}
       tools={
-        <div role="tablist" aria-label="Boards in cutting order" className="flex flex-wrap gap-1">
+        <div role="tablist" aria-label={translate('Boards in cutting order')} className="flex flex-wrap gap-1">
           {queue.map((e, i) => (
             <button
               key={e.board.id}
@@ -232,7 +243,8 @@ function PlanStep() {
                 'h-8 rounded-md px-3 text-sm',
                 e === current ? 'bg-muted font-medium' : 'text-muted-foreground hover:bg-muted/60'
               )}>
-              {i + 1} · {e.board.name} {e.board.thickness} mm
+              {i + 1} · {e.board.name} {e.board.thickness}
+              {translate(' mm ')}
               <CutBadge board={e.board} />
             </button>
           ))}
@@ -241,13 +253,24 @@ function PlanStep() {
       actions={
         <>
           <Hint
-            text={`${queue.length} ${queue.length === 1 ? 'board' : 'boards'}, ${swaps} bit ${swaps === 1 ? 'swap' : 'swaps'}. Estimated automatic motion and dwell time using reference machine limits. Add setup, tool changes, and operator pauses; unknown initial and parking distances are excluded.`}>
+            text={translate(
+              '{{value1}} {{value2}}, {{swaps}} bit {{value4}}. Estimated automatic motion and dwell time using reference machine limits. Add setup, tool changes, and operator pauses; unknown initial and parking distances are excluded.',
+              {
+                value1: queue.length,
+                value2: queue.length === 1 ? translate('board') : translate('boards'),
+                swaps: swaps,
+                value4: swaps === 1 ? translate('swap') : translate('swaps'),
+              }
+            )}>
             <span className="text-xs text-muted-foreground">
               {/* Only the time on a narrower window, for the bar to stay one row; the rest is in its hint there too. */}
               <span className="hidden min-[1680px]:inline">
-                Job: {queue.length} {queue.length === 1 ? 'board' : 'boards'} · {swaps} bit {swaps === 1 ? 'swap' : 'swaps'} ·{' '}
+                {translate('Job: ')}
+                {queue.length} {queue.length === 1 ? translate('board') : translate('boards')} · {swaps}
+                {translate(' bit ')}
+                {swaps === 1 ? translate('swap') : translate('swaps')} ·{' '}
               </span>
-              ≈ {formatDuration(totalMin * 60)} <span className="hidden min-[1680px]:inline">automatic</span>
+              ≈ {formatDuration(totalMin * 60)} <span className="hidden min-[1680px]:inline">{translate('automatic')}</span>
             </span>
           </Hint>
           <RehearsalButton job={job} boards={boards.map(b => freezeRehearsalBoard(b.board, b.nest))} ready={allReady} inBar />
@@ -257,27 +280,38 @@ function PlanStep() {
             <BitChip value={settings} onChange={savePlan} onOpen={openSettings} />
           )}
           <DropdownMenu>
-            <Hint text={`More actions for board ${current.board.name}: show it on the machine on its own, download its G-code.`}>
+            <Hint
+              text={translate('More actions for board {{value1}}: show it on the machine on its own, download its G-code.', {
+                value1: current.board.name,
+              })}>
               <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" className="size-8" aria-label="More actions">
+                <Button size="icon" variant="ghost" className="size-8" aria-label={translate('More actions')}>
                   <MoreHorizontal />
                 </Button>
               </DropdownMenuTrigger>
             </Hint>
             <DropdownMenuContent align="end" className="max-w-80">
-              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Board {current.board.name}</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                {translate('Board ')}
+                {current.board.name}
+              </DropdownMenuLabel>
               <DropdownMenuItem
                 disabled={!safe}
                 onSelect={showOnMachine}
-                aria-label={`Show board ${current.board.name} on machine`}
+                aria-label={translate('Show board {{value1}} on machine', { value1: current.board.name })}
                 aria-describedby="plan-show-on-machine-hint"
                 className="items-start">
                 <Play className="mt-0.5" />
                 <span className="flex flex-col gap-0.5">
-                  <span>Show board {current.board.name} on machine</span>
+                  <span>
+                    {translate('Show board ')}
+                    {current.board.name}
+                    {translate(' on machine')}
+                  </span>
                   <span id="plan-show-on-machine-hint" className="text-xs text-muted-foreground">
-                    Loads only board {current.board.name}’s {result && result.programs.length > 1 ? 'first program' : 'program'} into the
-                    machine view, to check or run it on its own.
+                    {translate('Loads only board ')}
+                    {current.board.name}’s {result && result.programs.length > 1 ? translate('first program') : translate('program')}
+                    {translate(' into the machine view, to check or run it on its own. ')}
                   </span>
                 </span>
               </DropdownMenuItem>
@@ -294,11 +328,16 @@ function PlanStep() {
             wrap
             text={
               allReady
-                ? 'Opens the machine view with every board in cutting order: place, align, zero and cut each one, with the bit swaps in between.'
-                : 'Opens the machine view with every board in cutting order, once every board has toolpaths that pass the checks.'
+                ? translate(
+                    'Opens the machine view with every board in cutting order: place, align, zero and cut each one, with the bit swaps in between.'
+                  )
+                : translate(
+                    'Opens the machine view with every board in cutting order, once every board has toolpaths that pass the checks.'
+                  )
             }>
             <Button size="sm" disabled={!allReady} onClick={takeToMachine}>
-              <Factory /> Take the job to the machine
+              <Factory />
+              {translate(' Take the job to the machine ')}
             </Button>
           </Hint>
         </>
@@ -307,29 +346,34 @@ function PlanStep() {
   );
   return (
     <Shell bar={bar}>
-      {layoutProblems.find(problem => problem.startsWith('Generated artwork')) && (
+      {carvingProblem && (
         <p role="alert" className="border-b border-destructive/40 bg-destructive/5 px-4 py-2 text-sm text-destructive">
-          {layoutProblems.find(problem => problem.startsWith('Generated artwork'))}{' '}
+          {carvingProblem}{' '}
           <Link to="/cam/$jobId/carve" params={{ jobId: job.id }}>
-            Recheck artwork
+            {translate('Recheck artwork ')}
           </Link>
         </p>
       )}
-      {layoutProblems.some(problem => problem.includes('earlier design')) && (
+      {earlierDesign && (
         <p role="alert" className="border-b border-destructive/40 bg-destructive/5 px-4 py-2 text-sm text-destructive">
-          A board was cut from an earlier design. Start over on Boards with a new physical sheet before using the changed design.
+          {translate(
+            'A board was cut from an earlier design. Start over on Boards with a new physical sheet before using the changed design. '
+          )}
         </p>
       )}
       {rehearsed && (
         <p role="status" className="border-b bg-primary/5 px-4 py-2 text-sm">
-          Back in your saved project. Rehearsal progress was discarded; your cut history is unchanged.
+          {translate('Back in your saved project. Rehearsal progress was discarded; your cut history is unchanged. ')}
         </p>
       )}
       {cut.length > 0 && (
         <p role="note" className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm">
-          {cut.length === 1 ? `Board ${cut[0].board.name} is` : `Boards ${cut.map(e => e.board.name).join(', ')} are`} already cut at the
-          machine. The bit, material and tab settings here are for the whole job: a change plans {cut.length === 1 ? 'it' : 'them'} again,
-          and the new programs no longer match what’s cut. Start over in Boards for a new sheet.
+          {cut.length === 1
+            ? translate('Board {{value1}} is', { value1: cut[0].board.name })
+            : translate('Boards {{value1}} are', { value1: cut.map(e => e.board.name).join(', ') })}
+          {translate(' already cut at the machine. The bit, material and tab settings here are for the whole job: a change plans ')}
+          {cut.length === 1 ? translate('it') : translate('them')}
+          {translate(' again, and the new programs no longer match what’s cut. Start over in Boards for a new sheet. ')}
         </p>
       )}
       <PlanWorkspace
@@ -367,11 +411,14 @@ function PlanStep() {
           current.error && !result ? (
             <p role="alert" className="flex gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3.5 text-[13px]">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
-              Board {current.board.name} couldn’t be planned: {current.error.message}
+              {translate('Board ')}
+              {current.board.name}
+              {translate(' couldn’t be planned: ')}
+              {current.error.message}
             </p>
           ) : !hasWork(current.request) ? (
             <p role="status" className="rounded-lg border bg-muted/30 p-4 text-sm">
-              No executable parts on this board. Include excluded parts again or repair their placement on Boards.
+              {translate('No executable parts on this board. Include excluded parts again or repair their placement on Boards. ')}
             </p>
           ) : !result ? (
             <div className="flex flex-1 items-center justify-center">
@@ -379,10 +426,14 @@ function PlanStep() {
             </div>
           ) : (
             <div role="status" className="flex flex-col gap-1 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-[13px]">
-              <p className="font-medium">Nothing to cut on board {current.board.name}</p>
+              <p className="font-medium">
+                {translate('Nothing to cut on board ')}
+                {current.board.name}
+              </p>
               <p className="text-muted-foreground">
-                Its parts have no outline, hole or pocket this bit can cut (a 3D part milled anyway may have no flat features). Check the
-                parts in the Model step.
+                {translate(
+                  'Its parts have no outline, hole or pocket this bit can cut (a 3D part milled anyway may have no flat features). Check the parts in the Model step. '
+                )}
               </p>
             </div>
           )
@@ -415,9 +466,9 @@ function PlanStep() {
               />
               <p className="text-xs text-muted-foreground">
                 {result.programs.length > 1
-                  ? 'One program per bit: run them in order, swap the bit and zero Z in between; the board stays put.'
-                  : 'One program per board.'}{' '}
-                Z0 at the bottom of the board, XY zero at its lower left corner.
+                  ? translate('One program per bit: run them in order, swap the bit and zero Z in between; the board stays put.')
+                  : translate('One program per board.')}{' '}
+                {translate('Z0 at the bottom of the board, XY zero at its lower left corner. ')}
               </p>
             </>
           )
@@ -509,12 +560,12 @@ function PlanWorkspace({
         )}
       </main>
       <aside
-        aria-label="Operations and settings"
+        aria-label={translate('Operations and settings')}
         className={cn(
           'flex flex-col border-t md:min-h-0 md:shrink-0 md:border-t-0 md:border-l',
           tab === 'operations' && opsView === 'table' && playback ? 'md:w-[760px]' : 'md:w-[360px]'
         )}>
-        <div role="tablist" aria-label="Operations and settings" className="flex gap-1 border-b px-3" onKeyDown={onKeyDown}>
+        <div role="tablist" aria-label={translate('Operations and settings')} className="flex gap-1 border-b px-3" onKeyDown={onKeyDown}>
           {kTabs.map(([t, text]) => (
             <button
               key={t}
@@ -536,7 +587,7 @@ function PlanWorkspace({
                     data-mark={mark}
                     className={cn('size-3.5', mark === 'problem' ? 'text-destructive' : 'text-amber-600 dark:text-amber-400')}
                   />
-                  <span className="sr-only">{mark === 'problem' ? '(a check failed)' : '(warnings)'}</span>
+                  <span className="sr-only">{mark === 'problem' ? translate('(a check failed)') : translate('(warnings)')}</span>
                 </>
               )}
             </button>
@@ -563,9 +614,9 @@ function PlanWorkspace({
 }
 
 const kFlipSteps: Record<FlipRegistration, string> = {
-  camera: 'Turn the board over top to bottom, then drag its outline onto it in the camera view again.',
-  dowels: 'Turn the board over top to bottom onto the dowel pins in the holes side A drilled.',
-  fence: 'Turn the board over top to bottom and push it against the fence and the stop again.',
+  camera: translate('Turn the board over top to bottom, then drag its outline onto it in the camera view again.'),
+  dowels: translate('Turn the board over top to bottom onto the dowel pins in the holes side A drilled.'),
+  fence: translate('Turn the board over top to bottom and push it against the fence and the stop again.'),
 };
 
 /** Side A (as placed) or side B (the parts' undersides, the board turned over), and how side B lines up. */
@@ -573,7 +624,7 @@ function SideSwitch({ plan, side, onSide }: { plan: PlanResult; side: 'a' | 'b';
   const flip = plan.flip!;
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg bg-muted/40 px-3.5 py-2.5 text-[13px]">
-      <div role="group" aria-label="Board side" className="flex rounded-md border bg-background p-0.5 text-xs">
+      <div role="group" aria-label={translate('Board side')} className="flex rounded-md border bg-background p-0.5 text-xs">
         {(['a', 'b'] as const).map(s => (
           <button
             key={s}
@@ -584,16 +635,21 @@ function SideSwitch({ plan, side, onSide }: { plan: PlanResult; side: 'a' | 'b';
               'rounded px-2.5 py-1',
               side === s ? 'bg-muted font-medium' : 'text-muted-foreground hover:bg-muted/60 disabled:opacity-50'
             )}>
-            {s === 'a' ? 'Side A' : 'Side B (turned over)'}
+            {s === 'a' ? translate('Side A') : translate('Side B (turned over)')}
           </button>
         ))}
       </div>
       <span className="text-muted-foreground">
         {plan.sideB
-          ? `After side A: ${kFlipSteps[flip.registration]} Fasten it in the same spots on the wood. Don’t re-zero XY; zero Z on the spoilboard.`
-          : 'No part on this board has features underneath.'}
+          ? translate('After side A: {{value1}} Fasten it in the same spots on the wood. Don’t re-zero XY; zero Z on the spoilboard.', {
+              value1: kFlipSteps[flip.registration],
+            })
+          : translate('No part on this board has features underneath.')}
         {flip.dowels &&
-          ` Pins ⌀${flip.dowelDiameter} at ${flip.dowels.map(p => `X${Math.round(p.x)} Y${Math.round(p.y)}`).join(' and ')} (and their mirrors).`}
+          translate(' Pins ⌀{{value1}} at {{value2}} (and their mirrors).', {
+            value1: flip.dowelDiameter,
+            value2: flip.dowels.map(p => `X${Math.round(p.x)} Y${Math.round(p.y)}`).join(' and '),
+          })}
       </span>
       {flip.problem && <span className="text-destructive">{flip.problem}</span>}
     </div>
@@ -625,7 +681,7 @@ function MissingBanner({
   const fix = (
     <Button size="sm" variant="outline" asChild>
       <Link to="/cam/$jobId/boards" params={{ jobId }}>
-        Fix on Boards
+        {translate('Fix on Boards ')}
       </Link>
     </Button>
   );
@@ -647,8 +703,9 @@ function MissingBanner({
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
           <span>
             <span className="font-medium">
-              {missing.length === 1 ? '1 part doesn’t' : `${missing.length} parts don’t`} fit on{' '}
-              {missing.length === 1 ? 'its board' : 'their boards'} and would not be cut:
+              {missing.length === 1 ? translate('1 part doesn’t') : translate('{{value1}} parts don’t', { value1: missing.length })}
+              {translate(' fit on')} {missing.length === 1 ? translate('its board') : translate('their boards')}
+              {translate(' and would not be cut: ')}
             </span>{' '}
             {missing.map(m => `${m.name} (${m.board})`).join(', ')}.
           </span>
@@ -668,9 +725,18 @@ function MissingBanner({
         {fix}
         {missing.length > 0 && !tight.length && (
           <Hint
-            text={`The job goes ahead without ${missing.length === 1 ? 'this part' : 'these parts'}: ${missing.length === 1 ? 'it isn’t' : 'they aren’t'} cut. The exclusion stays until you choose Include again, even after fitting ${missing.length === 1 ? 'it' : 'them'} on Boards.`}>
+            text={translate(
+              'The job goes ahead without {{value1}}: {{value2}} cut. The exclusion stays until you choose Include again, even after fitting {{value3}} on Boards.',
+              {
+                value1: missing.length === 1 ? translate('this part') : translate('these parts'),
+                value2: missing.length === 1 ? translate('it isn’t') : translate('they aren’t'),
+                value3: missing.length === 1 ? translate('it') : translate('them'),
+              }
+            )}>
             <Button size="sm" variant="ghost" onClick={onLeaveOut}>
-              Leave {missing.length === 1 ? 'it' : 'them'} out
+              {translate('Leave ')}
+              {missing.length === 1 ? translate('it') : translate('them')}
+              {translate(' out ')}
             </Button>
           </Hint>
         )}
@@ -718,21 +784,29 @@ function Checks({
   // Not a safety problem, but the part wouldn't come out as drawn: said before any "passed".
   const uncut = uncutNotes(board, instance => partOf(instance)?.name);
   const skins = (plan.holding ?? []).filter(h => h.how === 'skin');
-  const moves = 'no rapid moves in the stock, stays on the board, never deeper than the cut-through depth.';
+  const moves = translate('no rapid moves in the stock, stays on the board, never deeper than the cut-through depth.');
   return (
     <div className="flex flex-col gap-1.5 text-[13px]">
       {loose(board).map(h => (
         <p key={h.id ?? h.part} className="flex gap-2 text-destructive">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          {h.part}: {h.anchored === 0 ? 'none' : `only ${h.anchored}`} of its {h.tabs.length} tabs would hold it, so it would come loose. On
-          the Boards step, widen the gap or margin between parts, switch the board to a bottom skin, or use a smaller bit.
+          {h.part}: {h.anchored === 0 ? translate('none') : translate('only {{value1}}', { value1: h.anchored })}
+          {translate(' of its ')}
+          {h.tabs.length}
+          {translate(
+            ' tabs would hold it, so it would come loose. On the Boards step, widen the gap or margin between parts, switch the board to a bottom skin, or use a smaller bit. '
+          )}
         </p>
       ))}
       {(board.holdClash ?? []).length > 0 && (
         <p className="flex gap-2 text-destructive">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          {board.holdClash!.length === 1 ? 'A screw or clamp is' : `${board.holdClash!.length} screws or clamps are`} in the bit’s way or on
-          a part (red on the board). On the Boards step, drag {board.holdClash!.length === 1 ? 'it' : 'them'} into the waste.
+          {board.holdClash!.length === 1
+            ? translate('A screw or clamp is')
+            : translate('{{value1}} screws or clamps are', { value1: board.holdClash!.length })}
+          {translate(' in the bit’s way or on a part (red on the board). On the Boards step, drag ')}
+          {board.holdClash!.length === 1 ? translate('it') : translate('them')}
+          {translate(' into the waste. ')}
         </p>
       )}
       {(board.timeline ?? [])
@@ -748,14 +822,20 @@ function Checks({
         ))}
       {skins.length > 0 && plan.taped && (
         <p className="text-muted-foreground">
-          Every outline stops {plan.skin ?? 1} mm above the bottom, so the parts stay on the tape while the board is cut. The last program,
-          “Cut the parts free”, cuts the skin for all parts together, smallest first.
+          {translate('Every outline stops ')}
+          {plan.skin ?? 1}
+          {translate(
+            ' mm above the bottom, so the parts stay on the tape while the board is cut. The last program, “Cut the parts free”, cuts the skin for all parts together, smallest first. '
+          )}
         </p>
       )}
       {skins.length > 0 && !plan.taped && (
         <p className="text-muted-foreground">
-          Every part keeps a {plan.skin ?? 1} mm bottom skin, so nothing comes loose while the board is cut. At the machine, the “Cut the
-          parts free” step cuts {skins.length === 1 ? 'it' : 'them'} free one at a time.
+          {translate('Every part keeps a ')}
+          {plan.skin ?? 1}
+          {translate(' mm bottom skin, so nothing comes loose while the board is cut. At the machine, the “Cut the parts free” step cuts ')}
+          {skins.length === 1 ? translate('it') : translate('them')}
+          {translate(' free one at a time. ')}
         </p>
       )}
       {uncut.map(w => (
@@ -771,12 +851,20 @@ function Checks({
         ))
       ) : planBlock(board) ? null : (board.timeline ?? []).some(e => e.kind === 'loose') ? (
         // Parts cut loose as the user chose: only the moves passed.
-        <p className="text-muted-foreground">The moves pass the safety checks, but nothing holds the parts: {moves}</p>
+        <p className="text-muted-foreground">
+          {translate('The moves pass the safety checks, but nothing holds the parts: ')}
+          {moves}
+        </p>
       ) : uncut.length ? (
-        <p className="text-muted-foreground">The moves pass the safety checks, but not everything drawn gets cut (see above): {moves}</p>
+        <p className="text-muted-foreground">
+          {translate('The moves pass the safety checks, but not everything drawn gets cut (see above): ')}
+          {moves}
+        </p>
       ) : (
         <p className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-          <ShieldCheck className="size-4" /> Safety checks passed: {moves}
+          <ShieldCheck className="size-4" />
+          {translate(' Safety checks passed: ')}
+          {moves}
         </p>
       )}
       {looseHoles.map(h => (
@@ -784,12 +872,18 @@ function Checks({
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <div className="flex flex-col items-start gap-1">
             <p>
-              {h.name}: the {+h.size.toFixed(0)} mm piece in a through hole comes loose on the last pass and can catch the bit. Tape it,
-              screw it down, or clear it.
+              {h.name}
+              {translate(': the ')}
+              {+h.size.toFixed(0)}
+              {translate(
+                ' mm piece in a through hole comes loose on the last pass and can catch the bit. Tape it, screw it down, or clear it. '
+              )}
             </p>
             {canClearHole(h.partId) && (
               <Button size="sm" variant="outline" onClick={() => onClearHole(h.partId, h.hole)}>
-                Clear it, about +{h.addMinutes.toFixed(1)} min
+                {translate('Clear it, about +')}
+                {h.addMinutes.toFixed(1)}
+                {translate(' min ')}
               </Button>
             )}
           </div>
@@ -820,7 +914,7 @@ function Shell({
 }) {
   return (
     <CamPage className="min-h-dvh md:h-dvh">
-      {bar ?? <PageHeader title="Projects" />}
+      {bar ?? <PageHeader title={translate('Projects')} />}
       {message && <p className="m-8 text-muted-foreground">{message}</p>}
       {loading && (
         <div className="flex flex-1 items-center justify-center gap-2 text-muted-foreground">
@@ -839,14 +933,25 @@ function Shell({
 function CarvingBitsChip({ jobId, vBit, clear }: { jobId: string; vBit: LibraryTool; clear?: LibraryTool }) {
   const name = vBit.name ?? `V-bit ⌀${vBit.diameter}`;
   return (
-    <Hint text="The carving's bits, chosen on the Carve step: the V-bit carves; a flat bit, when asked, clears flat bottoms first.">
+    <Hint
+      text={translate(
+        "The carving's bits, chosen on the Carve step: the V-bit carves; a flat bit, when asked, clears flat bottoms first."
+      )}>
       <Button asChild size="sm" variant="outline">
         <Link
           to="/cam/$jobId/carve"
           params={{ jobId }}
-          aria-label={`Bits: ${name}${clear ? ` and ⌀${clear.diameter} flat` : ''}. Change them on the Carve step`}>
-          <span className="text-muted-foreground">Bits:</span> {name}
-          {clear && <span className="text-muted-foreground">+ ⌀{clear.diameter} flat</span>}
+          aria-label={translate('Bits: {{name}}{{value2}}. Change them on the Carve step', {
+            name: name,
+            value2: clear ? translate(' and ⌀{{value1}} flat', { value1: clear.diameter }) : '',
+          })}>
+          <span className="text-muted-foreground">{translate('Bits:')}</span> {name}
+          {clear && (
+            <span className="text-muted-foreground">
+              + ⌀{clear.diameter}
+              {translate(' flat')}
+            </span>
+          )}
         </Link>
       </Button>
     </Hint>

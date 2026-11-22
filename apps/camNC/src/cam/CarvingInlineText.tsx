@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { isWebFont, kCarvingFonts, type CarvingArt, type CarvingItemV1 } from './carving';
 import { webFontCss } from './webFonts';
@@ -60,7 +61,7 @@ export function CarvingInlineText({
       <foreignObject x={-width / 2 + dx} y={-inkMid} width={width} height={line} className="overflow-visible">
         <input
           ref={input}
-          aria-label="Text on the board"
+          aria-label={translate('Text on the board')}
           value={text}
           maxLength={60}
           spellCheck={false}

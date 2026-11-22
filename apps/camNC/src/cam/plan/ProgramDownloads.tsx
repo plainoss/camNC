@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { PlanResult } from '../camTypes';
 import { DropdownMenuItem } from '@wbcnc/ui/components/dropdown-menu';
 import { Download } from 'lucide-react';
@@ -19,14 +20,18 @@ export function ProgramDownloads({
     <>
       {programs.map((program, index) => (
         <DropdownMenuItem key={`gcode-${index}`} disabled={disabled} onSelect={() => onDownload(program, 'gcode')}>
-          <Download /> Download G-code{suffix(program, index)}
+          <Download />
+          {translate(' Download G-code')}
+          {suffix(program, index)}
         </DropdownMenuItem>
       ))}
       {programs.map(
         (program, index) =>
           program.setupSheet && (
             <DropdownMenuItem key={`setup-${index}`} disabled={disabled} onSelect={() => onDownload(program, 'setup')}>
-              <Download /> Download setup sheet{suffix(program, index)}
+              <Download />
+              {translate(' Download setup sheet')}
+              {suffix(program, index)}
             </DropdownMenuItem>
           )
       )}

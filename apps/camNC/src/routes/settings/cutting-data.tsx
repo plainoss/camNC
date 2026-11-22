@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { PageHeader } from '@/components/page-header';
 import { bitKey, kCuttingLabels, savedCuttingEntries, useCuttingData, type CuttingField } from '@/cam/cuttingData';
 import { CuttingDataEditor } from '@/cam/plan/CuttingDataEditor';
@@ -33,21 +34,22 @@ function CuttingDataPage() {
 
   return (
     <div className="h-full w-full">
-      <PageHeader title="Cutting data" />
+      <PageHeader title={translate('Cutting data')} />
       <div className="flex flex-row justify-center p-1">
         <div className="flex max-w-xl flex-1 flex-col gap-4 pb-8">
           <Card>
             <CardHeader>
-              <CardTitle>Bit and material</CardTitle>
+              <CardTitle>{translate('Bit and material')}</CardTitle>
               <CardDescription>
-                Feeds, stepdown and stepover per bit and material, used by every CAM job. A value you don’t set comes from your tool
-                library, or from a safe default for the material.
+                {translate(
+                  'Feeds, stepdown and stepover per bit and material, used by every CAM job. A value you don’t set comes from your tool library, or from a safe default for the material. '
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="cd-bit">Bit</Label>
+                  <Label htmlFor="cd-bit">{translate('Bit')}</Label>
                   <Select value={bitKey(bit)} onValueChange={k => setBit(bits.find(b => bitKey(b) === k)!)}>
                     <SelectTrigger id="cd-bit" className="w-full">
                       <SelectValue />
@@ -62,7 +64,7 @@ function CuttingDataPage() {
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="cd-material">Material</Label>
+                  <Label htmlFor="cd-material">{translate('Material')}</Label>
                   <Select value={material} onValueChange={m => setMaterial(m as MaterialKey)}>
                     <SelectTrigger id="cd-material" className="w-full">
                       <SelectValue />
@@ -84,12 +86,14 @@ function CuttingDataPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Saved</CardTitle>
-              <CardDescription>{entries.length ? 'Values you saved, by bit and material.' : 'Nothing saved yet.'}</CardDescription>
+              <CardTitle>{translate('Saved')}</CardTitle>
+              <CardDescription>
+                {entries.length ? translate('Values you saved, by bit and material.') : translate('Nothing saved yet.')}
+              </CardDescription>
             </CardHeader>
             {entries.length > 0 && (
               <CardContent>
-                <ul className="flex flex-col divide-y text-[13px]" aria-label="Saved cutting data">
+                <ul className="flex flex-col divide-y text-[13px]" aria-label={translate('Saved cutting data')}>
                   {entries.map(e => (
                     <li key={e.key} className="flex items-center gap-3 py-2">
                       <button
@@ -100,7 +104,10 @@ function CuttingDataPage() {
                           setMaterial(e.material);
                         }}>
                         <span className="font-medium">
-                          {e.bit ? `⌀ ${e.bit.diameter} · ${e.bit.name}` : 'A bit no longer in the library'} · {e.material}
+                          {e.bit
+                            ? translate('⌀ {{value1}} · {{value2}}', { value1: e.bit.diameter, value2: e.bit.name })
+                            : translate('A bit no longer in the library')}{' '}
+                          · {e.material}
                         </span>
                         <span className="font-mono text-xs text-muted-foreground">
                           {(Object.entries(e.values) as [CuttingField, number][])
@@ -108,7 +115,11 @@ function CuttingDataPage() {
                             .join(' · ')}
                         </span>
                       </button>
-                      <Button size="icon" variant="ghost" aria-label={`Forget the saved values for ${e.key}`} onClick={() => reset(e.key)}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={translate('Forget the saved values for {{value1}}', { value1: e.key })}
+                        onClick={() => reset(e.key)}>
                         <Trash2 className="size-4" />
                       </Button>
                     </li>

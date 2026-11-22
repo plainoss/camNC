@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import type { CadConstraint } from '@wbcnc/cad';
 import type { CSSProperties, Ref } from 'react';
@@ -31,10 +32,10 @@ export function SketchPolygonForm({
         onCreate();
       }}>
       <label>
-        Polygon sides{' '}
+        {translate('Polygon sides')}{' '}
         <input
           ref={inputRef}
-          aria-label="Polygon sides"
+          aria-label={translate('Polygon sides')}
           type="number"
           min={3}
           max={50}
@@ -50,7 +51,7 @@ export function SketchPolygonForm({
         />
       </label>
       <button type="submit" disabled={!canCreate}>
-        Create polygon
+        {translate('Create polygon ')}
       </button>
     </form>
   );
@@ -80,9 +81,10 @@ export function SketchChamferForm({
       }}>
       {distances.map((value, index) => (
         <label key={index}>
-          Distance {index + 1}{' '}
+          {translate('Distance ')}
+          {index + 1}{' '}
           <CadValueInput
-            aria-label={`Chamfer distance ${index + 1}`}
+            aria-label={translate('Chamfer distance {{value1}}', { value1: index + 1 })}
             inputMode="decimal"
             value={value}
             onChange={event => onDistances(previous => previous.map((text, i) => (i === index ? event.target.value : text)))}
@@ -96,10 +98,10 @@ export function SketchChamferForm({
         </label>
       ))}
       <button type="submit" disabled={!preview?.ok}>
-        Apply chamfers
+        {translate('Apply chamfers ')}
       </button>
       <button type="button" onClick={onCancel}>
-        Cancel chamfers
+        {translate('Cancel chamfers ')}
       </button>
       {((preview && !preview.ok) || (selection && !selection.ok)) && (
         <span role="alert" className="cad-error">
@@ -135,10 +137,10 @@ export function SketchFilletForm({
         onApply();
       }}>
       <label>
-        Fillet radius{' '}
+        {translate('Fillet radius')}{' '}
         <CadValueInput
           inputRef={inputRef}
-          aria-label="Fillet radius"
+          aria-label={translate('Fillet radius')}
           inputMode="decimal"
           value={radius}
           onFocus={onFocus}
@@ -152,10 +154,10 @@ export function SketchFilletForm({
         />
       </label>
       <button type="submit" disabled={!preview?.ok}>
-        Apply fillets
+        {translate('Apply fillets ')}
       </button>
       <button type="button" onClick={onCancel}>
-        Cancel fillets
+        {translate('Cancel fillets ')}
       </button>
       {preview && !preview.ok && (
         <span role="alert" className="cad-error">
@@ -187,10 +189,10 @@ export function SketchConicRhoForm({
         onApply();
       }}>
       <label>
-        Rho{' '}
+        {translate('Rho')}{' '}
         <input
           ref={inputRef}
-          aria-label="Conic rho"
+          aria-label={translate('Conic rho')}
           inputMode="decimal"
           value={rho}
           onChange={event => onRho(event.target.value)}
@@ -203,9 +205,9 @@ export function SketchConicRhoForm({
         />
       </label>
       <span>0 &lt; ρ &lt; 1</span>
-      <button type="submit">Apply rho</button>
+      <button type="submit">{translate('Apply rho')}</button>
       <button type="button" onClick={onClose}>
-        Close rho
+        {translate('Close rho ')}
       </button>
     </form>
   );
@@ -234,7 +236,7 @@ export function SketchDimensionEditor({
         onApply();
       }}>
       <label htmlFor="cad-edit-dimension" className="sr-only">
-        {dimension.label ?? dimension.type} <span>{dimension.type === 'angle' ? 'degrees' : lengthUnit}</span>
+        {dimension.label ?? dimension.type} <span>{dimension.type === 'angle' ? translate('degrees') : lengthUnit}</span>
       </label>
       <div>
         <CadValueInput
@@ -253,10 +255,10 @@ export function SketchDimensionEditor({
               event.preventDefault();
           }}
         />
-        <button type="submit" aria-label="Apply dimension">
+        <button type="submit" aria-label={translate('Apply dimension')}>
           ✓
         </button>
-        <button type="button" aria-label="Cancel dimension edit" onClick={onCancel}>
+        <button type="button" aria-label={translate('Cancel dimension edit')} onClick={onCancel}>
           ×
         </button>
       </div>
@@ -295,18 +297,24 @@ export function SketchShapeSizeForm({
         onCreate();
       }}>
       <span>
-        From {formatLength(from.x)}, {formatLength(from.y)}
+        {translate('From ')}
+        {formatLength(from.x)}, {formatLength(from.y)}
       </span>
       {rectangle ? (
         <>
           <label>
-            Width{' '}
-            <CadValueInput aria-label="Rectangle width" value={width} onChange={event => onWidth(event.target.value)} inputMode="decimal" />
+            {translate('Width')}{' '}
+            <CadValueInput
+              aria-label={translate('Rectangle width')}
+              value={width}
+              onChange={event => onWidth(event.target.value)}
+              inputMode="decimal"
+            />
           </label>
           <label>
-            Height{' '}
+            {translate('Height')}{' '}
             <CadValueInput
-              aria-label="Rectangle height"
+              aria-label={translate('Rectangle height')}
               value={height}
               onChange={event => onHeight(event.target.value)}
               inputMode="decimal"
@@ -315,11 +323,16 @@ export function SketchShapeSizeForm({
         </>
       ) : (
         <label>
-          Radius{' '}
-          <CadValueInput aria-label="Circle radius" value={radius} onChange={event => onRadius(event.target.value)} inputMode="decimal" />
+          {translate('Radius')}{' '}
+          <CadValueInput
+            aria-label={translate('Circle radius')}
+            value={radius}
+            onChange={event => onRadius(event.target.value)}
+            inputMode="decimal"
+          />
         </label>
       )}
-      <button type="submit">Create</button>
+      <button type="submit">{translate('Create')}</button>
     </form>
   );
 }

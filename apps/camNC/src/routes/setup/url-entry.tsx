@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { PageHeader } from '@/components/page-header';
 import { TryDemoCard } from '@/lib/demo/TryDemoCard';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -50,21 +51,22 @@ function DeleteCameraButton() {
       <AlertDialogTrigger asChild>
         <Button variant="secondary" size="sm" className="gap-2">
           <Trash2 className="h-4 w-4" />
-          Delete Camera Source
+          {translate('Delete Camera Source ')}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Camera Source</AlertDialogTitle>
+          <AlertDialogTitle>{translate('Delete Camera Source')}</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete &quot;{currentCamSource?.name}&quot;? This action cannot be undone and will remove all
-            calibration data and settings for this camera source.
+            {translate('Are you sure you want to delete "')}
+            {currentCamSource?.name}
+            {translate('"? This action cannot be undone and will remove all calibration data and settings for this camera source. ')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{translate('Cancel')}</AlertDialogCancel>
           <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-            Delete
+            {translate('Delete ')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -101,7 +103,7 @@ function UrlEntryComponent() {
     updateCamSource(activeCamId, changes);
     if (isCamCalibrated({ ...currentCamSource, ...changes })) {
       // Another source of the same camera: the calibration and markers still hold, no need to set them up again.
-      toast.success('Camera source changed. Calibration and markers were kept.');
+      toast.success(translate('Camera source changed. Calibration and markers were kept.'));
       navigate({ to: '/' });
     } else {
       navigate({ to: '/setup/camera-calibration' });
@@ -110,7 +112,9 @@ function UrlEntryComponent() {
 
   return (
     <div className="w-full h-full">
-      <PageHeader title={adding ? 'Add camera' : `Change source of "${currentCamSource.name}"`} />
+      <PageHeader
+        title={adding ? translate('Add camera') : translate('Change source of "{{value1}}"', { value1: currentCamSource.name })}
+      />
       <div className="flex justify-center p-1 flex-row">
         <div className="max-w-xl gap-4 flex flex-1 flex-col">
           {adding && <AddCameraSteps current="source" showReuse={Object.values(camSources).some(hasSetup)} />}
@@ -119,8 +123,9 @@ function UrlEntryComponent() {
           ) : (
             <Alert>
               <AlertDescription>
-                Switching this camera to another source, e.g. from an external go2rtc to a direct network camera, keeps its calibration and
-                markers, as long as the picture keeps its aspect ratio.
+                {translate(
+                  'Switching this camera to another source, e.g. from an external go2rtc to a direct network camera, keeps its calibration and markers, as long as the picture keeps its aspect ratio. '
+                )}
               </AlertDescription>
             </Alert>
           )}

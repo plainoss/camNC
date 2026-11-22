@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Edges, Line } from '@react-three/drei';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import {
@@ -45,7 +46,7 @@ const kSketch = '#3f5f8a';
 const kLift = 0.01;
 const kPartViewDirection: [number, number, number] = [0.2, -0.75, 1];
 const faceLabel = (face: CadFaceRef | { edge: string }) =>
-  face === 'top' ? 'top' : face === 'underside' ? 'underside' : 'edge' in face ? 'side face' : 'pocket floor';
+  face === 'top' ? 'top' : face === 'underside' ? 'underside' : 'edge' in face ? translate('side face') : translate('pocket floor');
 const alone = (part: CadPart): CadDocument => ({
   version: CAD_DOCUMENT_VERSION,
   id: 'part-view',
@@ -381,7 +382,8 @@ export default function PartView3D({
                 if (snapshot) onSketchSide?.(face, snapshot);
               } else onSketchFace(face, snapshot);
             }}>
-            Sketch{face ? ` on ${faceLabel(face)}` : ''}
+            {translate('Sketch')}
+            {face ? translate(' on {{value1}}', { value1: faceLabel(face) }) : ''}
           </button>
         </div>
       )}
@@ -389,10 +391,10 @@ export default function PartView3D({
         {solid.problem
           ? solid.problem
           : entry
-            ? `${depthLabel({ ...entry, depth })}. Type a depth, or drag the arrow.`
+            ? translate('{{value1}}. Type a depth, or drag the arrow.', { value1: depthLabel({ ...entry, depth }) })
             : regions.length
-              ? 'Click a region to set its depth, or a face to sketch on. Right-drag to turn, middle-drag to pan.'
-              : 'Click the top face, then Sketch, to draw what to cut.'}
+              ? translate('Click a region to set its depth, or a face to sketch on. Right-drag to turn, middle-drag to pan.')
+              : translate('Click the top face, then Sketch, to draw what to cut.')}
       </p>
     </div>
   );

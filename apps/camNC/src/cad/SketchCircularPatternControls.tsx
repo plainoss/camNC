@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadPoint } from '@wbcnc/cad';
 import type { PointerEvent } from 'react';
 import { CadValueInput } from './CadValueInput';
@@ -23,7 +24,7 @@ export function SketchCircularPatternControls({
 }) {
   return (
     <form
-      aria-label="Circular pattern"
+      aria-label={translate('Circular pattern')}
       className="cad-create-size cad-pattern-editor"
       onSubmit={e => {
         e.preventDefault();
@@ -36,9 +37,9 @@ export function SketchCircularPatternControls({
         }
       }}>
       <label>
-        Instances{' '}
+        {translate('Instances')}{' '}
         <input
-          aria-label="Circular instances"
+          aria-label={translate('Circular instances')}
           ref={e => onField('count', e)}
           inputMode="numeric"
           value={parameters.count}
@@ -47,7 +48,7 @@ export function SketchCircularPatternControls({
       </label>
       <label>
         <input
-          aria-label="Closed circular pattern"
+          aria-label={translate('Closed circular pattern')}
           type="checkbox"
           checked={parameters.closed}
           onChange={e =>
@@ -66,13 +67,13 @@ export function SketchCircularPatternControls({
             })
           }
         />
-        Closed
+        {translate('Closed ')}
       </label>
       {!parameters.closed && (
         <label>
-          Sweep{' '}
+          {translate('Sweep')}{' '}
           <CadValueInput
-            aria-label="Pattern sweep"
+            aria-label={translate('Pattern sweep')}
             inputRef={e => onField('angle', e)}
             unit="deg"
             value={parameters.angle}
@@ -81,34 +82,39 @@ export function SketchCircularPatternControls({
         </label>
       )}
       <label>
-        Center X{' '}
+        {translate('Center X')}{' '}
         <CadValueInput
-          aria-label="Pattern center X"
+          aria-label={translate('Pattern center X')}
           value={parameters.centerX}
           onChange={e => onChange({ ...parameters, centerX: e.target.value })}
         />
       </label>
       <label>
-        Center Y{' '}
+        {translate('Center Y')}{' '}
         <CadValueInput
-          aria-label="Pattern center Y"
+          aria-label={translate('Pattern center Y')}
           value={parameters.centerY}
           onChange={e => onChange({ ...parameters, centerY: e.target.value })}
         />
       </label>
       <button type="submit" disabled={!!error}>
-        Apply pattern
+        {translate('Apply pattern ')}
       </button>
       <button type="button" onClick={onCancel}>
-        Cancel pattern
+        {translate('Cancel pattern ')}
       </button>
       {error && (
         <span role="alert" className="cad-error">
           {error}
         </span>
       )}
-      {previewLimited && <span>Showing up to 10 instances. Apply creates the full pattern.</span>}
-      {releasedCount > 0 && <span role="status">{releasedCount} relations on removed instances will be released.</span>}
+      {previewLimited && <span>{translate('Showing up to 10 instances. Apply creates the full pattern.')}</span>}
+      {releasedCount > 0 && (
+        <span role="status">
+          {releasedCount}
+          {translate(' relations on removed instances will be released.')}
+        </span>
+      )}
     </form>
   );
 }
@@ -157,7 +163,7 @@ export function SketchCircularPatternManipulator({
         r={6 * k}
         onPointerDown={drag('center')}
         style={{ cursor: 'move' }}>
-        <title>Drag pattern center</title>
+        <title>{translate('Drag pattern center')}</title>
       </circle>
       <circle
         data-circular-handle="sweep"
@@ -166,12 +172,12 @@ export function SketchCircularPatternManipulator({
         r={6 * k}
         onPointerDown={drag('sweep')}
         style={{ cursor: 'crosshair' }}>
-        <title>Drag total sweep</title>
+        <title>{translate('Drag total sweep')}</title>
       </circle>
       <text
         role="button"
         tabIndex={0}
-        aria-label="Edit circular instance count"
+        aria-label={translate('Edit circular instance count')}
         x={point.x + 10 * k}
         y={-point.y - 10 * k}
         fill="currentColor"

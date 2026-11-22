@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { partCutInputProblems, type CadDocument, type CadSketchSolveStatus } from '@wbcnc/cad';
 
 /**
@@ -12,6 +13,6 @@ export function partTrouble(
 ): string | null {
   return (
     [...variableProblems, ...partCutInputProblems(document)].find(problem => problem.partId === id)?.message ??
-    (sketchStatuses[id]?.status === 'conflict' ? 'This part’s sketch can’t be solved with its current values.' : null)
+    (sketchStatuses[id]?.status === 'conflict' ? translate('This part’s sketch can’t be solved with its current values.') : null)
   );
 }

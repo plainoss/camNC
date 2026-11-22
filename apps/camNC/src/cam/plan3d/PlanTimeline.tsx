@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Button } from '@wbcnc/ui/components/button';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { Pause, Play } from 'lucide-react';
@@ -46,13 +47,13 @@ export function PlanTimeline({
 
   return (
     <div className="flex items-center gap-3 border-t border-zinc-200 bg-white px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-950">
-      <Hint text={playing ? 'Pause the simulated cut.' : 'Play the cut in the view, at the speed on the right.'}>
+      <Hint text={playing ? translate('Pause the simulated cut.') : translate('Play the cut in the view, at the speed on the right.')}>
         <Button
           size="icon"
           variant="outline"
           className="size-8 shrink-0"
           onClick={() => onPlaying(!playing)}
-          aria-label={playing ? 'Pause' : 'Play'}>
+          aria-label={playing ? translate('Pause') : translate('Play')}>
           {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
         </Button>
       </Hint>
@@ -81,7 +82,10 @@ export function PlanTimeline({
           <div
             key={op.index}
             data-group={op.group}
-            title={`${model.groups[op.group].label} · ${formatDuration(op.end - op.start)}`}
+            title={translate('{{value1}} · {{value2}}', {
+              value1: model.groups[op.group].label,
+              value2: formatDuration(op.end - op.start),
+            })}
             className={cn(
               'absolute top-1.5 h-4 border-x border-white/70 dark:border-zinc-950/70',
               selected !== null && selected !== op.group && 'opacity-25'
@@ -93,8 +97,8 @@ export function PlanTimeline({
           <div
             key={i}
             role="img"
-            aria-label={`Pause: ${p.label}`}
-            title={`Pause: ${p.label}`}
+            aria-label={translate('Pause: {{value1}}', { value1: p.label })}
+            title={translate('Pause: {{value1}}', { value1: p.label })}
             data-pause
             className="pointer-events-none absolute top-0.5 h-6 w-0.5 -translate-x-1/2 rounded-full bg-amber-500"
             style={{ left: `${timeToX(knots, p.time) * 100}%` }}
@@ -103,7 +107,7 @@ export function PlanTimeline({
         <div
           role="slider"
           tabIndex={0}
-          aria-label="Playhead"
+          aria-label={translate('Playhead')}
           aria-valuemin={0}
           aria-valuemax={Math.round(model.total)}
           aria-valuenow={Math.round(time)}
@@ -125,12 +129,12 @@ export function PlanTimeline({
       <div className="w-24 shrink-0 text-right text-xs text-zinc-500 tabular-nums dark:text-zinc-400">
         {formatDuration(time)} / {formatDuration(model.total)}
       </div>
-      <Hint text="Simulation speed: 20× plays 20 seconds of cutting each second.">
+      <Hint text={translate('Simulation speed: 20× plays 20 seconds of cutting each second.')}>
         <select
           className="h-8 rounded-md border border-zinc-200 bg-white px-1 text-xs dark:border-zinc-800 dark:bg-zinc-950"
           value={speed}
           onChange={e => onSpeed(Number(e.target.value))}
-          aria-label="Speed">
+          aria-label={translate('Speed')}>
           {kSpeeds.map(s => (
             <option key={s} value={s}>
               {s}×

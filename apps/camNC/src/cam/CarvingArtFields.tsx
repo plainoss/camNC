@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useState, type RefObject } from 'react';
 import { Input } from '@wbcnc/ui/components/input';
 import { FileUp } from 'lucide-react';
@@ -39,7 +40,7 @@ export function CarvingArtFields({
     <>
       <Input
         id="carve-text"
-        aria-label="Text"
+        aria-label={translate('Text')}
         value={text}
         maxLength={60}
         className="h-7 w-36 px-2 text-xs"
@@ -52,8 +53,8 @@ export function CarvingArtFields({
   ) : (
     <button
       type="button"
-      aria-label="Replace SVG"
-      title="Replace SVG"
+      aria-label={translate('Replace SVG')}
+      title={translate('Replace SVG')}
       onClick={onReplace}
       className="flex size-7 items-center justify-center rounded-md hover:bg-muted">
       <FileUp className="size-4" />

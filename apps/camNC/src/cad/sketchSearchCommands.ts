@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { SearchCommand } from './CommandSearch';
 import { constraintPrompt } from '@wbcnc/cad-editor/constraintCommands';
 import { sketchTools as tools } from './sketchTools';
@@ -8,17 +9,17 @@ export const sketchSearchCommands: SearchCommand[] = [
     ...t,
     description:
       t.id === 'circumscribedPolygon'
-        ? 'Sketch a regular polygon with its vertices on a circumscribing construction circle.'
+        ? translate('Sketch a regular polygon with its vertices on a circumscribing construction circle.')
         : t.id === 'inscribedPolygon'
-          ? 'Sketch a regular polygon around an inscribed construction circle.'
+          ? translate('Sketch a regular polygon around an inscribed construction circle.')
           : t.id === 'centerPointArc'
-            ? 'Sketch an arc by defining its center, start, and end points.'
+            ? translate('Sketch an arc by defining its center, start, and end points.')
             : t.id === 'ellipse'
-              ? 'Sketch an ellipse by defining its center point and two perpendicular axis radii.'
+              ? translate('Sketch an ellipse by defining its center point and two perpendicular axis radii.')
               : t.id === 'threePointCircle'
-                ? 'Sketch a circle by defining three points along its circumference.'
+                ? translate('Sketch a circle by defining three points along its circumference.')
                 : t.id === 'alignedRectangle'
-                  ? 'Sketch a rectangle from an oriented first edge and its perpendicular extent.'
+                  ? translate('Sketch a rectangle from an oriented first edge and its perpendicular extent.')
                   : undefined,
   })),
   ...(
@@ -38,7 +39,7 @@ export const sketchSearchCommands: SearchCommand[] = [
       'curvature',
     ] as const
   ).map(id => ({ id, label: id[0]!.toUpperCase() + id.slice(1), description: constraintPrompt(id) })),
-  { id: 'construction', label: 'Construction geometry', key: 'Q' },
-  { id: 'fix', label: 'Fix / unfix', key: 'Shift+J' },
-  { id: 'fit', label: 'Zoom to fit', key: 'F' },
+  { id: 'construction', label: translate('Construction geometry'), key: 'Q' },
+  { id: 'fix', label: translate('Fix / unfix'), key: 'Shift+J' },
+  { id: 'fit', label: translate('Zoom to fit'), key: 'F' },
 ];

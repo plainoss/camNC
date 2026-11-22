@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import { standaloneSketchPoints, type CadDocument, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useMemo, useState } from 'react';
@@ -52,7 +53,7 @@ export function NewHoleDialog({
     const listen = () =>
       pickPoint?.(pick => {
         const found = holePointAt(document, pick.surfacePoint ?? pick.point);
-        if (!found) setError('Click a point of a sketch on a part’s face, such as a circle’s centre.');
+        if (!found) setError(translate('Click a point of a sketch on a part’s face, such as a circle’s centre.'));
         else {
           setError(null);
           setPoints(current =>
@@ -94,7 +95,7 @@ export function NewHoleDialog({
   const save = () => {
     if ('error' in spec) return setError(spec.error);
     if (refusal) return setError(refusal);
-    if (!candidate) return setError('Pick the sketch points to place holes.');
+    if (!candidate) return setError(translate('Pick the sketch points to place holes.'));
     rememberHole(settings);
     onSave(candidate);
   };
@@ -102,7 +103,7 @@ export function NewHoleDialog({
     <FeatureDialog
       title={holeTitle(settings, diameter, depth)}
       okDisabled={!candidate || !!refusal}
-      okReason={refusal ?? (candidate ? null : 'Pick the sketch points to place holes.')}
+      okReason={refusal ?? (candidate ? null : translate('Pick the sketch points to place holes.'))}
       onOk={save}
       onCancel={() => {
         rememberHole(settings);
@@ -115,13 +116,13 @@ export function NewHoleDialog({
         picks={
           <>
             <div className="cad-feature-selection" data-active="">
-              <small>Sketch points to place holes</small>
+              <small>{translate('Sketch points to place holes')}</small>
               {points.map(point => (
                 <span key={point.pointId}>{holePointName(document, point.sketchId)}</span>
               ))}
             </div>
             <div className="cad-feature-selection">
-              <small>Merge scope</small>
+              <small>{translate('Merge scope')}</small>
               {board && <span>{board.name}</span>}
             </div>
           </>

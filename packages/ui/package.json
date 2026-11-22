@@ -36,7 +36,8 @@
     "sonner": "catalog:",
     "tailwind-merge": "catalog:",
     "tw-animate-css": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@wbcnc/i18n": "workspace:*"
   },
   "devDependencies": {
     "@heroui/react": "catalog:",

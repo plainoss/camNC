@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { camKeys } from '@/cam/camQueries';
 import { kDesignFile, kModelFile } from '@/cam/jobDb';
 import { isManufacturingLocked } from '@/cam/machine/camMachine';
@@ -31,7 +32,7 @@ export function useOpenFile() {
   return useCallback(
     async (file: File) => {
       if (isManufacturingLocked()) {
-        toast.info('Review or dismiss the original machine job before loading another file.');
+        toast.info(translate('Review or dismiss the original machine job before loading another file.'));
         return;
       }
       if (kModelFile.test(file.name) || kDesignFile.test(file.name)) {
@@ -53,7 +54,11 @@ export function useOpenFile() {
       const gcode = await file.text();
       if (isManufacturingLocked()) return;
       useStore.getState().updateToolpath(gcode, file.name);
-      toast.success(isDemoMode() ? `Loaded ${file.name}. It stays in your browser.` : `Loaded ${file.name}`);
+      toast.success(
+        isDemoMode()
+          ? translate('Loaded {{value1}}. It stays in your browser.', { value1: file.name })
+          : translate('Loaded {{value1}}', { value1: file.name })
+      );
     },
     [navigate, queryClient]
   );

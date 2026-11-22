@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   cadDrawnOnSupports,
   effectivePlacement,
@@ -14,7 +15,7 @@ import type { CadConnectorPick } from './PartFeatureDialogs';
 export type Picked = { partId: string; corner: string } | { partId: string; rim: CadFilletRim };
 
 /** The design has an error elsewhere, so the part isn't built: its edges along its faces can't be found. */
-export const kUnbuilt = 'The design can’t be built as it is, so edges along its faces can’t be picked: fix its errors first.';
+export const kUnbuilt = translate('The design can’t be built as it is, so edges along its faces can’t be picked: fix its errors first.');
 
 export const pickKey = (pick: Picked) =>
   'corner' in pick
@@ -36,8 +37,8 @@ function builtPart(document: CadDocument, partId: string): EvaluatedCadPart | un
  */
 export function pickedOf(document: CadDocument, pick: CadConnectorPick, edgeByEdge = false): Picked | { error: string } {
   const part = document.parts.find(candidate => candidate.id === pick.partId);
-  if (!part) return { error: 'Click an edge or a face of a part.' };
-  if (pick.copy) return { error: 'Pick the edge on the part itself, not on a copy of it.' };
+  if (!part) return { error: translate('Click an edge or a face of a part.') };
+  if (pick.copy) return { error: translate('Pick the edge on the part itself, not on a copy of it.') };
   const at = effectivePlacement(part, cadDrawnOnSupports(document)) ?? { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
   const back = [-at.rotation[0], -at.rotation[1], -at.rotation[2], at.rotation[3]];
   const local = (p: [number, number, number]) => rotateVector(back, [p[0] - at.position[0], p[1] - at.position[1], p[2] - at.position[2]]);
@@ -47,7 +48,7 @@ export function pickedOf(document: CadDocument, pick: CadConnectorPick, edgeByEd
     const point = local(pick.surfacePoint ?? pick.point);
     const made = built();
     if (!made) return { error: kUnbuilt };
-    if (Math.abs(normal[2]) < 1 - 1e-6) return { error: 'Click an edge, or the top or underside of a part.' };
+    if (Math.abs(normal[2]) < 1 - 1e-6) return { error: translate('Click an edge, or the top or underside of a part.') };
     const side = normal[2] > 0 ? 'top' : 'underside';
     if (Math.abs(point[2] - (side === 'top' ? made.thickness : 0)) > 1e-3)
       return { error: 'A pocket’s floor meets its walls at inside edges, which can’t be rounded over: pick the edges to round.' };
@@ -68,7 +69,7 @@ export function pickedOf(document: CadDocument, pick: CadConnectorPick, edgeByEd
   const corner = part.sketch.entities.find(
     entity => entity.type === 'point' && !entity.construction && Math.hypot(entity.x - a[0], entity.y - a[1]) < 1e-3
   );
-  return corner ? { partId: part.id, corner: corner.id } : { error: 'That edge isn’t at a corner of the part’s sketch.' };
+  return corner ? { partId: part.id, corner: corner.id } : { error: translate('That edge isn’t at a corner of the part’s sketch.') };
 }
 
 /** The sketch line a straight edge of the part runs along, between its ends: its ID, or undefined for none. */

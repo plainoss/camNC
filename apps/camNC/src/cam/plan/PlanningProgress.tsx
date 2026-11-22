@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { secondsLeft, timeLeftText, usePlanProgress } from '@/cam/planProgress';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 import { cn } from '@wbcnc/ui/lib/utils';
@@ -24,21 +25,21 @@ export function PlanningProgress({ boardId, after = 0, className }: { boardId: s
     <div role="status" className={cn('flex w-64 max-w-full flex-col gap-2 text-sm text-muted-foreground', className)}>
       <div className="flex items-center gap-2">
         <LoadingSpinner className="size-4 shrink-0" />
-        <span>Computing toolpaths…</span>
+        <span>{translate('Computing toolpaths…')}</span>
         {percent !== undefined && <span className="ml-auto tabular-nums">{percent}%</span>}
       </div>
       {progress && (
         <>
           <div
             role="progressbar"
-            aria-label="Toolpaths computed"
+            aria-label={translate('Toolpaths computed')}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={percent}
             className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${percent}%` }} />
           </div>
-          <span className="text-xs">{left === undefined ? 'Estimating the time left…' : timeLeftText(left)}</span>
+          <span className="text-xs">{left === undefined ? translate('Estimating the time left…') : timeLeftText(left)}</span>
         </>
       )}
     </div>

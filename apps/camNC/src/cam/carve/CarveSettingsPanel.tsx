@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { ReactNode } from 'react';
 import { vConeDepth } from '@wbcnc/cam';
 import { NumberInput } from '@/cam/NumberInput';
@@ -38,25 +39,25 @@ export function CarveSettingsPanel({
   const flatFrom = 2 * (Math.min(carving.maxDepth, cone) / Math.tan(((carving.vBit.angle ?? 90) * Math.PI) / 360));
   return (
     <>
-      <CarvePanelHeader title="Board and bit" onClose={onClose} />
-      <Section title="Board">
+      <CarvePanelHeader title={translate('Board and bit')} onClose={onClose} />
+      <Section title={translate('Board')}>
         <div className="grid grid-cols-3 gap-2">
-          <Field label="Width" id="carve-board-w">
+          <Field label={translate('Width')} id="carve-board-w">
             <NumberInput id="carve-board-w" value={size.w} min={kBoardLeast} max={kBoardMost} unit="mm" onCommit={w => onBoard({ w })} />
           </Field>
-          <Field label="Height" id="carve-board-h">
+          <Field label={translate('Height')} id="carve-board-h">
             <NumberInput id="carve-board-h" value={size.h} min={kBoardLeast} max={kBoardMost} unit="mm" onCommit={h => onBoard({ h })} />
           </Field>
-          <Field label="Thick" id="carve-board-t">
+          <Field label={translate('Thick')} id="carve-board-t">
             <NumberInput id="carve-board-t" value={thickness} min={3} max={100} unit="mm" onCommit={t => onBoard({ thickness: t })} />
           </Field>
         </div>
         <p className="text-xs text-muted-foreground">
-          Measure the board&rsquo;s thickness: Z0 is its underside, so a thicker board carves deeper and wider.
+          {translate('Measure the board’s thickness: Z0 is its underside, so a thicker board carves deeper and wider. ')}
         </p>
       </Section>
-      <Section title="Bit and depth">
-        <Field label="V-bit" id="carve-bit">
+      <Section title={translate('Bit and depth')}>
+        <Field label={translate('V-bit')} id="carve-bit">
           <select
             id="carve-bit"
             className="h-9 rounded-md border bg-background px-2"
@@ -69,7 +70,7 @@ export function CarveSettingsPanel({
             ))}
           </select>
         </Field>
-        <Field label="Deepest (mm)" id="carve-depth">
+        <Field label={translate('Deepest (mm)')} id="carve-depth">
           <NumberInput
             id="carve-depth"
             value={carving.maxDepth}
@@ -81,8 +82,10 @@ export function CarveSettingsPanel({
           />
         </Field>
         <p className="text-xs text-muted-foreground">
-          Strokes wider than {flatFrom.toFixed(1)} mm get a flat bottom
-          {carving.maxDepth > cone ? `: the bit's cone is only ${cone.toFixed(1)} mm deep` : ''}.
+          {translate('Strokes wider than ')}
+          {flatFrom.toFixed(1)}
+          {translate(' mm get a flat bottom ')}
+          {carving.maxDepth > cone ? translate(": the bit's cone is only {{value1}} mm deep", { value1: cone.toFixed(1) }) : ''}.
         </p>
         <label className="flex items-start gap-2">
           <input
@@ -92,12 +95,14 @@ export function CarveSettingsPanel({
             onChange={e => onCarving({ ...carving, clearWithFlat: e.target.checked })}
           />
           <span>
-            Clear flat bottoms with the {flatBitName} first
-            <span className="block text-xs text-muted-foreground">Otherwise the V-bit clears them: one bit, slower.</span>
+            {translate('Clear flat bottoms with the ')}
+            {flatBitName}
+            {translate(' first ')}
+            <span className="block text-xs text-muted-foreground">{translate('Otherwise the V-bit clears them: one bit, slower.')}</span>
           </span>
         </label>
       </Section>
-      <Section title="Cut out">
+      <Section title={translate('Cut out')}>
         <CarvingCutoutToggle
           carving={carving}
           taped={taped}

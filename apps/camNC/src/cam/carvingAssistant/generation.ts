@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { requestAssistant, type AssistantMessage, type AssistantTool } from '@/cad/assistant/provider';
 import type { AssistantCredentials } from '@/cad/assistant/keyStore';
 import {
@@ -88,13 +89,13 @@ export async function generateCarvingAsset(options: CarvingGenerationOptions): P
 }> {
   const { constraints, signal } = options;
   const prompt = options.prompt.trim();
-  if (!prompt || prompt.length > 4_000) throw new Error('Describe the artwork in 1–4000 characters.');
+  if (!prompt || prompt.length > 4_000) throw new Error(translate('Describe the artwork in 1–4000 characters.'));
   if (
     !['simple', 'balanced', 'detailed'].includes(constraints.detail) ||
     [constraints.widthMm, constraints.heightMm, constraints.minFeatureMm].some(value => !Number.isFinite(value) || value <= 0) ||
     constraints.minFeatureMm >= Math.min(constraints.widthMm, constraints.heightMm)
   )
-    throw new Error('Choose a positive artwork size and a minimum feature smaller than its size.');
+    throw new Error(translate('Choose a positive artwork size and a minimum feature smaller than its size.'));
   if (
     options.previous &&
     (typeof options.previous.id !== 'string' ||
@@ -104,7 +105,7 @@ export async function generateCarvingAsset(options: CarvingGenerationOptions): P
       typeof options.previous.prompt !== 'string' ||
       options.previous.prompt.length > 4_000)
   )
-    throw new Error('The previous artwork is too large to revise with this assistant.');
+    throw new Error(translate('The previous artwork is too large to revise with this assistant.'));
   const limits: AssistantLimits = {
     ...options.limits,
     maxOutputTokens: options.limits?.maxOutputTokens ?? 8_192,
@@ -118,7 +119,8 @@ export async function generateCarvingAsset(options: CarvingGenerationOptions): P
   // Callers can hold extra preview/provenance fields on an asset. Only the compact source reference enters model context.
   const previous = options.previous && { id: options.previous.id, svg: options.previous.svg, prompt: options.previous.prompt };
   const content = JSON.stringify({ brief: prompt, constraints, ...(previous && { previous }) });
-  if (content.length + instructions.length > limits.maxInputCharacters!) throw new Error('The artwork request exceeds the input budget.');
+  if (content.length + instructions.length > limits.maxInputCharacters!)
+    throw new Error(translate('The artwork request exceeds the input budget.'));
   if (signal.aborted) throw new DOMException('Stopped', 'AbortError');
 
   let answer: AssistantMessage;
@@ -144,16 +146,17 @@ export async function generateCarvingAsset(options: CarvingGenerationOptions): P
   options.onUsage?.(structuredClone(usage));
   if (signal.aborted) throw new DOMException('Stopped', 'AbortError');
   if (answer.completion === 'incomplete')
-    throw new Error('The provider truncated the artwork. Increase the output limit or request simpler art.');
-  if (answer.completion === 'refused') throw new Error('The provider declined to generate this artwork. Try another description.');
+    throw new Error(translate('The provider truncated the artwork. Increase the output limit or request simpler art.'));
+  if (answer.completion === 'refused')
+    throw new Error(translate('The provider declined to generate this artwork. Try another description.'));
   if (answer.calls?.length !== 1 || answer.calls[0].name !== tool.name)
-    throw new Error('The provider did not return one SVG artwork. Try again with a tool-capable model.');
+    throw new Error(translate('The provider did not return one SVG artwork. Try again with a tool-capable model.'));
   const { svg, title, summary } = answer.calls[0].arguments;
   if (typeof svg === 'string' && svg.length > (options.locallyTraced ? kMaxTracedSvgCharacters : kMaxSvgCharacters))
     throw new Error(
       options.locallyTraced
-        ? 'The traced artwork is too large. Choose Simple detail or request simpler art.'
-        : 'The provider returned oversized artwork. Request simpler art.'
+        ? translate('The traced artwork is too large. Choose Simple detail or request simpler art.')
+        : translate('The provider returned oversized artwork. Request simpler art.')
     );
   if (
     typeof svg !== 'string' ||
@@ -165,10 +168,10 @@ export async function generateCarvingAsset(options: CarvingGenerationOptions): P
     !summary.trim() ||
     summary.length > 600
   )
-    throw new Error('The provider returned incomplete or oversized artwork.');
+    throw new Error(translate('The provider returned incomplete or oversized artwork.'));
   // Compatible endpoints can echo request credentials in otherwise valid output. Never store that in exported artwork metadata.
   if (options.credentials.key && [svg, title, summary].some(value => value.includes(options.credentials.key)))
-    throw new Error('The provider returned credential data instead of usable artwork. Check the endpoint before trying again.');
+    throw new Error(translate('The provider returned credential data instead of usable artwork. Check the endpoint before trying again.'));
   return {
     asset: { id: crypto.randomUUID(), svg, prompt, title: title.trim(), summary: summary.trim() },
     usage,

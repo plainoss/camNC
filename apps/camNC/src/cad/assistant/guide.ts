@@ -1,9 +1,10 @@
+import { t as translate } from '@wbcnc/i18n';
 import reference from '../../../../../packages/cad-script/README.md?raw';
 
 function between(start: string, end: string): string {
   const from = reference.indexOf(start);
   const to = reference.indexOf(end, from + start.length);
-  if (from < 0 || to < 0) throw new Error(`Assistant guide section is missing: ${start}`);
+  if (from < 0 || to < 0) throw new Error(translate('Assistant guide section is missing: {{start}}', { start: start }));
   return reference.slice(from, to).trim();
 }
 

@@ -1,10 +1,11 @@
+import { t as translate } from '@wbcnc/i18n';
 /** Keyboard moves one actual feature even while its folder is closed. */
 export function RollbackBar({
   stepId,
   stepIds,
   onRollTo,
   onMenu,
-  label = 'Shown up to here',
+  label = translate('Shown up to here'),
 }: {
   stepId: string | null;
   stepIds: string[];
@@ -20,7 +21,9 @@ export function RollbackBar({
       aria-orientation="horizontal"
       tabIndex={onRollTo ? 0 : undefined}
       draggable={!!onRollTo}
-      title={onRollTo ? 'Drag, or use the arrow keys, to show the design up to a step. Right-click to roll to the end.' : undefined}
+      title={
+        onRollTo ? translate('Drag, or use the arrow keys, to show the design up to a step. Right-click to roll to the end.') : undefined
+      }
       onDragStart={event => {
         event.dataTransfer.setData('text/x-cad-rollback', '');
         event.dataTransfer.effectAllowed = 'move';

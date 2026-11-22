@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cadPartReferenceName, designStepLabel, designSteps, newCadId, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sketchPlaneName } from './drawnOnName';
@@ -69,55 +70,55 @@ export function SplitDialog({
   const planeName =
     plane &&
     (document.planes?.find(candidate => candidate.id === plane.datum)?.name ?? sketchPlaneName(document, { on: plane.across, offset: 0 }));
-  const missing = !target ? 'Pick the part to split.' : !plane ? 'Pick a plane to split it with.' : null;
+  const missing = !target ? translate('Pick the part to split.') : !plane ? translate('Pick a plane to split it with.') : null;
   return (
     <FeatureDialog
       title={title}
       okDisabled={!!missing || !!problem}
       okReason={missing ?? problem}
-      failing={problem ?? (target && !plane ? 'Select an entity to split with.' : null)}
+      failing={problem ?? (target && !plane ? translate('Select an entity to split with.') : null)}
       onOk={() => made && 'document' in made && onSave(made.document)}
       onCancel={onCancel}
       acceptFromPartsList>
       {/* Parts are split; splitting faces isn't offered yet. */}
-      <div className="cad-feature-tabs cad-static-tabs" role="tablist" aria-label="Split type">
+      <div className="cad-feature-tabs cad-static-tabs" role="tablist" aria-label={translate('Split type')}>
         <span role="tab" aria-selected>
-          Part
+          {translate('Part ')}
         </span>
-        <span role="tab" aria-selected={false} aria-disabled title="Not available yet">
-          Face
+        <span role="tab" aria-selected={false} aria-disabled title={translate('Not available yet')}>
+          {translate('Face ')}
         </span>
       </div>
       <div
         className="cad-feature-selection"
         role="group"
-        aria-label="Parts, surfaces, or curves to split"
+        aria-label={translate('Parts, surfaces, or curves to split')}
         data-active={active === 'parts' ? '' : undefined}
         onClick={() => !existing && setActive('parts')}>
-        <small>Parts, surfaces, or curves to split</small>
+        <small>{translate('Parts, surfaces, or curves to split')}</small>
         {targetName && <span className="cad-feature-chip">{targetName}</span>}
       </div>
       <div
         className="cad-feature-selection"
         role="group"
-        aria-label="Entity to split with"
+        aria-label={translate('Entity to split with')}
         data-active={active === 'tool' ? '' : undefined}
         data-missing={target && !plane ? '' : undefined}
         onClick={startPlane}>
-        <small>Entity to split with</small>
+        <small>{translate('Entity to split with')}</small>
         {planeName && <span className="cad-feature-chip">{planeName}</span>}
       </div>
-      <label title="Not available yet">
+      <label title={translate('Not available yet')}>
         <input type="checkbox" disabled />
-        Keep tools
+        {translate('Keep tools ')}
       </label>
-      <label title="Not available yet">
+      <label title={translate('Not available yet')}>
         <input type="checkbox" disabled />
-        Trim to face boundaries
+        {translate('Trim to face boundaries ')}
       </label>
-      <label title="Not available yet">
+      <label title={translate('Not available yet')}>
         <input type="checkbox" checked disabled readOnly />
-        Keep both sides
+        {translate('Keep both sides ')}
       </label>
       {problem && (
         <p role="alert" className="cad-thickness-error">

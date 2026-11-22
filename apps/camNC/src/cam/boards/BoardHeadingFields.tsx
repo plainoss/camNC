@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { MATERIALS } from '@wbcnc/cam/settings';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@wbcnc/ui/components/select';
@@ -19,7 +20,7 @@ export function BoardHeadingFields({ board, nest, onChange }: { board: BoardV1; 
       <Select value={board.material} onValueChange={m => onChange({ ...board, material: m as MaterialKey })}>
         <SelectTrigger
           id="board-material"
-          aria-label="Material"
+          aria-label={translate('Material')}
           size="sm"
           className="h-6 gap-1 rounded-none border-0 border-b border-dashed border-muted-foreground/60 bg-transparent px-0.5 text-sm shadow-none dark:bg-transparent">
           <SelectValue />
@@ -33,12 +34,15 @@ export function BoardHeadingFields({ board, nest, onChange }: { board: BoardV1; 
         </SelectContent>
       </Select>
       <Hint
-        text={`Measure the board with a caliper: cutting starts at this height. The parts are ${fmt(board.thickness)} mm. Too high cuts air at first, too low makes the first pass deeper.`}
+        text={translate(
+          'Measure the board with a caliper: cutting starts at this height. The parts are {{value1}} mm. Too high cuts air at first, too low makes the first pass deeper.',
+          { value1: fmt(board.thickness) }
+        )}
         id="board-thickness-hint">
         <span className="inline-flex items-center gap-1">
           <NumberInput
             id="board-thickness"
-            aria-label="Stock thickness"
+            aria-label={translate('Stock thickness')}
             aria-describedby="board-thickness-hint"
             value={stockTopOf(board)}
             digits={1}
@@ -47,12 +51,12 @@ export function BoardHeadingFields({ board, nest, onChange }: { board: BoardV1; 
             className={kInline}
             onCommit={t => onChange({ ...board, measuredThickness: t })}
           />
-          mm ·
+          {translate('mm · ')}
         </span>
       </Hint>
       <NumberInput
         id="board-w"
-        aria-label="Width"
+        aria-label={translate('Width')}
         value={nest.board.w}
         digits={1}
         min={10}
@@ -65,7 +69,7 @@ export function BoardHeadingFields({ board, nest, onChange }: { board: BoardV1; 
       ×
       <NumberInput
         id="board-h"
-        aria-label="Height"
+        aria-label={translate('Height')}
         value={nest.board.h}
         digits={1}
         min={10}
@@ -78,21 +82,21 @@ export function BoardHeadingFields({ board, nest, onChange }: { board: BoardV1; 
       <Hint
         text={
           board.size.fit
-            ? 'The board grows to fit its parts and holds. Off: it stays at this size.'
-            : `Fixed at this size: parts and holds that have no room are refused. On: the board grows to fit them.`
+            ? translate('The board grows to fit its parts and holds. Off: it stays at this size.')
+            : translate('Fixed at this size: parts and holds that have no room are refused. On: the board grows to fit them.')
         }
         id="board-fit-hint">
         <button
           type="button"
           aria-pressed={board.size.fit}
-          aria-label="Grow to fit"
+          aria-label={translate('Grow to fit')}
           aria-describedby="board-fit-hint"
           className={cn(
             'ml-1 h-6 rounded border px-1.5 text-xs',
             board.size.fit ? 'border-primary bg-primary/15 text-foreground' : 'border-muted-foreground/40 text-muted-foreground'
           )}
           onClick={() => onChange({ ...board, size: board.size.fit ? { fit: false, w: nest.board.w, h: nest.board.h } : { fit: true } })}>
-          Fit
+          {translate('Fit ')}
         </button>
       </Hint>
     </span>

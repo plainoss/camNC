@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { SelectionBar } from './boards/SelectionBar';
 import { closestOnLoop, cutoutOutline, newCutout, type CarvingCutoutV1, type CarvingV1 } from './carving';
@@ -9,8 +10,8 @@ type Pt = { x: number; y: number };
 export const kCutoutSelection = 'cutout';
 
 const kShapes: { value: CarvingCutoutV1['shape']; label: string }[] = [
-  { value: 'outline', label: 'Artwork outline' },
-  { value: 'plaque', label: 'Rounded plaque' },
+  { value: 'outline', label: translate('Artwork outline') },
+  { value: 'plaque', label: translate('Rounded plaque') },
 ];
 const kMaxMargin = 50;
 
@@ -35,11 +36,13 @@ export function CarvingCutoutToggle({
         onChange={e => onChange(e.target.checked ? newCutout(taped) : undefined)}
       />
       <span>
-        Cut it out
+        {translate('Cut it out ')}
         <span className="block text-xs text-muted-foreground">
           {carving.cutout
-            ? `With the ${bitName}, after carving. Click the cut line on the board to change its shape, margin and holding.`
-            : `With the ${bitName}, after carving, along the artwork's outline.`}
+            ? translate('With the {{bitName}}, after carving. Click the cut line on the board to change its shape, margin and holding.', {
+                bitName: bitName,
+              })
+            : translate("With the {{bitName}}, after carving, along the artwork's outline.", { bitName: bitName })}
         </span>
       </span>
     </label>
@@ -118,7 +121,7 @@ export function CarvingCutoutLine({
       {/* A wide invisible stroke takes clicks on the line, so the artwork inside keeps its own. */}
       <path
         role="button"
-        aria-label="Cut line"
+        aria-label={translate('Cut line')}
         d={carvingPath(outline, size.h)}
         className="cursor-pointer fill-none stroke-transparent"
         strokeWidth={5}
@@ -140,7 +143,7 @@ export function CarvingCutoutLine({
           // biome-ignore lint/suspicious/noArrayIndexKey: tabs have no identity but their order
           key={i}
           role="button"
-          aria-label={`Tab ${i + 1}`}
+          aria-label={translate('Tab {{value1}}', { value1: i + 1 })}
           x={t.x - 2}
           y={y(t) - 2}
           width={4}
@@ -161,7 +164,7 @@ export function CarvingCutoutLine({
         <g>
           <rect
             role="slider"
-            aria-label="Drag to change the margin"
+            aria-label={translate('Drag to change the margin')}
             aria-valuenow={cutout.margin}
             x={right.x - 1.25}
             y={y(right) - 5}
@@ -175,7 +178,8 @@ export function CarvingCutoutLine({
           />
           {preview && (
             <text x={right.x + 3} y={y(right) + 1.5} className="pointer-events-none fill-primary text-[4px]">
-              {cutout.margin} mm
+              {cutout.margin}
+              {translate(' mm ')}
             </text>
           )}
         </g>
@@ -199,10 +203,12 @@ export function CarvingCutoutBar({
   return (
     <SelectionBar<'margin'>
       id="carve-cutout"
-      title="Cutout"
+      title={translate('Cutout')}
       note={pieces > 1 ? `${pieces} pieces` : undefined}
       at={at}
-      fields={[{ key: 'margin', label: 'Margin', name: 'Cutout margin (mm)', value: cutout.margin, min: 0, max: kMaxMargin }]}
+      fields={[
+        { key: 'margin', label: translate('Margin'), name: translate('Cutout margin (mm)'), value: cutout.margin, min: 0, max: kMaxMargin },
+      ]}
       onField={(_, margin) => onChange({ ...cutout, margin })}
       scopes={[]}
       onApply={() => {}}
@@ -210,11 +216,11 @@ export function CarvingCutoutBar({
       deleteLabel="Don't cut it out"
       menu={
         cutout.hold === 'tabs' && cutout.tabsAt?.length
-          ? [{ label: 'Let Plan place the tabs', onSelect: () => onChange({ ...cutout, tabsAt: undefined }) }]
+          ? [{ label: translate('Let Plan place the tabs'), onSelect: () => onChange({ ...cutout, tabsAt: undefined }) }]
           : []
       }>
       <select
-        aria-label="Cutout shape"
+        aria-label={translate('Cutout shape')}
         className="h-8 rounded-md border bg-background px-2 text-sm"
         value={cutout.shape}
         onChange={e => onChange({ ...cutout, shape: e.target.value as CarvingCutoutV1['shape'] })}>
@@ -224,7 +230,7 @@ export function CarvingCutoutBar({
           </option>
         ))}
       </select>
-      <div role="radiogroup" aria-label="Hold it with" className="flex gap-0.5 rounded-md bg-muted p-0.5 text-sm">
+      <div role="radiogroup" aria-label={translate('Hold it with')} className="flex gap-0.5 rounded-md bg-muted p-0.5 text-sm">
         {(['skin', 'tabs'] as const).map(hold => (
           <button
             key={hold}
@@ -233,12 +239,16 @@ export function CarvingCutoutBar({
             aria-checked={cutout.hold === hold}
             title={
               hold === 'skin'
-                ? 'A thin layer stays on the bottom and is cut through at the end: no tab nubs on the edge'
-                : `Tabs hold it; ${cutout.tabsAt?.length ? 'drag them along the line' : 'Plan places them, or double-click the line to place your own'}`
+                ? translate('A thin layer stays on the bottom and is cut through at the end: no tab nubs on the edge')
+                : translate('Tabs hold it; {{value1}}', {
+                    value1: cutout.tabsAt?.length
+                      ? translate('drag them along the line')
+                      : translate('Plan places them, or double-click the line to place your own'),
+                  })
             }
             onClick={() => onChange({ ...cutout, hold })}
             className={`rounded px-2 py-0.5 ${cutout.hold === hold ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}>
-            {hold === 'skin' ? 'Onion skin' : 'Tabs'}
+            {hold === 'skin' ? translate('Onion skin') : translate('Tabs')}
           </button>
         ))}
       </div>

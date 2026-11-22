@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { RefObject } from 'react';
 import type { CadProposal } from '@wbcnc/cad-editor/proposal';
 import type { AssistantMessage } from './provider';
@@ -9,19 +10,19 @@ import type { AssistantRequirements } from './requirements';
 
 const starters = [
   {
-    title: 'Build a cupboard',
-    detail: 'Plan the size, shelves and joinery',
-    prompt: 'Help me design a cupboard. Ask me about dimensions, shelves and joinery before building.',
+    title: translate('Build a cupboard'),
+    detail: translate('Plan the size, shelves and joinery'),
+    prompt: translate('Help me design a cupboard. Ask me about dimensions, shelves and joinery before building.'),
   },
   {
-    title: 'Design a tray',
-    detail: 'A small project, made your way',
-    prompt: 'Help me design a wooden tray. Ask me about its size and construction first.',
+    title: translate('Design a tray'),
+    detail: translate('A small project, made your way'),
+    prompt: translate('Help me design a wooden tray. Ask me about its size and construction first.'),
   },
   {
-    title: 'Review this design',
-    detail: 'Explore dimensions and improvements',
-    prompt: 'Review the open design and suggest improvements. Ask before making changes.',
+    title: translate('Review this design'),
+    detail: translate('Explore dimensions and improvements'),
+    prompt: translate('Review the open design and suggest improvements. Ask before making changes.'),
   },
 ];
 
@@ -64,12 +65,12 @@ export function Transcript({
   // The newest turn shows the live activity, even before its first tool call arrives.
   const workingWithoutSteps = running && lastWork < lastUser;
   return (
-    <div className="cad-assistant-messages" role="log" aria-label="Conversation">
+    <div className="cad-assistant-messages" role="log" aria-label={translate('Conversation')}>
       {!messages.length && (
         <div className="cad-assistant-empty">
-          <span className="cad-assistant-eyebrow">FROM IDEA TO WORKSHOP</span>
-          <h3>What shall we make?</h3>
-          <p>Shape a new piece or refine your design. Start with an idea, a question or a reference.</p>
+          <span className="cad-assistant-eyebrow">{translate('FROM IDEA TO WORKSHOP')}</span>
+          <h3>{translate('What shall we make?')}</h3>
+          <p>{translate('Shape a new piece or refine your design. Start with an idea, a question or a reference.')}</p>
           <div className="cad-assistant-starters">
             {starters.map(starter => (
               <button type="button" key={starter.title} onClick={() => onStarter(starter.prompt)}>
@@ -100,7 +101,7 @@ export function Transcript({
           );
         return (
           <article key={index} className="cad-assistant-message" data-role={message.role} data-event={message.event || undefined}>
-            <strong>{message.event ? 'Design' : message.role === 'user' ? 'You' : 'Assistant'}</strong>
+            <strong>{message.event ? translate('Design') : message.role === 'user' ? translate('You') : translate('Assistant')}</strong>
             {message.text && <p>{message.text}</p>}
             {!(question && message === questionMessage) && asked && asked.question !== message.text && <p>{asked.question}</p>}
             {message.images?.map((image, i) => (
@@ -122,27 +123,31 @@ export function Transcript({
       )}
       {proposal && (
         <div className="cad-assistant-proposal">
-          <strong>Checked design proposal</strong>
-          <p>Review the changes, lost cuts and warnings before applying.</p>
+          <strong>{translate('Checked design proposal')}</strong>
+          <p>{translate('Review the changes, lost cuts and warnings before applying.')}</p>
           {staleProposal && (
-            <p>The design has changed. You can review this proposal, but it cannot be applied. Ask again to check a new proposal.</p>
+            <p>
+              {translate(
+                'The design has changed. You can review this proposal, but it cannot be applied. Ask again to check a new proposal.'
+              )}
+            </p>
           )}
           <div>
             <button type="button" className="cad-assistant-primary" disabled={disabled || running} onClick={onReview}>
-              Review proposal
+              {translate('Review proposal ')}
             </button>
             <button type="button" onClick={onDiscard}>
-              Discard proposal
+              {translate('Discard proposal ')}
             </button>
           </div>
-          {disabled && <p>Complete the current edit before reviewing this proposal.</p>}
+          {disabled && <p>{translate('Complete the current edit before reviewing this proposal.')}</p>}
         </div>
       )}
       <p className="cad-assistant-status" data-running={running} role="status">
         {proposal && !running && (staleProposal || !question)
           ? staleProposal
-            ? 'Proposal out of date. It cannot be applied; ask again to check a new proposal.'
-            : 'Checked proposal ready to review.'
+            ? translate('Proposal out of date. It cannot be applied; ask again to check a new proposal.')
+            : translate('Checked proposal ready to review.')
           : running
             ? ''
             : activity}

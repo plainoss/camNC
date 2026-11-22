@@ -1,3 +1,4 @@
+import { t as translate, getLanguage } from '@wbcnc/i18n';
 import type { AssistantLimits, AssistantPricing, AssistantRunUsage } from './runBudget';
 
 export interface AssistantRunSettings {
@@ -17,21 +18,29 @@ export function RunSettings({
   disabled: boolean;
   onChange: (value: AssistantRunSettings) => void;
 }) {
-  const count = (number: number | null) => (number === null ? 'unknown' : number.toLocaleString());
+  const count = (number: number | null) => (number === null ? translate('unknown') : number.toLocaleString(getLanguage()));
   return (
     // Shown as a settings dialog section, which already is the disclosure: the form is open as soon as it is picked.
     <div className="cad-assistant-settings">
-      <h3>Usage and limits</h3>
+      <h3>{translate('Usage and limits')}</h3>
       {usage && (
-        <p aria-label="Last turn usage">
-          {usage.calls} requests · {usage.checks} checks · input {count(usage.inputTokens)} tokens · output {count(usage.outputTokens)}{' '}
-          tokens · cached {count(usage.cacheReadTokens)} tokens · cost {usage.costUsd === null ? 'unknown' : `$${usage.costUsd.toFixed(4)}`}
+        <p aria-label={translate('Last turn usage')}>
+          {usage.calls}
+          {translate(' requests · ')}
+          {usage.checks}
+          {translate(' checks · input ')}
+          {count(usage.inputTokens)}
+          {translate(' tokens · output ')}
+          {count(usage.outputTokens)} {translate('tokens · cached ')}
+          {count(usage.cacheReadTokens)}
+          {translate(' tokens · cost ')}
+          {usage.costUsd === null ? translate('unknown') : translate('${{value1}}', { value1: usage.costUsd.toFixed(4) })}
         </p>
       )}
       <fieldset disabled={disabled}>
-        <legend>Per turn</legend>
+        <legend>{translate('Per turn')}</legend>
         <label>
-          Output tokens per request
+          {translate('Output tokens per request ')}
           <input
             type="number"
             min="1"
@@ -46,7 +55,7 @@ export function RunSettings({
           />
         </label>
         <label>
-          Total token limit (optional)
+          {translate('Total token limit (optional) ')}
           <input
             type="number"
             min="1"
@@ -61,7 +70,7 @@ export function RunSettings({
           />
         </label>
         <label>
-          USD limit (optional)
+          {translate('USD limit (optional) ')}
           <input
             type="number"
             min="0.0001"
@@ -83,13 +92,20 @@ export function RunSettings({
               })
             }
           />
-          Use my provider prices (USD per million tokens)
+          {translate('Use my provider prices (USD per million tokens) ')}
         </label>
         {value.pricing &&
           (['inputUsdPerMillion', 'outputUsdPerMillion', 'cacheReadUsdPerMillion', 'cacheWriteUsdPerMillion'] as const).map(
             (key, index) => (
               <label key={key}>
-                {['Input price', 'Output price', 'Cache read price (optional)', 'Cache write price (optional)'][index]}
+                {
+                  [
+                    translate('Input price'),
+                    translate('Output price'),
+                    translate('Cache read price (optional)'),
+                    translate('Cache write price (optional)'),
+                  ][index]
+                }
                 <input
                   type="number"
                   min="0"
@@ -115,13 +131,14 @@ export function RunSettings({
               checked={!!value.pricing.cacheWritesAtInputPrice}
               onChange={event => onChange({ ...value, pricing: { ...value.pricing!, cacheWritesAtInputPrice: event.target.checked } })}
             />
-            Cache writes are billed at the input price
+            {translate('Cache writes are billed at the input price ')}
           </label>
         )}
       </fieldset>
       <p>
-        Token and USD limits are checked between requests; the last request can exceed the remaining total. Missing usage or prices are
-        shown as unknown and stop a capped run. Prices and limits last until this dock closes; check prices after changing models.
+        {translate(
+          'Token and USD limits are checked between requests; the last request can exceed the remaining total. Missing usage or prices are shown as unknown and stop a capped run. Prices and limits last until this dock closes; check prices after changing models. '
+        )}
       </p>
     </div>
   );

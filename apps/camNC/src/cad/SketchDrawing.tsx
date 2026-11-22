@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CSSProperties, PointerEvent, RefObject } from 'react';
 import { drawnOnOutline, type CadDimension, type CadSketchSolveStatus } from '@wbcnc/cad';
 import { associatedEntityIds } from '@wbcnc/cad-editor/inlineConstraintLayout';
@@ -418,7 +419,7 @@ export function SketchDrawing({
             );
             if (!additive) setSelected([]);
             setDimension(null);
-            setMessage('Constraint selected. Press Delete to remove it; Undo restores it.');
+            setMessage(translate('Constraint selected. Press Delete to remove it; Undo restores it.'));
             svg.current?.focus();
           }}
           onHover={(_id, ids) => setHoveredConstraintEntities(ids)}

@@ -1,3 +1,4 @@
+import { t as translate, workerLanguageName } from '@wbcnc/i18n';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { hasWork } from './carving';
 import * as Comlink from 'comlink';
@@ -26,7 +27,9 @@ let worker: Comlink.Remote<CamWorkerAPI> | undefined;
 export function camWorker() {
   worker ??= trackCalls(
     'worker',
-    Comlink.wrap<CamWorkerAPI>(new Worker(new URL('../workers/cam.worker.ts', import.meta.url), { type: 'module' }))
+    Comlink.wrap<CamWorkerAPI>(
+      new Worker(new URL('../workers/cam.worker.ts', import.meta.url), { type: 'module', name: workerLanguageName() })
+    )
   );
   return worker;
 }
@@ -117,7 +120,7 @@ export function useCamModel(job: CamJobV1 | null | undefined) {
       let model: ModelImport;
       try {
         const bytes = await getModelBytes(job!.id);
-        if (!bytes) throw new Error('The model file of this job is missing.');
+        if (!bytes) throw new Error(translate('The model file of this job is missing.'));
         model = await camWorker().importModel(Comlink.transfer(bytes, [bytes.buffer as ArrayBuffer]), job!.fileName, modelKey(job!));
       } catch (e) {
         // Kept on the job, so the job list shows it failed.

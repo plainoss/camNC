@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   cadSketchFrame,
   CAD_CHORD_TOLERANCE,
@@ -65,7 +66,7 @@ export function replaceExtrudeProfile(
   const owner = source && document.parts.find(p => p.id === sketchOwnerId(source));
   const reference = owner ? owner.id : 'face' in selection ? selection.face.partId : null;
   if (!reference || (reference !== targetId && dependsOn(document, reference, targetId)))
-    throw new Error('Choose a profile that does not depend on this extrusion.');
+    throw new Error(translate('Choose a profile that does not depend on this extrusion.'));
   if (reference === targetId && 'sketch' in selection) {
     if (selection.region) return withRegionToggled(document, targetId, selection.region);
     const entireSketch = wholeSketch(target);
@@ -73,7 +74,7 @@ export function replaceExtrudeProfile(
     if (same(entireSketch.regions, target.regions)) return document;
     return { ...document, revision: document.revision + 1, parts: document.parts.map(p => (p.id === targetId ? entireSketch : p)) };
   }
-  if (reference === targetId) throw new Error('Choose a face of another part.');
+  if (reference === targetId) throw new Error(translate('Choose a face of another part.'));
   // A region of the sketch this extrude already takes is picked into it, or taken back out, beside the others.
   // One that takes the whole sketch starts from each of its solid regions, so the first click takes that one out.
   if (owner && target.sketchOf === owner.id && 'sketch' in selection && selection.region) {

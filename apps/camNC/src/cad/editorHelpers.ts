@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadSnapResult } from '@wbcnc/cad-editor/picking';
 import {
   entityPointIds as curvePointIds,
@@ -19,7 +20,7 @@ export const snapLabels: Record<CadSnapResult['kind'], string> = {
   center: 'Center',
   point: 'Point',
   midpoint: 'Midpoint',
-  pointOnCurve: 'On curve',
+  pointOnCurve: translate('On curve'),
 };
 
 export const editable = (target: EventTarget | null) =>

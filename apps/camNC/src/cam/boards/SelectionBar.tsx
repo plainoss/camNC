@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@wbcnc/ui/components/dropdown-menu';
 import { MoreHorizontal, Trash2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
@@ -121,7 +122,7 @@ export function SelectionBar<K extends string>({
                 if (onField(f.key, value) !== false) setOffer({ key: f.key, label: f.label, value });
               }}
             />
-            {f.unit ?? 'mm'}
+            {f.unit ?? translate('mm')}
           </label>
         ))}
         {children}
@@ -129,7 +130,7 @@ export function SelectionBar<K extends string>({
           <button
             type="button"
             aria-label={deleteLabel}
-            title={`${deleteLabel} (⌫)`}
+            title={translate('{{deleteLabel}} (⌫)', { deleteLabel: deleteLabel })}
             onClick={onDelete}
             className="flex size-7 items-center justify-center rounded-md hover:bg-destructive/20 hover:text-destructive">
             <Trash2 className="size-4" />
@@ -138,7 +139,10 @@ export function SelectionBar<K extends string>({
         {menu.length > 0 && (
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <button type="button" aria-label="More" className="flex size-7 items-center justify-center rounded-md hover:bg-muted">
+              <button
+                type="button"
+                aria-label={translate('More')}
+                className="flex size-7 items-center justify-center rounded-md hover:bg-muted">
                 <MoreHorizontal className="size-4" />
               </button>
             </DropdownMenuTrigger>
@@ -155,7 +159,8 @@ export function SelectionBar<K extends string>({
       {offer && scopes.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 border-t pt-1.5 text-xs text-muted-foreground">
           <span className="whitespace-nowrap">
-            {offer.label} {offer.value} mm for
+            {offer.label} {offer.value}
+            {translate(' mm for ')}
           </span>
           {scopes.map(s => (
             <button

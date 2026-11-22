@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import React, { useMemo } from 'react';
 import { useStore } from '../store/store';
 import { getCutZRange } from './depthInspection';
@@ -23,7 +24,7 @@ function ZDepthLegendForRange({ minZ, maxZ }: { minZ: number; maxZ: number }) {
 
   return (
     <div className="z-depth-legend">
-      <div className="text-center font-bold text-sm mb-3">Z Depth Visualization</div>
+      <div className="text-center font-bold text-sm mb-3">{translate('Z Depth Visualization')}</div>
       <div className="flex flex-col w-full px-2">
         <div
           className="h-8 w-full rounded-md shadow-inner relative"
@@ -41,8 +42,11 @@ function ZDepthLegendForRange({ minZ, maxZ }: { minZ: number; maxZ: number }) {
         {/* Value labels */}
         <div className="flex justify-between mt-2 text-xs">
           <div className="text-left font-medium">
-            <span>{formatNumber(minZ)} mm</span>
-            <div className="text-gray-500 text-[10px]">Max Depth</div>
+            <span>
+              {formatNumber(minZ)}
+              {translate(' mm')}
+            </span>
+            <div className="text-gray-500 text-[10px]">{translate('Max Depth')}</div>
           </div>
 
           {intermediateValues.map((value, index) => (
@@ -52,8 +56,11 @@ function ZDepthLegendForRange({ minZ, maxZ }: { minZ: number; maxZ: number }) {
           ))}
 
           <div className="text-right font-medium">
-            <span>{formatNumber(maxZ)} mm</span>
-            <div className="text-gray-500 text-[10px]">Min Depth</div>
+            <span>
+              {formatNumber(maxZ)}
+              {translate(' mm')}
+            </span>
+            <div className="text-gray-500 text-[10px]">{translate('Min Depth')}</div>
           </div>
         </div>
       </div>

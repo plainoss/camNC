@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cadPartReference, type CadDocument, type CadPart } from '@wbcnc/cad';
 import { useCallback, useState } from 'react';
 import { builtStudioParts } from './studioParts';
@@ -39,13 +40,17 @@ export function usePartCutSelection(document: CadDocument, part: CadPart | undef
     // Source transforms precede downstream cuts, so consumed history remains editable.
     // Keep the raw copy ID: a selected or disappeared copy must never become its family.
     if (!part || copyId !== undefined)
-      return refuse('Transforming only the selected copy is not supported. Select the source part in Parts to transform its whole family.');
+      return refuse(
+        translate('Transforming only the selected copy is not supported. Select the source part in Parts to transform its whole family.')
+      );
     open(part.id);
   };
   const featurePart = (kind: PartFeature, open: (kind: PartFeature, partId: string) => void, refuse: (message: string) => void) => {
     // Source history stays editable after consumption. A raw copy ID, including an absent slot, must not become its family.
     if (kind === 'pattern' && copyId !== undefined)
-      return refuse('Patterning only the selected copy is not supported. Select the source part in Parts to pattern its whole family.');
+      return refuse(
+        translate('Patterning only the selected copy is not supported. Select the source part in Parts to pattern its whole family.')
+      );
     if (part) open(kind, part.id);
   };
   return {

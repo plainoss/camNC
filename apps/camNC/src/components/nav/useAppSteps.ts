@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { MouseEvent } from 'react';
 import { useStageNavigation } from './stageNavigation';
 import { useCamJob } from '@/cam/camQueries';
@@ -84,15 +85,19 @@ export function useAppSteps() {
   const carving = !!job?.carving || prepare?.[2] === 'carve';
   const steps: AppStep[] = [
     ...(carving
-      ? [prepareStep('carve', 'Carve', Type)]
+      ? [prepareStep('carve', translate('Carve'), Type)]
       : [
-          prepareStep(native ? 'design' : 'model', native ? (atMachine ? 'Edit design' : 'Design') : 'Model', Box),
-          prepareStep('boards', 'Boards', LayoutGrid),
+          prepareStep(
+            native ? 'design' : 'model',
+            native ? (atMachine ? translate('Edit design') : translate('Design')) : translate('Model'),
+            Box
+          ),
+          prepareStep('boards', translate('Boards'), LayoutGrid),
         ]),
-    prepareStep('plan', 'Plan', ListOrdered),
+    prepareStep('plan', translate('Plan'), ListOrdered),
     {
       key: 'machine',
-      label: 'Machine',
+      label: translate('Machine'),
       icon: Factory,
       current: atMachine,
       disabled: false,
@@ -111,5 +116,5 @@ export function useAppSteps() {
         : { link: { to: kMachineRoute } }),
     },
   ];
-  return { steps, jobName: jobId ? (job?.name ?? 'CAM job') : 'No job', current: steps.find(s => s.current) };
+  return { steps, jobName: jobId ? (job?.name ?? translate('CAM job')) : translate('No job'), current: steps.find(s => s.current) };
 }

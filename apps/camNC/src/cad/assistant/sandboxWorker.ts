@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { initializeCadSolver, parseCadDocument } from '@wbcnc/cad';
 import { cupboard } from '../../../../../packages/cad-script/src/cupboard';
 import { frameStool } from '../../../../../packages/cad-script/src/frameStool';
@@ -21,11 +22,14 @@ function located(error: unknown, source: string): string {
 }
 
 async function scriptFrom(source: string): Promise<CadScript> {
-  if (typeof source !== 'string' || source.length > 256_000) throw new Error('A script must be JavaScript text of at most 256 KB.');
+  if (typeof source !== 'string' || source.length > 256_000)
+    throw new Error(translate('A script must be JavaScript text of at most 256 KB.'));
   const expression = source
     .replace(/^\s*import\s*\{([^}]+)\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/, (_line, names: string) => {
       if (names.split(',').some(name => !['design', ...Object.keys(kPatterns)].includes(name.trim())))
-        throw new Error(`Only design, ${Object.keys(kPatterns).join(', ')} may be imported in a browser script.`);
+        throw new Error(
+          translate('Only design, {{value1}} may be imported in a browser script.', { value1: Object.keys(kPatterns).join(', ') })
+        );
       return keepLines(_line);
     })
     .replace(/^\s*export\s*\{\s*(?:cupboard|panelChair|frameStool)\s*\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/m, keepLines)
@@ -40,7 +44,7 @@ async function scriptFrom(source: string): Promise<CadScript> {
   try {
     const loaded = await import(/* @vite-ignore */ url);
     const script = loaded.default((fn: CadScript) => fn, ...Object.values(kPatterns)) as unknown;
-    if (typeof script !== 'function') throw new Error('Export default design(d => { ... }) or pass a JavaScript function.');
+    if (typeof script !== 'function') throw new Error(translate('Export default design(d => { ... }) or pass a JavaScript function.'));
     return script as CadScript;
   } finally {
     URL.revokeObjectURL(url);
@@ -84,7 +88,7 @@ self.addEventListener('message', async function run(event: MessageEvent) {
       Object.defineProperty(self, name, {
         configurable: false,
         get() {
-          throw new Error(`Scripts cannot access ${name}.`);
+          throw new Error(translate('Scripts cannot access {{name}}.', { name: name }));
         },
       });
     }
@@ -95,7 +99,8 @@ self.addEventListener('message', async function run(event: MessageEvent) {
       d => {
         try {
           const returned = script(d) as unknown;
-          if (returned && typeof returned === 'object' && 'then' in returned) throw new Error('Design scripts must finish synchronously.');
+          if (returned && typeof returned === 'object' && 'then' in returned)
+            throw new Error(translate('Design scripts must finish synchronously.'));
         } catch (error) {
           thrown = error;
           throw error;
@@ -108,7 +113,8 @@ self.addEventListener('message', async function run(event: MessageEvent) {
   } catch (error) {
     const name = error instanceof Error && error.name !== 'Error' && !error.message.startsWith(error.name) ? `${error.name}: ` : '';
     reply({
-      failure: error instanceof Error ? `${name}${error.message}${located(error, event.data.source)}` : 'The script checker stopped.',
+      failure:
+        error instanceof Error ? `${name}${error.message}${located(error, event.data.source)}` : translate('The script checker stopped.'),
     });
   } finally {
     port.close();

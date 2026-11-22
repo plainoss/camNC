@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cadHoleName, type CadPart } from '@wbcnc/cad';
 
 export type HoleKind = 'simple' | 'counterbore' | 'countersink';
@@ -20,10 +21,10 @@ export interface HoleSettings {
 /** Metric drill sizes, mm, as the Drill size list offers them. */
 export const kDrillSizes = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18, 20];
 export const kTerminations: { id: HoleTermination; label: string; available: boolean }[] = [
-  { id: 'blind', label: 'Blind', available: true },
-  { id: 'upToNext', label: 'Up to next', available: false },
-  { id: 'upToEntity', label: 'Up to entity', available: false },
-  { id: 'through', label: 'Through all', available: true },
+  { id: 'blind', label: translate('Blind'), available: true },
+  { id: 'upToNext', label: translate('Up to next'), available: false },
+  { id: 'upToEntity', label: translate('Up to entity'), available: false },
+  { id: 'through', label: translate('Through all'), available: true },
 ];
 
 const text = (value: number) => `${+value.toFixed(3)}`;
@@ -104,7 +105,7 @@ type Parse = (text: string) => { value: number; expression?: string } | { error:
 export function holeSpecOf(settings: HoleSettings, parse: Parse): Pick<CadPart, 'hole' | 'remove'> | { error: string } {
   const across = parse(settings.diameter);
   if ('error' in across) return across;
-  if (!(across.value > 0)) return { error: 'A hole needs a diameter.' };
+  if (!(across.value > 0)) return { error: translate('A hole needs a diameter.') };
   const tip = Number(settings.tipAngle);
   const hole: NonNullable<CadPart['hole']> = {
     diameter: across.value,
@@ -115,10 +116,12 @@ export function holeSpecOf(settings: HoleSettings, parse: Parse): Pick<CadPart, 
   if (settings.termination !== 'blind') return { hole, remove: { depth: 'through' } };
   const deep = parse(settings.depth);
   if ('error' in deep) return deep;
-  if (!(deep.value > 0)) return { error: 'A hole needs some depth.' };
+  if (!(deep.value > 0)) return { error: translate('A hole needs some depth.') };
   return { hole, remove: { depth: deep.value, ...(deep.expression && { depthExpression: deep.expression }) } };
 }
 
 /** Why the green check can't make these settings: only a simple hole is drilled so far. */
 export const holeKindRefusal = (settings: HoleSettings) =>
-  settings.kind === 'simple' ? null : `A ${settings.kind} hole can't be made yet: choose Simple to drill a plain hole.`;
+  settings.kind === 'simple'
+    ? null
+    : translate("A {{value1}} hole can't be made yet: choose Simple to drill a plain hole.", { value1: settings.kind });

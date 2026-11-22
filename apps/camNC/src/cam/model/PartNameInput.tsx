@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cn } from '@wbcnc/ui/lib/utils';
 import type { CamPartInfo } from '../camTypes';
 
@@ -7,7 +8,7 @@ import type { CamPartInfo } from '../camTypes';
  */
 export function PartNameInput({
   part,
-  label = 'Part name',
+  label = translate('Part name'),
   onRename,
   onDone,
   className,

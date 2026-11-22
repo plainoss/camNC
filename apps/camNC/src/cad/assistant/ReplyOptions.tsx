@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useState } from 'react';
 import type { AssistantChoiceSketch } from './choiceSketch';
 import { answerQuestionFields, type AssistantQuestionField } from './questionFields';
@@ -20,12 +21,12 @@ export function ReplyOptions({
   );
   const answer = answerQuestionFields(fields, values);
   return (
-    <div className="cad-assistant-replies" role="group" aria-label="Suggested replies">
+    <div className="cad-assistant-replies" role="group" aria-label={translate('Suggested replies')}>
       {question.question && <p className="cad-assistant-reply-question">{question.question}</p>}
       {fields.length > 0 && (
         <form
           className="cad-assistant-fields"
-          aria-label="Answer with values"
+          aria-label={translate('Answer with values')}
           onSubmit={event => {
             event.preventDefault();
             if (answer.text) onReply(answer.text, answer.requirements);
@@ -45,13 +46,13 @@ export function ReplyOptions({
                       setValues(previous => ({ ...previous, [field.name]: event.target.value ? Number(event.target.value) : undefined }))
                     }
                   />
-                  {field.unit === 'mm' && <small>mm</small>}
+                  {field.unit === 'mm' && <small>{translate('mm')}</small>}
                 </span>
               </label>
             ))}
           </div>
           <button type="submit" className="cad-assistant-primary" disabled={disabled || !answer.text}>
-            Use these values
+            {translate('Use these values ')}
           </button>
         </form>
       )}
@@ -87,7 +88,7 @@ export function ReplyOptions({
                     )
                   )}
                 </svg>
-                <small>Illustration</small>
+                <small>{translate('Illustration')}</small>
               </span>
             )}
             <span className="cad-assistant-option-copy">

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useCallback } from 'react';
 
 import { useCameraTexture } from '@/calibration/useCameraTexture';
@@ -13,10 +14,10 @@ import { CanvasTexture } from 'three';
 export function averageVideoFrames(videoElement: HTMLVideoElement, targetFrameCount: number = 25): Promise<ImageData> {
   return new Promise((resolve, reject) => {
     if (!videoElement.videoWidth || !videoElement.videoHeight) {
-      throw new Error('Video dimensions are not available. Ensure the video has loaded metadata.');
+      throw new Error(translate('Video dimensions are not available. Ensure the video has loaded metadata.'));
     }
     if (targetFrameCount <= 0) {
-      throw new Error('targetFrameCount must be positive.');
+      throw new Error(translate('targetFrameCount must be positive.'));
     }
 
     const offCanvas = document.createElement('canvas');
@@ -25,7 +26,7 @@ export function averageVideoFrames(videoElement: HTMLVideoElement, targetFrameCo
     const offCtx = offCanvas.getContext('2d', { willReadFrequently: true }); // Optimize for frequent readback
 
     if (!offCtx) {
-      throw new Error('Could not get 2D context for offscreen canvas');
+      throw new Error(translate('Could not get 2D context for offscreen canvas'));
     }
 
     let frameCount = 0;
@@ -45,7 +46,7 @@ export function averageVideoFrames(videoElement: HTMLVideoElement, targetFrameCo
         frameData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
       } catch (error) {
         // Handle potential security errors (e.g., tainted canvas)
-        reject(new Error(`Could not get image data: ${error}`));
+        reject(new Error(translate('Could not get image data: {{error}}', { error: error })));
         return;
       }
       const data = frameData.data;
@@ -78,7 +79,7 @@ export function averageVideoFrames(videoElement: HTMLVideoElement, targetFrameCo
     const finishAveraging = () => {
       if (!runningAverage) {
         // Should not happen if targetFrameCount > 0
-        reject(new Error('Averaging finished unexpectedly without data.'));
+        reject(new Error(translate('Averaging finished unexpectedly without data.')));
         return;
       }
       // Convert float average back to clamped byte array
@@ -108,7 +109,7 @@ export function useStillFrameTexture() {
     canvas.width = camTexture.image.videoWidth;
     canvas.height = camTexture.image.videoHeight;
     const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Failed to get 2d context');
+    if (!ctx) throw new Error(translate('Failed to get 2d context'));
     return [new CanvasTexture(canvas), ctx];
   }, [camTexture.image]);
 

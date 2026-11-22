@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { MachineBoundsValues } from '@/setup/MachineBoundsForm';
 
 export interface BedPreset {
@@ -8,10 +9,10 @@ export interface BedPreset {
 
 /** Common working areas, to preview G-code without a machine connection. */
 export const kBedPresets: BedPreset[] = [
-  { label: 'Desktop', width: 300, depth: 300 },
-  { label: 'Small', width: 600, depth: 600 },
-  { label: 'Half sheet', width: 1220, depth: 1220 },
-  { label: 'Full sheet (4 × 8 ft)', width: 1220, depth: 2440 },
+  { label: translate('Desktop'), width: 300, depth: 300 },
+  { label: translate('Small'), width: 600, depth: 600 },
+  { label: translate('Half sheet'), width: 1220, depth: 1220 },
+  { label: translate('Full sheet (4 × 8 ft)'), width: 1220, depth: 2440 },
 ];
 
 /** The largest preset, so that most programs fit: drawn until the user picks a size or a machine reports its own. */

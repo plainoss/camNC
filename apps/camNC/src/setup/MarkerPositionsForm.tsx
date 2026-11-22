@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Hint } from '@/components/Hint';
 import { useArucoTagSize, useCamSource, useSetArucoTagSize, useSetMarkerPositions, useMachineBoundsOrNull } from '@/store/store';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -85,7 +86,7 @@ export function MarkerPositionsForm({ onConfirmed }: { onConfirmed: () => void }
   const bounds = useMachineBoundsOrNull();
   const savedRaw = camSource?.markerPositions;
   if (!bounds) {
-    throw new Error('No machine bounds found');
+    throw new Error(translate('No machine bounds found'));
   }
   const arucoTagSize = useArucoTagSize();
   const setMarkerPositions = useSetMarkerPositions();
@@ -122,19 +123,22 @@ export function MarkerPositionsForm({ onConfirmed }: { onConfirmed: () => void }
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <Hint title="Marker Placement">
+        <Hint title={translate('Marker Placement')}>
           <p className="mb-1">
-            You need to place 4 markers on or near the wasteboard so they&apos;re visible in the camera view. You can do this in either of
-            the following ways:
+            {translate(
+              "You need to place 4 markers on or near the wasteboard so they're visible in the camera view. You can do this in either of the following ways: "
+            )}
           </p>
           <ul className="list-disc list-inside space-y-1 ml-4">
             <li>
-              Recommended: Add four small 40x40mm pockets to the wasteboard and place (3d) printed{' '}
+              {translate('Recommended: Add four small 40x40mm pockets to the wasteboard and place (3d) printed')}{' '}
               <a href="/aruco.pdf" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-                ArUco markers <ExternalLink className="size-4 inline-block" />
+                {translate('ArUco markers ')}
+                <ExternalLink className="size-4 inline-block" />
               </a>{' '}
-              inside. They can be (re-)detected automatically (e.g. in case the camera or table moves). <br />
-              Pocketing gcode for 3.175mm (1/8in) endmill can be generated below for the positions entered.
+              {translate('inside. They can be (re-)detected automatically (e.g. in case the camera or table moves). ')}
+              <br />
+              {translate('Pocketing gcode for 3.175mm (1/8in) endmill can be generated below for the positions entered. ')}
             </li>
           </ul>
         </Hint>
@@ -145,11 +149,11 @@ export function MarkerPositionsForm({ onConfirmed }: { onConfirmed: () => void }
             name="arucoTagSize"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>ArUco tag size (mm)</FormLabel>
+                <FormLabel>{translate('ArUco tag size (mm)')}</FormLabel>
                 <FormControl>
                   <Input {...field} type="number" placeholder="30" />
                 </FormControl>
-                <p className="text-xs text-muted-foreground">Size of the black border in mm (excluding white border)</p>
+                <p className="text-xs text-muted-foreground">{translate('Size of the black border in mm (excluding white border)')}</p>
                 <FormMessage />
               </FormItem>
             )}
@@ -157,12 +161,15 @@ export function MarkerPositionsForm({ onConfirmed }: { onConfirmed: () => void }
         </div>
 
         <div>
-          <h3 className="font-medium mb-4">Marker Positions (Centers of ArUco tags)</h3>
+          <h3 className="font-medium mb-4">{translate('Marker Positions (Centers of ArUco tags)')}</h3>
         </div>
 
         {markerIndices.map(i => (
           <div key={i} className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">Marker {i}</p>
+            <p className="text-sm font-medium text-muted-foreground">
+              {translate('Marker ')}
+              {i}
+            </p>
             <MarkerFields control={form.control} index={i} />
           </div>
         ))}
@@ -172,7 +179,7 @@ export function MarkerPositionsForm({ onConfirmed }: { onConfirmed: () => void }
           <MarkerBoundsButton bounds={bounds} arucoTagSize={watchArucoTagSize} onApply={handleMarkerBoundsApply} />
         </div>
         <div className="flex space-x-2 justify-end mt-2">
-          <Button type="submit">Confirm</Button>
+          <Button type="submit">{translate('Confirm')}</Button>
         </div>
       </form>
     </Form>

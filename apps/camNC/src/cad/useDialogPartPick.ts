@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cadPartReferenceOwner, type CadDocument } from '@wbcnc/cad';
 import { useEffect, useRef, useState } from 'react';
 
@@ -48,7 +49,7 @@ export function useDialogPartPick({
     const source = cadPartReferenceOwner(document, pick.partId);
     if (!source) return;
     // A copy is its family's result: taking its family instead would change a part that wasn't clicked.
-    if (source.id !== pick.partId) return setProblem(`Pick ${source.name} itself, not one of its copies.`);
+    if (source.id !== pick.partId) return setProblem(translate('Pick {{value1}} itself, not one of its copies.', { value1: source.name }));
     setPicked(true);
     if (source.id === target) return setProblem(null);
     const refusal = take?.(source.id, target);

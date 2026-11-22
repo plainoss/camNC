@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { machineSupport } from '@/lib/fluidnc/machine-support';
 import { machineView, MachineView } from '@/lib/machine/workflow';
@@ -27,9 +28,9 @@ import { SetupView } from './SetupView';
 type DialogKind = 'files' | 'macros' | 'config' | null;
 
 const kDialogs: Record<Exclude<DialogKind, null>, { title: string; description: string }> = {
-  files: { title: 'SD card', description: 'Files on the controller’s SD card.' },
-  macros: { title: 'Edit macros', description: 'Macros run line by line and stop at the first error.' },
-  config: { title: 'Configuration', description: 'The running FluidNC configuration ($CD), read-only.' },
+  files: { title: translate('SD card'), description: translate('Files on the controller’s SD card.') },
+  macros: { title: translate('Edit macros'), description: translate('Macros run line by line and stop at the first error.') },
+  config: { title: translate('Configuration'), description: translate('The running FluidNC configuration ($CD), read-only.') },
 };
 
 /** The view follows the machine (setup ↔ running); a manual choice holds until the machine changes phase. */
@@ -60,45 +61,49 @@ export function MachinePanelContent({ onClose, className }: { onClose?: () => vo
     <div className={cn('flex flex-col h-full min-h-0', className)} data-testid="machine-panel">
       <div className="flex flex-col gap-2 p-3 border-b">
         <div className="flex flex-row items-center gap-2">
-          <h2 className="font-semibold">Machine</h2>
+          <h2 className="font-semibold">{translate('Machine')}</h2>
           <MachineStateBadge />
           <JobProgressBadge />
           <div
             className="flex min-w-0 flex-row items-center gap-1.5 text-xs text-muted-foreground"
-            title={api.firmware.value ? `FluidNC ${api.firmware.value.version}` : undefined}>
+            title={api.firmware.value ? translate('FluidNC {{value1}}', { value1: api.firmware.value.version }) : undefined}>
             <ConnectionBadge dotWhenConnected />
             {machine?.host && <span className="truncate">{machine.host}</span>}
           </div>
           <div className="ml-auto flex shrink-0 flex-row items-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" className="size-8" aria-label="More machine tools">
+                <Button size="icon" variant="ghost" className="size-8" aria-label={translate('More machine tools')}>
                   <MoreHorizontal />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem disabled={!connected} onClick={() => setConsoleOpen(o => !o)}>
-                  <SquareTerminal /> {consoleOpen ? 'Hide console' : 'Console'}
+                  <SquareTerminal /> {consoleOpen ? translate('Hide console') : translate('Console')}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!connected} onClick={() => setDialog('files')}>
-                  <HardDrive /> SD card files
+                  <HardDrive />
+                  {translate(' SD card files ')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setDialog('macros')}>
-                  <Pencil /> Edit macros
+                  <Pencil />
+                  {translate(' Edit macros ')}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!connected} onClick={() => setDialog('config')}>
-                  <FileCog /> Configuration ($CD)
+                  <FileCog />
+                  {translate(' Configuration ($CD) ')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link to="/setup/fluidnc">
-                    <Plug /> Connection settings
+                    <Plug />
+                    {translate(' Connection settings ')}
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             {onClose && (
-              <Button size="icon" variant="ghost" className="size-8" aria-label="Close machine panel" onClick={onClose}>
+              <Button size="icon" variant="ghost" className="size-8" aria-label={translate('Close machine panel')} onClick={onClose}>
                 <X />
               </Button>
             )}
@@ -116,7 +121,7 @@ export function MachinePanelContent({ onClose, className }: { onClose?: () => vo
                   aria-selected={view === v}
                   className={cn('px-2 py-1 rounded', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground')}
                   onClick={() => setView(v)}>
-                  {v === 'setup' ? 'Setup' : 'Running'}
+                  {v === 'setup' ? translate('Setup') : translate('Running')}
                 </button>
               ))}
             </div>
@@ -129,9 +134,9 @@ export function MachinePanelContent({ onClose, className }: { onClose?: () => vo
         {!support.supported && <p className="text-sm text-muted-foreground mb-4">{support.reason}</p>}
         {support.supported && !machine?.host && (
           <p className="text-sm mb-4">
-            No machine connected.{' '}
+            {translate('No machine connected.')}{' '}
             <Button asChild variant="link" className="p-0 h-auto">
-              <Link to="/setup/fluidnc">Connect one</Link>
+              <Link to="/setup/fluidnc">{translate('Connect one')}</Link>
             </Button>
           </p>
         )}
@@ -145,8 +150,13 @@ export function MachinePanelContent({ onClose, className }: { onClose?: () => vo
       {consoleOpen && (
         <div className="border-t p-2 flex flex-col gap-1">
           <div className="flex flex-row items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Console</span>
-            <Button size="icon" variant="ghost" className="size-6" aria-label="Close console" onClick={() => setConsoleOpen(false)}>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{translate('Console')}</span>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              aria-label={translate('Close console')}
+              onClick={() => setConsoleOpen(false)}>
               <X className="size-3.5" />
             </Button>
           </div>

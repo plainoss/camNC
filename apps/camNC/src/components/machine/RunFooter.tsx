@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { isManufacturingLocked, useCamMachine } from '@/cam/machine/camMachine';
 import { useMachineLockReason } from '@/cam/machine/useMachineBusy';
 import { getCncApi } from '@/lib/fluidnc/machine';
@@ -43,13 +44,13 @@ import { useProbeZ } from './useProbeZ';
 /** How long (ms) the main button stays locked once a step is done: a double press must not start the next one. */
 const kSettleMs = 800;
 
-const kStepLabels = { home: 'Home machine', z: 'Probe Z', run: 'Run job' };
+const kStepLabels = { home: translate('Home machine'), z: 'Probe Z', run: translate('Run job') };
 
 /** Checklist items this footer shows as a check of its own, or that Run takes care of. */
 const kHandledHere = new Set(['homed', 'xy-zero', 'z-zero']);
 
 function report(promise: Promise<unknown>, what: string) {
-  return promise.catch(err => toast.error(`${what} failed`, { description: errorText(err) }));
+  return promise.catch(err => toast.error(translate('{{what}} failed', { what: what }), { description: errorText(err) }));
 }
 
 function DoneMark({ done, label }: { done: boolean; label: string }) {
@@ -161,12 +162,15 @@ export function RunFooter() {
     hideZeroPreview();
   };
   const runDescription = zeroMoves
-    ? `Sets XY zero where the job is drawn${movedBy === null ? '' : ` (${movedBy.toFixed(0)} mm from the old zero)`}, uploads the G-code to a unique execution file on the SD card and starts it.`
+    ? translate(
+        'Sets XY zero where the job is drawn{{value1}}, uploads the G-code to a unique execution file on the SD card and starts it.',
+        { value1: movedBy === null ? '' : translate(' ({{value1}} mm from the old zero)', { value1: movedBy.toFixed(0) }) }
+      )
     : `Keeps the XY zero, which is already where the job is drawn. Uploads the G-code to a unique execution file on the SD card and starts it.`;
 
   return (
     <section
-      aria-label="Run"
+      aria-label={translate('Run')}
       className="sticky bottom-0 z-10 -mx-3 -mb-3 mt-auto flex flex-col gap-2 border-t bg-background px-3 py-3 shadow-[0_-4px_12px_-8px_rgba(0,0,0,0.25)]">
       {warnings.length > 0 && (
         <ul className="flex flex-col gap-0.5" data-testid="job-checklist">
@@ -192,30 +196,31 @@ export function RunFooter() {
           size="sm"
           variant="outline"
           disabled={!!lockReason || !idle}
-          title="Jog the axes outside the travel 0.5 mm into it"
-          onClick={() => report(api.moveIntoTravel(), 'Moving into the travel')}>
-          <MoveRight /> Move into the travel
+          title={translate('Jog the axes outside the travel 0.5 mm into it')}
+          onClick={() => report(api.moveIntoTravel(), translate('Moving into the travel'))}>
+          <MoveRight />
+          {translate(' Move into the travel ')}
         </Button>
       )}
       {warnings.some(isAlarm) && (
         <p className="text-xs text-red-700 dark:text-red-400">
           {outside
-            ? 'Move the machine into its travel first: FluidNC 3.9 stops any move from outside it, even a Z lift.'
-            : 'Fix the travel problem above first: with soft limits on, the controller would stop this job with an alarm.'}
+            ? translate('Move the machine into its travel first: FluidNC 3.9 stops any move from outside it, even a Z lift.')
+            : translate('Fix the travel problem above first: with soft limits on, the controller would stop this job with an alarm.')}
         </p>
       )}
       <div className="flex flex-row flex-wrap items-center gap-x-3 gap-y-1">
-        <DoneMenu disabled={!!lockReason} done={homed} label="Home" onChange={done => (api.homed.value = done)}>
-          <DoneMark done={homed} label="Home" />
+        <DoneMenu disabled={!!lockReason} done={homed} label={translate('Home')} onChange={done => (api.homed.value = done)}>
+          <DoneMark done={homed} label={translate('Home')} />
         </DoneMenu>
         <DoneMenu
           done={zOk}
           label="Z"
           disabled={!!lockReason || (zOk && !zZeroed)}
           onChange={done => (api.zZeroedAt.value = done ? Date.now() : null)}>
-          <DoneMark done={zOk} label={zOk && !zZeroed ? 'Z set by the G-code' : 'Z'} />
+          <DoneMark done={zOk} label={zOk && !zZeroed ? translate('Z set by the G-code') : 'Z'} />
         </DoneMenu>
-        {hasToolpath && <DoneMark done={false} label="XY when you run" />}
+        {hasToolpath && <DoneMark done={false} label={translate('XY when you run')} />}
       </div>
       <div className="flex flex-row gap-0.5">
         <Button
@@ -227,43 +232,43 @@ export function RunFooter() {
         </Button>
         <DropdownMenu onOpenChange={onMenuOpen}>
           <DropdownMenuTrigger asChild>
-            <Button size="lg" className="rounded-l-none px-3" aria-label="More actions">
+            <Button size="lg" className="rounded-l-none px-3" aria-label={translate('More actions')}>
               <Ellipsis />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" className="w-64">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Setup</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">{translate('Setup')}</DropdownMenuLabel>
             <DoneItem done={homed} disabled={!!lockReason || !idle} onClick={home}>
-              Home machine
+              {translate('Home machine ')}
             </DoneItem>
             <DoneItem done={zOk} disabled={!!lockReason || !idle} onClick={() => setDialog('probe')}>
-              Probe Z
+              {translate('Probe Z ')}
             </DoneItem>
             <DropdownMenuItem disabled={!!lockReason || !idle} onClick={() => report(api.zeroAxes(['z']), 'Zeroing')}>
-              Zero Z here
+              {translate('Zero Z here ')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs text-muted-foreground">XY zero</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">{translate('XY zero')}</DropdownMenuLabel>
             <DoneItem done={xyOk} disabled={!!lockReason || !idle || !hasToolpath} onClick={() => setXYZeroFromToolpath()}>
-              Set XY zero
+              {translate('Set XY zero ')}
             </DoneItem>
             <DropdownMenuItem
               disabled={!!lockReason || !idle || !hasToolpath}
               {...movePreview(offset)}
               onClick={() => work(setXYZeroFromToolpath(true), 'Moving')}>
-              Set XY zero and move there
+              {translate('Set XY zero and move there ')}
             </DropdownMenuItem>
             <DropdownMenuItem disabled={!!lockReason || !idle} {...movePreview(zero)} onClick={() => work(api.goToXYZero(), 'Moving')}>
-              Move to XY zero
+              {translate('Move to XY zero ')}
             </DropdownMenuItem>
             <DropdownMenuItem disabled={!!lockReason || !idle} onClick={() => zeroXYAtBit()}>
-              Zero XY at the bit
+              {translate('Zero XY at the bit ')}
             </DropdownMenuItem>
             <DropdownMenuItem disabled={!!lockReason || !idle || !hasToolpath} {...zeroPreview} onClick={() => moveToolpathToMachineZero()}>
-              Move job to the machine&apos;s zero
+              {translate("Move job to the machine's zero ")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Run</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">{translate('Run')}</DropdownMenuLabel>
             <DropdownMenuItem
               disabled={!!lockReason || !idle || !hasToolpath || !!keepZero?.blocking}
               title={keepZero?.blocking ? keepZero.details?.join(' ') : undefined}
@@ -273,7 +278,7 @@ export function RunFooter() {
                 machineZeroPreview.value = true;
                 setDialog('keep');
               }}>
-              Run from the machine&apos;s zero
+              {translate("Run from the machine's zero ")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -287,16 +292,18 @@ export function RunFooter() {
       <AlertDialog open={dialog === 'probe'} onOpenChange={open => !open && closeDialog()}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Probe Z?</AlertDialogTitle>
+            <AlertDialogTitle>{translate('Probe Z?')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Put the probe plate ({prefs.probePlateThickness} mm thick) under the bit. The bit moves down until it touches, up to{' '}
-              {prefs.probeMaxTravel} mm.
+              {translate('Put the probe plate (')}
+              {prefs.probePlateThickness}
+              {translate(' mm thick) under the bit. The bit moves down until it touches, up to')} {prefs.probeMaxTravel}
+              {translate(' mm. ')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{translate('Cancel')}</AlertDialogCancel>
             <AlertDialogAction disabled={locked || !!lockReason} onClick={() => !isManufacturingLocked() && work(probe(), 'Probing')}>
-              Probe
+              {translate('Probe ')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -304,17 +311,21 @@ export function RunFooter() {
       <AlertDialog open={dialog === 'run' || dialog === 'keep'} onOpenChange={open => !open && closeDialog()}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Run job?</AlertDialogTitle>
+            <AlertDialogTitle>{translate('Run job?')}</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="flex flex-col gap-2">
                 <p>
                   {dialog === 'keep'
-                    ? `Keeps the XY zero on the machine and cuts at the yellow outline, not where the job is drawn. Uploads the G-code to a unique execution file on the SD card and starts it.`
+                    ? translate(
+                        'Keeps the XY zero on the machine and cuts at the yellow outline, not where the job is drawn. Uploads the G-code to a unique execution file on the SD card and starts it.'
+                      )
                     : runDescription}
                 </p>
                 {dialog === 'run' && midBoard && zeroMoves && (
                   <p className="text-amber-700 dark:text-amber-400">
-                    This board already has cuts from the old zero. Unless you moved the board, this one will be out of line with them.
+                    {translate(
+                      'This board already has cuts from the old zero. Unless you moved the board, this one will be out of line with them. '
+                    )}
                   </p>
                 )}
                 {warnings.length > 0 && (
@@ -328,7 +339,7 @@ export function RunFooter() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{translate('Cancel')}</AlertDialogCancel>
             <AlertDialogAction
               disabled={locked || !!lockReason}
               onClick={() => {
@@ -345,12 +356,12 @@ export function RunFooter() {
                   run().catch(err => {
                     const message = errorText(err);
                     setRunError(message);
-                    toast.error('Run failed', { description: message });
+                    toast.error(translate('Run failed'), { description: message });
                   }),
                   'Run'
                 );
               }}>
-              {warnings.length ? 'Run anyway' : 'Run'}
+              {warnings.length ? translate('Run anyway') : translate('Run')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

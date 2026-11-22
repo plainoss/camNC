@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   addConstraint,
   addPoint,
@@ -185,7 +186,7 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
     const curveId = hit?.entityId;
     if (modification.phase === 'offset') {
       if (!modification.entityIds.length || event.shiftKey) {
-        if (!curveId) return setMessage('Select a line, circle or arc to offset.');
+        if (!curveId) return setMessage(translate('Select a line, circle or arc to offset.'));
         const next = modification.entityIds.includes(curveId)
           ? modification.entityIds.filter(id => id !== curveId)
           : modificationSourceIds(sketch, [...modification.entityIds, curveId], 'offset');
@@ -204,7 +205,7 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
           : modificationSourceIds(sketch, [...modification.entityIds, pickedId], 'mirror');
         setModification(previous => transitionModification(previous, { type: 'sources', entityIds: next }));
         setSelected(next);
-        setMessage('Add entities, then press Enter or choose Mirror line.');
+        setMessage(translate('Add entities, then press Enter or choose Mirror line.'));
       } else if (curveId) {
         const result = mirrorSketchEntities(sketch, { entityIds: modification.entityIds, axisId: curveId });
         if (!result.ok) return setMessage(result.message);
@@ -212,11 +213,12 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
         setModification(previous => transitionModification(previous, { type: 'complete' }));
         setSelected([]);
         setHoveredModifyCurve(null);
-        setMessage('Mirrored geometry created. Select entities to mirror again.');
+        setMessage(translate('Mirrored geometry created. Select entities to mirror again.'));
       }
     } else if (!modification.entityId) {
       const curve = sketch.entities.find(entity => entity.id === curveId);
-      if (!curve || (curve.type !== 'line' && curve.type !== 'arc')) return setMessage('Select near an endpoint of a line or arc.');
+      if (!curve || (curve.type !== 'line' && curve.type !== 'arc'))
+        return setMessage(translate('Select near an endpoint of a line or arc.'));
       const points = pointsOf(sketch),
         start = points.get(curve.startId)!,
         end = points.get(curve.endId)!;
@@ -224,7 +226,7 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
       setModification(previous => transitionModification(previous, { type: 'extendPick', entityId: curve.id, end: endName }));
       setSelected([curve.id]);
       setModifyTarget(null);
-      setMessage('Click the new endpoint or a boundary. Escape cancels this extension.');
+      setMessage(translate('Click the new endpoint or a boundary. Escape cancels this extension.'));
     } else {
       const result = extendSketchCurve(sketch, {
         entityId: modification.entityId,
@@ -239,8 +241,8 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
       setModifyTarget(null);
       setMessage(
         result.kind === 'delete'
-          ? 'Curve removed by crossing its opposite endpoint. Undo restores it.'
-          : 'Curve extended. Select another endpoint.'
+          ? translate('Curve removed by crossing its opposite endpoint. Undo restores it.')
+          : translate('Curve extended. Select another endpoint.')
       );
     }
     return;
@@ -254,7 +256,7 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
   }
   if (tool === 'curveControlPoint') {
     const polygon = pickBezierControlPolygon(sketch, { x: event.clientX, y: event.clientY }, { project: projectPoint, curveRadiusPx: 8 });
-    if (polygon?.kind === 'vertex') return setMessage('Choose a segment of the Bezier control polygon, away from its vertices.');
+    if (polygon?.kind === 'vertex') return setMessage(translate('Choose a segment of the Bezier control polygon, away from its vertices.'));
     const hit =
       polygon ??
       pickSketchSnap(
@@ -264,12 +266,12 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
       );
     const curve = sketch.entities.find(entity => entity.id === hit?.entityId);
     if (!curve || (curve.type !== 'spline' && curve.type !== 'bezier'))
-      return setMessage('Choose an open spline or a Bezier control-polygon segment.');
+      return setMessage(translate('Choose an open spline or a Bezier control-polygon segment.'));
     try {
       changeSketch(insertCurveControlPoint(sketch, curve.id, hit?.parameter ?? 0.5));
       chooseTool('select');
       setSelected([curve.id]);
-      setMessage('Control point added. Drag its handle to reshape the curve.');
+      setMessage(translate('Control point added. Drag its handle to reshape the curve.'));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     }
@@ -277,21 +279,21 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
   }
   if (tool === 'tangentArc' && !pending.length) {
     const point = pointHit?.targetPointId && sketch.entities.find(entity => entity.id === pointHit.targetPointId);
-    if (!point || point.type !== 'point') return setMessage('Choose an existing endpoint of a line or arc.');
+    if (!point || point.type !== 'point') return setMessage(translate('Choose an existing endpoint of a line or arc.'));
     const equivalent = pointEquivalence(sketch.constraints);
     const candidates = sketch.entities.filter(
       entity =>
         (entity.type === 'line' || entity.type === 'arc') && [entity.startId, entity.endId].some(id => equivalent.equivalent(id, point.id))
     );
     const curve = candidates.find(candidate => selected.includes(candidate.id)) ?? (candidates.length === 1 ? candidates[0] : undefined);
-    if (!curve) return setMessage('Choose an unambiguous line or arc endpoint, or preselect its curve.');
+    if (!curve) return setMessage(translate('Choose an unambiguous line or arc endpoint, or preselect its curve.'));
     if (curve.type !== 'line' && curve.type !== 'arc') return;
     const pointId = equivalent.equivalent(curve.startId, point.id) ? curve.startId : curve.endId;
     setChain({ pointId, curveId: curve.id });
     setPending([{ x: point.x, y: point.y }]);
     pendingSnaps.current = [];
     setLineContinuation(true);
-    setMessage('Click the tangent arc end.');
+    setMessage(translate('Click the tangent arc end.'));
     return;
   }
   if (fixMode) {
@@ -308,7 +310,7 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
       changeSketch((result.constraints ?? [result.constraint!]).reduce((next, c) => addConstraint(next, c), sketch));
       setSelected(constraintMode === 'symmetric' ? axisIds : []);
       setMessage(
-        `${result.message} ${constraintMode === 'symmetric' ? 'Select the next pair relative to this symmetry line.' : constraintPrompt(constraintMode)}`
+        `${result.message} ${constraintMode === 'symmetric' ? translate('Select the next pair relative to this symmetry line.') : constraintPrompt(constraintMode)}`
       );
     } else if (result.alreadyApplied) {
       setSelected(constraintMode === 'symmetric' ? axisIds : []);
@@ -377,7 +379,7 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
     );
     const curve = sketch.entities.find(e => e.id === hit?.entityId);
     if (!curve || curve.type === 'point' || isOwnedSplineHandle(curve) || hit?.parameter === undefined)
-      return setMessage('Select a sketch curve, away from its endpoints or tangent handles.');
+      return setMessage(translate('Select a sketch curve, away from its endpoints or tangent handles.'));
     const tau = Math.PI * 2;
     const wrap = (angle: number) => ((angle % tau) + tau) % tau;
     const parameter =
@@ -389,7 +391,7 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
     if (isClosedSketchCurve(curve) && splitFirst?.entityId !== curve.id) {
       const points = new Map(sketch.entities.filter(e => e.type === 'point').map(e => [e.id, e]));
       setSplitFirst({ entityId: curve.id, parameter, point: evaluateCurvePoint(curve, points, parameter) });
-      setMessage('Choose a second distinct point on the same closed curve. Escape cancels both split points.');
+      setMessage(translate('Choose a second distinct point on the same closed curve. Escape cancels both split points.'));
       return;
     }
     const result = splitSketchCurve(sketch, curve.id, isClosedSketchCurve(curve) ? [splitFirst!.parameter, parameter] : [parameter]);
@@ -399,11 +401,16 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
     setSelected([]);
     const notice =
       result.releasedConstraintIds.length || result.releasedFixedPointIds.length
-        ? `Released relations: ${result.releasedConstraintIds.length}; released fixed control points: ${result.releasedFixedPointIds.length}. The exact pieces are independently editable.`
+        ? translate(
+            'Released relations: {{value1}}; released fixed control points: {{value2}}. The exact pieces are independently editable.',
+            { value1: result.releasedConstraintIds.length, value2: result.releasedFixedPointIds.length }
+          )
         : '';
     setSplitNotice(notice);
     setMessage(
-      notice ? 'Curve split. Review the released relations shown above.' : 'Curve split. Click another curve to split, or press Escape.'
+      notice
+        ? translate('Curve split. Review the released relations shown above.')
+        : translate('Curve split. Click another curve to split, or press Escape.')
     );
     return;
   }
@@ -413,11 +420,11 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
     if (id) {
       const entity = sketch.entities.find(entity => entity.id === id);
       if (entity && isOwnedSplineHandle(entity))
-        return setMessage('Spline tangent handles cannot be trimmed. Edit their constraints or reshape the spline.');
-      if (sketchPatternOwner(sketch, id)) return setMessage('Remove the pattern relation before trimming its finite geometry.');
+        return setMessage(translate('Spline tangent handles cannot be trimmed. Edit their constraints or reshape the spline.'));
+      if (sketchPatternOwner(sketch, id)) return setMessage(translate('Remove the pattern relation before trimming its finite geometry.'));
       const trimmed = trimSketchCurveAt(sketch, id, p);
       if (trimmed) changeSketch(trimmed);
-      else setMessage('Trim supports line, circle and arc intervals. Select other curves and press Delete to remove them.');
+      else setMessage(translate('Trim supports line, circle and arc intervals. Select other curves and press Delete to remove them.'));
     }
     return;
   }
@@ -481,7 +488,7 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
           : undefined;
       const targets = dragTargets(sketch, next, { x: 0, y: 0 });
       if (!radiusEntityId && !targets.length) {
-        setMessage('The selected points are fixed. Unfix them or edit the dimensions to move this geometry.');
+        setMessage(translate('The selected points are fixed. Unfix them or edit the dimensions to move this geometry.'));
         return;
       }
       drag.current = {
@@ -528,7 +535,7 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
     }
-    if (tool === 'arc') setMessage('Click the arc end, then move to shape the arc.');
+    if (tool === 'arc') setMessage(translate('Click the arc end, then move to shape the arc.'));
   } else if (
     (tool === 'arc' ||
       tool === 'conic' ||
@@ -553,18 +560,18 @@ export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent
     pendingSnaps.current.push(lastDrawingHint.current);
     setMessage(
       polygonTool
-        ? 'Enter the number of sides, or move toward/away from the center to adjust it. Click or press Enter to finish.'
+        ? translate('Enter the number of sides, or move toward/away from the center to adjust it. Click or press Enter to finish.')
         : tool === 'centerPointArc'
-          ? 'Move clockwise or counterclockwise around the center, then click the arc end.'
+          ? translate('Move clockwise or counterclockwise around the center, then click the arc end.')
           : tool === 'alignedRectangle'
-            ? 'Click to set the perpendicular extent of the rectangle.'
+            ? translate('Click to set the perpendicular extent of the rectangle.')
             : tool === 'threePointCircle'
-              ? 'Click the third point on the circle circumference.'
+              ? translate('Click the third point on the circle circumference.')
               : tool === 'ellipse'
-                ? 'Click to set the second axis radius, perpendicular to the first.'
+                ? translate('Click to set the second axis radius, perpendicular to the first.')
                 : tool === 'arc'
-                  ? 'Move to shape the arc, then click a point on it.'
-                  : 'Click the conic control point.'
+                  ? translate('Move to shape the arc, then click a point on it.')
+                  : translate('Click the conic control point.')
     );
   } else {
     // Rho opens during this pointerdown. Suppress the browser's following mousedown

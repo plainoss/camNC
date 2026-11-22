@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { isJoinedBody, type CadDocument, type CadLengthUnit } from '@wbcnc/cad';
 import { brepProblems, partBrep, writeStep, type StepProduct } from '@wbcnc/cam';
 import { Matrix4 } from 'three';
@@ -53,7 +54,7 @@ export function studioStep(
     const brep = partBrep(entry.features, below, entry.rounds);
     const open = brepProblems(brep);
     if (open.length)
-      return void problems.push({ name: instance.name, message: 'Its solid doesn’t close, so it can’t be written exactly.' });
+      return void problems.push({ name: instance.name, message: translate('Its solid doesn’t close, so it can’t be written exactly.') });
     // The mesh's `flat` takes it back from the assembly to its sketch's frame; the solid goes the other way, from the
     // frame its features are in (lying flat, for a part milled that way) through its sketch's.
     const own = flat ? new Matrix4().fromArray(flat).invert() : new Matrix4();

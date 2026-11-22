@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   useCamSource,
   useHasToolpath,
@@ -42,7 +43,7 @@ function PlayPauseButton() {
   function toggleShowStillFrame() {
     setShowStillFrame(!showStillFrame);
   }
-  const label = showStillFrame ? 'Play Video' : 'Pause Video';
+  const label = showStillFrame ? translate('Play Video') : translate('Pause Video');
   return (
     <TooltipIconButton
       label={label}
@@ -59,7 +60,7 @@ function AddCameraButton() {
   const hasCamera = !!useCamSource();
   return (
     <TooltipIconButton
-      label={hasCamera ? 'Finish camera setup' : 'Add a camera'}
+      label={hasCamera ? translate('Finish camera setup') : translate('Add a camera')}
       icon={<Camera />}
       onClick={() => navigate({ to: hasCamera ? '/setup/point-selection' : '/setup/url-entry' })}
       data-testid="add-camera"
@@ -68,7 +69,7 @@ function AddCameraButton() {
 }
 
 function OpenFileButton() {
-  return <TooltipIconButton label="Open G-code file" icon={<FolderOpen />} shortcut="o" onClick={openGcodeFile} />;
+  return <TooltipIconButton label={translate('Open G-code file')} icon={<FolderOpen />} shortcut="o" onClick={openGcodeFile} />;
 }
 
 function ToolDiameterButton({ onClick }: { onClick: () => void }) {
@@ -76,10 +77,14 @@ function ToolDiameterButton({ onClick }: { onClick: () => void }) {
   const panelOpen = useStore(s => s.machinePanelOpen);
   return (
     <TooltipIconButton
-      label="Tool Diameter"
+      label={translate('Tool Diameter')}
       icon={
         <>
-          <Diameter /> <span className={kValue(panelOpen)}>{toolDiameter}mm</span>
+          <Diameter />{' '}
+          <span className={kValue(panelOpen)}>
+            {toolDiameter}
+            {translate('mm')}
+          </span>
         </>
       }
       shortcut="t"
@@ -104,11 +109,13 @@ function StockHeightDialogButton() {
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={onSubmit} className="space-y-4">
           <DialogHeader>
-            <DialogTitle>Stock Height</DialogTitle>
+            <DialogTitle>{translate('Stock Height')}</DialogTitle>
             <DialogDescription>
-              Set the stock material height to compensate for camera perspective effects.
+              {translate('Set the stock material height to compensate for camera perspective effects. ')}
               <br />
-              Important: Machine coordinates will only align perfectly with video pixels for objects at this specific height.
+              {translate(
+                'Important: Machine coordinates will only align perfectly with video pixels for objects at this specific height. '
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -120,13 +127,13 @@ function StockHeightDialogButton() {
               maximumFractionDigits: 2,
             }}
             min={0}
-            label="Stock Height"
+            label={translate('Stock Height')}
             value={stockHeight}
             step={0.1}
             onValueChange={value => value !== undefined && setStockHeight(value)}
           />
           <DialogFooter>
-            <Button type="submit">OK</Button>
+            <Button type="submit">{translate('OK')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -150,8 +157,8 @@ function ToolDiameterDialogButton() {
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={onSubmit} className="space-y-4">
           <DialogHeader>
-            <DialogTitle>Tool Diameter</DialogTitle>
-            <DialogDescription>Adjust the diameter of the tool.</DialogDescription>
+            <DialogTitle>{translate('Tool Diameter')}</DialogTitle>
+            <DialogDescription>{translate('Adjust the diameter of the tool.')}</DialogDescription>
           </DialogHeader>
           <NumberInput
             formatOptions={{
@@ -161,13 +168,13 @@ function ToolDiameterDialogButton() {
               maximumFractionDigits: 2,
             }}
             min={0}
-            label="Tool Diameter"
+            label={translate('Tool Diameter')}
             value={toolDiameter}
             step={0.1}
             onValueChange={value => value && setToolDiameter(value)}
           />
           <DialogFooter>
-            <Button type="submit">OK</Button>
+            <Button type="submit">{translate('OK')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -181,11 +188,15 @@ function StockHeightButton({ onClick }: { onClick: () => void }) {
   return (
     <TooltipIconButton
       onClick={onClick}
-      label="Stock Height"
+      label={translate('Stock Height')}
       className={stockHeight === 0 ? 'bg-warning' : ''}
       icon={
         <>
-          <PencilRuler /> <span className={kValue(panelOpen)}>{stockHeight}mm</span>
+          <PencilRuler />{' '}
+          <span className={kValue(panelOpen)}>
+            {stockHeight}
+            {translate('mm')}
+          </span>
         </>
       }
       shortcut="h"
@@ -203,7 +214,7 @@ function ColorLegendButton() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <div>
-          <TooltipIconButton label="Color Legend" icon={<Palette />} shortcut="c" onClick={() => setOpen(true)} />
+          <TooltipIconButton label={translate('Color Legend')} icon={<Palette />} shortcut="c" onClick={() => setOpen(true)} />
         </div>
       </PopoverTrigger>
       <PopoverContent>
@@ -216,7 +227,7 @@ function ColorLegendButton() {
             step={0.01}
             value={opacity}
             onChange={v => setOpacity(v)}
-            label="Opacity"
+            label={translate('Opacity')}
           />
         </div>
       </PopoverContent>

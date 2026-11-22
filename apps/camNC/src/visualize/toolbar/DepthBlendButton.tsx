@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { isDepthBlendSupported } from '@/depth/depthBlendManager';
 import { useDepthBlendEnabled, useDepthBlendInitializing, useSetDepthBlendEnabled } from '@/store/store';
 import { ClientOnly } from '@tanstack/react-router';
@@ -19,9 +20,9 @@ export function DepthBlendButton() {
           label={
             enabled
               ? initializing
-                ? 'Preparing Hide‑Machine (first run may download model)'
-                : 'Disable Hide‑Machine'
-              : 'Enable Hide‑Machine'
+                ? translate('Preparing Hide‑Machine (first run may download model)')
+                : translate('Disable Hide‑Machine')
+              : translate('Enable Hide‑Machine')
           }
           icon={
             initializing && enabled ? <LoadingSpinner className="text-primary" /> : <Layers className={enabled ? 'text-primary' : ''} />

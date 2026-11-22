@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@wbcnc/ui/components/dropdown-menu';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { CircleMinus, CirclePlus, MousePointer2, Redo2, Undo2, WandSparkles } from 'lucide-react';
@@ -52,9 +53,14 @@ export function HoldTools({ holds, onUndo, onRedo }: { holds: HoldEditing; onUnd
     </Hint>
   );
   return (
-    <div role="toolbar" aria-label="Fixtures" className="flex flex-wrap items-center gap-0.5">
-      <Hint text="Select and move what's on the drawing." side="bottom" wrap>
-        <button type="button" aria-label="Select" aria-pressed={!tool} onClick={() => pick(null)} className={cn(kButton, size)}>
+    <div role="toolbar" aria-label={translate('Fixtures')} className="flex flex-wrap items-center gap-0.5">
+      <Hint text={translate("Select and move what's on the drawing.")} side="bottom" wrap>
+        <button
+          type="button"
+          aria-label={translate('Select')}
+          aria-pressed={!tool}
+          onClick={() => pick(null)}
+          className={cn(kButton, size)}>
           <MousePointer2 className="size-[18px]" />
           <kbd aria-hidden className="absolute right-0.5 bottom-0 font-mono text-[8px] opacity-60">
             V
@@ -65,14 +71,14 @@ export function HoldTools({ holds, onUndo, onRedo }: { holds: HoldEditing; onUnd
         'clamp',
         'Clamp',
         'C',
-        'Click near an edge of the board: only the parts in the way move aside. Esc puts it down.',
+        translate('Click near an edge of the board: only the parts in the way move aside. Esc puts it down.'),
         <ClampIcon />
       )}
       {toolButton(
         'screw',
         'Screw',
         'S',
-        'Click in the waste: it lands on the most forgiving spot nearby. Esc puts it down.',
+        translate('Click in the waste: it lands on the most forgiving spot nearby. Esc puts it down.'),
         <ScrewIcon />
       )}
       {toolButton(
@@ -80,35 +86,50 @@ export function HoldTools({ holds, onUndo, onRedo }: { holds: HoldEditing; onUnd
         'Tab',
         'T',
         tabsOn
-          ? 'Click on a part’s outline to add a tab. Esc puts it down.'
-          : 'This board doesn’t use tabs: choose Tabs under “Parts stay in place with”.',
+          ? translate('Click on a part’s outline to add a tab. Esc puts it down.')
+          : translate('This board doesn’t use tabs: choose Tabs under “Parts stay in place with”.'),
         <TabIcon />,
         !tabsOn
       )}
       <DropdownMenu modal={false}>
-        <Hint text="Suggest holds, or one clamp fewer or more." side="bottom" wrap>
+        <Hint text={translate('Suggest holds, or one clamp fewer or more.')} side="bottom" wrap>
           <DropdownMenuTrigger asChild>
-            <button type="button" aria-label="Suggest holds" disabled={!canPlace} className={cn(kButton, size)}>
+            <button type="button" aria-label={translate('Suggest holds')} disabled={!canPlace} className={cn(kButton, size)}>
               <WandSparkles className="size-[18px]" />
             </button>
           </DropdownMenuTrigger>
         </Hint>
         <DropdownMenuContent side="bottom" align="start">
           <DropdownMenuItem onSelect={suggest}>
-            <WandSparkles className="size-4" /> Suggest holds
+            <WandSparkles className="size-4" />
+            {translate(' Suggest holds ')}
           </DropdownMenuItem>
           <DropdownMenuItem disabled={holdCount <= 3} onSelect={() => nudgeHolds(false)}>
-            <CircleMinus className="size-4" /> One clamp fewer
+            <CircleMinus className="size-4" />
+            {translate(' One clamp fewer ')}
           </DropdownMenuItem>
           <DropdownMenuItem disabled={!holdCount} onSelect={() => nudgeHolds(true)}>
-            <CirclePlus className="size-4" /> One clamp more
+            <CirclePlus className="size-4" />
+            {translate(' One clamp more ')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <button type="button" aria-label="Undo" title="Undo (⌘Z)" disabled={!onUndo} onClick={onUndo} className={cn(kButton, size)}>
+      <button
+        type="button"
+        aria-label={translate('Undo')}
+        title={translate('Undo (⌘Z)')}
+        disabled={!onUndo}
+        onClick={onUndo}
+        className={cn(kButton, size)}>
         <Undo2 className="size-[18px]" />
       </button>
-      <button type="button" aria-label="Redo" title="Redo (⇧⌘Z)" disabled={!onRedo} onClick={onRedo} className={cn(kButton, size)}>
+      <button
+        type="button"
+        aria-label={translate('Redo')}
+        title={translate('Redo (⇧⌘Z)')}
+        disabled={!onRedo}
+        onClick={onRedo}
+        className={cn(kButton, size)}>
         <Redo2 className="size-[18px]" />
       </button>
     </div>

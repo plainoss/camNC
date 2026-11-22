@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import { type CadDimension, type CadPoint, type CadSketch } from '@wbcnc/cad';
 import type { PointerEvent, ReactNode } from 'react';
@@ -185,9 +186,17 @@ export function DimensionGraphics({
           role="button"
           aria-disabled={!interactive}
           tabIndex={interactive ? 0 : -1}
-          aria-label={`${constraint.driven ? 'Reference' : 'Edit'} ${constraint.label ?? constraint.type}: ${formatted} ${constraint.type === 'angle' ? 'degrees' : lengthUnit}`}
+          aria-label={translate('{{value1}} {{value2}}: {{formatted}} {{value4}}', {
+            value1: constraint.driven ? translate('Reference') : translate('Edit'),
+            value2: constraint.label ?? constraint.type,
+            formatted: formatted,
+            value4: constraint.type === 'angle' ? translate('degrees') : lengthUnit,
+          })}
           aria-description={
-            [constraint.driven ? 'Read-only measurement that follows the geometry.' : '', expression ? `Expression: ${expression}` : '']
+            [
+              constraint.driven ? translate('Read-only measurement that follows the geometry.') : '',
+              expression ? `Expression: ${expression}` : '',
+            ]
               .filter(Boolean)
               .join(' ') || undefined
           }

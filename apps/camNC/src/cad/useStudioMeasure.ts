@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { CadDocument } from '@wbcnc/cad';
 import type { ModelMeasurePick } from '@/cam/model/measurementPick';
@@ -83,7 +84,12 @@ export function useStudioMeasure(
     if (!enabled || !instance) return;
     const owner = instanceKey(instance),
       key = JSON.stringify([owner, pick.entity]);
-    const item: PickedSelection = { key, instance: owner, label: `${instance.name} · ${pick.entity.kind}`, entity: pick.entity };
+    const item: PickedSelection = {
+      key,
+      instance: owner,
+      label: translate('{{value1}} · {{value2}}', { value1: instance.name, value2: pick.entity.kind }),
+      entity: pick.entity,
+    };
     setPicked(previous => {
       const current = previous.version === version ? previous.items : [];
       // A click adds to the selection, and a second click on the same geometry takes it off; empty space clears.

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadReport, CadReportIssue } from '@wbcnc/cad-script';
 
 type Body = NonNullable<CadReport['assembly']>['parts'][number];
@@ -23,7 +24,10 @@ export function structuralWarnings(report: CadReport): CadReportIssue[] {
         warnings.push({
           code: 'floating-part',
           part: body.name,
-          message: `${body.name} touches no other part, so nothing holds it. Move it onto or into a neighbouring part and join it.`,
+          message: translate(
+            '{{value1}} touches no other part, so nothing holds it. Move it onto or into a neighbouring part and join it.',
+            { value1: body.name }
+          ),
         });
   const height = high[2]! - low[2]!,
     footprint = Math.min(high[0]! - low[0]!, high[1]! - low[1]!);
@@ -31,7 +35,10 @@ export function structuralWarnings(report: CadReport): CadReportIssue[] {
   if (bodies.length > 1 && footprint > 0 && height / footprint > 3)
     warnings.push({
       code: 'may-tip',
-      message: `The piece is ${round(height)} mm tall on a ${round(footprint)} mm footprint (${(height / footprint).toFixed(1)}:1). Freestanding, it can tip: widen or deepen the base, or tell the user it must be fixed to a wall.`,
+      message: translate(
+        'The piece is {{value1}} mm tall on a {{value2}} mm footprint ({{value3}}:1). Freestanding, it can tip: widen or deepen the base, or tell the user it must be fixed to a wall.',
+        { value1: round(height), value2: round(footprint), value3: (height / footprint).toFixed(1) }
+      ),
     });
   for (const body of bodies) {
     const across = Math.max(body.size[0]!, body.size[1]!);
@@ -40,7 +47,10 @@ export function structuralWarnings(report: CadReport): CadReportIssue[] {
       warnings.push({
         code: 'slender-part',
         part: body.name,
-        message: `${body.name} is ${round(body.size[2]!)} mm tall but only ${round(across)} mm across; it may flex or break under load. Thicken it or brace it, or tell the user.`,
+        message: translate(
+          '{{value1}} is {{value2}} mm tall but only {{value3}} mm across; it may flex or break under load. Thicken it or brace it, or tell the user.',
+          { value1: body.name, value2: round(body.size[2]!), value3: round(across) }
+        ),
       });
   }
   return warnings;

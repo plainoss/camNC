@@ -1,3 +1,5 @@
+import { CadStatus } from './CadStatus';
+import { t as translate } from '@wbcnc/i18n';
 import { initialView, numeric, type ConstraintTool, type NumericConstraint, type Point, type Tool, type View } from './cadEditorShared';
 import type { SketchEditorInput } from './sketchEditorInput';
 import { sketchPointerDown } from './sketchPointerDown';
@@ -271,14 +273,14 @@ export function CadEditor({
     setPalette(value => !value);
   };
   const [searchHighlight, setSearchHighlight] = useState<SearchCommand['id'] | null>(null);
-  const [status, setStatus] = useState('Checking sketch…');
+  const [status, setStatus] = useState(translate('Checking sketch…'));
   const [{ problems, sketchProblems, featureProblems, unbuiltParts }, setProblems] = useState(noSketchProblems);
   const [inProgress, setInProgress] = useState(false);
   const [solving, setSolving] = useState(true);
   const [checkEpoch, setCheckEpoch] = useState(0);
   const [sketchStatuses, setSketchStatuses] = useState<Record<string, CadSketchSolveStatus>>({});
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('Choose a drawing tool or select geometry.');
+  const [message, setMessage] = useState(translate('Choose a drawing tool or select geometry.'));
   const [finishError, setFinishError] = useState<string | null>(null);
   const [width, setWidth] = useState(lengthText(100));
   const [height, setHeight] = useState(lengthText(60));
@@ -714,7 +716,7 @@ export function CadEditor({
         setSolving(false);
         setProblems(failedCheckProblems(error));
         setInProgress(false);
-        setStatus('Sketch could not be checked');
+        setStatus(translate('Sketch could not be checked'));
       });
     return () => {
       cancelled = true;
@@ -1034,8 +1036,9 @@ export function CadEditor({
       callbacks.current.onFinishBlocked?.(reason);
       return null;
     };
-    if (busy || solving || finishing.current || preparingDimension.current) return blocked('Wait for the current sketch check to finish.');
-    const reason = !thicknessValid ? 'Enter a valid part thickness before finishing the sketch.' : pendingFinishReason;
+    if (busy || solving || finishing.current || preparingDimension.current)
+      return blocked(translate('Wait for the current sketch check to finish.'));
+    const reason = !thicknessValid ? translate('Enter a valid part thickness before finishing the sketch.') : pendingFinishReason;
     if (reason) {
       return blocked(reason);
     }
@@ -1251,11 +1254,14 @@ export function CadEditor({
   const partsPanel = (
     <>
       <div className="cad-panel-heading" hidden={!!faceSketch}>
-        <h2>Parts ({studioSession ? physicalPartCount : doc.parts.length})</h2>
+        <h2>
+          {translate('Parts (')}
+          {studioSession ? physicalPartCount : doc.parts.length})
+        </h2>
         {!studioSession && (
           <button
             type="button"
-            aria-label="Add part"
+            aria-label={translate('Add part')}
             onClick={() => {
               const added = createCadPart(`Part ${doc.parts.length + 1}`, part?.thickness ?? 18);
               commit({ ...doc, parts: [...doc.parts, added] });
@@ -1388,12 +1394,17 @@ export function CadEditor({
         />
       )}
       <div className="cad-workspace" inert={busy}>
-        <aside className="cad-sidebar" aria-label="Parts and sketch properties">
+        <aside className="cad-sidebar" aria-label={translate('Parts and sketch properties')}>
           {faceSketch && (
             <div className="cad-properties">
-              <h3>Sketch on the {faceSketch.label.toLowerCase()}</h3>
+              <h3>
+                {translate('Sketch on the ')}
+                {faceSketch.label.toLowerCase()}
+              </h3>
               <p className="cad-muted">
-                Draw lines or shapes across the part to mark out regions. Finish the sketch, then click a region to set its depth.
+                {translate(
+                  'Draw lines or shapes across the part to mark out regions. Finish the sketch, then click a region to set its depth. '
+                )}
               </p>
             </div>
           )}
@@ -1457,7 +1468,7 @@ export function CadEditor({
             />
           )}
           {studioSession && (
-            <section className="cad-parts-panel" aria-label="Parts panel">
+            <section className="cad-parts-panel" aria-label={translate('Parts panel')}>
               {partsPanel}
             </section>
           )}
@@ -1474,7 +1485,7 @@ export function CadEditor({
             <StudioSketchDialog
               key={`${doc.id}:${part.sketch.id}`}
               editor={root}
-              title={designStepLabel(doc, `${part.id}:sketch`) ?? `Sketch · ${part.name}`}
+              title={designStepLabel(doc, `${part.id}:sketch`) ?? translate('Sketch · {{value1}}', { value1: part.name })}
               plane={sketchPlaneName(doc, part.drawnOn)}
               disabled={!sketchCanFinish}
               checking={busy || solving}
@@ -1607,7 +1618,7 @@ export function CadEditor({
             data-testid="cad-canvas"
             data-part-id={part?.id}
             role="img"
-            aria-label="2D sketch drawing canvas"
+            aria-label={translate('2D sketch drawing canvas')}
             tabIndex={0}
             viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
             onPointerDown={pointerDown}
@@ -1848,43 +1859,23 @@ export function CadEditor({
           {...(studioSession && !showWorkspace && { confirm: { reason: sketchFinishReason, onConfirm: () => closeSketch(true) } })}
         />
       )}
-      <footer className="cad-status">
-        <span className={openSketchProblems.length && !inProgress ? 'cad-error' : ''}>
-          {studioSession && showWorkspace ? (
-            // In the studio, a sketch's freedom isn't what's being worked on.
-            solving ? (
-              'Checking sketch…'
-            ) : (
-              ''
-            )
-          ) : (
-            <>
-              {solving ? 'Checking sketch…' : displayStatus}
-              {colorNotice && ` · ${colorNotice}`}
-            </>
-          )}
-        </span>
-        {cancelledSketch && (
-          // Its own status, outside the instruction line that narrow windows hide, so Restore is always there.
-          <span className="cad-restore-sketch" role="status">
-            Sketch cancelled.{' '}
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => {
-                if (busy) return;
-                commit(cancelledSketch.document);
-                openSketch(cancelledSketch.partId, cancelledSketch.before);
-              }}>
-              Restore
-            </button>
-          </span>
-        )}
-        <span className="cad-instruction" role="status">
-          {cancelledSketch || acceptanceNotice || (studioSession && showWorkspace) ? '' : message}
-        </span>
-        <span>{saveStatus ?? 'Draft'}</span>
-      </footer>
+      <CadStatus
+        error={!!openSketchProblems.length && !inProgress}
+        studioWorkspace={studioSession && showWorkspace}
+        solving={solving}
+        displayStatus={displayStatus}
+        colorNotice={colorNotice}
+        cancelled={!!cancelledSketch}
+        busy={busy}
+        onRestore={() => {
+          if (busy || !cancelledSketch) return;
+          commit(cancelledSketch.document);
+          openSketch(cancelledSketch.partId, cancelledSketch.before);
+        }}
+        hideInstruction={!!(cancelledSketch || acceptanceNotice || (studioSession && showWorkspace))}
+        message={message}
+        saveStatus={saveStatus}
+      />
       {!acceptanceNotice && <SketchProblems problems={openSketchProblems} inProgress={inProgress} nothingDrawn={isEmptyDesign(doc)} />}
     </div>
   );

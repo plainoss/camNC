@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { UnskewedVideoMesh } from '@/calibration/UnskewTsl';
 import { PageHeader } from '@/components/page-header';
 import { PresentCanvas } from '@/scene/PresentCanvas';
@@ -145,15 +146,15 @@ export function ThreePointSelectionStep() {
   // Handle saving points
   const handleSave = () => {
     if (markers.length < kExpectedMarkerCount) {
-      console.error('Must select exactly 4 points');
+      console.error(translate('Must select exactly 4 points'));
       return;
     }
 
     const reprojectionError = setMarkersAndRecompute(markers);
-    toast.success(`Updated camera extrinsics`, {
+    toast.success(translate('Updated camera extrinsics'), {
       description: formatReprojectionError(reprojectionError),
       action: {
-        label: 'Go to 2D view',
+        label: translate('Go to 2D view'),
         onClick: () => navigate({ to: '/' }),
       },
     });
@@ -168,14 +169,20 @@ export function ThreePointSelectionStep() {
     const validMarkers = getValidMarkers(detectedMarkers);
     if (validMarkers.length !== kExpectedMarkerCount) {
       toast.error(
-        `Detected ${validMarkers.length} of ${kExpectedMarkerCount} expected aruco tags (ids 0-${kExpectedMarkerCount - 1}), ignoring`,
+        translate('Detected {{value1}} of {{kExpectedMarkerCount}} expected aruco tags (ids 0-{{value3}}), ignoring', {
+          value1: validMarkers.length,
+          kExpectedMarkerCount: kExpectedMarkerCount,
+          value3: kExpectedMarkerCount - 1,
+        }),
         {
           position: 'top-right',
         }
       );
       return;
     }
-    toast.success(`Detected ${kExpectedMarkerCount} markers`, { position: 'top-right' });
+    toast.success(translate('Detected {{kExpectedMarkerCount}} markers', { kExpectedMarkerCount: kExpectedMarkerCount }), {
+      position: 'top-right',
+    });
 
     setMarkers(validMarkers);
   };
@@ -184,7 +191,7 @@ export function ThreePointSelectionStep() {
 
   return (
     <div className="w-full h-app flex flex-col gap-1 overflow-hidden">
-      <PageHeader title="Markers in Camera" className="absolute" />
+      <PageHeader title={translate('Markers in Camera')} className="absolute" />
 
       <div className="flex-1 overflow-hidden">
         <PresentCanvas>
@@ -196,10 +203,10 @@ export function ThreePointSelectionStep() {
         {/* Action buttons for reset and save */}
         <DetectArucosButton onMarkersDetected={handleMarkersDetected} />
         <Button variant="secondary" onClick={handleReset}>
-          Reset
+          {translate('Reset ')}
         </Button>
         <Button onClick={handleSave} disabled={!canSave}>
-          Save
+          {translate('Save ')}
         </Button>
       </div>
     </div>

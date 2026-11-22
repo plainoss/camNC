@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   activeDesign,
   cadStepReport,
@@ -17,17 +18,17 @@ export interface CadProposal {
 
 export function cadProposal(base: CadDocument, candidate: unknown): CadProposal {
   const document = parseCadDocument(structuredClone(candidate));
-  if (document.id !== base.id) throw new Error('A proposal must change the open design.');
+  if (document.id !== base.id) throw new Error(translate('A proposal must change the open design.'));
   return { base: structuredClone(base), document };
 }
 
 export function cadProposalRefusal(session: CadSession, proposal: CadProposal): string | null {
-  if (session.conflict) return 'Resolve the incoming design change before applying a proposal.';
+  if (session.conflict) return translate('Resolve the incoming design change before applying a proposal.');
   if (proposal.document.id !== session.document.id || proposal.base.id !== session.document.id)
-    return 'This proposal belongs to another design.';
+    return translate('This proposal belongs to another design.');
   // Revisions alone cannot detect an external replacement or an uncommitted sketch change.
   if (JSON.stringify(proposal.base) !== JSON.stringify(session.document))
-    return 'The design has changed. Check the request again against the current design.';
+    return translate('The design has changed. Check the request again against the current design.');
   return null;
 }
 
@@ -121,7 +122,10 @@ export function compareCadProposal(proposal: CadProposal): CadProposalComparison
       parts.flatMap(part => (part.cuts ?? []).filter(cut => cut.id.startsWith(prefix)).map(cut => `${part.partId}/${cut.id}`));
     const next = new Set(openings(newGeometry.parts));
     const lost = openings(oldGeometry.parts).filter(key => !next.has(key)).length;
-    if (lost) result.costs.push(`Cut parts ${step.stepId}: ${lost} housing or joint opening(s) lost.`);
+    if (lost)
+      result.costs.push(
+        translate('Cut parts {{value1}}: {{value2}} housing or joint opening(s) lost.', { value1: step.stepId, value2: lost })
+      );
   }
   for (const part of oldGeometry.parts) {
     const next = newGeometry.parts.find(candidate => candidate.partId === part.partId);
@@ -129,7 +133,7 @@ export function compareCadProposal(proposal: CadProposal): CadProposalComparison
       if (cut.id.startsWith('cut-parts:')) continue;
       const replacement = next?.cuts?.find(candidate => candidate.id === cut.id);
       if (cut.to > cut.from && (!replacement || replacement.to <= replacement.from))
-        result.costs.push(`${part.name}: cut ${cut.id} no longer removes material.`);
+        result.costs.push(translate('{{value1}}: cut {{value2}} no longer removes material.', { value1: part.name, value2: cut.id }));
     }
     const sharedCuts = new Set(part.cuts?.map(cut => cut.id));
     for (const [copyId, cuts] of Object.entries(part.copyCuts ?? {})) {
@@ -137,7 +141,13 @@ export function compareCadProposal(proposal: CadProposal): CadProposalComparison
         if (sharedCuts.has(cut.id)) continue;
         const replacement = next?.copyCuts?.[copyId]?.find(candidate => candidate.id === cut.id);
         if (cut.to > cut.from && (!replacement || replacement.to <= replacement.from))
-          result.costs.push(`${part.name}, copy ${copyId}: cut ${cut.id} no longer removes material.`);
+          result.costs.push(
+            translate('{{value1}}, copy {{value2}}: cut {{value3}} no longer removes material.', {
+              value1: part.name,
+              value2: copyId,
+              value3: cut.id,
+            })
+          );
       }
     }
   }

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { generateCarvingAsset, type CarvingGenerationOptions } from './generation';
 import { nativeBudgetRefusal, nativeImageUrl, requestNativeImage, type NativeImageConfig } from './nativeImage';
 import { traceCarvingPng, type TracedCarvingRaster } from './rasterSource';
@@ -9,7 +10,8 @@ export async function generateNativeRasterAsset(
   fetcher: typeof fetch = fetch
 ): Promise<Awaited<ReturnType<typeof generateCarvingAsset>>> {
   nativeBudgetRefusal(options.limits?.maxCostUsd);
-  if (options.previous) throw new Error('Native raster generation creates new artwork. Use text SVG to revise a saved composition.');
+  if (options.previous)
+    throw new Error(translate('Native raster generation creates new artwork. Use text SVG to revise a saved composition.'));
   nativeImageUrl(native);
   let traced: TracedCarvingRaster | undefined;
   const result = await generateCarvingAsset({
@@ -33,8 +35,8 @@ export async function generateNativeRasterAsset(
             name: 'submit_carving_svg',
             arguments: {
               svg: traced.svg,
-              title: 'Traced carving illustration',
-              summary: 'Monochrome image traced into filled cut regions. Review image-to-contour losses before applying.',
+              title: translate('Traced carving illustration'),
+              summary: translate('Monochrome image traced into filled cut regions. Review image-to-contour losses before applying.'),
             },
           },
         ],

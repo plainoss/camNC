@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import { CAD_MAX_PART_PATTERN, type CadDocument, type CadDrawnOn, type CadPartPattern, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -93,7 +94,8 @@ function LinearPartPatternField({
     const parsedCount = parseCadValue(countText, { unit: 'scalar', variables });
     if ('error' in parsedCount) return parsedCount.error;
     const n = Math.floor(parsedCount.value + 1e-9);
-    if (n < 1 || n > CAD_MAX_PART_PATTERN) return `A pattern makes one to ${CAD_MAX_PART_PATTERN}, counting the part itself.`;
+    if (n < 1 || n > CAD_MAX_PART_PATTERN)
+      return translate('A pattern makes one to {{value1}}, counting the part itself.', { value1: CAD_MAX_PART_PATTERN });
     const parsedSpacing = parseCadValue(spacingText, { unit: 'mm', variables });
     if ('error' in parsedSpacing) return parsedSpacing.error;
     return { n, parsedCount, parsedSpacing };
@@ -163,7 +165,7 @@ function LinearPartPatternField({
       {!ready && (
         <label>
           <input type="checkbox" checked={!!pattern} onChange={event => (event.target.checked ? onChange(kStart) : onChange(null))} />
-          Pattern copies in a row
+          {translate('Pattern copies in a row ')}
         </label>
       )}
       {pattern && (
@@ -173,7 +175,7 @@ function LinearPartPatternField({
               type="button"
               className="cad-feature-selection"
               data-active={picking || !pattern.direction ? '' : undefined}
-              aria-label="Direction"
+              aria-label={translate('Direction')}
               onClick={() => {
                 const generation = ++pickGeneration.current;
                 setPicking(true);
@@ -185,13 +187,13 @@ function LinearPartPatternField({
                   setPicking(false);
                 });
               }}>
-              <small>Direction</small>
+              <small>{translate('Direction')}</small>
               <span>
                 {pattern.direction && document
                   ? drawnOnName(document, pattern.direction.along)
                   : pattern.vector
-                    ? `Along an edge (${pattern.vector.map(value => +value.toFixed(3)).join(', ')})`
-                    : 'Pick a plane or a face'}
+                    ? translate('Along an edge ({{value1}})', { value1: pattern.vector.map(value => +value.toFixed(3)).join(', ') })
+                    : translate('Pick a plane or a face')}
               </span>
             </button>
           )}
@@ -200,7 +202,7 @@ function LinearPartPatternField({
               type="button"
               className="cad-feature-selection"
               data-active={pickingEdge ? '' : undefined}
-              aria-label="Direction edge"
+              aria-label={translate('Direction edge')}
               onClick={() => {
                 const generation = ++pickGeneration.current;
                 setPickingEdge(true);
@@ -210,14 +212,14 @@ function LinearPartPatternField({
                   if (generation !== pickGeneration.current) return;
                   pickGeneration.current++;
                   setPickingEdge(false);
-                  if (!edge) return setError('Click close to an edge of a part.');
+                  if (!edge) return setError(translate('Click close to an edge of a part.'));
                   const along = edge.b.map((value, axis) => value - edge.a[axis]!) as Vec3;
                   const length = Math.hypot(...along);
                   latestApply.current(undefined, null, along.map(value => +(value / length).toFixed(9)) as Vec3);
                 });
               }}>
-              <small>Or along an edge</small>
-              <span>{pickingEdge ? 'Click an edge of a part' : 'Pick an edge'}</span>
+              <small>{translate('Or along an edge')}</small>
+              <span>{pickingEdge ? translate('Click an edge of a part') : translate('Pick an edge')}</span>
             </button>
           )}
           {pattern.vector && !pattern.direction ? (
@@ -228,7 +230,7 @@ function LinearPartPatternField({
                   cancelPick();
                   apply(current.axis, null, null);
                 }}>
-                Clear
+                {translate('Clear ')}
               </button>
               {/* The edge's direction turned the other way. */}
               <button
@@ -237,7 +239,7 @@ function LinearPartPatternField({
                   cancelPick();
                   apply(current.axis, null, pattern.vector!.map(value => -value || 0) as Vec3);
                 }}>
-                Flip direction
+                {translate('Flip direction ')}
               </button>
             </div>
           ) : pattern.direction ? (
@@ -249,7 +251,7 @@ function LinearPartPatternField({
                     cancelPick();
                     apply(current.axis, null);
                   }}>
-                  Clear
+                  {translate('Clear ')}
                 </button>
               </div>
               <label>
@@ -261,12 +263,12 @@ function LinearPartPatternField({
                     apply(current.axis, { ...pattern.direction!, flip: event.target.checked });
                   }}
                 />
-                Flip direction
+                {translate('Flip direction ')}
               </label>
             </>
           ) : (
             <label htmlFor={`${id}-axis`} className="cad-number-field">
-              Along
+              {translate('Along ')}
               <span>
                 <select
                   id={`${id}-axis`}
@@ -283,7 +285,7 @@ function LinearPartPatternField({
             </label>
           )}
           <label htmlFor={`${id}-count`} className="cad-number-field">
-            How many
+            {translate('How many ')}
             <span>
               <CadValueInput
                 bare
@@ -299,7 +301,7 @@ function LinearPartPatternField({
             </span>
           </label>
           <label htmlFor={`${id}-spacing`} className="cad-number-field">
-            Spacing
+            {translate('Spacing ')}
             <span>
               <CadValueInput
                 bare

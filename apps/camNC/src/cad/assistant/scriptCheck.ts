@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { parseCadDocument, type CadDocument } from '@wbcnc/cad';
 import { inspectCadDocument, type CadEditResult } from '@wbcnc/cad-script';
 import runtime from 'virtual:cad-script-sandbox';
@@ -18,12 +19,12 @@ export function checkScriptInBrowser(
   source: string,
   options: { signal?: AbortSignal; timeoutMs?: number; toolpaths?: boolean; bit?: number } = {}
 ): Promise<CadEditResult> {
-  if (options.signal?.aborted) return Promise.resolve(failed(start, 'The script check was stopped.'));
+  if (options.signal?.aborted) return Promise.resolve(failed(start, translate('The script check was stopped.')));
   const timeoutMs = Math.min(60_000, Math.max(100, options.timeoutMs ?? 30_000));
   return new Promise(resolve => {
     const frame = document.createElement('iframe');
     frame.hidden = true;
-    frame.title = 'Isolated design script checker';
+    frame.title = translate('Isolated design script checker');
     frame.setAttribute('sandbox', 'allow-scripts');
     frame.srcdoc = sandboxFrameHtml;
     const channel = new MessageChannel();
@@ -44,8 +45,11 @@ export function checkScriptInBrowser(
       closing = setTimeout(remove, 100);
       resolve(result);
     };
-    const abort = () => finish(failed(start, 'The script check was stopped.'));
-    const timer = setTimeout(() => finish(failed(start, `The script check exceeded ${timeoutMs / 1000} seconds.`)), timeoutMs);
+    const abort = () => finish(failed(start, translate('The script check was stopped.')));
+    const timer = setTimeout(
+      () => finish(failed(start, translate('The script check exceeded {{value1}} seconds.', { value1: timeoutMs / 1000 }))),
+      timeoutMs
+    );
     channel.port1.onmessage = async (event: MessageEvent) => {
       const message = event.data;
       if (message?.type === 'stopped') {
@@ -64,8 +68,8 @@ export function checkScriptInBrowser(
         }
         try {
           const candidate = parseCadDocument(result.document);
-          if (candidate.id !== start.id) throw new Error('A script must edit the same design.');
-          if (!result.report || typeof result.ok !== 'boolean') throw new Error('The checker returned an invalid result.');
+          if (candidate.id !== start.id) throw new Error(translate('A script must edit the same design.'));
+          if (!result.report || typeof result.ok !== 'boolean') throw new Error(translate('The checker returned an invalid result.'));
           if (!result.ok) {
             finish({ ...result, document: candidate });
             return;
@@ -76,7 +80,7 @@ export function checkScriptInBrowser(
           trusted.report.warnings.push(...structuralWarnings(trusted.report));
           finish({ ...trusted, ok: trusted.report.ok });
         } catch (error) {
-          finish(failed(start, error instanceof Error ? error.message : 'Invalid design result.'));
+          finish(failed(start, error instanceof Error ? error.message : translate('Invalid design result.')));
         }
       }
     };

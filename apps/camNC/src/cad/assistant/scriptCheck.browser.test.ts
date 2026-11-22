@@ -199,3 +199,29 @@ describe('isolated browser design checks', () => {
     expect((await pending).scriptError).toContain('stopped');
   });
 });
+
+it('reports worker startup failure without a module-scope translation function in the opaque frame', async () => {
+  const frame = document.createElement('iframe');
+  frame.hidden = true;
+  frame.setAttribute('sandbox', 'allow-scripts');
+  frame.srcdoc = sandboxFrameHtml;
+  const channel = new MessageChannel();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const failure = await new Promise<string>((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error('No worker failure was reported')), 8000);
+      channel.port1.onmessage = event => {
+        if (event.data.type === 'ready')
+          channel.port1.postMessage({ type: 'check', runtime: 'invalid JavaScript !', document: {}, source: '' });
+        if (event.data.type === 'failed') resolve(event.data.message);
+      };
+      frame.onload = () => frame.contentWindow!.postMessage({ type: 'connect' }, '*', [channel.port2]);
+      document.body.append(frame);
+    });
+    expect(failure).toBe('The isolated script checker could not start.');
+  } finally {
+    if (timer) clearTimeout(timer);
+    channel.port1.close();
+    frame.remove();
+  }
+});

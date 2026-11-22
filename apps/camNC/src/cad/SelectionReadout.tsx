@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { lengthUnitScale, useDesignUnits } from './designUnits';
 import { cadFaceFrame, type CadDocument, type CadPart, type CadPoint, type CadSketch } from '@wbcnc/cad';
 import { selectionMeasurements, type SelectionMeasurement } from '@wbcnc/cad-editor/selectionMeasurements';
@@ -46,7 +47,7 @@ export function SelectionReadout({ sketch, selectedIds, picks, className, docume
   return (
     <div
       role="status"
-      aria-label="Selection measurements"
+      aria-label={translate('Selection measurements')}
       aria-atomic="true"
       className={['cad-selection-readout', className].filter(Boolean).join(' ')}>
       <dl>
@@ -55,7 +56,7 @@ export function SelectionReadout({ sketch, selectedIds, picks, className, docume
             <dt>{measurement.label}</dt>
             <dd>
               {text(measurement)}
-              {measurement.unit === 'deg' ? '°' : ` ${lengthUnit}`}
+              {measurement.unit === 'deg' ? '°' : translate(' {{lengthUnit}}', { lengthUnit: lengthUnit })}
             </dd>
           </div>
         ))}

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect } from 'react';
 import { useStageNavigation, type CamStageDestination } from '@/components/nav/stageNavigation';
 import { useCamJob, useSaveCamJob } from './camQueries';
@@ -53,13 +54,16 @@ export function CamJobBar({
   const note =
     job?.origin?.kind === 'sample'
       ? isDemoMode()
-        ? 'Temporary rehearsal copy'
-        : 'Sample copy · saved in this browser'
+        ? translate('Temporary rehearsal copy')
+        : translate('Sample copy · saved in this browser')
       : job?.origin?.kind === 'designFile'
         ? // It may have been written by a script or an AI, which nobody has checked against the real part.
-          'Imported · check before cutting'
+          translate('Imported · check before cutting')
         : undefined;
-  const noteDetail = job?.origin?.kind === 'designFile' ? `Imported from ${job.origin.fileName}. Check it before cutting.` : undefined;
+  const noteDetail =
+    job?.origin?.kind === 'designFile'
+      ? translate('Imported from {{value1}}. Check it before cutting.', { value1: job.origin.fileName })
+      : undefined;
   return (
     <>
       <header
@@ -71,8 +75,13 @@ export function CamJobBar({
         {/* A fixed width, for the tools to start at the same place whatever the name and board. */}
         <div className="flex w-full min-w-0 flex-col leading-tight md:w-28 min-[1680px]:w-44" title={job?.fileName}>
           <span className="flex min-w-0 gap-1 text-sm text-muted-foreground">
-            {title ?? <span className="truncate">{job?.name ?? 'CAM job'}</span>}
-            {board && <span className="shrink-0 whitespace-nowrap text-foreground">· Board {board}</span>}
+            {title ?? <span className="truncate">{job?.name ?? translate('CAM job')}</span>}
+            {board && (
+              <span className="shrink-0 whitespace-nowrap text-foreground">
+                {translate('· Board ')}
+                {board}
+              </span>
+            )}
           </span>
           {note && (
             <span className="truncate text-[11px] text-muted-foreground" title={noteDetail}>
@@ -104,13 +113,14 @@ function CamJobNotices({ jobId }: { jobId: string }) {
   return (
     <>
       {job?.design && hasDesignDraft(job) && (
-        <span className="px-3 text-xs text-amber-700 dark:text-amber-300">Design draft · CAM uses finished sketch</span>
+        <span className="px-3 text-xs text-amber-700 dark:text-amber-300">{translate('Design draft · CAM uses finished sketch')}</span>
       )}
       {!!job?.plan?.leaveOut?.length && (
         <div role="status" className="flex basis-full flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <p>
-            Excluded from CAM: {job.plan.leaveOut.map(id => job.parts.find(part => part.id === id.split('#')[0])?.name ?? id).join(', ')}.
-            These parts stay excluded until included again.
+            {translate('Excluded from CAM: ')}
+            {job.plan.leaveOut.map(id => job.parts.find(part => part.id === id.split('#')[0])?.name ?? id).join(', ')}
+            {translate('. These parts stay excluded until included again. ')}
           </p>
           <button
             type="button"
@@ -119,14 +129,16 @@ function CamJobNotices({ jobId }: { jobId: string }) {
             onClick={() => {
               save.mutate({ ...job, plan: { ...job.plan!, leaveOut: [] } });
             }}>
-            Include again
+            {translate('Include again ')}
           </button>
         </div>
       )}
       {!!job?.design?.holeChoiceIssues?.length && (
         <div role="alert" className="flex basis-full flex-wrap items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
           <span>
-            A hole with CAM settings was removed or replaced. Its settings are retained for Undo and are not applied to another hole.
+            {translate(
+              'A hole with CAM settings was removed or replaced. Its settings are retained for Undo and are not applied to another hole. '
+            )}
           </span>
           <button
             type="button"
@@ -140,7 +152,7 @@ function CamJobNotices({ jobId }: { jobId: string }) {
                 design: { ...job.design!, holeChoiceIssues: undefined },
               });
             }}>
-            Discard removed hole settings
+            {translate('Discard removed hole settings ')}
           </button>
         </div>
       )}
@@ -173,7 +185,7 @@ function AtTheMachine({
         const to = openAtMachine(jobId, board);
         void navigate(to === '/start' ? { to, search: { for: 'cam', job: jobId, board } } : { to });
       }}>
-      At the machine
+      {translate('At the machine ')}
     </button>
   );
 }

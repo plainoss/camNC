@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import GCodeToolpath, { Modal, Vector3D } from 'gcode-toolpath';
 import { Box3, Vector3 } from 'three';
 
@@ -77,7 +78,7 @@ function withoutMachineMoves(gcode: string) {
       .join('');
     // A G53 block can inherit its motion mode. Keep even a block with only coordinates nonblank, since the
     // interpreter drops blank lines and its callback indices must still match sourceLines.
-    return `(G53 machine coordinates omitted) ${filtered}`;
+    return translate('(G53 machine coordinates omitted) {{value1}}', { value1: filtered });
   });
 }
 
@@ -173,7 +174,7 @@ export function generateArcPoints(
     } else if (plane === 'G19') {
       vertex = new Vector3(z, x, y); // YZ plane
     } else {
-      throw new Error(`Unsupported plane: ${plane}`);
+      throw new Error(translate('Unsupported plane: {{plane}}', { plane: plane }));
     }
 
     points.push(vertex);

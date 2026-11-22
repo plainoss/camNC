@@ -1,10 +1,11 @@
+import { t as translate } from '@wbcnc/i18n';
 import { standaloneSketchPoints, type CadDocument, type CadSketch, type CadSketchSolveStatus, type CadSolveResult } from '@wbcnc/cad';
 
 export function constraintColorNotice(status?: CadSketchSolveStatus): string | undefined {
   if (status?.status !== 'solved' || status.entityAnalysis?.complete !== false) return;
   return status.entityAnalysis.limitedBy === 'engine-reset'
-    ? 'Sketch solved; constraint color analysis reset'
-    : 'Sketch solved; some constraint colors unavailable';
+    ? translate('Sketch solved; constraint color analysis reset')
+    : translate('Sketch solved; some constraint colors unavailable');
 }
 
 /**
@@ -39,11 +40,11 @@ export function sketchFeedback(result: CadSolveResult) {
   const free = profiles.reduce((sum, s) => sum + s.dof, 0);
   const empty = isEmptyDesign(result.document);
   const status = issues.some(issue => issue.code === 'solver-restarted')
-    ? 'Sketch solver reset'
+    ? translate('Sketch solver reset')
     : result.status === 'conflict'
-      ? 'Conflicting constraints'
+      ? translate('Conflicting constraints')
       : result.status === 'invalid' && !inProgress
-        ? 'Sketch needs attention'
+        ? translate('Sketch needs attention')
         : sketchDofStatus(free, empty);
   return {
     status,
@@ -78,7 +79,7 @@ function brokenFeatures(result: CadSolveResult, issues: CadSolveResult['diagnost
   const unpicked = new Set(issues.flatMap(d => (d.partId && d.code === 'region-missing' ? [d.partId] : [])));
   for (const sketch of profiles)
     if (unbuilt.has(sketch.partId) && !unpicked.has(sketch.partId) && sketch.dof > 0)
-      broken[`${sketch.partId}:sketch`] = 'is not fully defined';
+      broken[`${sketch.partId}:sketch`] = translate('is not fully defined');
   return broken;
 }
 
@@ -107,5 +108,5 @@ export function isEmptyDesign(document: Pick<CadDocument, 'parts'>): boolean {
 }
 
 export function sketchDofStatus(dof: number, empty: boolean): string {
-  return empty ? 'Empty sketch' : dof ? `${dof} ${dof === 1 ? 'degree' : 'degrees'} of freedom` : 'Fully constrained';
+  return empty ? translate('Empty sketch') : dof ? translate('degreesOfFreedom', { count: dof }) : translate('Fully constrained');
 }

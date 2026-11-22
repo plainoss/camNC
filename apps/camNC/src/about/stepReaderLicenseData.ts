@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import notice from '../../../../packages/cam/THIRD_PARTY_NOTICES.md?raw';
 import readerLgpl from '../../../../packages/cam/licenses/occt-import-js-LGPL-2.1.txt?raw';
 import occtLgpl from '../../../../packages/cam/licenses/OCCT-LGPL-2.1.txt?raw';
@@ -28,7 +29,7 @@ export const stepReaderLicenses = [
   {
     id: 'occt-import-js',
     name: `occt-import-js ${manifest.version}`,
-    description: 'JavaScript and WebAssembly STEP reader, by Viktor Kovács.',
+    description: translate('JavaScript and WebAssembly STEP reader, by Viktor Kovács.'),
     license: 'LGPL 2.1',
     text: readerLgpl,
     url: `${base}occt-import-js-LGPL-2.1.txt`,
@@ -36,7 +37,7 @@ export const stepReaderLicenses = [
   {
     id: 'occt',
     name: `Open CASCADE Technology ${manifest.occtVersion}`,
-    description: 'Geometry library the STEP reader is built from. Copyright © Open CASCADE SAS and contributors.',
+    description: translate('Geometry library the STEP reader is built from. Copyright © Open CASCADE SAS and contributors.'),
     license: 'LGPL 2.1',
     text: occtLgpl,
     url: `${base}OCCT-LGPL-2.1.txt`,
@@ -44,7 +45,7 @@ export const stepReaderLicenses = [
   {
     id: 'occt-exception',
     name: 'Open CASCADE exception 1.0',
-    description: 'The additional permission Open CASCADE Technology grants with its LGPL 2.1 license.',
+    description: translate('The additional permission Open CASCADE Technology grants with its LGPL 2.1 license.'),
     license: 'Exception to LGPL 2.1',
     text: occtException,
     url: `${base}OCCT-LGPL-Exception-1.0.txt`,
@@ -52,7 +53,7 @@ export const stepReaderLicenses = [
   {
     id: 'emscripten-step',
     name: 'Emscripten 3.1.69',
-    description: 'WebAssembly build runtime of the STEP reader. Copyright © 2010–2014 Emscripten authors.',
+    description: translate('WebAssembly build runtime of the STEP reader. Copyright © 2010–2014 Emscripten authors.'),
     license: 'MIT / University of Illinois NCSA',
     text: emscripten,
     url: `${base}Emscripten-3.1.69-LICENSE.txt`,

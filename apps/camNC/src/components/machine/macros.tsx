@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { errorText, runMacro } from '@/lib/machine/jobs';
 import { kDefaultMacros, Macro, MacroKind, parseWebUiMacros, splitMacros } from '@/lib/machine/macros';
@@ -21,8 +22,8 @@ import { useState } from 'react';
 
 const kKindLabels: Record<MacroKind, string> = {
   gcode: 'G-code / commands',
-  sd: 'Run file from SD card',
-  localfs: 'Run file from controller flash',
+  sd: translate('Run file from SD card'),
+  localfs: translate('Run file from controller flash'),
 };
 
 function MacroEditor({ macro, onSave, onClose }: { macro: Macro; onSave: (macro: Macro) => void; onClose: () => void }) {
@@ -38,15 +39,15 @@ function MacroEditor({ macro, onSave, onClose }: { macro: Macro; onSave: (macro:
             onSave({ ...draft, name: draft.name.trim() });
           }}>
           <DialogHeader>
-            <DialogTitle>{macro.name ? 'Edit macro' : 'New macro'}</DialogTitle>
-            <DialogDescription>Macros run line by line and stop at the first error.</DialogDescription>
+            <DialogTitle>{macro.name ? translate('Edit macro') : translate('New macro')}</DialogTitle>
+            <DialogDescription>{translate('Macros run line by line and stop at the first error.')}</DialogDescription>
           </DialogHeader>
           <Label className="flex flex-col items-start gap-1">
-            Name
+            {translate('Name ')}
             <Input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} autoFocus />
           </Label>
           <Label className="flex flex-col items-start gap-1">
-            Type
+            {translate('Type ')}
             <Select value={draft.kind} onValueChange={kind => setDraft({ ...draft, kind: kind as MacroKind })}>
               <SelectTrigger className="w-full">
                 <SelectValue />
@@ -61,7 +62,7 @@ function MacroEditor({ macro, onSave, onClose }: { macro: Macro; onSave: (macro:
             </Select>
           </Label>
           <Label className="flex flex-col items-start gap-1">
-            {draft.kind === 'gcode' ? 'Commands (one per line)' : 'File path'}
+            {draft.kind === 'gcode' ? translate('Commands (one per line)') : translate('File path')}
             {draft.kind === 'gcode' ? (
               <Textarea
                 className="font-mono"
@@ -76,9 +77,9 @@ function MacroEditor({ macro, onSave, onClose }: { macro: Macro; onSave: (macro:
           </Label>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {translate('Cancel ')}
             </Button>
-            <Button type="submit">Save</Button>
+            <Button type="submit">{translate('Save')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -95,14 +96,14 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
     try {
       const imported = parseWebUiMacros(text);
       if (!imported.length) {
-        toast.error('No macros found');
+        toast.error(translate('No macros found'));
         return;
       }
       setMacros([...macros, ...imported]);
-      toast.success(`Imported ${imported.length} macro${imported.length === 1 ? '' : 's'}`);
+      toast.success(translate('importedMacroCount', { count: imported.length }));
       onClose();
     } catch (err) {
-      toast.error('Could not read preferences.json', { description: errorText(err) });
+      toast.error(translate('Could not read preferences.json'), { description: errorText(err) });
     }
   }
 
@@ -110,7 +111,7 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
     try {
       importJson(await getCncApi().readLocalFile('/preferences.json'));
     } catch (err) {
-      toast.error('Could not read /preferences.json from the controller', { description: errorText(err) });
+      toast.error(translate('Could not read /preferences.json from the controller'), { description: errorText(err) });
     }
   }
 
@@ -118,21 +119,24 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
     <Dialog open onOpenChange={open => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Import WebUI macros</DialogTitle>
+          <DialogTitle>{translate('Import WebUI macros')}</DialogTitle>
           <DialogDescription>
-            The FluidNC WebUI stores its macros in <code>preferences.json</code> on the controller. Read it directly, or paste its contents.
+            {translate('The FluidNC WebUI stores its macros in ')}
+            <code>{translate('preferences.json')}</code>
+            {translate(' on the controller. Read it directly, or paste its contents. ')}
           </DialogDescription>
         </DialogHeader>
         <Button variant="outline" disabled={!getCncApi().isConnected.value} onClick={readFromController}>
-          <Download /> Read from controller
+          <Download />
+          {translate(' Read from controller ')}
         </Button>
         <Textarea rows={6} className="font-mono text-xs" placeholder="{ … }" value={json} onChange={e => setJson(e.target.value)} />
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {translate('Cancel ')}
           </Button>
           <Button disabled={!json.trim()} onClick={() => importJson(json)}>
-            Import pasted JSON
+            {translate('Import pasted JSON ')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -156,20 +160,26 @@ export function MacroButtons({ onEdit }: { onEdit: () => void }) {
           variant="secondary"
           className="min-w-0 shrink px-1.5 text-xs"
           disabled={!idle}
-          title={`${macro.name}\n${macro.content}`}
+          title={translate('{{value1}}\n{{value2}}', { value1: macro.name, value2: macro.content })}
           onClick={() => runMacro(macro)}>
           <span className="truncate">{macro.name}</span>
         </Button>
       ))}
       {macros.length === 0 && (
         <Button size="sm" variant="ghost" className="px-2 text-muted-foreground" onClick={onEdit}>
-          <Plus /> Add macro
+          <Plus />
+          {translate(' Add macro ')}
         </Button>
       )}
       {macros.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost" className="ml-auto size-8 shrink-0" aria-label="More macros" title="More macros">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="ml-auto size-8 shrink-0"
+              aria-label={translate('More macros')}
+              title={translate('More macros')}>
               <ChevronDown />
             </Button>
           </DropdownMenuTrigger>
@@ -181,7 +191,8 @@ export function MacroButtons({ onEdit }: { onEdit: () => void }) {
             ))}
             {more.length > 0 && <DropdownMenuSeparator />}
             <DropdownMenuItem onClick={onEdit}>
-              <Pencil /> Edit macros
+              <Pencil />
+              {translate(' Edit macros ')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -218,13 +229,17 @@ export function MacroManager() {
             <li key={macro.id} className="flex flex-row items-center gap-1 py-1">
               <span className="flex-1 truncate">{macro.name}</span>
               <span className="text-xs text-muted-foreground">{macro.kind === 'gcode' ? '' : macro.kind.toUpperCase()}</span>
-              <Button size="icon" variant="ghost" title="Move up" disabled={i === 0} onClick={() => move(i, -1)}>
+              <Button size="icon" variant="ghost" title={translate('Move up')} disabled={i === 0} onClick={() => move(i, -1)}>
                 ↑
               </Button>
-              <Button size="icon" variant="ghost" title="Edit" onClick={() => setEditing(macro)}>
+              <Button size="icon" variant="ghost" title={translate('Edit')} onClick={() => setEditing(macro)}>
                 <Pencil />
               </Button>
-              <Button size="icon" variant="ghost" title="Delete" onClick={() => setMacros(macros.filter(m => m.id !== macro.id))}>
+              <Button
+                size="icon"
+                variant="ghost"
+                title={translate('Delete')}
+                onClick={() => setMacros(macros.filter(m => m.id !== macro.id))}>
                 <Trash2 />
               </Button>
             </li>
@@ -232,13 +247,16 @@ export function MacroManager() {
         </ul>
         <div className="flex flex-row flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => setEditing({ id: crypto.randomUUID(), name: '', kind: 'gcode', content: '' })}>
-            <Plus /> New macro
+            <Plus />
+            {translate(' New macro ')}
           </Button>
           <Button size="sm" variant="outline" onClick={() => setImporting(true)}>
-            <Download /> Import from WebUI
+            <Download />
+            {translate(' Import from WebUI ')}
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setMacros(kDefaultMacros)}>
-            <RotateCcw /> Reset to LowRider defaults
+            <RotateCcw />
+            {translate(' Reset to LowRider defaults ')}
           </Button>
         </div>
       </section>

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadDocument } from '@wbcnc/cad';
 import { studioCutParts } from '../cad/studioGeometry';
 import { solveCadDocument } from '../cad/solveCad';
@@ -18,13 +19,15 @@ export async function saveDesignDraft(
   document: CadDocument,
   expectedDraft: CadDocument | undefined = base.design?.draft
 ): Promise<CamJobV1> {
-  if (!base.design || document.id !== base.design.draft.id) throw new Error('This design is no longer open.');
+  if (!base.design || document.id !== base.design.draft.id) throw new Error(translate('This design is no longer open.'));
   const saved = await updateJobForModel(base, current => {
     if (!current.design || !same(current.design.draft, expectedDraft)) return null;
     return { ...current, name: document.name, fileName: document.name, design: { ...current.design, draft: document } };
   });
   if (!saved) {
-    const error = new Error('This design changed in another view. Your local sketch is kept; save a copy or use the saved sketch.');
+    const error = new Error(
+      translate('This design changed in another view. Your local sketch is kept; save a copy or use the saved sketch.')
+    );
     error.name = 'CadDraftConflict';
     throw error;
   }
@@ -33,11 +36,12 @@ export async function saveDesignDraft(
 
 /** Accept a valid sketch as a new CAM revision, preserving settings and references by permanent ID. */
 export async function acceptDesign(base: CamJobV1, document: CadDocument): Promise<CamJobV1> {
-  if (!base.design) throw new Error('This job is not a native design.');
+  if (!base.design) throw new Error(translate('This job is not a native design.'));
   const solved = await solveCadDocument(document);
   if (solved.status !== 'solved' || !studioCutParts(solved).length)
     throw new Error(
-      solved.diagnostics.find(d => d.severity === 'error')?.message || 'Draw at least one closed part before continuing to Boards.'
+      solved.diagnostics.find(d => d.severity === 'error')?.message ||
+        translate('Draw at least one closed part before continuing to Boards.')
     );
   const before = base.design.accepted ? await solveCadDocument(base.design.accepted) : null;
   // Mirrored copies are parts of their own to CAM, and plain copies add to a part's quantity.
@@ -86,7 +90,7 @@ export async function acceptDesign(base: CamJobV1, document: CadDocument): Promi
       },
     };
   });
-  if (!saved) throw new Error('This design changed while it was being solved. Reopen it before accepting changes.');
+  if (!saved) throw new Error(translate('This design changed while it was being solved. Reopen it before accepting changes.'));
   return saved;
 }
 

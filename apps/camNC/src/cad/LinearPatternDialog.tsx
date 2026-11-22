@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   cadCuts,
   designStepLabel,
@@ -97,8 +98,10 @@ export function LinearPatternDialog({
     seen.current = pick.seq;
     if (active !== 'entities') return;
     const picked = document.parts.find(candidate => candidate.id === pick.partId);
-    if (!takes(type, picked)) return setError(type === 'feature' ? 'Pick an Extrude that removes, in the feature list.' : 'Pick a part.');
-    if (picked!.pattern) return setError(`${picked!.name} has a pattern already. Open it from the feature list to change it.`);
+    if (!takes(type, picked))
+      return setError(type === 'feature' ? translate('Pick an Extrude that removes, in the feature list.') : 'Pick a part.');
+    if (picked!.pattern)
+      return setError(translate('{{value1}} has a pattern already. Open it from the feature list to change it.', { value1: picked!.name }));
     setTarget(picked!.id);
     setError(null);
   }, [partPicks?.pick, active, type, document.parts, existing]);
@@ -107,7 +110,7 @@ export function LinearPatternDialog({
     setActive(box);
     pickPoint?.(pick => {
       setActive('entities');
-      if (!pick.edge) return setError('Click close to an edge of a part.');
+      if (!pick.edge) return setError(translate('Click close to an edge of a part.'));
       const along = pick.edge.b.map((value, axis) => value - pick.edge!.a[axis]!) as Vec3;
       const main = along.reduce((best, value, axis) => (Math.abs(value) > Math.abs(along[best]!) ? axis : best), 0);
       const length = Math.hypot(...along) * Math.sign(along[main]!);
@@ -159,7 +162,7 @@ export function LinearPatternDialog({
         setSkipped(list =>
           list.some(([i, j]) => i === at[0] && j === at[1]) ? list.filter(([i, j]) => i !== at[0] || j !== at[1]) : [...list, at]
         );
-      else setError('Click one of the pattern’s instances to skip it.');
+      else setError(translate('Click one of the pattern’s instances to skip it.'));
       pickSkips();
     });
   };
@@ -168,14 +171,14 @@ export function LinearPatternDialog({
     const count = parseCadValue(countText, { unit: 'scalar', variables });
     if ('error' in distance) return { error: distance.error };
     if ('error' in count) return { error: count.error };
-    if (!Number.isInteger(count.value) || count.value < 1) return { error: 'Use a whole number of instances, at least 1.' };
+    if (!Number.isInteger(count.value) || count.value < 1) return { error: translate('Use a whole number of instances, at least 1.') };
     let second: Grid | undefined;
     if (secondOn && secondVector) {
       const along = parseCadValue(secondDistanceText, { unit: 'mm', variables });
       const rows = parseCadValue(secondCountText, { unit: 'scalar', variables });
       if ('error' in along) return { error: along.error };
       if ('error' in rows) return { error: rows.error };
-      if (!Number.isInteger(rows.value) || rows.value < 1) return { error: 'Use a whole number of instances, at least 1.' };
+      if (!Number.isInteger(rows.value) || rows.value < 1) return { error: translate('Use a whole number of instances, at least 1.') };
       second = {
         vector: secondVector,
         count: rows.value,
@@ -185,9 +188,9 @@ export function LinearPatternDialog({
         ...(secondCentered && { centered: true as const }),
       };
     }
-    if (count.value * (second?.count ?? 1) < 2) return { error: 'Use at least two instances.' };
+    if (count.value * (second?.count ?? 1) < 2) return { error: translate('Use at least two instances.') };
     // As many as a saved design can hold: each instance is its own copy to lay out.
-    if (count.value * (second?.count ?? 1) > 200) return { error: 'Use at most 200 instances in all.' };
+    if (count.value * (second?.count ?? 1) > 200) return { error: translate('Use at most 200 instances in all.') };
     // Skipped positions the grid no longer has, or the original's, are left out.
     const seed = [centered ? Math.floor((count.value - 1) / 2) : 0, second?.centered ? Math.floor(((second?.count ?? 1) - 1) / 2) : 0];
     const kept = skipped.filter(([i, j]) => i < count.value && j < (second?.count ?? 1) && !(i === seed[0] && j === seed[1]));
@@ -228,10 +231,10 @@ export function LinearPatternDialog({
   const accept = () => {
     const problem = !target
       ? type === 'feature'
-        ? 'Pick the feature to pattern in the feature list.'
-        : 'Pick the part to pattern.'
+        ? translate('Pick the feature to pattern in the feature list.')
+        : translate('Pick the part to pattern.')
       : !vector
-        ? 'Pick an edge for the direction.'
+        ? translate('Pick an edge for the direction.')
         : 'error' in settings
           ? settings.error
           : null;
@@ -242,19 +245,24 @@ export function LinearPatternDialog({
       const own = resolved.filter(cut => !cut.id.includes('~')).length;
       const instances = settings.pattern.count * (settings.pattern.second?.count ?? 1) - (settings.pattern.skipped?.length ?? 0);
       if (resolved.length < own * instances)
-        return setError('Some instances would fall off the board or out of its face. Change the distance, count or direction.');
+        return setError(translate('Some instances would fall off the board or out of its face. Change the distance, count or direction.'));
     }
     onChange(() => draft);
     onOk();
   };
   const picked = target ? document.parts.find(candidate => candidate.id === target) : undefined;
   const name = picked && (picked.remove ? (designStepLabel(document, `${picked.id}:extrude`) ?? picked.name) : picked.name);
-  const label = type === 'feature' ? 'Features to pattern' : 'Entities to pattern';
-  const unsupported = 'Not available yet';
+  const label = type === 'feature' ? translate('Features to pattern') : translate('Entities to pattern');
+  const unsupported = translate('Not available yet');
   return (
-    <FeatureDialog title="Linear pattern" onOk={accept} onCancel={onCancel} acceptFromPartsList className="cad-part-cut-dialog">
+    <FeatureDialog
+      title={translate('Linear pattern')}
+      onOk={accept}
+      onCancel={onCancel}
+      acceptFromPartsList
+      className="cad-part-cut-dialog">
       <label className="cad-number-field">
-        Pattern type
+        {translate('Pattern type ')}
         <select
           value={type}
           disabled={!!existing}
@@ -263,12 +271,12 @@ export function LinearPatternDialog({
             setTarget(null);
             setActive('entities');
           }}>
-          <option value="part">Part pattern</option>
-          <option value="feature">Feature pattern</option>
+          <option value="part">{translate('Part pattern')}</option>
+          <option value="feature">{translate('Feature pattern')}</option>
         </select>
       </label>
       {type === 'part' && (
-        <div className="cad-feature-tabs" role="tablist" aria-label="Pattern operation">
+        <div className="cad-feature-tabs" role="tablist" aria-label={translate('Pattern operation')}>
           {['New', 'Add', 'Remove', 'Intersect'].map(choice => (
             <button
               key={choice}
@@ -293,53 +301,56 @@ export function LinearPatternDialog({
         }}>
         <small>{label}</small>
         <span className={name ? undefined : 'cad-feature-hint'}>
-          {name ?? (type === 'feature' ? 'Click a feature in the feature list' : 'Click a part in the view or the parts list')}
+          {name ??
+            (type === 'feature'
+              ? translate('Click a feature in the feature list')
+              : translate('Click a part in the view or the parts list'))}
         </span>
       </div>
       <div
         className="cad-feature-selection cad-part-cut-box"
         role="group"
-        aria-label="Direction"
+        aria-label={translate('Direction')}
         data-active={active === 'direction' || undefined}
         onClick={() => pickDirection()}>
-        <small>Direction</small>
+        <small>{translate('Direction')}</small>
         <span className={vector ? undefined : 'cad-feature-hint'}>
           {vector
-            ? `Along an edge (${vector.map(value => +value.toFixed(3)).join(', ')})`
+            ? translate('Along an edge ({{value1}})', { value1: vector.map(value => +value.toFixed(3)).join(', ') })
             : active === 'direction'
-              ? 'Click an edge'
-              : 'Pick an edge'}
+              ? translate('Click an edge')
+              : translate('Pick an edge')}
         </span>
       </div>
       {vector && (
         <button type="button" onClick={() => setVector(vector.map(value => -value || 0) as Vec3)}>
-          Flip direction
+          {translate('Flip direction ')}
         </button>
       )}
       <label className="cad-part-cut-clearance">
-        Distance
+        {translate('Distance ')}
         <CadValueInput
           bare
           value={distanceText}
-          aria-label="Distance"
+          aria-label={translate('Distance')}
           spellCheck={false}
           onChange={event => setDistanceText(event.target.value)}
         />
       </label>
       <label className="cad-part-cut-clearance">
-        Instance count
+        {translate('Instance count ')}
         <CadValueInput
           bare
           unit="scalar"
           value={countText}
-          aria-label="Instance count"
+          aria-label={translate('Instance count')}
           spellCheck={false}
           onChange={event => setCountText(event.target.value)}
         />
       </label>
       <label>
         <input type="checkbox" checked={centered} disabled={type !== 'feature'} onChange={event => setCentered(event.target.checked)} />
-        Centered
+        {translate('Centered ')}
       </label>
       <label title={type === 'feature' ? undefined : unsupported}>
         <input
@@ -352,42 +363,42 @@ export function LinearPatternDialog({
             else pickPoint?.(null);
           }}
         />
-        Second direction
+        {translate('Second direction ')}
       </label>
       {secondOn && (
-        <div className="cad-part-pattern-second" role="group" aria-label="Second direction">
+        <div className="cad-part-pattern-second" role="group" aria-label={translate('Second direction')}>
           <div
             className="cad-feature-selection cad-part-cut-box"
             role="group"
-            aria-label="Second direction edge"
+            aria-label={translate('Second direction edge')}
             data-active={active === 'second' || undefined}
             onClick={() => pickDirection('second')}>
-            <small>Direction</small>
+            <small>{translate('Direction')}</small>
             <span className={secondVector ? undefined : 'cad-feature-hint'}>
               {secondVector
-                ? `Along an edge (${secondVector.map(value => +value.toFixed(3)).join(', ')})`
+                ? translate('Along an edge ({{value1}})', { value1: secondVector.map(value => +value.toFixed(3)).join(', ') })
                 : active === 'second'
-                  ? 'Click an edge'
-                  : 'Pick an edge'}
+                  ? translate('Click an edge')
+                  : translate('Pick an edge')}
             </span>
           </div>
           <label className="cad-part-cut-clearance">
-            Distance
+            {translate('Distance ')}
             <CadValueInput
               bare
               value={secondDistanceText}
-              aria-label="Second distance"
+              aria-label={translate('Second distance')}
               spellCheck={false}
               onChange={event => setSecondDistanceText(event.target.value)}
             />
           </label>
           <label className="cad-part-cut-clearance">
-            Instance count
+            {translate('Instance count ')}
             <CadValueInput
               bare
               unit="scalar"
               value={secondCountText}
-              aria-label="Second instance count"
+              aria-label={translate('Second instance count')}
               spellCheck={false}
               onChange={event => setSecondCountText(event.target.value)}
             />
@@ -395,18 +406,18 @@ export function LinearPatternDialog({
           <label>
             <input
               type="checkbox"
-              aria-label="Centered second direction"
+              aria-label={translate('Centered second direction')}
               checked={secondCentered}
               onChange={event => setSecondCentered(event.target.checked)}
             />
-            Centered
+            {translate('Centered ')}
           </label>
         </div>
       )}
       {type === 'feature' && (
         <label title={unsupported}>
           <input type="checkbox" disabled />
-          Reapply features
+          {translate('Reapply features ')}
         </label>
       )}
       <label title={type === 'feature' ? undefined : unsupported}>
@@ -420,16 +431,16 @@ export function LinearPatternDialog({
             else pickPoint?.(null);
           }}
         />
-        Skip instances
+        {translate('Skip instances ')}
       </label>
       {skipOn && (
         <div
           className="cad-feature-selection cad-part-cut-box"
           role="group"
-          aria-label="Instances to skip"
+          aria-label={translate('Instances to skip')}
           data-active={active === 'skip' || undefined}
           onClick={pickSkips}>
-          <small>Instances to skip</small>
+          <small>{translate('Instances to skip')}</small>
           {skipped.length ? (
             <ul>
               {skipped.map(([i, j]) => (
@@ -437,7 +448,7 @@ export function LinearPatternDialog({
                   ({i}, {j})
                   <button
                     type="button"
-                    aria-label={`Bring back instance (${i}, ${j})`}
+                    aria-label={translate('Bring back instance ({{i}}, {{j}})', { i: i, j: j })}
                     onClick={event => {
                       event.stopPropagation();
                       setSkipped(list => list.filter(([a, b]) => a !== i || b !== j));
@@ -448,7 +459,7 @@ export function LinearPatternDialog({
               ))}
             </ul>
           ) : (
-            <span className="cad-feature-hint">Click the instances to skip in the view</span>
+            <span className="cad-feature-hint">{translate('Click the instances to skip in the view')}</span>
           )}
         </div>
       )}

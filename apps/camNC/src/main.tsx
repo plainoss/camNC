@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { DemoGate } from '@/lib/demo/DemoGate';
 import { getRehearsalId, exitDemo, isDemoMode } from '@/lib/demo/demo-mode';
 import { initDesktopApp, isDesktopApp } from '@/lib/desktop/desktop';
@@ -10,12 +11,14 @@ import { getCncApi } from './lib/fluidnc/machine';
 import { createRouter } from './router';
 import './style.css';
 
+document.title = translate('camNC – Live Camera + CNC Toolpath Overlay');
+
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 // Desktop and simulated sessions work locally without loading account services.
 // demo-mode resolves keyless loopback previews before any saved settings hydrate.
 if (!PUBLISHABLE_KEY && !isDesktopApp() && !isDemoMode()) {
-  throw new Error('Add your Clerk Publishable Key to the .env file');
+  throw new Error(translate('Add your Clerk Publishable Key to the .env file'));
 }
 
 setKeepAliveTime(60_000);

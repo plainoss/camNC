@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useId, useState } from 'react';
 import { sketchExportCurves, sketchToDxf, sketchToSvg, type CadDocument, type CadLengthUnit, type CadSketch } from '@wbcnc/cad';
 import { Button } from '@wbcnc/ui/components/button';
@@ -23,9 +24,9 @@ export type ExportTarget =
 
 type Format = 'dxf' | 'svg' | 'step';
 const formats: Record<Format, { label: string; type: string }> = {
-  dxf: { label: 'DXF', type: 'application/dxf' },
-  svg: { label: 'SVG', type: 'image/svg+xml' },
-  step: { label: 'STEP', type: 'model/step' },
+  dxf: { label: translate('DXF'), type: 'application/dxf' },
+  svg: { label: translate('SVG'), type: 'image/svg+xml' },
+  step: { label: translate('STEP'), type: 'model/step' },
 };
 
 /** The one Export dialog: file name, format, unit and the options that format has, then Download. */
@@ -70,7 +71,7 @@ export function ExportDialog({
       if (!result.parts.length)
         return setProblem(
           !target.leftOutByRollback
-            ? why || 'There are no parts to export.'
+            ? why || translate('There are no parts to export.')
             : target.only
               ? 'This part is past the rollback bar, so the view leaves it out. Roll to end to export it.'
               : 'No part is built before the rollback bar, so there are none to export. Roll to end to export them.'
@@ -78,7 +79,7 @@ export function ExportDialog({
       // A file missing parts is only written once the person has seen which.
       if (why && !confirmedPartial) {
         setConfirmedPartial(true);
-        return setProblem(`These are left out: ${why}`);
+        return setProblem(translate('These are left out: {{value1}}', { value1: why }));
       }
       text = result.text;
     } else if (empty) return;
@@ -95,15 +96,16 @@ export function ExportDialog({
     <Dialog open={!!target} onOpenChange={open => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{parts ? 'Export parts' : 'Export sketch'}</DialogTitle>
+          <DialogTitle>{parts ? translate('Export parts') : translate('Export sketch')}</DialogTitle>
           <DialogDescription>
             {!parts
-              ? 'Download the sketch’s curves at full size, in its own plane.'
-              : `${
-                  target.only
-                    ? 'Download this part as a solid, where it is in the studio.'
-                    : 'Download every shown part as a solid, where it is in the studio.'
-                }${target.rolledBack ? ' Like the view, it stops at the rollback bar: what’s past it is left out.' : ''}`}
+              ? translate('Download the sketch’s curves at full size, in its own plane.')
+              : translate('{{value1}}{{value2}}', {
+                  value1: target.only
+                    ? translate('Download this part as a solid, where it is in the studio.')
+                    : translate('Download every shown part as a solid, where it is in the studio.'),
+                  value2: target.rolledBack ? translate(' Like the view, it stops at the rollback bar: what’s past it is left out.') : '',
+                })}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -113,10 +115,10 @@ export function ExportDialog({
             download();
           }}>
           <label className="grid gap-1">
-            File name
+            {translate('File name ')}
             <span className="flex items-center gap-1">
               <input
-                aria-label="File name"
+                aria-label={translate('File name')}
                 className="min-w-0 flex-1 rounded border bg-background px-2 py-1"
                 required
                 value={name}
@@ -126,7 +128,7 @@ export function ExportDialog({
             </span>
           </label>
           <label className="grid gap-1">
-            Format
+            {translate('Format ')}
             <select
               className="rounded border bg-background px-2 py-1"
               value={format}
@@ -139,28 +141,28 @@ export function ExportDialog({
             </select>
           </label>
           <label className="grid gap-1">
-            Units
+            {translate('Units ')}
             <select
               className="rounded border bg-background px-2 py-1"
               value={unit}
               onChange={event => setUnit(event.target.value as CadLengthUnit)}>
-              <option value="mm">Millimeters (mm)</option>
-              <option value="cm">Centimeters (cm)</option>
-              <option value="m">Meters (m)</option>
-              <option value="in">Inches (in)</option>
-              <option value="ft">Feet (ft)</option>
+              <option value="mm">{translate('Millimeters (mm)')}</option>
+              <option value="cm">{translate('Centimeters (cm)')}</option>
+              <option value="m">{translate('Meters (m)')}</option>
+              <option value="in">{translate('Inches (in)')}</option>
+              <option value="ft">{translate('Feet (ft)')}</option>
             </select>
           </label>
           {!parts && (
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={construction} onChange={event => setConstruction(event.target.checked)} />
-              Include construction geometry
+              {translate('Include construction geometry ')}
             </label>
           )}
           {format === 'dxf' && (
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={polylines} onChange={event => setPolylines(event.target.checked)} />
-              Export splines as polylines
+              {translate('Export splines as polylines ')}
             </label>
           )}
           {(problem ?? empty) && (
@@ -169,7 +171,7 @@ export function ExportDialog({
             </p>
           )}
           <Button type="submit" disabled={!!empty} aria-describedby={(problem ?? empty) ? problemId : undefined}>
-            {confirmedPartial ? 'Download without them' : 'Download'}
+            {confirmedPartial ? translate('Download without them') : translate('Download')}
           </Button>
         </form>
       </DialogContent>
@@ -182,5 +184,5 @@ function emptySketchReason(sketch: CadSketch, construction: boolean): string | n
   if (sketchExportCurves(sketch, construction).length) return null;
   return sketchExportCurves(sketch, true).length
     ? 'Every curve in this sketch is construction geometry. Turn on Include construction geometry to export it.'
-    : 'This sketch has no curves to export. Draw some in it first.';
+    : translate('This sketch has no curves to export. Draw some in it first.');
 }

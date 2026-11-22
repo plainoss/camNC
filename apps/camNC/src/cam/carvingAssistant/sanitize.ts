@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 const namespace = 'http://www.w3.org/2000/svg';
 const elements = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line']);
 const geometry = new Set(['x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'width', 'height', 'stroke-width']);
@@ -15,9 +16,10 @@ export function sanitizeCarvingSvg(input: string): string {
   // Models annotate parts with comments; drop them before the declaration check. Comment nodes are never copied.
   const source = input.length > 180_000 ? input : input.replace(/<!--[^]*?-->/g, '');
   if (source.length > 180_000 || /<!|<\?/.test(source))
-    throw new Error('Artwork must be a small, self-contained SVG without declarations.');
+    throw new Error(translate('Artwork must be a small, self-contained SVG without declarations.'));
   const parsed = new DOMParser().parseFromString(source, 'image/svg+xml');
-  if (parsed.querySelector('parsererror') || parsed.documentElement.localName !== 'svg') throw new Error('Artwork is not valid SVG.');
+  if (parsed.querySelector('parsererror') || parsed.documentElement.localName !== 'svg')
+    throw new Error(translate('Artwork is not valid SVG.'));
   const root = parsed.documentElement;
   const viewBox = root
     .getAttribute('viewBox')
@@ -25,16 +27,16 @@ export function sanitizeCarvingSvg(input: string): string {
     .split(/[\s,]+/)
     .map(Number);
   if (!viewBox || viewBox.length !== 4 || !viewBox.every(Number.isFinite) || viewBox[2] <= 0 || viewBox[3] <= 0)
-    throw new Error('Artwork needs a finite positive SVG viewBox.');
+    throw new Error(translate('Artwork needs a finite positive SVG viewBox.'));
   if (Math.max(viewBox[2] / viewBox[3], viewBox[3] / viewBox[2]) > 20)
-    throw new Error('Artwork proportions exceed the supported 20:1 limit.');
+    throw new Error(translate('Artwork proportions exceed the supported 20:1 limit.'));
   const output = document.implementation.createDocument(namespace, 'svg', null);
   let count = 0;
   let commands = 0;
   const copy = (node: Element, depth: number): Element => {
-    if (++count > 300 || depth > 12) throw new Error('Artwork has too many shapes or nested groups.');
+    if (++count > 300 || depth > 12) throw new Error(translate('Artwork has too many shapes or nested groups.'));
     if (!elements.has(node.localName) || (node.namespaceURI && node.namespaceURI !== namespace) || (depth && node.localName === 'svg'))
-      throw new Error(`Unsupported artwork element: ${node.localName}. Use plain filled shapes.`);
+      throw new Error(translate('Unsupported artwork element: {{value1}}. Use plain filled shapes.', { value1: node.localName }));
     const target = output.createElementNS(namespace, node.localName);
     for (const attribute of [...node.attributes]) {
       const { name, value } = attribute;
@@ -54,23 +56,25 @@ export function sanitizeCarvingSvg(input: string): string {
             .split(/[\s,]+/)
             .every(v => Number.isFinite(Number(v)) && Math.abs(Number(v)) <= 1e6)
         )
-          throw new Error(`Invalid artwork coordinate: ${name}.`);
+          throw new Error(translate('Invalid artwork coordinate: {{name}}.', { name: name }));
       } else if (name === 'd' && node.localName === 'path') {
-        if (!/^[MmLlHhVvCcSsQqTtAaZz\s,0-9eE+.-]*$/.test(value) || !finiteCoordinates(value)) throw new Error('Invalid artwork path.');
+        if (!/^[MmLlHhVvCcSsQqTtAaZz\s,0-9eE+.-]*$/.test(value) || !finiteCoordinates(value))
+          throw new Error(translate('Invalid artwork path.'));
         commands += (value.match(/[MmLlHhVvCcSsQqTtAaZz]/g) ?? []).length;
-        if (commands > kMaxCommands) throw new Error('Artwork has too many path commands.');
+        if (commands > kMaxCommands) throw new Error(translate('Artwork has too many path commands.'));
       } else if (name === 'points' && (node.localName === 'polygon' || node.localName === 'polyline')) {
-        if (!numeric.test(value) || !finiteCoordinates(value)) throw new Error('Invalid artwork points.');
+        if (!numeric.test(value) || !finiteCoordinates(value)) throw new Error(translate('Invalid artwork points.'));
         commands += value.trim().split(/[\s,]+/).length / 2;
-        if (commands > kMaxCommands) throw new Error('Artwork has too many points.');
+        if (commands > kMaxCommands) throw new Error(translate('Artwork has too many points.'));
       } else if (name === 'fill' || name === 'stroke') {
-        if (!/^(?:black|white|none|#000(?:000)?|#fff(?:fff)?)$/i.test(value)) throw new Error('Use only black, white or no fill/stroke.');
+        if (!/^(?:black|white|none|#000(?:000)?|#fff(?:fff)?)$/i.test(value))
+          throw new Error(translate('Use only black, white or no fill/stroke.'));
       } else if (name === 'fill-rule') {
-        if (value !== 'evenodd' && value !== 'nonzero') throw new Error('Invalid artwork fill rule.');
+        if (value !== 'evenodd' && value !== 'nonzero') throw new Error(translate('Invalid artwork fill rule.'));
       } else if (name === 'stroke-linecap') {
-        if (!['round', 'butt', 'square'].includes(value)) throw new Error('Invalid line cap.');
+        if (!['round', 'butt', 'square'].includes(value)) throw new Error(translate('Invalid line cap.'));
       } else if (name === 'stroke-linejoin') {
-        if (!['round', 'bevel', 'miter'].includes(value)) throw new Error('Invalid line join.');
+        if (!['round', 'bevel', 'miter'].includes(value)) throw new Error(translate('Invalid line join.'));
       } else if (name === 'transform') {
         // Split at closing parentheses so adjacent whitespace cannot cause exponential regex backtracking.
         const transforms = value.split(')');
@@ -81,13 +85,14 @@ export function sanitizeCarvingSvg(input: string): string {
           !transforms.every(part => /^\s*(?:translate|scale|rotate|matrix|skewX|skewY)\([\s,0-9eE+.-]+$/.test(part)) ||
           !finiteCoordinates(value)
         )
-          throw new Error('Invalid artwork transform.');
-      } else throw new Error(`Unsupported artwork attribute: ${name}.`);
+          throw new Error(translate('Invalid artwork transform.'));
+      } else throw new Error(translate('Unsupported artwork attribute: {{name}}.', { name: name }));
       target.setAttribute(name, value);
     }
     for (const child of [...node.childNodes]) {
       if (child.nodeType === Node.ELEMENT_NODE) target.append(copy(child as Element, depth + 1));
-      else if (child.nodeType !== Node.COMMENT_NODE && child.textContent?.trim()) throw new Error('Convert artwork text to filled paths.');
+      else if (child.nodeType !== Node.COMMENT_NODE && child.textContent?.trim())
+        throw new Error(translate('Convert artwork text to filled paths.'));
     }
     return target;
   };

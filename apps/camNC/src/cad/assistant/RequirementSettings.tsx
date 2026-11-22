@@ -1,19 +1,20 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useState } from 'react';
 import { requirementLengths, validateAssistantRequirements, type AssistantRequirements } from './requirements';
 
 const labels: Record<string, string> = {
-  width: 'Part outline width',
-  height: 'Part outline height',
-  thickness: 'Part thickness',
-  pocketDepth: 'Every blind cut depth',
-  minimumFloor: 'Minimum pocket floor',
-  minimumWall: 'Minimum outer top-pocket wall',
-  assemblyWidth: 'Assembly width',
-  assemblyDepth: 'Assembly depth',
-  assemblyHeight: 'Assembly height',
-  sourcePartCount: 'Outlined source parts',
-  holeCount: 'Through holes',
-  pocketCount: 'Blind cuts',
+  width: translate('Part outline width'),
+  height: translate('Part outline height'),
+  thickness: translate('Part thickness'),
+  pocketDepth: translate('Every blind cut depth'),
+  minimumFloor: translate('Minimum pocket floor'),
+  minimumWall: translate('Minimum outer top-pocket wall'),
+  assemblyWidth: translate('Assembly width'),
+  assemblyDepth: translate('Assembly depth'),
+  assemblyHeight: translate('Assembly height'),
+  sourcePartCount: translate('Outlined source parts'),
+  holeCount: translate('Through holes'),
+  pocketCount: translate('Blind cuts'),
 };
 export function Requirements({
   value,
@@ -31,21 +32,25 @@ export function Requirements({
   return (
     // Shown as a settings dialog section, which already is the disclosure: the form is open as soon as it is picked.
     <div className="cad-assistant-settings">
-      <h3>Confirmed requirements{Object.keys(value).length ? ' · active' : ' · optional'}</h3>
+      <h3>
+        {translate('Confirmed requirements')}
+        {Object.keys(value).length ? translate(' · active') : translate(' · optional')}
+      </h3>
       <p>
-        These application checks stay outside generated scripts. Enter agreed values in mm; blank fields add no requirement. Outline checks
-        use one unambiguous part. Appearance and strength still need review.
+        {translate(
+          'These application checks stay outside generated scripts. Enter agreed values in mm; blank fields add no requirement. Outline checks use one unambiguous part. Appearance and strength still need review. '
+        )}
       </p>
       <fieldset disabled={disabled}>
-        <legend>Design requirements</legend>
+        <legend>{translate('Design requirements')}</legend>
         <label>
-          Part name or ID (blank means the single outlined part)
+          {translate('Part name or ID (blank means the single outlined part) ')}
           <input value={draft.part ?? ''} onChange={event => setDraft({ ...draft, part: event.target.value || undefined })} />
         </label>
         {[...requirementLengths, 'sourcePartCount', 'holeCount', 'pocketCount'].map(key => (
           <label key={key}>
             {labels[key]}
-            {requirementLengths.includes(key as (typeof requirementLengths)[number]) ? ' (mm)' : ''}
+            {requirementLengths.includes(key as (typeof requirementLengths)[number]) ? translate(' (mm)') : ''}
             <input
               type="number"
               min={key.endsWith('Count') ? 0 : 0.001}
@@ -61,7 +66,7 @@ export function Requirements({
             checked={!!draft.preserveExistingIds}
             onChange={event => setDraft({ ...draft, preserveExistingIds: event.target.checked || undefined })}
           />
-          Keep all existing entity IDs
+          {translate('Keep all existing entity IDs ')}
         </label>
         {error && <p role="alert">{error}</p>}
         <button
@@ -72,10 +77,10 @@ export function Requirements({
               onConfirm(validateAssistantRequirements(draft));
               setError('');
             } catch (cause) {
-              setError(cause instanceof Error ? cause.message : 'Invalid requirements.');
+              setError(cause instanceof Error ? cause.message : translate('Invalid requirements.'));
             }
           }}>
-          Confirm requirements
+          {translate('Confirm requirements ')}
         </button>
         <button
           type="button"
@@ -84,10 +89,10 @@ export function Requirements({
             setDraft({});
             setError('');
           }}>
-          Clear fields
+          {translate('Clear fields ')}
         </button>
       </fieldset>
-      {dirty && <p>Unconfirmed changes are not used by the assistant.</p>}
+      {dirty && <p>{translate('Unconfirmed changes are not used by the assistant.')}</p>}
     </div>
   );
 }

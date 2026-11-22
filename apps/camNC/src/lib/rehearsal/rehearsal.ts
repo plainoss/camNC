@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { BoardV1 } from '@/cam/boards';
 import { useCuttingData } from '@/cam/cuttingData';
 import { createJob, getModelBytes, type CamJobV1 } from '@/cam/jobDb';
@@ -31,16 +32,16 @@ export function rehearsalBlockedReason() {
     api.jobStartedAt.value !== null ||
     ['Run', 'Hold', 'Door', 'Jog', 'Home'].includes(api.status.value?.state ?? '')
   )
-    return 'Finish or stop the real machine job before starting a rehearsal.';
+    return translate('Finish or stop the real machine job before starting a rehearsal.');
   return null;
 }
 
 export async function launchRehearsal(job: CamJobV1, boards: BoardV1[], signal?: AbortSignal, boardId?: string) {
-  if (isDemoMode()) throw new Error('Return to your saved CAM project before starting another rehearsal.');
+  if (isDemoMode()) throw new Error(translate('Return to your saved CAM project before starting another rehearsal.'));
   const blocked = rehearsalBlockedReason();
   if (blocked) throw new Error(blocked);
   const model = await getModelBytes(job.id);
-  if (!model) throw new Error('The model file is missing. Open it again before rehearsing.');
+  if (!model) throw new Error(translate('The model file is missing. Open it again before rehearsing.'));
   const snapshot = makeSnapshot(job, model, boards, {
     bits: useToolLibrary.getState().bits,
     cutting: useCuttingData.getState().saved,
@@ -53,7 +54,7 @@ export async function launchRehearsal(job: CamJobV1, boards: BoardV1[], signal?:
   // Navigation and reload need a tab-local token; blocked session storage must fail before leaving the real app.
   try {
     sessionStorage.setItem('camnc-rehearsal', snapshot.id);
-    if (sessionStorage.getItem('camnc-rehearsal') !== snapshot.id) throw new Error('Tab storage is unavailable.');
+    if (sessionStorage.getItem('camnc-rehearsal') !== snapshot.id) throw new Error(translate('Tab storage is unavailable.'));
     signal?.throwIfAborted();
     const changed = rehearsalBlockedReason();
     if (changed) throw new Error(changed);
@@ -72,9 +73,9 @@ export async function launchRehearsal(job: CamJobV1, boards: BoardV1[], signal?:
 /** Called after installing the simulator, before the router, settings gate or machine connection can start. */
 export async function prepareRehearsal() {
   const id = getRehearsalId();
-  if (!isDemoMode() || !id) throw new Error('No rehearsal was selected.');
+  if (!isDemoMode() || !id) throw new Error(translate('No rehearsal was selected.'));
   // Without a remembered tab token, the next reload could restore real settings. Refuse to enter that state.
-  if (sessionStorage.getItem('camnc-rehearsal') !== id) throw new Error('Tab storage is unavailable.');
+  if (sessionStorage.getItem('camnc-rehearsal') !== id) throw new Error(translate('Tab storage is unavailable.'));
   const snapshot = await loadSnapshot(id);
   const job = await createJob(new File([snapshot.model.slice().buffer], snapshot.job.fileName), {
     ...snapshot.job,

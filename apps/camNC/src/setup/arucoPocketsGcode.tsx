@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 export const gcodeHeader = `
 ; Assumes:
 ; - 3.175mm (1/8in) endmill
@@ -163,14 +164,14 @@ export interface Point {
 }
 
 export function getPocketsGcode(corners: Point[], tagSize: number): string {
-  if (tagSize !== 30) throw new Error('Only 30mm tag size is supported');
+  if (tagSize !== 30) throw new Error(translate('Only 30mm tag size is supported'));
   return gcodeHeader + repeatGCodeAtCorners(pockets_40, corners) + gcodeSuffix;
 }
 
 // Repeat a block of G‑code at four arbitrary corner points.
 function repeatGCodeAtCorners(gcode: string, corners: Point[]): string {
   if (corners.length !== 4) {
-    throw new Error(`Expected 4 corner points, got ${corners.length}.`);
+    throw new Error(translate('Expected 4 corner points, got {{value1}}.', { value1: corners.length }));
   }
 
   const srcLines = gcode.split(/\r?\n/);

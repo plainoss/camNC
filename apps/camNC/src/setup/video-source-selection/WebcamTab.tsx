@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { buildConnectionUrl, WebcamConnectionParams } from '@wbcnc/go2webrtc/url-helpers';
 import { VideoDimensions } from '@wbcnc/go2webrtc/video-source';
 import { Button } from '@wbcnc/ui/components/button';
@@ -62,31 +63,31 @@ export function WebcamTab({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Webcam</CardTitle>
-        <CardDescription>Select an available webcam connected to your computer.</CardDescription>
+        <CardTitle>{translate('Webcam')}</CardTitle>
+        <CardDescription>{translate('Select an available webcam connected to your computer.')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {devices.length > 0 ? (
           <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a webcam" />
+              <SelectValue placeholder={translate('Select a webcam')} />
             </SelectTrigger>
             <SelectContent>
               {devices.map(device => (
                 <SelectItem key={device.deviceId} value={device.deviceId}>
-                  {device.label || `Camera ${devices.indexOf(device) + 1}`}
+                  {device.label || translate('Camera {{value1}}', { value1: devices.indexOf(device) + 1 })}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         ) : (
           <div className="text-sm text-muted-foreground">
-            No webcams found or permission denied. Please ensure your webcam is connected and permissions are granted.
+            {translate('No webcams found or permission denied. Please ensure your webcam is connected and permissions are granted. ')}
           </div>
         )}
         {selectedDeviceId && <VideoPreview connectionUrl={buildConnectionUrl(getParams())} ref={videoPreviewRef} />}
         <Button disabled={!selectedDeviceId} onClick={handleConfirm}>
-          Confirm
+          {translate('Confirm ')}
         </Button>
       </CardContent>
     </Card>

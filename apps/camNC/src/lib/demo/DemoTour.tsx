@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useStore } from '@/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@wbcnc/ui/components/button';
@@ -16,12 +17,16 @@ interface TourStep {
 
 const kFirstStep = isDemoWithoutCamera()
   ? {
-      title: 'Your machine bed, no camera needed',
-      body: 'Without a camera, camNC draws the bed from the machine size it reads from FluidNC, with a 10 mm grid in machine coordinates. The toolpath sits where the machine will cut. Drag it to place it, and double-click the bed to jog there.',
+      title: translate('Your machine bed, no camera needed'),
+      body: translate(
+        'Without a camera, camNC draws the bed from the machine size it reads from FluidNC, with a 10 mm grid in machine coordinates. The toolpath sits where the machine will cut. Drag it to place it, and double-click the bed to jog there.'
+      ),
     }
   : {
-      title: 'A recorded camera example',
-      body: 'This is a recorded camera clip above a LowRider bed, not a live feed synchronized to the simulator. camNC straightens it into a top view and draws the toolpath where the machine will cut. Drag the toolpath to place it on the stock.',
+      title: translate('A recorded camera example'),
+      body: translate(
+        'This is a recorded camera clip above a LowRider bed, not a live feed synchronized to the simulator. camNC straightens it into a top view and draws the toolpath where the machine will cut. Drag the toolpath to place it on the stock.'
+      ),
     };
 
 const kSteps: TourStep[] = [
@@ -33,29 +38,37 @@ const kSteps: TourStep[] = [
     },
   },
   {
-    title: 'See the cut in 3D',
-    body: 'Use the view buttons in the toolbar for 3D, Front and Side views. They show the cut depth against the stock height.',
+    title: translate('See the cut in 3D'),
+    body: translate('Use the view buttons in the toolbar for 3D, Front and Side views. They show the cut depth against the stock height.'),
     enter: ({ view }) => view('3d'),
   },
   {
-    title: 'A simulated FluidNC',
-    body: 'The machine panel is connected to a FluidNC simulator running in this tab, no hardware needed. Press Home, then jog with the arrow buttons or keys. The yellow marker follows the machine position.',
+    title: translate('A simulated FluidNC'),
+    body: translate(
+      'The machine panel is connected to a FluidNC simulator running in this tab, no hardware needed. Press Home, then jog with the arrow buttons or keys. The yellow marker follows the machine position.'
+    ),
     enter: ({ view, machinePanel }) => {
       view('top');
       machinePanel(true);
     },
   },
   {
-    title: 'Run the job',
-    body: 'Press the big button at the bottom: it homes, probes Z, then runs the job, as on a real machine. Running sets XY zero where the job is drawn, uploads the file to the simulated SD card and starts it, and a green line shows the progress. The speed buttons in the demo bar slow it down or speed it up.',
+    title: translate('Run the job'),
+    body: translate(
+      'Press the big button at the bottom: it homes, probes Z, then runs the job, as on a real machine. Running sets XY zero where the job is drawn, uploads the file to the simulated SD card and starts it, and a green line shows the progress. The speed buttons in the demo bar slow it down or speed it up.'
+    ),
   },
   {
-    title: 'Try your own G-code',
-    body: 'Press O, use Open in the toolbar, or drop a .gcode or .nc file anywhere on the page. It is loaded in your browser and never uploaded.',
+    title: translate('Try your own G-code'),
+    body: translate(
+      'Press O, use Open in the toolbar, or drop a .gcode or .nc file anywhere on the page. It is loaded in your browser and never uploaded.'
+    ),
   },
   {
-    title: 'Ready for your own machine?',
-    body: 'Start with just your FluidNC: camNC reads the bed size from it and you can jog, preview and run jobs right away. Add a camera later (a phone works, setup takes about 15 minutes). Nothing you did in the demo is saved.',
+    title: translate('Ready for your own machine?'),
+    body: translate(
+      'Start with just your FluidNC: camNC reads the bed size from it and you can jog, preview and run jobs right away. Add a camera later (a phone works, setup takes about 15 minutes). Nothing you did in the demo is saved.'
+    ),
     final: true,
   },
 ];
@@ -88,11 +101,11 @@ export function DemoTour() {
   return (
     <div
       role="dialog"
-      aria-label="Demo tour"
+      aria-label={translate('Demo tour')}
       className="fixed bottom-16 max-md:bottom-30 left-3 md:left-[calc(var(--app-rail,0rem)+0.75rem)] z-50 flex w-80 max-w-[calc(100vw-1.5rem)] flex-col gap-2 rounded-lg border bg-background p-4 shadow-xl">
       <div className="flex flex-row items-start justify-between gap-2">
         <h2 className="font-semibold leading-tight">{current.title}</h2>
-        <Button size="icon" variant="ghost" className="-mr-2 -mt-1 size-6" aria-label="Close tour" onClick={close}>
+        <Button size="icon" variant="ghost" className="-mr-2 -mt-1 size-6" aria-label={translate('Close tour')} onClick={close}>
           <X className="size-4" />
         </Button>
       </div>
@@ -104,21 +117,21 @@ export function DemoTour() {
         <div className="flex flex-row gap-1">
           {step > 0 && (
             <Button size="sm" variant="ghost" onClick={() => setStep(step - 1)}>
-              Back
+              {translate('Back ')}
             </Button>
           )}
           {current.final ? (
             <>
               <Button size="sm" variant="outline" onClick={close}>
-                Keep exploring
+                {translate('Keep exploring ')}
               </Button>
               <Button size="sm" onClick={() => exitDemo('/start')}>
-                Set up my machine
+                {translate('Set up my machine ')}
               </Button>
             </>
           ) : (
             <Button size="sm" onClick={() => setStep(step + 1)}>
-              Next
+              {translate('Next ')}
             </Button>
           )}
         </div>

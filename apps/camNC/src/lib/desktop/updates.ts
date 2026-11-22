@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { toast } from '@wbcnc/ui/components/sonner';
@@ -8,14 +9,14 @@ interface ReadyUpdate {
 
 function offerRestart({ version }: ReadyUpdate) {
   // Stays until dismissed: restarting is up to the user, e.g. not in the middle of a job.
-  toast.info(`camNC ${version} is ready`, {
+  toast.info(translate('camNC {{version}} is ready', { version: version }), {
     id: 'desktop-update',
-    description: 'Restart the app to use the new version.',
+    description: translate('Restart the app to use the new version.'),
     duration: Infinity,
     action: {
-      label: 'Restart',
+      label: translate('Restart'),
       onClick: () => {
-        invoke('restart_to_update').catch(err => toast.error(`Update failed: ${err}`));
+        invoke('restart_to_update').catch(err => toast.error(translate('Update failed: {{err}}', { err: err })));
       },
     },
   });

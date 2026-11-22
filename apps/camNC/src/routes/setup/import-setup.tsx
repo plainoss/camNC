@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { EnsureHasCamSource } from '@/components/EnsureHasCamSource';
 import { PageHeader } from '@/components/page-header';
 import { cameraSourceLabel } from '@/lib/camera/source-label';
@@ -35,19 +36,22 @@ export const Route = createFileRoute('/setup/import-setup')({
 const kScopes: { value: ImportScope; label: string; description: string }[] = [
   {
     value: 'same-spot',
-    label: 'Same camera, same spot',
-    description:
-      'Only the way the video reaches camNC changed, e.g. a direct network camera instead of go2rtc. Copies everything and checks it against the live picture.',
+    label: translate('Same camera, same spot'),
+    description: translate(
+      'Only the way the video reaches camNC changed, e.g. a direct network camera instead of go2rtc. Copies everything and checks it against the live picture.'
+    ),
   },
   {
     value: 'moved',
-    label: 'Same camera, moved',
-    description: 'Copies the lens calibration and where the markers are on the machine. You point out the markers in the picture again.',
+    label: translate('Same camera, moved'),
+    description: translate(
+      'Copies the lens calibration and where the markers are on the machine. You point out the markers in the picture again.'
+    ),
   },
   {
     value: 'other-camera',
-    label: 'A different camera',
-    description: 'Copies where the markers are on the machine. You calibrate the lens and point out the markers.',
+    label: translate('A different camera'),
+    description: translate('Copies where the markers are on the machine. You calibrate the lens and point out the markers.'),
   },
 ];
 
@@ -67,11 +71,17 @@ function CheckResult({
   if (check.state === 'idle' || check.state === 'checking') return null;
   let message: string;
   if (check.state === 'off') {
-    message = `The copied setup doesn't quite fit the picture (${formatReprojectionError(check.error)}). The camera may have moved, or its lens or zoom differs.`;
+    message = translate(
+      "The copied setup doesn't quite fit the picture ({{value1}}). The camera may have moved, or its lens or zoom differs.",
+      { value1: formatReprojectionError(check.error) }
+    );
   } else if (check.state === 'missing') {
-    message = `Only ${check.found} of ${kExpectedMarkerCount} markers are visible, so the setup could not be checked. If the markers are off the machine right now, you can use the copied setup anyway.`;
+    message = translate(
+      'Only {{value1}} of {{value2}} markers are visible, so the setup could not be checked. If the markers are off the machine right now, you can use the copied setup anyway.',
+      { value1: check.found, value2: kExpectedMarkerCount }
+    );
   } else {
-    message = `The setup could not be checked: ${check.message}`;
+    message = translate('The setup could not be checked: {{value1}}', { value1: check.message });
   }
   return (
     <Alert>
@@ -79,15 +89,15 @@ function CheckResult({
         <p>{message}</p>
         <div className="flex flex-row flex-wrap gap-2">
           <Button size="sm" onClick={onPickMarkers}>
-            Point out the markers again
+            {translate('Point out the markers again ')}
           </Button>
           {check.state === 'off' && (
             <Button size="sm" variant="secondary" onClick={onCalibrate}>
-              Calibrate the lens again
+              {translate('Calibrate the lens again ')}
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={onUse}>
-            Use it anyway
+            {translate('Use it anyway ')}
           </Button>
         </div>
       </AlertDescription>
@@ -106,7 +116,7 @@ function SourceChoice({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <Label>Copy from</Label>
+      <Label>{translate('Copy from')}</Label>
       {cameras.map(([id, camera]) => (
         <label key={id} className="flex flex-row items-start gap-2 rounded-md border px-3 py-2 text-sm">
           <input type="radio" name="from" className="mt-1" checked={value === id} onChange={() => onChange(id)} />
@@ -158,7 +168,12 @@ function ImportSetupComponent() {
       setCheck(result);
       return;
     }
-    toast.success(`Copied the setup of "${from.name}" and checked it against the picture. ${formatReprojectionError(result.error)}`);
+    toast.success(
+      translate('Copied the setup of "{{value1}}" and checked it against the picture. {{value2}}', {
+        value1: from.name,
+        value2: formatReprojectionError(result.error),
+      })
+    );
     finish();
   }
 
@@ -170,7 +185,7 @@ function ImportSetupComponent() {
     deleteCamSource(activeCamId);
     setActiveCam(fromId);
     if (isCamCalibrated({ ...from, ...changes })) {
-      toast.success(`"${from.name}" now uses the new source. Calibration and markers were kept.`);
+      toast.success(translate('"{{value1}}" now uses the new source. Calibration and markers were kept.', { value1: from.name }));
       finish();
     } else {
       navigate({ to: '/setup/camera-calibration' });
@@ -180,26 +195,28 @@ function ImportSetupComponent() {
   const checking = check.state === 'checking';
   return (
     <div className="w-full h-full">
-      <PageHeader title={adding ? 'Add camera' : 'Copy setup from another camera'} />
+      <PageHeader title={adding ? translate('Add camera') : translate('Copy setup from another camera')} />
       <div className="flex justify-center p-1 flex-row">
         <div className="max-w-xl gap-4 flex flex-1 flex-col pb-8">
           {adding && <AddCameraSteps current="reuse" showReuse />}
           <Card>
             <CardHeader>
-              <CardTitle>Reuse a camera&apos;s setup?</CardTitle>
+              <CardTitle>{translate("Reuse a camera's setup?")}</CardTitle>
               <CardDescription>
-                &quot;{target.name}&quot; can start from the calibration and markers of a camera that is already set up, instead of going
-                through the whole setup again.
+                &quot;{target.name}
+                {translate(
+                  '" can start from the calibration and markers of a camera that is already set up, instead of going through the whole setup again. '
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               {candidates.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No other camera is set up yet.</p>
+                <p className="text-sm text-muted-foreground">{translate('No other camera is set up yet.')}</p>
               ) : (
                 <>
                   <SourceChoice cameras={candidates} value={fromId} onChange={setFromId} />
                   <div className="flex flex-col gap-1">
-                    <Label>This camera is</Label>
+                    <Label>{translate('This camera is')}</Label>
                     {kScopes.map(option => (
                       <label key={option.value} className="flex flex-row items-start gap-2 text-sm">
                         <input
@@ -218,9 +235,11 @@ function ImportSetupComponent() {
                   </div>
                   {lensDropped && from && (
                     <p className="text-sm text-muted-foreground">
-                      The picture has another shape ({target.maxResolution[0]}×{target.maxResolution[1]} instead of {from.maxResolution[0]}×
-                      {from.maxResolution[1]}), so the lens has to be calibrated again. The marker positions on the machine are still
-                      copied.
+                      {translate('The picture has another shape (')}
+                      {target.maxResolution[0]}×{target.maxResolution[1]}
+                      {translate(' instead of ')}
+                      {from.maxResolution[0]}×{from.maxResolution[1]}
+                      {translate('), so the lens has to be calibrated again. The marker positions on the machine are still copied. ')}
                     </p>
                   )}
                   <CheckResult
@@ -232,11 +251,14 @@ function ImportSetupComponent() {
                   {check.state === 'idle' || checking ? (
                     <div className="flex flex-row flex-wrap items-center gap-2">
                       <Button onClick={apply} disabled={!from || checking}>
-                        {checking && <Loader2 className="animate-spin" />} {checking ? 'Checking against the picture…' : 'Copy setup'}
+                        {checking && <Loader2 className="animate-spin" />}{' '}
+                        {checking ? translate('Checking against the picture…') : translate('Copy setup')}
                       </Button>
                       {scope === 'same-spot' && from && (
                         <Button variant="link" onClick={moveSourceToExisting} disabled={checking}>
-                          Switch &quot;{from.name}&quot; to this source instead
+                          {translate('Switch "')}
+                          {from.name}
+                          {translate('" to this source instead ')}
                         </Button>
                       )}
                     </div>
@@ -245,7 +267,7 @@ function ImportSetupComponent() {
               )}
               <div>
                 <Button variant="outline" onClick={() => navigate({ to: '/setup/camera-calibration' })} disabled={checking}>
-                  Start from scratch
+                  {translate('Start from scratch ')}
                 </Button>
               </div>
             </CardContent>
