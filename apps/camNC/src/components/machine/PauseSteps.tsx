@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useCamMachine } from '@/cam/machine/camMachine';
 import { pauseSteps } from '@/lib/machine/pauseSteps';
 import type { PauseMarker } from '@wbcnc/cam/pauseMarker';
@@ -8,7 +9,7 @@ function PartChips({ n, of }: { n: number; of: number }) {
   const overlay = useCamMachine(s => s.overlay);
   const names = overlay?.freeParts?.map(p => p.name) ?? (overlay?.tabsPerPart ? [...new Set(overlay.tabs?.map(t => t.part))] : []);
   return (
-    <div className="flex flex-row flex-wrap items-center gap-1" aria-label="Parts">
+    <div className="flex flex-row flex-wrap items-center gap-1" aria-label={translate('Parts')}>
       {names.length === of &&
         names.map((name, i) => (
           <span
@@ -23,7 +24,9 @@ function PartChips({ n, of }: { n: number; of: number }) {
           </span>
         ))}
       <span className="ml-auto text-xs text-muted-foreground">
-        {n} of {of}
+        {n}
+        {translate(' of ')}
+        {of}
       </span>
     </div>
   );
@@ -56,7 +59,10 @@ export function PauseSteps({ marker, line }: { marker: PauseMarker; line: number
             </li>
           ))}
         </ol>
-        <span className="text-[11px] font-mono text-amber-900/60 dark:text-amber-200/60">M0 · line {line}</span>
+        <span className="text-[11px] font-mono text-amber-900/60 dark:text-amber-200/60">
+          {translate('M0 · line ')}
+          {line}
+        </span>
       </div>
     </div>
   );

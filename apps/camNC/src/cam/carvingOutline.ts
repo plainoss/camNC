@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { simplifyLoop, unionPaths } from '@wbcnc/cam';
 import { isWebFont, kCarvingFonts, type CarvingArt } from './carving';
 import { ensureWebFont, webFontCss } from './webFonts';
@@ -47,7 +48,7 @@ export function maskOutline(
       while (x < w && ink[y * w + x]) x++;
       runs.push(start, x);
       // Generated noisy masks can contain hundreds of thousands of runs; reject before polygon union allocates them.
-      if (++runCount > maxRuns) throw new Error('Artwork has too many pixel runs. Use simpler filled shapes.');
+      if (++runCount > maxRuns) throw new Error(translate('Artwork has too many pixel runs. Use simpler filled shapes.'));
     }
     return runs;
   };
@@ -79,11 +80,11 @@ function canvas(w: number, h: number) {
       ? new OffscreenCanvas(w, h)
       : Object.assign(document.createElement('canvas'), { width: w, height: h });
   const ctx = c.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
-  if (!ctx) throw new Error('This browser cannot draw the artwork');
+  if (!ctx) throw new Error(translate('This browser cannot draw the artwork'));
   return ctx;
 }
 
-const kUnreadableSvg = 'This SVG could not be read. Use filled shapes, without linked images or fonts.';
+const kUnreadableSvg = translate('This SVG could not be read. Use filled shapes, without linked images or fonts.');
 
 /** Absolute SVG lengths in CSS pixels; relative or missing dimensions do not define a viewport. */
 function svgLengthPx(length: string | null): number | undefined {
@@ -147,7 +148,7 @@ export async function outlineArt(
   if (doc.querySelector('parsererror')) throw new Error(kUnreadableSvg);
   const svg = doc.documentElement;
   if (svg.localName !== 'svg' || (svg.namespaceURI && svg.namespaceURI !== 'http://www.w3.org/2000/svg'))
-    throw new Error('This file is not an SVG. Choose an SVG file.');
+    throw new Error(translate('This file is not an SVG. Choose an SVG file.'));
   const viewBox = svg
     .getAttribute('viewBox')
     ?.trim()

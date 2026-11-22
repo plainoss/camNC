@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 /**
  * Read the files of a zip archive (stored or deflated entries), e.g. Fusion's `.tools` tool library export, which is
  * a zip with the library JSON inside. Uses the browser's DecompressionStream, no library.
@@ -12,12 +13,12 @@ export async function unzip(bytes: Uint8Array<ArrayBuffer>): Promise<{ name: str
       break;
     }
   }
-  if (eocd < 0) throw new Error('Not a zip file');
+  if (eocd < 0) throw new Error(translate('Not a zip file'));
   const count = view.getUint16(eocd + 10, true);
   let p = view.getUint32(eocd + 16, true);
   const out: { name: string; data: Uint8Array }[] = [];
   for (let k = 0; k < count; k++) {
-    if (view.getUint32(p, true) !== 0x02014b50) throw new Error('Damaged zip file');
+    if (view.getUint32(p, true) !== 0x02014b50) throw new Error(translate('Damaged zip file'));
     const method = view.getUint16(p + 10, true);
     const size = view.getUint32(p + 20, true);
     const nameLen = view.getUint16(p + 28, true);
@@ -34,7 +35,7 @@ export async function unzip(bytes: Uint8Array<ArrayBuffer>): Promise<{ name: str
     else if (method === 8) {
       const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
       out.push({ name, data: new Uint8Array(await new Response(stream).arrayBuffer()) });
-    } else throw new Error(`Unsupported zip compression (${method}) in ${name}`);
+    } else throw new Error(translate('Unsupported zip compression ({{method}}) in {{name}}', { method: method, name: name }));
   }
   return out;
 }
@@ -46,6 +47,6 @@ export async function fusionLibraryText(file: File): Promise<string> {
   if (!isZip) return new TextDecoder().decode(bytes);
   const entries = await unzip(bytes);
   const json = entries.find(e => /\.json$/i.test(e.name)) ?? entries[0];
-  if (!json) throw new Error('The .tools file is empty');
+  if (!json) throw new Error(translate('The .tools file is empty'));
   return new TextDecoder().decode(json.data);
 }

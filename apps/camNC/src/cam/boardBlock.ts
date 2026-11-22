@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { spacingProblem } from './boards';
 import type { PlanResult } from './camTypes';
 import type { JobBoard, MissingPart } from './useJobBoards';
@@ -25,40 +26,59 @@ export function unstable(plan: PlanResult | undefined) {
   return !!plan && ((plan.timeline ?? []).some(e => e.block) || (plan.holdClash ?? []).length > 0);
 }
 
+/** Keep this condition independent of the localized explanation shown to the operator. */
+export function cutFromEarlierDesign(b: Pick<JobBoard, 'board'>, sourceKey?: string): boolean {
+  return !!(b.board.cut?.sourceKey && sourceKey && b.board.cut.sourceKey !== sourceKey);
+}
+
 /** What's wrong with the board's layout, whatever its programs are. */
 export function layoutBlock(
   b: Pick<JobBoard, 'board' | 'nest' | 'carvingProblem'>,
   { bit, missing, sourceKey }: BlockContext
 ): string | null {
   if (b.carvingProblem) return b.carvingProblem;
-  if (b.board.cut?.sourceKey && sourceKey && b.board.cut.sourceKey !== sourceKey)
-    return 'This board was cut from an earlier design. Start over on Boards with a new physical sheet before using this design.';
+  if (cutFromEarlierDesign(b, sourceKey))
+    return translate('This board was cut from an earlier design. Start over on Boards with a new physical sheet before using this design.');
   const sizeProblem = boardSizeProblem(b);
   if (sizeProblem) return sizeProblem;
   const own = missing.filter(m => m.board === b.board.name);
   if (own.length)
-    return `${own.map(m => m.name).join(', ')} ${own.length === 1 ? 'doesn’t' : 'don’t'} fit on board ${b.board.name} and would not be cut.`;
+    return translate('boardPartsDoNotFit', {
+      names: own.map(m => m.name).join(', '),
+      count: own.length,
+      board: b.board.name,
+    });
   return spacingProblem(b.board, b.nest, bit);
 }
 
 export function boardSizeProblem(b: Pick<JobBoard, 'board' | 'nest'>): string | null {
   return b.nest.machineFits === false
-    ? `Board ${b.board.name} is larger than the machine work area. Resize the board or use a larger machine before cutting.`
+    ? translate('Board {{value1}} is larger than the machine work area. Resize the board or use a larger machine before cutting.', {
+        value1: b.board.name,
+      })
     : null;
 }
 
 /** What's wrong with the board's programs: side A, side B and the guided ones after them. */
 export function planBlock(plan: PlanResult): string | null {
-  if (!plan.ops.length) return 'Nothing to cut: its parts have no outline, hole or pocket this bit can cut.';
+  if (!plan.ops.length) return translate('Nothing to cut: its parts have no outline, hole or pocket this bit can cut.');
   const broken = [...plan.safety, ...(plan.sideB?.safety ?? []).map(s => `Side B: ${s}`), ...releaseProblems(plan)];
-  if (broken.length) return `A safety check failed: ${broken[0]}${broken.length > 1 ? ` (and ${broken.length - 1} more)` : ''}`;
+  if (broken.length)
+    return translate('A safety check failed: {{value1}}{{value2}}', {
+      value1: broken[0],
+      value2: broken.length > 1 ? translate('andMore', { count: broken.length - 1 }) : '',
+    });
   if (plan.flip?.problem) return plan.flip.problem;
   const looseParts = loose(plan);
-  if (looseParts.length) return `${looseParts.map(h => h.part).join(', ')} would come loose: too few of the tabs hold.`;
+  if (looseParts.length)
+    return translate('{{value1}} would come loose: too few of the tabs hold.', { value1: looseParts.map(h => h.part).join(', ') });
   const pivot = plan.timeline?.find(e => e.block);
   if (pivot) return pivot.message;
   const clashes = plan.holdClash?.length ?? 0;
-  if (clashes) return `${clashes === 1 ? 'A screw or clamp is' : `${clashes} screws or clamps are`} in the bit’s way or on a part.`;
+  if (clashes)
+    return translate('{{value1}} in the bit’s way or on a part.', {
+      value1: clashes === 1 ? translate('A screw or clamp is') : translate('{{value1}} screws or clamps are', { value1: clashes }),
+    });
   return null;
 }
 

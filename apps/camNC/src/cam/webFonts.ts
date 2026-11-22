@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { WebFont } from './carving';
 
 export type FontCategory = 'sans' | 'serif' | 'display' | 'handwriting' | 'mono';
@@ -80,17 +81,17 @@ async function storeFont(record: FontRecord): Promise<void> {
 
 async function fetchFont(font: WebFont, fetcher: typeof fetch): Promise<FontRecord> {
   const css = await fetcher(`https://fonts.googleapis.com/css2?family=${familyParam(font.family)}:wght@${font.weight}&display=swap`);
-  if (!css.ok) throw new Error('Font stylesheet unavailable');
+  if (!css.ok) throw new Error(translate('Font stylesheet unavailable'));
   const blocks = [...(await css.text()).matchAll(/(?:\/\*\s*([^*]*?)\s*\*\/\s*)?@font-face\s*\{([^}]+)\}/g)];
   const hasSubsets = blocks.some(block => block[1]);
   const selected = blocks.filter(block => !hasSubsets || block[1] === 'latin' || block[1] === 'latin-ext');
-  if (!selected.length) throw new Error('No Latin font faces');
+  if (!selected.length) throw new Error(translate('No Latin font faces'));
   const faces = await Promise.all(
     selected.map(async block => {
       const url = /src:\s*url\(\s*['"]?([^'"\s)]+)['"]?\s*\)/.exec(block[2])?.[1];
-      if (!url) throw new Error('Missing font source');
+      if (!url) throw new Error(translate('Missing font source'));
       const response = await fetcher(url);
-      if (!response.ok) throw new Error('Font file unavailable');
+      if (!response.ok) throw new Error(translate('Font file unavailable'));
       const unicodeRange = /unicode-range:\s*([^;]+)/.exec(block[2])?.[1].trim();
       return { data: await response.arrayBuffer(), ...(unicodeRange && { unicodeRange }) };
     })
@@ -131,7 +132,9 @@ export async function ensureWebFont(font: WebFont, opts: { fetch?: typeof fetch 
       return record;
     })().catch(() => {
       loaded.delete(key);
-      throw new Error(`Could not load the font "${font.family}". Check the connection, or pick a built-in font.`);
+      throw new Error(
+        translate('Could not load the font "{{value1}}". Check the connection, or pick a built-in font.', { value1: font.family })
+      );
     });
     loaded.set(key, pending);
   }

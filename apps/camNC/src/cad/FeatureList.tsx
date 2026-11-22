@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import { filteredFeatureRows, useFeatureFilter } from './featureFilter';
 import { FeatureDependenciesPanel, FeatureFilterBox } from './FeatureListTools';
@@ -37,8 +38,8 @@ function Eye({ name, shown, onToggle }: { name: string; shown: boolean; onToggle
       type="button"
       className="cad-feature-eye"
       // Named for what it does only, so the row keeps its name to itself; its title says which feature.
-      aria-label={shown ? 'Hide' : 'Show'}
-      title={`${shown ? 'Hide' : 'Show'} ${name} in the view`}
+      aria-label={shown ? translate('Hide') : translate('Show')}
+      title={translate('{{value1}} {{name}} in the view', { value1: shown ? translate('Hide') : translate('Show'), name: name })}
       aria-pressed={shown}
       onClick={event => {
         event.stopPropagation();
@@ -70,7 +71,7 @@ export type FeatureAction =
   | 'unavailable';
 
 /** A menu item the reference offers that camNC has nothing behind yet: listed, but greyed with the reason. */
-const unavailable = (label: string) => ({ action: 'unavailable' as const, label, disabled: true, title: 'Not available yet' });
+const unavailable = (label: string) => ({ action: 'unavailable' as const, label, disabled: true, title: translate('Not available yet') });
 
 /** What each row's menu offers, in the reference's order, and why an item isn't there for it. */
 function menuItems(
@@ -81,7 +82,10 @@ function menuItems(
     sketchName = 'sketch',
     shown,
     folders = false,
+    suppressed = false,
   }: {
+    /** A variable switched off: its menu offers to switch it back on. */
+    suppressed?: boolean;
     rolledBack?: boolean;
     last?: boolean;
     sketchName?: string;
@@ -90,62 +94,86 @@ function menuItems(
     folders?: boolean;
   } = {}
 ): { action: FeatureAction; label: string; disabled?: boolean; title?: string }[] {
-  if (entry.kind === 'variable' || entry.kind === 'plane')
+  if (entry.kind === 'variable')
     return [
-      ...(entry.kind === 'plane' ? [{ action: 'newSketch' as const, label: 'New sketch' }] : []),
-      { action: 'edit', label: 'Edit…' },
-      { action: 'delete', label: 'Delete' },
+      { action: 'edit', label: translate('Edit…') },
+      unavailable(translate('Add selection to folder…')),
+      unavailable(translate('Section view…')),
+      { action: 'suppress', label: suppressed ? translate('Unsuppress') : translate('Suppress') },
+      unavailable(translate('Dynamic suppression')),
+      unavailable(translate('Add comment')),
+      { action: 'delete', label: translate('Delete') },
+    ];
+  if (entry.kind === 'plane')
+    return [
+      { action: 'newSketch' as const, label: translate('New sketch') },
+      { action: 'edit', label: translate('Edit…') },
+      { action: 'delete', label: translate('Delete') },
     ];
   const { kind } = entry.step;
   const sketch = kind === 'sketch' || kind === 'faceSketch';
-  const rename = kind === 'sketch' || kind === 'extrude' ? [{ action: 'rename' as const, label: 'Rename' }] : [];
+  const rename = kind === 'sketch' || kind === 'extrude' ? [{ action: 'rename' as const, label: translate('Rename') }] : [];
   // A part is in one folder at most, so one already in a folder has nothing to add.
   const folder = {
     action: 'addToFolder' as const,
-    label: 'Add selection to folder…',
+    label: translate('Add selection to folder…'),
     disabled: !folders,
-    title: 'Its part is already in a folder.',
+    title: translate('Its part is already in a folder.'),
   };
   const suppress = sketch
-    ? { action: 'unavailable' as const, label: 'Suppress', disabled: true, title: 'A sketch is suppressed with the extrude made from it.' }
+    ? {
+        action: 'unavailable' as const,
+        label: translate('Suppress'),
+        disabled: true,
+        title: translate('A sketch is suppressed with the extrude made from it.'),
+      }
     : {
         action: 'suppress' as const,
-        label: entry.step.suppressed ? 'Unsuppress' : 'Suppress',
+        label: entry.step.suppressed ? translate('Unsuppress') : translate('Suppress'),
         disabled: kind === 'move',
-        title: 'A move is undone by deleting it.',
+        title: translate('A move is undone by deleting it.'),
       };
-  const remove = { action: 'delete' as const, label: 'Delete', disabled: kind === 'faceSketch' || kind === 'copy' };
+  const remove = { action: 'delete' as const, label: translate('Delete'), disabled: kind === 'faceSketch' || kind === 'copy' };
   // A step past the bar can only be named, grouped, switched off, rolled to or deleted until the design reaches it.
   if (rolledBack)
     return [
       ...rename,
       folder,
       suppress,
-      unavailable('Dynamic suppression'),
-      unavailable('Add comment'),
-      { action: 'rollTo', label: 'Roll to here' },
-      { action: 'rollToEnd', label: 'Roll to end' },
+      unavailable(translate('Dynamic suppression')),
+      unavailable(translate('Add comment')),
+      { action: 'rollTo', label: translate('Roll to here') },
+      { action: 'rollToEnd', label: translate('Roll to end') },
       remove,
     ];
   return [
     ...rename,
-    { action: 'edit', label: 'Edit…' },
+    { action: 'edit', label: translate('Edit…') },
     // Named for the sketch it opens, as Edit Sketch 1….
-    ...(kind === 'extrude' ? [{ action: 'editSketch' as const, label: `Edit ${sketchName}…` }] : []),
-    ...(sketch ? [unavailable('Copy sketch')] : []),
-    unavailable('Show dimensions'),
+    ...(kind === 'extrude'
+      ? [{ action: 'editSketch' as const, label: translate('Edit {{sketchName}}…', { sketchName: sketchName }) }]
+      : []),
+    ...(sketch ? [unavailable(translate('Copy sketch'))] : []),
+    unavailable(translate('Show dimensions')),
     folder,
-    ...(kind === 'sketch' && shown !== undefined ? [{ action: 'toggleShown' as const, label: shown ? 'Hide' : 'Show' }] : []),
-    ...(sketch ? [unavailable(`Create Drawing of ${entry.step.label}…`), { action: 'export' as const, label: 'Export as DXF/SVG…' }] : []),
+    ...(kind === 'sketch' && shown !== undefined
+      ? [{ action: 'toggleShown' as const, label: shown ? translate('Hide') : translate('Show') }]
+      : []),
+    ...(sketch
+      ? [
+          unavailable(translate('Create Drawing of {{value1}}…', { value1: entry.step.label })),
+          { action: 'export' as const, label: translate('Export as DXF/SVG…') },
+        ]
+      : []),
     suppress,
-    unavailable('Dynamic suppression'),
-    unavailable('Add comment'),
-    unavailable('Zoom to selection'),
-    ...(sketch ? [unavailable('View normal to')] : []),
-    { action: 'dependencies', label: 'Show dependencies…' },
+    unavailable(translate('Dynamic suppression')),
+    unavailable(translate('Add comment')),
+    unavailable(translate('Zoom to selection')),
+    ...(sketch ? [unavailable(translate('View normal to'))] : []),
+    { action: 'dependencies', label: translate('Show dependencies…') },
     // The last step has nothing after it to roll back from.
-    ...(sketch || !last ? [{ action: 'rollTo' as const, label: 'Roll to here' }] : []),
-    sketch ? unavailable('Edit sketch appearance…') : unavailable('Add appearance to feature…'),
+    ...(sketch || !last ? [{ action: 'rollTo' as const, label: translate('Roll to here') }] : []),
+    sketch ? unavailable(translate('Edit sketch appearance…')) : unavailable(translate('Add appearance to feature…')),
     remove,
   ];
 }
@@ -218,6 +246,7 @@ export function FeatureList({
 }) {
   const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);
+  const variableOff = (id: string) => !!document.variables?.find(variable => variable.id === id)?.suppressed;
   const pendingProblem = useSyncExternalStore(subscribePendingProblem, pendingProblemNow);
   const previewed = useMemo(() => (preview && preview !== document ? designSteps(preview) : null), [preview, document]);
   const entries = folderFeatureEntries(document).map(entry => {
@@ -233,7 +262,9 @@ export function FeatureList({
   });
   /** What hovering a broken row says, as the reference does: the feature by its name, then why. */
   const brokenMessage = (step: DesignStep) =>
-    step.broken === 'is not fully defined' ? `${step.label} ${step.broken}` : `${step.label} did not regenerate properly: ${step.broken}`;
+    step.broken === translate('is not fully defined')
+      ? `${step.label} ${step.broken}`
+      : translate('{{value1}} did not regenerate properly: {{value2}}', { value1: step.label, value2: step.broken });
   const [selectedEntry, setSelectedEntry] = useState<string | null>(initialSelection ?? null);
   const folders = useFolderControls({ document, onChange, onRollTo, selectedPartId });
   const select = (entry: FeatureEntry) => {
@@ -261,7 +292,7 @@ export function FeatureList({
     if (entry.kind === 'plane') return document.planes!.find(candidate => candidate.id === entry.id)!.name;
     const variable = document.variables!.find(candidate => candidate.id === entry.id)!;
     const result = scope[variable.name];
-    const unit = result?.kind === 'length' ? ` ${lengthUnit}` : result?.kind === 'angle' ? '°' : '';
+    const unit = result?.kind === 'length' ? ` ${lengthUnit}` : result?.kind === 'angle' ? ' deg' : '';
     return `#${variable.name} = ${result ? `${result.kind === 'length' ? formatLength(result.value) : formatCadValue(result.value)}${unit}` : variable.expression}`;
   };
   /** What a row's eye shows or hides: a sketch, by its step's id, or a plane. */
@@ -338,20 +369,23 @@ export function FeatureList({
   // The count takes in the default geometry listed above the features: the origin, when shown, and the base planes.
   const defaultRows = onPickPlane || onToggleShown ? (onToggleShown ? 1 : 0) + kBasePlanes.length : 0;
   return (
-    <section className="cad-studio-features" aria-label="Features" tabIndex={-1}>
+    <section className="cad-studio-features" aria-label={translate('Features')} tabIndex={-1}>
       <div className="cad-panel-heading">
         <h2>
-          Features (
+          {translate('Features ( ')}
           {visible
-            ? `${entries.filter(entry => entry.kind !== 'folder' && visible.has(key(entry))).length} of ${defaultRows + entries.filter(entry => entry.kind !== 'folder').length}`
+            ? translate('{{value1}} of {{value2}}', {
+                value1: entries.filter(entry => entry.kind !== 'folder' && visible.has(key(entry))).length,
+                value2: defaultRows + entries.filter(entry => entry.kind !== 'folder').length,
+              })
             : defaultRows + entries.filter(entry => entry.kind !== 'folder').length}
           )
           {brokenCount > 0 && (
             <span
               className="cad-feature-error-badge"
               role="status"
-              aria-label={`${brokenCount} with errors`}
-              title={`${brokenCount} with errors`}>
+              aria-label={translate('{{brokenCount}} with errors', { brokenCount: brokenCount })}
+              title={translate('{{brokenCount}} with errors', { brokenCount: brokenCount })}>
               {brokenCount}
             </span>
           )}
@@ -359,8 +393,8 @@ export function FeatureList({
         {onChange && (
           <button
             type="button"
-            aria-label="New folder"
-            title="Group neighbouring parts and planes in a folder"
+            aria-label={translate('New folder')}
+            title={translate('Group neighbouring parts and planes in a folder')}
             onClick={() => folders.newFolder()}>
             ＋
           </button>
@@ -368,18 +402,18 @@ export function FeatureList({
       </div>
       <FeatureFilterBox />
       {visible && (onPickPlane || onToggleShown) && (
-        <ul className="cad-default-geometry" aria-label="Default geometry">
+        <ul className="cad-default-geometry" aria-label={translate('Default geometry')}>
           <li className="cad-feature-elided">…</li>
         </ul>
       )}
       {/* Listed in a sketch too, as in the reference, to show or hide; a plane is picked to sketch on from the studio. */}
       {!visible && (onPickPlane || onToggleShown) && (
-        <ul className="cad-default-geometry" aria-label="Default geometry">
+        <ul className="cad-default-geometry" aria-label={translate('Default geometry')}>
           {onToggleShown && (
             <li className={shown?.('origin') === false ? 'cad-feature-hidden' : undefined}>
               <span className="cad-default-origin">
                 <span aria-hidden="true">⊙</span>
-                <span>Origin</span>
+                <span>{translate('Origin')}</span>
               </span>
               <Eye name="Origin" shown={shown?.('origin') ?? true} onToggle={() => onToggleShown('origin')} />
             </li>
@@ -440,7 +474,10 @@ export function FeatureList({
                 <button
                   type="button"
                   className="cad-folder-disclosure"
-                  aria-label={`${folder.collapsed ? 'Expand' : 'Collapse'} ${folder.name}`}
+                  aria-label={translate('{{value1}} {{value2}}', {
+                    value1: folder.collapsed ? translate('Expand') : translate('Collapse'),
+                    value2: folder.name,
+                  })}
                   aria-expanded={!folder.collapsed}
                   onClick={() => folders.toggle(folder)}>
                   <span aria-hidden="true">{folder.collapsed ? '▸' : '▾'}</span>
@@ -477,7 +514,7 @@ export function FeatureList({
                     stepIds={stepIds}
                     onRollTo={onRollTo}
                     onMenu={(x, y) => setBarMenu({ x, y })}
-                    label={`Shown through ${contained.find(step => step.id === rollback)?.label}`}
+                    label={translate('Shown through {{value1}}', { value1: contained.find(step => step.id === rollback)?.label })}
                   />
                 )}
               </li>
@@ -491,7 +528,7 @@ export function FeatureList({
               <li key={key(entry)}>
                 <input
                   className="cad-feature-rename"
-                  aria-label="New name"
+                  aria-label={translate('New name')}
                   defaultValue={step.label}
                   autoFocus
                   onFocus={event => event.currentTarget.select()}
@@ -552,7 +589,7 @@ export function FeatureList({
                   rollbackAt >= 0 && index > rollbackAt && 'cad-feature-rolled-back',
                   folderId && 'cad-folder-child',
                   folder?.suppressed && 'cad-feature-suppressed',
-                  step?.suppressed && 'cad-feature-suppressed',
+                  (step?.suppressed || (entry.kind === 'variable' && variableOff(entry.id))) && 'cad-feature-suppressed',
                   step?.broken && 'cad-feature-broken',
                   visibilityId(entry) && shown?.(visibilityId(entry)!) === false && 'cad-feature-hidden',
                   ...dropClasses(key(entry)),
@@ -606,7 +643,7 @@ export function FeatureList({
                 <span>{label(entry)}</span>
                 {step?.detail && <small>{step.detail}</small>}
                 {step?.broken && (
-                  <span className="cad-feature-warning" role="img" aria-label="Error" title={brokenMessage(step)}>
+                  <span className="cad-feature-warning" role="img" aria-label={translate('Error')} title={brokenMessage(step)}>
                     ⚠
                   </span>
                 )}
@@ -641,8 +678,11 @@ export function FeatureList({
                 <span
                   className="cad-feature-warning"
                   role="img"
-                  aria-label="Error"
-                  title={`${pending.label} did not regenerate properly: ${pendingProblem}`}>
+                  aria-label={translate('Error')}
+                  title={translate('{{value1}} did not regenerate properly: {{pendingProblem}}', {
+                    value1: pending.label,
+                    pendingProblem: pendingProblem,
+                  })}>
                   ⚠
                 </span>
               )}
@@ -655,7 +695,11 @@ export function FeatureList({
       )}
       {folders.controls}
       {barMenu && onRollTo && (
-        <div className="cad-feature-menu" role="menu" aria-label="Rollback bar actions" style={{ left: barMenu.x, top: barMenu.y }}>
+        <div
+          className="cad-feature-menu"
+          role="menu"
+          aria-label={translate('Rollback bar actions')}
+          style={{ left: barMenu.x, top: barMenu.y }}>
           <button
             type="button"
             role="menuitem"
@@ -665,7 +709,7 @@ export function FeatureList({
               setBarMenu(null);
               onRollTo(null);
             }}>
-            Roll to end
+            {translate('Roll to end ')}
           </button>
         </div>
       )}
@@ -674,7 +718,7 @@ export function FeatureList({
           ref={menuRef}
           className="cad-feature-menu"
           role="menu"
-          aria-label={`${label(menu.entry)} actions`}
+          aria-label={translate('{{value1}} actions', { value1: label(menu.entry) })}
           style={{ left: menu.x, top: menu.y }}
           onKeyDown={event => {
             event.stopPropagation();
@@ -692,6 +736,7 @@ export function FeatureList({
             sketchName: sketchOf(menu.entry),
             shown: onToggleShown && visibilityId(menu.entry) ? shown?.(visibilityId(menu.entry)!) !== false : undefined,
             folders: !!onChange && !inFolder(menu.entry),
+            suppressed: menu.entry.kind === 'variable' && variableOff(menu.entry.id),
           }).map(item => (
             <button
               key={item.label}
@@ -731,9 +776,14 @@ export function FeatureList({
           y={planeMenu.y}
           onClose={closePlaneMenu}
           items={[
-            ...(onNewSketch ? [{ label: 'New sketch', onSelect: () => onNewSketch(planeMenu.plane) }] : []),
+            ...(onNewSketch ? [{ label: translate('New sketch'), onSelect: () => onNewSketch(planeMenu.plane) }] : []),
             ...(onToggleShown
-              ? [{ label: shown?.(planeMenu.plane) === false ? 'Show' : 'Hide', onSelect: () => onToggleShown(planeMenu.plane) }]
+              ? [
+                  {
+                    label: shown?.(planeMenu.plane) === false ? translate('Show') : translate('Hide'),
+                    onSelect: () => onToggleShown(planeMenu.plane),
+                  },
+                ]
               : []),
           ]}
         />

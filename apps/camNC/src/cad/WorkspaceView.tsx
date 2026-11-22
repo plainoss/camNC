@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   activeDesign,
   assemblyReport,
@@ -37,14 +38,14 @@ import { sectionModel } from './sectionModel';
 import { StudioSectionControls, StudioSectionInspector } from './StudioSectionControls';
 
 const kViews: { view: ModelView; label: string }[] = [
-  { view: 'assembled', label: 'Assembled' },
-  { view: 'exploded', label: 'Exploded' },
-  { view: 'flat', label: 'Laid flat' },
+  { view: 'assembled', label: translate('Assembled') },
+  { view: 'exploded', label: translate('Exploded') },
+  { view: 'flat', label: translate('Laid flat') },
 ];
 const kDisplays: { display: ModelDisplay; label: string }[] = [
-  { display: 'edges', label: 'Shaded with edges' },
-  { display: 'shaded', label: 'Shaded' },
-  { display: 'translucent', label: 'Translucent' },
+  { display: 'edges', label: translate('Shaded with edges') },
+  { display: 'shaded', label: translate('Shaded') },
+  { display: 'translucent', label: translate('Translucent') },
 ];
 const always = () => true;
 /** Two clicks this close together open a part, rather than selecting it twice. */
@@ -208,7 +209,9 @@ export default function WorkspaceView({
   const sectionPicking = sectionEnabled && section.picking;
   const model = useMemo(() => sectionModel(assembly, section.plane), [assembly, section.plane]);
   const sectionProblem = model.sectionProblems.length
-    ? `Section unavailable: ${model.sectionProblems.map(item => `${item.name}: ${item.message}`).join('; ')} Showing the full model.`
+    ? translate('Section unavailable: {{value1}} Showing the full model.', {
+        value1: model.sectionProblems.map(item => `${item.name}: ${item.message}`).join('; '),
+      })
     : null;
   const sectionAvailable = model.sectionProblems.length === 0;
   // Hiding an unsupported body can change a full-model fallback into a valid section without editing the design.
@@ -255,7 +258,7 @@ export default function WorkspaceView({
   };
   const pickFace = (pick: ModelFacePick) => {
     const found = faceAt(pick);
-    if (!found) return setNotice('Pick a flat face: a part’s top, its underside, or one of its straight edges.');
+    if (!found) return setNotice(translate('Pick a flat face: a part’s top, its underside, or one of its straight edges.'));
     const { part, face, copyId } = found;
     setChoosing(false);
     setNotice(null);
@@ -263,7 +266,7 @@ export default function WorkspaceView({
   };
   const pickMirrorFace = (pick: ModelFacePick) => {
     const found = faceAt(pick);
-    if (!found) return setNotice('Pick a flat face: a part’s top, its underside, or one of its straight edges.');
+    if (!found) return setNotice(translate('Pick a flat face: a part’s top, its underside, or one of its straight edges.'));
     setNotice(null);
     lastClick.current = null;
     onSelectFace?.({ partId: found.part.id, face: found.face, ...(found.copyId && { copyId: found.copyId }) });
@@ -290,27 +293,31 @@ export default function WorkspaceView({
     : -1;
   const status =
     sectionProblem ??
-    (sectionEnabled && section.active && section.reason ? `Section view: ${section.reason}` : null) ??
-    (sectionPicking ? 'Pick a planar model face, or choose a section plane.' : null) ??
+    (sectionEnabled && section.active && section.reason ? translate('Section view: {{value1}}', { value1: section.reason }) : null) ??
+    (sectionPicking ? translate('Pick a planar model face, or choose a section plane.') : null) ??
     (notice
       ? notice
       : measure.expanded
-        ? 'Select vertices, straight edges or flat faces to measure. Click a selected item again to remove it.'
+        ? translate('Select vertices, straight edges or flat faces to measure. Click a selected item again to remove it.')
         : onPickPoint
-          ? 'Click an edge, a corner or the middle of a face.'
+          ? translate('Click an edge, a corner or the middle of a face.')
           : choosing
-            ? 'Click the face of a part to draw the new part on, or pick a plane. Esc cancels.'
+            ? translate('Click the face of a part to draw the new part on, or pick a plane. Esc cancels.')
             : picked
-              ? `Picked ${picked}: Sketch or Shift+S draws on it.`
+              ? translate('Picked {{value1}}: Sketch or Shift+S draws on it.', { value1: picked })
               : clashes.length
-                ? `${clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', ')} take up the same space.`
+                ? translate('{{value1}} take up the same space.', {
+                    value1: clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', '),
+                  })
                 : model.problems.length
-                  ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
+                  ? translate('Not shown: {{value1}}', {
+                      value1: model.problems.map(problem => `${problem.name} (${problem.message})`).join(', '),
+                    })
                   : view === 'flat'
-                    ? 'Each part turned so its machined side faces up, the way it lies on the board.'
+                    ? translate('Each part turned so its machined side faces up, the way it lies on the board.')
                     : model.meshes.length
-                      ? 'Click a part to select it, double-click to work on it. Right-drag to turn, middle-drag to pan.'
-                      : 'Draw a part to start.');
+                      ? translate('Click a part to select it, double-click to work on it. Right-drag to turn, middle-drag to pan.')
+                      : translate('Draw a part to start.'));
   return (
     <div
       ref={frame}
@@ -325,7 +332,7 @@ export default function WorkspaceView({
         }
       }}>
       <div className="cad-part-view-tools cad-assembly-tools">
-        <div role="group" aria-label="Workspace view" className="cad-view-switch">
+        <div role="group" aria-label={translate('Workspace view')} className="cad-view-switch">
           {kViews.map(option => (
             <button
               key={option.view}
@@ -339,7 +346,7 @@ export default function WorkspaceView({
         </div>
         {!section.active && view === 'exploded' && <ExplosionSlider progress={explosion.progress} onChange={explosion.scrub} />}
         {controlled && (
-          <select aria-label="Display" value={display} onChange={event => setDisplay(event.target.value as ModelDisplay)}>
+          <select aria-label={translate('Display')} value={display} onChange={event => setDisplay(event.target.value as ModelDisplay)}>
             {kDisplays.map(option => (
               <option key={option.display} value={option.display}>
                 {option.label}
@@ -350,7 +357,7 @@ export default function WorkspaceView({
         <StudioSectionControls section={section} enabled={sectionEnabled} />
         <button
           type="button"
-          aria-label="Measure"
+          aria-label={translate('Measure')}
           aria-keyshortcuts="["
           aria-pressed={measure.expanded}
           disabled={!sectionEnabled || sectionEditing || !model.meshes.some(mesh => mesh.indices.length > 0)}
@@ -360,7 +367,8 @@ export default function WorkspaceView({
             setView('assembled');
             measure.open();
           }}>
-          Measure <kbd>[</kbd>
+          {translate('Measure ')}
+          <kbd>[</kbd>
         </button>
         {onNewPart && !controlled && (
           <button
@@ -371,17 +379,18 @@ export default function WorkspaceView({
               setNotice(null);
               frame.current?.focus({ preventScroll: true });
             }}>
-            New part
+            {translate('New part ')}
           </button>
         )}
         {onCutParts && !choosing && document.parts.length > 1 && (
           <button type="button" onClick={onCutParts}>
-            Cut parts
+            {translate('Cut parts ')}
           </button>
         )}
         {selectedId && !choosing && !controlled && (
           <button type="button" onClick={() => onOpen(selectedId)}>
-            Open {document.parts.find(part => part.id === selectedId)?.name ?? 'part'}
+            {translate('Open ')}
+            {document.parts.find(part => part.id === selectedId)?.name ?? translate('part')}
           </button>
         )}
       </div>
@@ -402,7 +411,7 @@ export default function WorkspaceView({
         pickingConnector={!!onPickPoint}
         connectors={Object.entries(connectors ?? {}).map(([end, pick]) => ({
           ...pick,
-          label: end === 'from' ? 'Source mate connector' : 'Destination mate connector',
+          label: end === 'from' ? translate('Source mate connector') : translate('Destination mate connector'),
         }))}
         meshes={model.meshes}
         sourceMeshes={assembly.meshes}
@@ -422,7 +431,7 @@ export default function WorkspaceView({
             ? {
                 partId: selectedFace!.partId,
                 index: selectedFaceIndex,
-                point: selectedFrame.origin,
+                point: selectedFrame.anchor ?? selectedFrame.origin,
                 normal: selectedFrame.normal,
               }
             : null
@@ -487,8 +496,8 @@ export default function WorkspaceView({
           const instance = model.instances[index]!,
             partId = instance.partId;
           if (onPickPoint) {
-            if (pick?.sectionCap) return setNotice('Pick a model corner or edge; the section surface is temporary.');
-            if (!pick) return setNotice('Click a face of a part: its corners and middle snap.');
+            if (pick?.sectionCap) return setNotice(translate('Pick a model corner or edge; the section surface is temporary.'));
+            if (!pick) return setNotice(translate('Click a face of a part: its corners and middle snap.'));
             setNotice(null);
             return onPickPoint({
               partId,

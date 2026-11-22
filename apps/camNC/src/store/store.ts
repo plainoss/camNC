@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { DepthBlendManager } from '@/depth/depthBlendManager';
 import { immerable } from 'immer';
 import { Box2, Matrix3, Texture, Vector2, Vector3 } from 'three';
@@ -189,7 +190,7 @@ export const useStore = create(subscribeWithSelector(persist(immer(combine(
           const cam = state.activeCamId
             ? state.camSources[state.activeCamId]
             : undefined;
-          if (!cam) throw new Error('configure source first');
+          if (!cam) throw new Error(translate("configure source first"));
           cam.calibration = calibration;
         }),
       setExtrinsics: (extrinsics: CameraExtrinsics) =>
@@ -197,7 +198,7 @@ export const useStore = create(subscribeWithSelector(persist(immer(combine(
           const cam = state.activeCamId
             ? state.camSources[state.activeCamId]
             : undefined;
-          if (!cam) throw new Error('configure source first');
+          if (!cam) throw new Error(translate("configure source first"));
           cam.extrinsics = extrinsics;
         }),
       setMarkerPosInCam: (points: Vector2[]) =>
@@ -205,7 +206,7 @@ export const useStore = create(subscribeWithSelector(persist(immer(combine(
           const cam = state.activeCamId
             ? state.camSources[state.activeCamId]
             : undefined;
-          if (!cam) throw new Error('configure source first');
+          if (!cam) throw new Error(translate("configure source first"));
           cam.markerPosInCam = points;
         }),
       setMarkerPositions: (markers: Vector3[]) =>
@@ -213,7 +214,7 @@ export const useStore = create(subscribeWithSelector(persist(immer(combine(
           const cam = state.activeCamId
             ? state.camSources[state.activeCamId]
             : undefined;
-          if (!cam) throw new Error('configure source first');
+          if (!cam) throw new Error(translate("configure source first"));
           cam.markerPositions = markers;
         }),
       setArucoTagSize: (arucoTagSize: number) =>
@@ -221,7 +222,7 @@ export const useStore = create(subscribeWithSelector(persist(immer(combine(
           const cam = state.activeCamId
             ? state.camSources[state.activeCamId]
             : undefined;
-          if (!cam) throw new Error('configure source first');
+          if (!cam) throw new Error(translate("configure source first"));
           cam.arucoTagSize = arucoTagSize;
         }),
     },
@@ -393,7 +394,7 @@ export const useIsCameraReady = () => useStore(state => isCameraReady(state.acti
 export function useMachineBounds(): Box2 {
   const bounds = useMachineBoundsOrNull();
   if (!bounds) {
-    throw new Error('Machine bounds not set');
+    throw new Error(translate('Machine bounds not set'));
   }
   return bounds;
 }

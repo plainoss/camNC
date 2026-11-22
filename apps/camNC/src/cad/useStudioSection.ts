@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cadFaceFrame, cadVariableScope, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Box3, Vector3 } from 'three';
@@ -84,9 +85,9 @@ export function useStudioSection(
   const reason =
     pickProblem ??
     (!source
-      ? 'Pick a plane or a planar face for the section.'
+      ? translate('Pick a plane or a planar face for the section.')
       : !sourceFrame
-        ? 'The selected plane or face changed. Pick it again.'
+        ? translate('The selected plane or face changed. Pick it again.')
         : offsetProblem);
   const active = state !== null,
     flipped = state?.flipped ?? false,
@@ -162,8 +163,12 @@ export function useStudioSection(
       if (!('error' in picked))
         source = {
           kind: 'face',
-          frame: picked,
-          label: `${model.instances.find(item => item.partId === selectedFace.partId && item.copyId === selectedFace.copyId)?.name ?? 'Selected'} face`,
+          // Through a point of the face itself, where the section's handle sits.
+          frame: { ...picked, origin: picked.anchor ?? picked.origin },
+          label: translate('{{value1}} face', {
+            value1:
+              model.instances.find(item => item.partId === selectedFace.partId && item.copyId === selectedFace.copyId)?.name ?? 'Selected',
+          }),
           document,
         };
     }
@@ -187,13 +192,18 @@ export function useStudioSection(
   }, [selectedPlane]);
   const pickFace = (pick: ModelFacePick) => {
     if (!state?.editing || !state.picking) return;
-    if (pick.sectionCap) return setPickProblem('Pick a model face rather than the temporary cut surface.');
+    if (pick.sectionCap) return setPickProblem(translate('Pick a model face rather than the temporary cut surface.'));
     const instance = model.instances[pick.index];
     const point = pick.surfacePoint ?? pick.point;
     if (!instance || !point.every(Number.isFinite) || !pick.normal.every(Number.isFinite) || Math.hypot(...pick.normal) < 1e-9) return;
     setState({
       ...state,
-      source: { kind: 'face', frame: faceFrame(point, pick.normal), label: `${instance.name} face`, document },
+      source: {
+        kind: 'face',
+        frame: faceFrame(point, pick.normal),
+        label: translate('{{value1}} face', { value1: instance.name }),
+        document,
+      },
       offset: '0',
       flipped: false,
       picking: false,

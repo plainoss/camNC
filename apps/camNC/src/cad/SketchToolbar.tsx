@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   DropdownMenu,
@@ -496,9 +497,9 @@ export function SketchToolbar({
       ref={toolbar}
       className="cad-toolbar"
       role="toolbar"
-      aria-label="Sketch toolbar"
+      aria-label={translate('Sketch toolbar')}
       data-toolbar-layout={compact ? 'compact' : 'families'}>
-      <div className="cad-tool-group cad-drawing-tools" aria-label="Sketch tools" role="group" inert={busy}>
+      <div className="cad-tool-group cad-drawing-tools" aria-label={translate('Sketch tools')} role="group" inert={busy}>
         {tools.map(item => {
           const group = (compact ? sketchToolGroups : sketchToolFamilies).find(group =>
             (group.tools as readonly string[]).includes(item.id)
@@ -564,11 +565,11 @@ export function SketchToolbar({
             </div>
           );
         })}
-        <ToolHint label="Construction geometry (Q)">
+        <ToolHint label={translate('Construction geometry (Q)')}>
           <button
             type="button"
             className="cad-icon-button"
-            aria-label="Construction Q"
+            aria-label={translate('Construction Q')}
             data-command-highlight={searchHighlight === 'construction' || undefined}
             aria-pressed={construction}
             onClick={onConstruction}>
@@ -580,16 +581,16 @@ export function SketchToolbar({
           <ToolHint
             label={
               constraintMode === 'fix'
-                ? 'Fix constraint'
+                ? translate('Fix constraint')
                 : constraintMode
-                  ? `${sketchConstraints.find(c => c.id === constraintMode)?.label} constraint`
-                  : 'Constraints'
+                  ? translate('{{value1}} constraint', { value1: sketchConstraints.find(c => c.id === constraintMode)?.label })
+                  : translate('Constraints')
             }>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
                 className="cad-icon-button"
-                aria-label="Constraints"
+                aria-label={translate('Constraints')}
                 data-command-highlight={sketchConstraints.some(c => c.id === searchHighlight) || searchHighlight === 'fix' || undefined}
                 aria-pressed={!!constraintMode}>
                 <SketchToolGlyph kind={constraintMode ?? 'constraints'} />
@@ -615,33 +616,34 @@ export function SketchToolbar({
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={onFix}>
               <SketchToolGlyph kind="fix" />
-              <span>Fix / Unfix</span>
-              <DropdownMenuShortcut>Shift+J</DropdownMenuShortcut>
+              <span>{translate('Fix / Unfix')}</span>
+              <DropdownMenuShortcut>{translate('Shift+J')}</DropdownMenuShortcut>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
       {onSearch && (
         <button type="button" className="cad-search-trigger" disabled={busy} onClick={onSearch} aria-keyshortcuts="Alt+C">
-          Search tools… <kbd>alt/⌥ C</kbd>
+          {translate('Search tools… ')}
+          <kbd>{translate('alt/⌥ C')}</kbd>
         </button>
       )}
-      <div className="cad-tool-group cad-session-actions" aria-label="Sketch actions" role="group">
-        <ToolHint label="Undo (Ctrl or Command Z)">
+      <div className="cad-tool-group cad-session-actions" aria-label={translate('Sketch actions')} role="group">
+        <ToolHint label={translate('Undo (Ctrl or Command Z)')}>
           <button
             type="button"
             className="cad-icon-button"
-            aria-label="Undo (Ctrl or Command Z)"
+            aria-label={translate('Undo (Ctrl or Command Z)')}
             disabled={!canUndo || busy}
             onClick={onUndo}>
             <SketchToolGlyph kind="undo" />
           </button>
         </ToolHint>
-        <ToolHint label="Redo (Ctrl or Command Shift Z)">
+        <ToolHint label={translate('Redo (Ctrl or Command Shift Z)')}>
           <button
             type="button"
             className="cad-icon-button"
-            aria-label="Redo (Ctrl or Command Shift Z)"
+            aria-label={translate('Redo (Ctrl or Command Shift Z)')}
             disabled={!canRedo || busy}
             onClick={onRedo}>
             <SketchToolGlyph kind="redo" />
@@ -650,16 +652,21 @@ export function SketchToolbar({
         {!closeElsewhere && (
           <>
             <span className="cad-toolbar-divider" aria-hidden="true" />
-            <ToolHint label="Cancel sketch">
-              <button type="button" className="cad-icon-button cad-cancel" aria-label="Cancel" disabled={busy} onClick={onCancel}>
+            <ToolHint label={translate('Cancel sketch')}>
+              <button
+                type="button"
+                className="cad-icon-button cad-cancel"
+                aria-label={translate('Cancel')}
+                disabled={busy}
+                onClick={onCancel}>
                 <SketchToolGlyph kind="cancel" />
               </button>
             </ToolHint>
-            <ToolHint label="Finish sketch">
+            <ToolHint label={translate('Finish sketch')}>
               <button
                 type="button"
                 className="cad-icon-button cad-finish"
-                aria-label="✓ Finish sketch"
+                aria-label={translate('✓ Finish sketch')}
                 disabled={busy || !canFinish}
                 onClick={onFinish}>
                 <SketchToolGlyph kind="finish" />

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Vector3 } from 'three';
 import { ParsedToolpath } from '../gcodeParsing';
 import { isRapidSegment } from '../depthInspection';
@@ -87,7 +88,7 @@ export function getTimelineMarks(toolpath: ParsedToolpath, times: Float64Array, 
     const nextTool = toolpath.modals[i]?.tool;
     if (nextTool !== tool) {
       tool = nextTool;
-      marks.push({ time: times[i - 1], kind: 'tool', label: `Tool T${nextTool ?? '?'}` });
+      marks.push({ time: times[i - 1], kind: 'tool', label: translate('Tool T{{value1}}', { value1: nextTool ?? '?' }) });
       depth = null;
     }
     if (isRapidSegment(toolpath, i)) continue;
@@ -97,7 +98,7 @@ export function getTimelineMarks(toolpath: ParsedToolpath, times: Float64Array, 
     if (Math.abs(p1.z - p0.z) > 1e-6 || p0.equals(p1)) continue;
     if (depth === null || Math.abs(p1.z - depth) > minDepthStep) {
       depth = p1.z;
-      marks.push({ time: times[i - 1], kind: 'depth', label: `Z ${p1.z.toFixed(2)}` });
+      marks.push({ time: times[i - 1], kind: 'depth', label: translate('Z {{value1}}', { value1: p1.z.toFixed(2) }) });
     }
   }
   return marks;

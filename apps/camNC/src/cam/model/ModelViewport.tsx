@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Html, Line } from '@react-three/drei';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -437,7 +438,7 @@ export function ModelViewport({
             <ModelConnector key={connector.label} connector={connector} model={assembled} />
           ))}
           {pickingConnector && hoveredConnector && (
-            <ModelConnector connector={{ ...hoveredConnector, label: 'Mate connector under pointer' }} model={assembled} />
+            <ModelConnector connector={{ ...hoveredConnector, label: translate('Mate connector under pointer') }} model={assembled} />
           )}
         </>
       )}
@@ -475,7 +476,7 @@ export function ModelViewport({
           <Html center zIndexRange={[5, 0]} position={[0, 0, 0]} style={{ pointerEvents: 'none' }}>
             <div
               data-testid="model-origin"
-              aria-label="Origin"
+              aria-label={translate('Origin')}
               style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', border: `2px solid ${kPlane}` }}
             />
           </Html>

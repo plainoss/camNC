@@ -24,7 +24,9 @@ export function folderFeatureEntries(document: CadDocument): ListedFeatureEntry[
     ...(document.variables ?? [])
       .filter(
         variable =>
-          !variable.folderId && !(variable.before && steps.some(entry => entry.kind === 'step' && entry.step.id === variable.before))
+          !variable.folderId &&
+          !(variable.before && steps.some(entry => entry.kind === 'step' && entry.step.id === variable.before)) &&
+          !(variable.after && steps.some(entry => entry.kind === 'step' && entry.step.id === variable.after))
       )
       .map(variable => ({ kind: 'variable' as const, id: variable.id })),
     ...(document.planes ?? [])
@@ -48,6 +50,10 @@ export function folderFeatureEntries(document: CadDocument): ListedFeatureEntry[
       for (const variable of document.variables ?? [])
         if (!variable.folderId && variable.before === entry.step.id) entries.push({ kind: 'variable', id: variable.id });
     entries.push(entry);
+    // One made by the Variable tool comes just after the step that was last then.
+    if (entry.kind === 'step')
+      for (const variable of document.variables ?? [])
+        if (!variable.folderId && variable.after === entry.step.id) entries.push({ kind: 'variable', id: variable.id });
   }
   for (const folder of document.folders ?? []) emitFolder(folder.id);
   return entries;

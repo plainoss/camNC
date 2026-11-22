@@ -18,7 +18,9 @@
     "check-status": "node scripts/status.mjs",
     "check-types": "turbo run check-types",
     "prepare": "simple-git-hooks",
-    "sim": "pnpm --filter @wbcnc/fluidnc sim --"
+    "sim": "pnpm --filter @wbcnc/fluidnc sim --",
+    "i18n:check": "node scripts/i18n.mjs --check",
+    "i18n:extract": "node scripts/i18n.mjs --write"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
@@ -33,7 +35,8 @@
     "typescript": "catalog:",
     "vite-plugin-node-polyfills": "catalog:",
     "vitest": "catalog:",
-    "yaml": "catalog:"
+    "yaml": "catalog:",
+    "@babel/parser": "7.29.9"
   },
   "packageManager": "pnpm@12.19.0",
   "engines": {

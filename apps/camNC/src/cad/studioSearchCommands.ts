@@ -1,14 +1,15 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { SearchCommand } from './CommandSearch';
 import type { PartPatternKind } from './partPatternKind';
 import { kStudioCommands, type StudioCommand } from './studioCommands';
 
 /** The reference's other plane commands, listed under Plane as not available yet. */
 const kOtherPlanes = [
-  'Plane Normal To Edge',
-  'Plane Containing Edges',
-  'Offset Planes',
-  'Intermediate Planes',
-  'Surface Tangent Plane',
+  translate('Plane Normal To Edge'),
+  translate('Plane Containing Edges'),
+  translate('Offset Planes'),
+  translate('Intermediate Planes'),
+  translate('Surface Tangent Plane'),
 ] as const;
 
 export type StudioSearchId = StudioCommand | 'linearPartPattern' | 'circularPartPattern' | `plane:${(typeof kOtherPlanes)[number]}`;
@@ -30,13 +31,23 @@ export function studioSearchCommands(disabled: Partial<Record<StudioCommand, str
     if (disabled[id] || id === 'linearPattern') return [];
     if (id === 'pattern')
       return [
-        { id: 'linearPartPattern', label: 'Linear pattern', description: 'Copies of the selected part in a row', glyph },
-        { id: 'circularPartPattern', label: 'Circular pattern', description: 'Copies of the selected part around an axis', glyph },
+        {
+          id: 'linearPartPattern',
+          label: translate('Linear pattern'),
+          description: translate('Copies of the selected part in a row'),
+          glyph,
+        },
+        {
+          id: 'circularPartPattern',
+          label: translate('Circular pattern'),
+          description: translate('Copies of the selected part around an axis'),
+          glyph,
+        },
       ];
     if (id === 'plane')
       return [
         { id, label, description: hint, glyph },
-        ...kOtherPlanes.map(name => ({ id: `plane:${name}` as const, label: name, glyph, unavailable: 'Not available yet' })),
+        ...kOtherPlanes.map(name => ({ id: `plane:${name}` as const, label: name, glyph, unavailable: translate('Not available yet') })),
       ];
     return [{ id, label, description: hint, glyph }];
   });

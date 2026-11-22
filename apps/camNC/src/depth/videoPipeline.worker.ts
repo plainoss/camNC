@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { ensureReadableStream, registerThreeJsTransferHandlers, ReplaceableStreamWorker } from '@wbcnc/video-worker-utils';
 import * as Comlink from 'comlink';
 import log from 'loglevel';
@@ -104,7 +105,7 @@ class VideoPipelineWorker implements VideoPipelineWorkerAPI {
     existing?.destroy(); // size changed – destroy old
 
     const tex = this.ensureDevice().createTexture({
-      label: `${tag} (${width}x${height})`,
+      label: '{{tag}} ({{width}}x{{height}})',
       size: [width, height],
       format: 'rgba8unorm',
       usage,
@@ -115,7 +116,7 @@ class VideoPipelineWorker implements VideoPipelineWorkerAPI {
 
   /** Utility to ensure GPU device is present */
   private ensureDevice(): GPUDevice {
-    if (!this.device) throw new Error('GPU device not ready');
+    if (!this.device) throw new Error(translate('GPU device not ready'));
     return this.device;
   }
 
@@ -247,9 +248,9 @@ class VideoPipelineWorker implements VideoPipelineWorkerAPI {
   }
 
   async init(stream: ReadableStream<VideoFrame> | MediaStreamTrack, cfg: Config): Promise<void> {
-    if (!navigator.gpu) throw new Error('WebGPU not supported');
+    if (!navigator.gpu) throw new Error(translate('WebGPU not supported'));
     const adapter = await navigator.gpu.requestAdapter();
-    if (!adapter) throw new Error('No GPU adapter');
+    if (!adapter) throw new Error(translate('No GPU adapter'));
     this.device = await adapter.requestDevice();
     this.reader = ensureReadableStream(stream).getReader();
 
@@ -318,7 +319,7 @@ class VideoPipelineWorker implements VideoPipelineWorkerAPI {
 
   /** internal: processes one frame and returns depth result */
   private async processFrame(): Promise<DepthFrameResult | null> {
-    if (!this.reader || !this.device || !this.cfg) throw new Error('Worker not initialized');
+    if (!this.reader || !this.device || !this.cfg) throw new Error(translate('Worker not initialized'));
 
     await this._throttleFrameRate();
     this.lastFrameTime = performance.now();

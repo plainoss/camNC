@@ -482,6 +482,9 @@ importers:
 
   .:
     devDependencies:
+      '@babel/parser':
+        specifier: 7.29.9
+        version: 7.29.9
       '@biomejs/biome':
         specifier: 2.6.6
         version: 2.6.6
@@ -635,6 +638,9 @@ importers:
       '@wbcnc/go2webrtc':
         specifier: workspace:*
         version: link:../../packages/go2webrtc
+      '@wbcnc/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@wbcnc/load-opencv':
         specifier: workspace:*
         version: link:../../packages/load-opencv
@@ -1127,6 +1133,9 @@ importers:
       '@wbcnc/cad':
         specifier: workspace:*
         version: link:../cad
+      '@wbcnc/i18n':
+        specifier: workspace:*
+        version: link:../i18n
     devDependencies:
       '@mergifyio/vitest':
         specifier: 'catalog:'
@@ -1217,6 +1226,9 @@ importers:
       '@wbcnc/cam':
         specifier: workspace:*
         version: link:../cam
+      '@wbcnc/i18n':
+        specifier: workspace:*
+        version: link:../i18n
     devDependencies:
       '@mergifyio/vitest':
         specifier: 'catalog:'
@@ -1381,6 +1393,22 @@ importers:
         specifier: workspace:*
         version: link:../typescript-config
 
+  packages/i18n:
+    dependencies:
+      i18next:
+        specifier: ^25.6.3
+        version: 25.10.10(typescript@7.0.2)
+    devDependencies:
+      '@wbcnc/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.5.2)(@vitest/browser@3.2.4)(@vitest/ui@3.2.4)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.0.0))(lightningcss@1.33.0)(supports-color@10.0.0)(terser@5.43.1)(tsx@4.20.3)(vite@8.3.5(@types/node@24.5.2)(esbuild@0.27.3)(jiti@2.7.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0))(yaml@2.8.0)
+
   packages/load-opencv:
     dependencies:
       '@techstark/opencv-js':
@@ -1449,6 +1477,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: 'catalog:'
         version: 1.2.7(@types/react-dom@19.1.6(@types/react@19.1.8))(@types/react@19.1.8)(react-dom@19.1.0(@types/react@19.1.8)(react@19.1.0))(react@19.1.0)
+      '@wbcnc/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -1874,6 +1905,10 @@ packages:
 
   '@babel/runtime@7.27.6':
     resolution: {integrity: sha512-vbavdySgbTTrmFE+EsiqUTzlOr5bzlnJtUv9PynGCAKvfQqjIXbvFdumPM/GxMDfyuGMJaJAU6TO4zc1Jf1i8Q==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/runtime@7.29.14':
+    resolution: {integrity: sha512-Y5tqevQaUAZhhj82BpYMNC1ssvLQTVAfwKdm8iy8qwmhvC2/CpcAu8OC+QEtjM7pMk7knx83u1Qj8gzkicyelw==}
     engines: {node: '>=6.9.0'}
 
   '@babel/template@7.27.2':
@@ -9155,6 +9190,14 @@ packages:
     resolution: {integrity: sha512-B4FFZ6q/T2jhhksgkbEW3HBvWIfDW85snkQgawt07S7J5QXTk6BkNV+0yAeZrM5QpMAdYlocGoljn0sJ/WQkFw==}
     engines: {node: '>=10.17.0'}
 
+  i18next@25.10.10:
+    resolution: {integrity: sha512-cqUW2Z3EkRx7NqSyywjkgCLK7KLCL6IFVFcONG7nVYIJ3ekZ1/N5jUsihHV6Bq37NfhgtczxJcxduELtjTwkuQ==}
+    peerDependencies:
+      typescript: ^5 || ^6
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   iconv-lite@0.4.24:
     resolution: {integrity: sha512-v3MXnZAcvnywkTUEZomIActle7RXXeedOR31wwl7VlyoXO4Qi9arvSenNQWne1TcRwhCL1HwLI21bEqdpj8/rA==}
     engines: {node: '>=0.10.0'}
@@ -13076,6 +13119,8 @@ snapshots:
       core-js-pure: 3.44.0
 
   '@babel/runtime@7.27.6': {}
+
+  '@babel/runtime@7.29.14': {}
 
   '@babel/template@7.27.2':
     dependencies:
@@ -20415,6 +20460,12 @@ snapshots:
       - supports-color
 
   human-signals@2.1.0: {}
+
+  i18next@25.10.10(typescript@7.0.2):
+    dependencies:
+      '@babel/runtime': 7.29.14
+    optionalDependencies:
+      typescript: 7.0.2
 
   iconv-lite@0.4.24:
     dependencies:

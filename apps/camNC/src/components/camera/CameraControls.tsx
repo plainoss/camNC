@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useStore } from '@/store/store';
 import {
   AlertDialog,
@@ -26,7 +27,7 @@ export function CameraNameInput({ id, name }: { id: string; name: string }) {
   }
   return (
     <Input
-      aria-label="Camera name"
+      aria-label={translate('Camera name')}
       className="font-medium"
       value={value}
       onChange={e => setValue(e.target.value)}
@@ -47,24 +48,30 @@ export function DeleteCameraButton({ id, name, onDeleted }: { id: string; name: 
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label={`Delete ${name}`}>
-          <Trash2 /> Delete
+        <Button variant="ghost" size="sm" aria-label={translate('Delete {{name}}', { name: name })}>
+          <Trash2 />
+          {translate(' Delete ')}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete &quot;{name}&quot;?</AlertDialogTitle>
-          <AlertDialogDescription>Its source, calibration and markers are removed. This cannot be undone.</AlertDialogDescription>
+          <AlertDialogTitle>
+            {translate('Delete "')}
+            {name}&quot;?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {translate('Its source, calibration and markers are removed. This cannot be undone.')}
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{translate('Cancel')}</AlertDialogCancel>
           <AlertDialogAction
             onClick={() => {
               deleteCamSource(id);
               onDeleted?.();
             }}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-            Delete
+            {translate('Delete ')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

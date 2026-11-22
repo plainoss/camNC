@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   buildRtspUrl,
   CameraStream,
@@ -25,7 +26,7 @@ const schema = z.object({
   url: z
     .string()
     .trim()
-    .regex(/^rtsps?:\/\/[^/\s]+/i, 'Enter an rtsp:// URL, e.g. rtsp://admin:password@192.168.1.20:554/h264Preview_01_main'),
+    .regex(/^rtsps?:\/\/[^/\s]+/i, translate('Enter an rtsp:// URL, e.g. rtsp://admin:password@192.168.1.20:554/h264Preview_01_main')),
   type: z.literal('rtsp'),
 });
 
@@ -61,7 +62,7 @@ function useCameraSearch() {
 function StreamChoice({ streams, value, onChange }: { streams: CameraStream[]; value: string; onChange: (url: string) => void }) {
   return (
     <div className="flex flex-col gap-1">
-      <Label>Stream</Label>
+      <Label>{translate('Stream')}</Label>
       {streams.map(stream => (
         <label key={stream.url} className="flex flex-row items-center gap-2 text-sm">
           <input type="radio" name="stream" checked={value === stream.url} onChange={() => onChange(stream.url)} />
@@ -115,11 +116,11 @@ function CameraLogin({ camera, onConnect }: { camera: FoundCamera; onConnect: On
     <div className="flex flex-col gap-4 rounded-md border p-3">
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col gap-1">
-          <Label htmlFor="camera-user">Username</Label>
+          <Label htmlFor="camera-user">{translate('Username')}</Label>
           <Input id="camera-user" autoComplete="off" value={user} onChange={e => setUser(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="camera-password">Password</Label>
+          <Label htmlFor="camera-password">{translate('Password')}</Label>
           <Input
             id="camera-password"
             type="password"
@@ -136,11 +137,12 @@ function CameraLogin({ camera, onConnect }: { camera: FoundCamera; onConnect: On
       {!usePreset && !streams && (
         <div className="flex flex-row items-center gap-2">
           <Button onClick={logIn} disabled={busy}>
-            {busy && <Loader2 className="animate-spin" />} Log in
+            {busy && <Loader2 className="animate-spin" />}
+            {translate(' Log in ')}
           </Button>
           {camera.rtsp && (
             <Button variant="link" onClick={() => setUsePreset(true)}>
-              Pick the stream path instead
+              {translate('Pick the stream path instead ')}
             </Button>
           )}
         </div>
@@ -148,7 +150,7 @@ function CameraLogin({ camera, onConnect }: { camera: FoundCamera; onConnect: On
       {!usePreset && streams && <StreamChoice streams={streams} value={streamUrl} onChange={setStreamUrl} />}
       {usePreset && (
         <div className="flex flex-col gap-1">
-          <Label>Camera type</Label>
+          <Label>{translate('Camera type')}</Label>
           <Select value={path} onValueChange={setPath}>
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -161,12 +163,12 @@ function CameraLogin({ camera, onConnect }: { camera: FoundCamera; onConnect: On
               ))}
             </SelectContent>
           </Select>
-          <p className="text-sm text-muted-foreground">Another brand? Enter its RTSP URL below.</p>
+          <p className="text-sm text-muted-foreground">{translate('Another brand? Enter its RTSP URL below.')}</p>
         </div>
       )}
       {(usePreset || streams) && (
         <div>
-          <Button onClick={connect}>Connect</Button>
+          <Button onClick={connect}>{translate('Connect')}</Button>
         </div>
       )}
     </div>
@@ -186,18 +188,25 @@ function ManualUrlForm({ defaults, onConnect }: { defaults: RtspConnectionParams
           name="url"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>RTSP URL</FormLabel>
+              <FormLabel>{translate('RTSP URL')}</FormLabel>
               <FormControl>
-                <Input placeholder="rtsp://admin:password@192.168.1.20:554/h264Preview_01_main" autoComplete="off" {...field} />
+                <Input
+                  placeholder={translate('rtsp://admin:password@192.168.1.20:554/h264Preview_01_main')}
+                  autoComplete="off"
+                  {...field}
+                />
               </FormControl>
               <FormDescription>
-                Special characters in the password must be URL-encoded, e.g. <code>$</code> as <code>%24</code>.
+                {translate('Special characters in the password must be URL-encoded, e.g. ')}
+                <code>$</code>
+                {translate(' as ')}
+                <code>%24</code>.
               </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit">Connect</Button>
+        <Button type="submit">{translate('Connect')}</Button>
       </form>
     </Form>
   );
@@ -214,23 +223,25 @@ export function RtspTab({ defaults, onConnect }: { defaults: RtspConnectionParam
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Network camera</CardTitle>
+        <CardTitle>{translate('Network camera')}</CardTitle>
         <CardDescription>
-          Connect directly to an IP camera on your network, such as a Reolink. The desktop app streams it through its built-in go2rtc, so
-          nothing else needs to be installed.
+          {translate(
+            'Connect directly to an IP camera on your network, such as a Reolink. The desktop app streams it through its built-in go2rtc, so nothing else needs to be installed. '
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-row items-center justify-between">
-          <Label>Cameras on your network</Label>
+          <Label>{translate('Cameras on your network')}</Label>
           <Button variant="ghost" size="sm" onClick={search} disabled={searching}>
-            {searching ? <Loader2 className="animate-spin" /> : <RefreshCw />} {searching ? 'Searching…' : 'Search again'}
+            {searching ? <Loader2 className="animate-spin" /> : <RefreshCw />}{' '}
+            {searching ? translate('Searching…') : translate('Search again')}
           </Button>
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
         {cameras && cameras.length === 0 && !searching && (
           <p className="text-sm text-muted-foreground">
-            No cameras found. Make sure the camera is on the same network, or enter its RTSP URL below.
+            {translate('No cameras found. Make sure the camera is on the same network, or enter its RTSP URL below. ')}
           </p>
         )}
         {cameras && cameras.length > 0 && (
@@ -246,7 +257,7 @@ export function RtspTab({ defaults, onConnect }: { defaults: RtspConnectionParam
                   <Camera className="size-4 shrink-0" />
                   <span className="font-medium">{cameraLabel(camera)}</span>
                   <span className="text-muted-foreground">{camera.host}</span>
-                  {camera.host === currentHost && <span className="ml-auto text-muted-foreground">current</span>}
+                  {camera.host === currentHost && <span className="ml-auto text-muted-foreground">{translate('current')}</span>}
                 </button>
                 {selected === camera.host && selectedCamera && (
                   <div className="mt-2">
@@ -260,7 +271,8 @@ export function RtspTab({ defaults, onConnect }: { defaults: RtspConnectionParam
         <Collapsible open={manualOpen} onOpenChange={setManualOpen}>
           <CollapsibleTrigger asChild>
             <Button variant="link" className="px-0">
-              <ChevronDown className={manualOpen ? 'rotate-180' : ''} /> Enter an RTSP URL
+              <ChevronDown className={manualOpen ? 'rotate-180' : ''} />
+              {translate(' Enter an RTSP URL ')}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>

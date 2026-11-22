@@ -1,0 +1,10 @@
+{
+  "name": "@wbcnc/i18n",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "i18next": "^25.6.3" },
+  "scripts": { "test": "vitest", "check-types": "tsc --noEmit", "lint": "oxlint --max-warnings 0" },
+  "devDependencies": { "vitest": "catalog:", "typescript": "catalog:", "@wbcnc/typescript-config": "workspace:*" }
+}

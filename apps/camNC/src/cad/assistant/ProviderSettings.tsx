@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { rememberAssistantCredentials, setAssistantCredentials, type AssistantCredentials } from './keyStore';
 import { providerUrl, type ProviderConfig } from './provider';
@@ -62,9 +63,9 @@ export function ProviderSettings({
   };
   const validate = (requireModel: boolean) => {
     providerUrl(config);
-    if (!key.trim()) throw new Error('Enter your API key.');
-    if (requireModel && !config.model.trim() && !preset.models[0]) throw new Error('Enter the model ID from your provider.');
-    if (!config.tools) throw new Error('The assistants need a model that supports tools.');
+    if (!key.trim()) throw new Error(translate('Enter your API key.'));
+    if (requireModel && !config.model.trim() && !preset.models[0]) throw new Error(translate('Enter the model ID from your provider.'));
+    if (!config.tools) throw new Error(translate('The assistants need a model that supports tools.'));
     const model = config.model.trim() || (requireModel ? preset.models[0]!.id : '');
     const imageModel = config.imageModel?.trim();
     const { imageModel: _image, ...rest } = config;
@@ -85,7 +86,7 @@ export function ProviderSettings({
         try {
           next = validate(false);
         } catch (cause) {
-          setError(cause instanceof Error ? cause.message : 'Unable to save this connection.');
+          setError(cause instanceof Error ? cause.message : translate('Unable to save this connection.'));
           return;
         }
         const abort = new AbortController();
@@ -101,19 +102,19 @@ export function ProviderSettings({
             save({ ...next, config: result.config });
           })
           .catch(cause => {
-            if (!abort.signal.aborted) setError(cause instanceof Error ? cause.message : 'The connection test failed.');
+            if (!abort.signal.aborted) setError(cause instanceof Error ? cause.message : translate('The connection test failed.'));
           })
           .finally(() => {
             if (controller.current === abort) setTesting(false);
           });
       }}>
       <div className="cad-assistant-connection-intro">
-        <span className="cad-assistant-eyebrow">ONE CONNECTION FOR EVERY ASSISTANT</span>
-        <h3>Connect an AI provider</h3>
-        <p>Paste your key. The provider, models, address and capabilities are chosen and checked for you.</p>
+        <span className="cad-assistant-eyebrow">{translate('ONE CONNECTION FOR EVERY ASSISTANT')}</span>
+        <h3>{translate('Connect an AI provider')}</h3>
+        <p>{translate('Paste your key. The provider, models, address and capabilities are chosen and checked for you.')}</p>
       </div>
       <label>
-        API key
+        {translate('API key ')}
         <input
           type="password"
           autoComplete="off"
@@ -128,7 +129,7 @@ export function ProviderSettings({
           }}
         />
       </label>
-      <div className="cad-assistant-presets" role="radiogroup" aria-label="Provider">
+      <div className="cad-assistant-presets" role="radiogroup" aria-label={translate('Provider')}>
         {connectionPresets.map(item => (
           <button
             type="button"
@@ -145,10 +146,10 @@ export function ProviderSettings({
         ))}
       </div>
       <details className="cad-assistant-advanced">
-        <summary>Models (optional)</summary>
+        <summary>{translate('Models (optional)')}</summary>
         <fieldset disabled={testing}>
           <label>
-            Design model
+            {translate('Design model ')}
             <select
               value={customModel ? 'custom' : config.model}
               onChange={event => {
@@ -156,27 +157,31 @@ export function ProviderSettings({
                 setCustomModel(custom);
                 if (!custom) setConfig({ ...config, model: event.target.value });
               }}>
-              <option value="">Automatic (recommended)</option>
+              <option value="">{translate('Automatic (recommended)')}</option>
               {preset.models.map(model => (
                 <option key={model.id} value={model.id}>
                   {model.label}
                 </option>
               ))}
-              <option value="custom">Another model ID…</option>
+              <option value="custom">{translate('Another model ID…')}</option>
             </select>
           </label>
           {customModel && (
             <label>
-              Model ID
-              <input value={config.model} placeholder="Model ID" onChange={event => setConfig({ ...config, model: event.target.value })} />
+              {translate('Model ID ')}
+              <input
+                value={config.model}
+                placeholder={translate('Model ID')}
+                onChange={event => setConfig({ ...config, model: event.target.value })}
+              />
             </label>
           )}
           {config.kind !== 'anthropic' && (
             <label>
-              Image model, for Carve
+              {translate('Image model, for Carve ')}
               <input
                 value={config.imageModel ?? ''}
-                placeholder="Automatic"
+                placeholder={translate('Automatic')}
                 onChange={event => setConfig({ ...config, imageModel: event.target.value || undefined })}
               />
             </label>
@@ -185,17 +190,17 @@ export function ProviderSettings({
       </details>
       <label className="cad-assistant-check">
         <input type="checkbox" checked={remember} disabled={testing} onChange={event => setRemember(event.target.checked)} />
-        Remember on this device
+        {translate('Remember on this device ')}
       </label>
       <details className="cad-assistant-advanced" open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)}>
-        <summary>Address and capabilities</summary>
+        <summary>{translate('Address and capabilities')}</summary>
         <fieldset disabled={testing}>
           <label>
-            API address
+            {translate('API address ')}
             <input type="url" value={config.endpoint} onChange={event => setConfig({ ...config, endpoint: event.target.value })} />
           </label>
           <label>
-            API type
+            {translate('API type ')}
             <select
               value={config.kind === 'anthropic' ? 'anthropic' : config.protocol}
               onChange={event =>
@@ -205,14 +210,14 @@ export function ProviderSettings({
                     : { ...config, kind: 'compatible', protocol: event.target.value as 'chat' | 'responses' }
                 )
               }>
-              <option value="anthropic">Anthropic Messages</option>
-              <option value="responses">OpenAI Responses</option>
-              <option value="chat">OpenAI Chat Completions</option>
+              <option value="anthropic">{translate('Anthropic Messages')}</option>
+              <option value="responses">{translate('OpenAI Responses')}</option>
+              <option value="chat">{translate('OpenAI Chat Completions')}</option>
             </select>
           </label>
           <label className="cad-assistant-check">
             <input type="checkbox" checked={config.images} onChange={event => setConfig({ ...config, images: event.target.checked })} />
-            Try image input (the test turns it off if the model refuses images)
+            {translate('Try image input (the test turns it off if the model refuses images) ')}
           </label>
           {config.kind === 'anthropic' && (
             <label className="cad-assistant-check">
@@ -221,7 +226,7 @@ export function ProviderSettings({
                 checked={config.promptCaching !== false}
                 onChange={event => setConfig({ ...config, promptCaching: event.target.checked })}
               />
-              Reuse prompt context with Anthropic caching (cache writes are billed)
+              {translate('Reuse prompt context with Anthropic caching (cache writes are billed) ')}
             </label>
           )}
           <button
@@ -230,18 +235,19 @@ export function ProviderSettings({
               try {
                 save(validate(true));
               } catch (cause) {
-                setError(cause instanceof Error ? cause.message : 'Unable to save this connection.');
+                setError(cause instanceof Error ? cause.message : translate('Unable to save this connection.'));
               }
             }}>
-            Save without testing
+            {translate('Save without testing ')}
           </button>
         </fieldset>
       </details>
       <p>
-        Your key and requests go straight from this browser to the provider. The key stays out of account sync and settings backups. The
-        test sends one tiny request (well under a cent) and no design data.
+        {translate(
+          'Your key and requests go straight from this browser to the provider. The key stays out of account sync and settings backups. The test sends one tiny request (well under a cent) and no design data. '
+        )}
       </p>
-      {testing && <p role="status">Testing the connection…</p>}
+      {testing && <p role="status">{translate('Testing the connection…')}</p>}
       {notes.map(note => (
         <p key={note} role="status">
           {note}
@@ -249,11 +255,11 @@ export function ProviderSettings({
       ))}
       {error && <p role="alert">{error}</p>}
       <button type="submit" disabled={testing}>
-        {testing ? 'Testing…' : 'Test and connect'}
+        {testing ? translate('Testing…') : translate('Test and connect')}
       </button>
       {testing && (
         <button type="button" onClick={() => controller.current?.abort()}>
-          Cancel
+          {translate('Cancel ')}
         </button>
       )}
       {value && !testing && (
@@ -264,7 +270,7 @@ export function ProviderSettings({
             setKey('');
             onSave(null);
           }}>
-          Forget key
+          {translate('Forget key ')}
         </button>
       )}
     </form>

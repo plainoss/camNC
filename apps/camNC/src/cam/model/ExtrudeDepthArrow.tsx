@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Html, Line } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
@@ -84,7 +85,7 @@ export function ExtrudeDepthArrow({ control }: { control: ExtrudeDepthControl })
           type="button"
           role="spinbutton"
           className="cad-extrude-depth-arrow"
-          aria-label="Extrusion depth"
+          aria-label={translate('Extrusion depth')}
           aria-valuenow={control.depth}
           aria-valuemin={CAD_MIN_THICKNESS}
           aria-valuetext={`${control.depth} mm`}
@@ -92,8 +93,8 @@ export function ExtrudeDepthArrow({ control }: { control: ExtrudeDepthControl })
           data-dragging={control.dragging || undefined}
           title={
             control.editable
-              ? `${control.depth} mm — drag or use arrow keys to change depth`
-              : `${control.depth} mm — depth follows the end condition or merge target`
+              ? translate('{{value1}} mm — drag or use arrow keys to change depth', { value1: control.depth })
+              : translate('{{value1}} mm — depth follows the end condition or merge target', { value1: control.depth })
           }
           onPointerDown={event => {
             event.stopPropagation();

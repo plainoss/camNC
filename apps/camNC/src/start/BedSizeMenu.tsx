@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { MachineBoundsForm, type MachineBoundsValues } from '@/setup/MachineBoundsForm';
 import { Button } from '@wbcnc/ui/components/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@wbcnc/ui/components/popover';
@@ -20,8 +21,16 @@ export function BedSizeMenu({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" aria-label={`Bed size: ${bounds.xmax - bounds.xmin} by ${bounds.ymax - bounds.ymin} mm`}>
-          <Ruler aria-hidden /> {bounds.xmax - bounds.xmin} × {bounds.ymax - bounds.ymin} mm <ChevronDown aria-hidden />
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label={translate('Bed size: {{value1}} by {{value2}} mm', {
+            value1: bounds.xmax - bounds.xmin,
+            value2: bounds.ymax - bounds.ymin,
+          })}>
+          <Ruler aria-hidden /> {bounds.xmax - bounds.xmin} × {bounds.ymax - bounds.ymin}
+          {translate(' mm ')}
+          <ChevronDown aria-hidden />
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -43,7 +52,7 @@ export function BedSizeMenu({
           </Button>
         ))}
         <Button variant="ghost" className="justify-start" onClick={() => setCustom(v => !v)}>
-          Custom size…
+          {translate('Custom size… ')}
         </Button>
         {custom && (
           <div className="p-2">

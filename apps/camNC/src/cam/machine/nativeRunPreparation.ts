@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getRehearsalId, isDemoMode } from '@/lib/demo/demo-mode';
 import { isCut, physicalSheetIdOf, type BoardCut, type BoardV1 } from '../boards';
 import { getJob, updateJobForModel } from '../jobDb';
@@ -29,19 +30,19 @@ export class NativePreparationFailure extends Error {
 const storageContext = () => JSON.stringify([isDemoMode(), getRehearsalId()]);
 function assertContext(expected: string) {
   if (storageContext() !== expected)
-    throw new Error('The project storage mode changed. Its original preparation remains reserved for review.');
+    throw new Error(translate('The project storage mode changed. Its original preparation remains reserved for review.'));
 }
 const changed = (id: string) => window.dispatchEvent(new CustomEvent(nativeRunHistoryChanged, { detail: id }));
 
 /** Reserve a physical start before dispatch, with ownership that can be released only while no run was requested. */
 export async function prepareNativeRun(snapshot: ManufacturingSnapshot, executionId: string): Promise<NativePreparationReceipt> {
-  if (!executionId) throw new Error('The execution identity is missing.');
+  if (!executionId) throw new Error(translate('The execution identity is missing.'));
   const context = storageContext();
   for (let attempt = 0; attempt < 3; attempt++) {
     assertContext(context);
     const job = await getJob(snapshot.jobId);
     assertContext(context);
-    if (!job) throw new Error('The CAM project was removed. The program was not started.');
+    if (!job) throw new Error(translate('The CAM project was removed. The program was not started.'));
     const target = nativeRunTarget(snapshot, job);
     const receipt: NativePreparationReceipt = {
       jobId: job.id,
@@ -60,7 +61,8 @@ export async function prepareNativeRun(snapshot: ManufacturingSnapshot, executio
           const { board, boards, sourceKey } = nativeRunTarget(snapshot, current);
           const claims = board.cut?.startClaims ?? {};
           const existing = claims[executionId];
-          if (existing && existing.doneId !== snapshot.doneId) throw new Error('This execution already owns another program preparation.');
+          if (existing && existing.doneId !== snapshot.doneId)
+            throw new Error(translate('This execution already owns another program preparation.'));
           const sameProgram = Object.values(claims).filter(claim => claim.doneId === snapshot.doneId);
           const priorStarted =
             !!board.cut?.startedKeys?.includes(snapshot.doneId) && (!sameProgram.length || sameProgram.some(claim => claim.priorStarted));
@@ -97,7 +99,7 @@ export async function prepareNativeRun(snapshot: ManufacturingSnapshot, executio
       if (!saved) continue;
       const { board, sourceKey } = nativeRunTarget(snapshot, saved);
       if (board.cut?.sourceKey !== sourceKey || board.cut?.startClaims?.[executionId]?.doneId !== snapshot.doneId)
-        throw new Error('The physical preparation changed before it could be recorded. Review the setup before starting.');
+        throw new Error(translate('The physical preparation changed before it could be recorded. Review the setup before starting.'));
       changed(saved.id);
       return receipt;
     } catch (error) {
@@ -105,7 +107,7 @@ export async function prepareNativeRun(snapshot: ManufacturingSnapshot, executio
       throw error;
     }
   }
-  throw new Error('The project changed while preparing this program. Review the setup before starting.');
+  throw new Error(translate('The project changed while preparing this program. Review the setup before starting.'));
 }
 
 /** Call only before any controller run request. A later execution or physical generation is never rolled back. */
@@ -152,5 +154,5 @@ export async function rollbackNativePreparation(receipt: NativePreparationReceip
     }
     if (visited) return false;
   }
-  throw new Error('The project kept changing. Its original preparation remains reserved for review.');
+  throw new Error(translate('The project kept changing. Its original preparation remains reserved for review.'));
 }

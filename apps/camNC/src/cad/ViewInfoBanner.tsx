@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -16,7 +17,7 @@ export function ViewInfoBanner({ message }: { message: string | null }) {
         i
       </span>
       {message}
-      <button type="button" aria-label="Close message" onClick={() => setClosed(message)}>
+      <button type="button" aria-label={translate('Close message')} onClick={() => setClosed(message)}>
         ×
       </button>
     </p>,

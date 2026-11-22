@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { providerMetadata } from './providerMetadata';
 import { anthropicCachedSystem } from './anthropicCache';
 
@@ -73,9 +74,11 @@ export interface ProviderRequest {
 
 export function providerUrl(config: ProviderConfig): string {
   const url = new URL(config.endpoint);
-  if (url.username || url.password || url.search || url.hash) throw new Error('Use an API address without credentials, query or fragment.');
+  if (url.username || url.password || url.search || url.hash)
+    throw new Error(translate('Use an API address without credentials, query or fragment.'));
   const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback)) throw new Error('Use HTTPS, or a local provider on localhost.');
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback))
+    throw new Error(translate('Use HTTPS, or a local provider on localhost.'));
   return `${url.href.replace(/\/$/, '')}/${config.kind === 'anthropic' ? 'messages' : config.protocol === 'responses' ? 'responses' : 'chat/completions'}`;
 }
 
@@ -113,11 +116,11 @@ export function providerPayload({
   toolChoice,
   maxOutputTokens = 8192,
 }: Omit<ProviderRequest, 'key' | 'signal'>): Record<string, unknown> {
-  if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1) throw new Error('Choose a positive output token limit.');
-  if (!config.tools) throw new Error('Select a model that supports tools.');
-  if (!config.model.trim()) throw new Error('Enter the model ID from your provider.');
+  if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1) throw new Error(translate('Choose a positive output token limit.'));
+  if (!config.tools) throw new Error(translate('Select a model that supports tools.'));
+  if (!config.model.trim()) throw new Error(translate('Enter the model ID from your provider.'));
   if (!config.images && messages.some(message => message.images?.length))
-    throw new Error('This model is marked as text-only. Select an image-capable model or remove the images.');
+    throw new Error(translate('This model is marked as text-only. Select an image-capable model or remove the images.'));
   if (config.kind === 'anthropic') {
     const turns: { role: string; content: unknown[] }[] = [];
     for (const message of messages) {
@@ -255,13 +258,14 @@ export function providerPayload({
 
 function argumentsObject(input: unknown): Record<string, unknown> {
   const value: unknown = typeof input === 'string' ? JSON.parse(input) : input;
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('The provider returned invalid tool arguments.');
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error(translate('The provider returned invalid tool arguments.'));
   return value as Record<string, unknown>;
 }
 
 function toolCall(id: unknown, name: unknown, input: unknown): AssistantToolCall {
   if (typeof id !== 'string' || !id.trim() || typeof name !== 'string' || !name.trim())
-    throw new Error('The provider returned an invalid tool call ID or name.');
+    throw new Error(translate('The provider returned an invalid tool call ID or name.'));
   return { id, name, arguments: argumentsObject(input) };
 }
 
@@ -276,7 +280,7 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
     output?: { type: string; call_id?: string; name?: string; arguments?: string; content?: { text?: string }[] }[];
   };
   if (config.kind === 'anthropic') {
-    if (!Array.isArray(data.content)) throw new Error('The provider returned no message.');
+    if (!Array.isArray(data.content)) throw new Error(translate('The provider returned no message.'));
     return {
       role: 'assistant',
       ...metadata,
@@ -291,7 +295,7 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
     };
   }
   if (config.protocol === 'responses') {
-    if (!Array.isArray(data.output)) throw new Error('The provider returned no message.');
+    if (!Array.isArray(data.output)) throw new Error(translate('The provider returned no message.'));
     return {
       role: 'assistant',
       ...metadata,
@@ -307,7 +311,7 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
     };
   }
   const message = data.choices?.[0]?.message;
-  if (!message) throw new Error('The provider returned no message.');
+  if (!message) throw new Error(translate('The provider returned no message.'));
   return {
     role: 'assistant',
     ...metadata,
@@ -337,7 +341,7 @@ export async function requestAssistant(request: ProviderRequest, fetcher: typeof
   const url = providerUrl(request.config);
   const payload = providerPayload(request);
   const timeoutMs = request.timeoutMs ?? 90_000;
-  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new Error('Choose a positive provider timeout.');
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new Error(translate('Choose a positive provider timeout.'));
   if (request.signal.aborted) throw new DOMException('Stopped', 'AbortError');
   const controller = new AbortController();
   const started = performance.now();
@@ -352,7 +356,7 @@ export async function requestAssistant(request: ProviderRequest, fetcher: typeof
     // Race the complete operation: a provider can return headers and then stall its JSON body.
     timer = setTimeout(() => {
       controller.abort();
-      reject(new AssistantProviderError('timeout', 'The provider took too long. Try again or choose a faster model.'));
+      reject(new AssistantProviderError('timeout', translate('The provider took too long. Try again or choose a faster model.')));
     }, timeoutMs);
   });
   const operation = async (): Promise<AssistantMessage> => {
@@ -374,17 +378,21 @@ export async function requestAssistant(request: ProviderRequest, fetcher: typeof
     } catch {
       throw new AssistantProviderError(
         'network',
-        'Could not reach this provider from the browser. Check its address and browser access (CORS).'
+        translate('Could not reach this provider from the browser. Check its address and browser access (CORS).')
       );
     }
     if (!response.ok) {
       const action =
         response.status === 429
-          ? 'Wait before trying again, or check your provider quota.'
+          ? translate('Wait before trying again, or check your provider quota.')
           : response.status === 401 || response.status === 403
-            ? 'Check your key and model permissions.'
-            : 'Check your model and API protocol, or try again later.';
-      throw new AssistantProviderError('http', `Provider request failed (HTTP ${response.status}). ${action}`, response.status);
+            ? translate('Check your key and model permissions.')
+            : translate('Check your model and API protocol, or try again later.');
+      throw new AssistantProviderError(
+        'http',
+        translate('Provider request failed (HTTP {{value1}}). {{value2}}', { value1: response.status, value2: action }),
+        response.status
+      );
     }
     try {
       const message = parseProviderMessage(request.config, await response.json());
@@ -392,7 +400,7 @@ export async function requestAssistant(request: ProviderRequest, fetcher: typeof
     } catch {
       throw new AssistantProviderError(
         'protocol',
-        'The provider returned an unsupported response. Check its API protocol and tool support.'
+        translate('The provider returned an unsupported response. Check its API protocol and tool support.')
       );
     }
   };

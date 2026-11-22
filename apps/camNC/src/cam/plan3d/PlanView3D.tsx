@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Canvas, useThree } from '@react-three/fiber';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { Focus } from 'lucide-react';
@@ -60,15 +61,15 @@ export function PlanView3D({
   const hint =
     mode !== 'toolpath'
       ? label
-        ? `${label}: solid where it has cut, a tint where it still cuts`
-        : 'Select an operation to see what it removes'
+        ? translate('{{value1}}: solid where it has cut, a tint where it still cuts', { value1: label })
+        : translate('Select an operation to see what it removes')
       : label
-        ? `${label} on its own`
-        : 'Click an operation to isolate it';
+        ? translate('{{value1}} on its own', { value1: label })
+        : translate('Click an operation to isolate it');
 
   return (
     <section
-      aria-label={`3D view of board ${board.name}`}
+      aria-label={translate('3D view of board {{value1}}', { value1: board.name })}
       data-mode={mode}
       className={cn('flex flex-col overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800', className)}>
       <div className="flex h-[420px] min-w-0 flex-col md:h-auto md:min-h-0 md:flex-1">
@@ -87,26 +88,28 @@ export function PlanView3D({
           </Canvas>
           <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
             <Segmented
-              label="Show"
+              label={translate('Show')}
               value={mode}
               onChange={setMode}
               options={[
-                ['result', 'Result', 'The board as it comes out, cut up to the playhead.'],
+                ['result', 'Result', translate('The board as it comes out, cut up to the playhead.')],
                 [
                   'compare',
                   'Compare',
-                  "The cut board against your model: green as designed, orange where material is left, red where it's cut too deep.",
+                  translate(
+                    "The cut board against your model: green as designed, orange where material is left, red where it's cut too deep."
+                  ),
                 ],
-                ['toolpath', 'Toolpath', 'Every move of the bit, at its real depth, through a see-through board.'],
+                ['toolpath', 'Toolpath', translate('Every move of the bit, at its real depth, through a see-through board.')],
               ]}
             />
             <Segmented
-              label="View"
+              label={translate('View')}
               value={view}
               onChange={setView}
               options={[
-                ['3d', '3D', 'Look at the board at an angle. Drag to turn it.'],
-                ['top', 'Top', 'Look straight down on the board.'],
+                ['3d', '3D', translate('Look at the board at an angle. Drag to turn it.')],
+                ['top', 'Top', translate('Look straight down on the board.')],
               ]}
             />
             {view === '3d' && (
@@ -114,7 +117,7 @@ export function PlanView3D({
                 pressed={ortho3d}
                 onChange={setOrtho3d}
                 hint="No perspective: sizes compare true across the whole board. The top view always is.">
-                Orthographic
+                {translate('Orthographic ')}
               </Toggle>
             )}
             {mode === 'result' && (
@@ -122,7 +125,7 @@ export function PlanView3D({
                 pressed={seeThrough}
                 onChange={setSeeThrough}
                 hint="A see-through board: the toolpaths and the finished parts show through it.">
-                See through
+                {translate('See through ')}
               </Toggle>
             )}
             {mode === 'toolpath' && (
@@ -130,13 +133,16 @@ export function PlanView3D({
                 pressed={showRapids}
                 onChange={setShowRapids}
                 hint="Show the fast moves between cuts, with the bit up out of the wood.">
-                Rapids
+                {translate('Rapids ')}
               </Toggle>
             )}
-            <Hint text={selected !== null ? 'Zoom back to the selected operation.' : 'Fit the whole board in the view again.'}>
+            <Hint
+              text={
+                selected !== null ? translate('Zoom back to the selected operation.') : translate('Fit the whole board in the view again.')
+              }>
               <button
                 className={cn(kChip, 'px-2')}
-                aria-label={selected !== null ? 'Zoom to the operation' : 'Show the whole board'}
+                aria-label={selected !== null ? translate('Zoom to the operation') : translate('Show the whole board')}
                 onClick={() => setFitCount(c => c + 1)}>
                 <Focus className="size-3.5" />
               </button>
@@ -145,13 +151,13 @@ export function PlanView3D({
           {mode === 'compare' ? (
             <div
               role="note"
-              aria-label="Compared to the model"
+              aria-label={translate('Compared to the model')}
               className="pointer-events-none absolute right-2.5 bottom-2.5 flex flex-wrap gap-x-3 gap-y-1 rounded-md bg-black/60 px-2.5 py-1.5 text-xs text-zinc-100">
               {(
                 [
-                  ['#22b259', `As designed (±${kCompareTolerance} mm)`],
-                  ['#f58c1a', 'Material left'],
-                  ['#db2626', 'Cut too deep'],
+                  ['#22b259', translate('As designed (±{{value1}} mm)', { value1: kCompareTolerance })],
+                  ['#f58c1a', translate('Material left')],
+                  ['#db2626', translate('Cut too deep')],
                 ] as const
               ).map(([c, t]) => (
                 <span key={t} className="flex items-center gap-1.5">

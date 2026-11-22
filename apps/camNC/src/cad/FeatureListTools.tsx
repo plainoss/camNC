@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { featureDependencies, type CadDocument } from '@wbcnc/cad';
 import { useState } from 'react';
 import { kFeatureFilterHelp, setFeatureFilter, useFeatureFilter } from './featureFilter';
@@ -10,8 +11,8 @@ export function FeatureFilterBox() {
     <div className="cad-feature-filter">
       <input
         type="search"
-        aria-label="Filter by name or type"
-        placeholder="Filter by name or type"
+        aria-label={translate('Filter by name or type')}
+        placeholder={translate('Filter by name or type')}
         aria-describedby={focused ? 'cad-feature-filter-help' : undefined}
         value={text}
         onFocus={() => setFocused(true)}
@@ -25,7 +26,7 @@ export function FeatureFilterBox() {
       />
       {focused && (
         <div id="cad-feature-filter-help" role="note" className="cad-feature-filter-help">
-          <p>Filter by name or type, or with:</p>
+          <p>{translate('Filter by name or type, or with:')}</p>
           <dl>
             {kFeatureFilterHelp.map(([syntax, meaning]) => (
               <div key={syntax}>
@@ -63,21 +64,25 @@ export function FeatureDependenciesPanel({
   const inOrder = (keys: string[]) => order.filter(key => keys.includes(key));
   const parents = inOrder(found.parents),
     children = inOrder(found.children);
-  const title = `Dependencies of ${label(entryKey)}`;
+  const title = translate('Dependencies of {{value1}}', { value1: label(entryKey) });
   const list = (name: string, keys: string[]) => (
     <ul aria-label={name}>
-      {keys.length ? keys.map(key => <li key={key}>{label(key)}</li>) : <li className="cad-feature-dependencies-none">None</li>}
+      {keys.length ? (
+        keys.map(key => <li key={key}>{label(key)}</li>)
+      ) : (
+        <li className="cad-feature-dependencies-none">{translate('None')}</li>
+      )}
     </ul>
   );
   return (
     <section className="cad-feature-dependencies" role="dialog" aria-label={title}>
       <header>
         <h3>{title}</h3>
-        <button type="button" aria-label="Close" onClick={onClose}>
+        <button type="button" aria-label={translate('Close')} onClick={onClose}>
           ×
         </button>
       </header>
-      {list('Depends on', parents)}
+      {list(translate('Depends on'), parents)}
       <p className="cad-feature-dependencies-arrow" aria-hidden="true">
         ↑
       </p>
@@ -85,7 +90,7 @@ export function FeatureDependenciesPanel({
       <p className="cad-feature-dependencies-arrow" aria-hidden="true">
         ↓
       </p>
-      {list('Used by', children)}
+      {list(translate('Used by'), children)}
     </section>
   );
 }

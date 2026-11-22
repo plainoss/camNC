@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   evaluateCurvePoint,
   isNurbsCurve,
@@ -95,7 +96,7 @@ export function SketchGeometry({
             data-spline-tangents={handle?.splineId}>
             <title>
               {entity.type}
-              {entity.faceEdge ? ' (face edge)' : entity.construction ? ' (construction)' : ''}
+              {entity.faceEdge ? translate(' (face edge)') : entity.construction ? translate(' (construction)') : ''}
             </title>
             {shape && handle && entity.type === 'line' ? (
               <path
@@ -141,7 +142,7 @@ export function SketchGeometry({
               vectorEffect="non-scaling-stroke"
               className="cad-point">
               <title>
-                {point.fixed ? 'Fixed point' : 'Point'} {formatCadValue(point.x)}, {formatCadValue(point.y)}
+                {point.fixed ? translate('Fixed point') : translate('Point')} {formatCadValue(point.x)}, {formatCadValue(point.y)}
               </title>
             </circle>
             {hoveredPointId === point.id && (
@@ -225,7 +226,7 @@ export function SketchGeometry({
               key={`rho:${entity.id}`}
               data-conic-rho={entity.id}
               role={enabled ? 'button' : undefined}
-              aria-label={enabled ? `Edit conic rho: ${formatCadValue(entity.rho)}` : undefined}
+              aria-label={enabled ? translate('Edit conic rho: {{value1}}', { value1: formatCadValue(entity.rho) }) : undefined}
               tabIndex={enabled ? 0 : -1}
               transform={`translate(${anchor.x + 12 / scale},${-anchor.y - 12 / scale}) scale(${1 / scale})`}
               pointerEvents={enabled ? 'all' : 'none'}

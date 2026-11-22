@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import './featureList.css';
 
@@ -37,7 +38,7 @@ export function PartRowMenu({
       ref={ref}
       className="cad-feature-menu"
       role="menu"
-      aria-label={`${name} actions`}
+      aria-label={translate('{{name}} actions', { name: name })}
       style={{ left: x, top: y }}
       onKeyDown={event => {
         event.stopPropagation();

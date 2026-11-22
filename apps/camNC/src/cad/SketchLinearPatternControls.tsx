@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import { patternSourceIds, type CadPoint, type CadSketch } from '@wbcnc/cad';
 import type { PointerEvent } from 'react';
@@ -34,14 +35,14 @@ export function SketchLinearPatternControls({
   const fields = [
     ['countX', 'Instances 1', 'scalar'],
     ['spacingX', 'Spacing 1', 'mm'],
-    ['angleX', 'Direction angle 1', 'deg'],
+    ['angleX', translate('Direction angle 1'), 'deg'],
     ['countY', 'Instances 2', 'scalar'],
     ['spacingY', 'Spacing 2', 'mm'],
-    ['angleY', 'Direction angle 2', 'deg'],
+    ['angleY', translate('Direction angle 2'), 'deg'],
   ] as const;
   return (
     <form
-      aria-label="Linear pattern"
+      aria-label={translate('Linear pattern')}
       className="cad-pattern-inline"
       onSubmit={e => {
         e.preventDefault();
@@ -99,8 +100,13 @@ export function SketchLinearPatternControls({
           {error}
         </span>
       )}
-      {releasedCount > 0 && <span role="status">{releasedCount} relations on removed instances will be released.</span>}
-      {previewLimited && <span role="status">Showing up to 10 instances. The sketch gets the full pattern.</span>}
+      {releasedCount > 0 && (
+        <span role="status">
+          {releasedCount}
+          {translate(' relations on removed instances will be released.')}
+        </span>
+      )}
+      {previewLimited && <span role="status">{translate('Showing up to 10 instances. The sketch gets the full pattern.')}</span>}
     </form>
   );
 }
@@ -197,7 +203,7 @@ export function SketchLinearPatternManipulator({
                 stroke="none"
                 fontSize={11 * k}
                 pointerEvents="none">
-                —<title>Horizontal</title>
+                —<title>{translate('Horizontal')}</title>
               </text>
             )}
             {count > 1 && !made && (
@@ -212,7 +218,11 @@ export function SketchLinearPatternManipulator({
                   e.stopPropagation();
                   onStart(index, e);
                 }}>
-                <title>Drag direction {label} spacing and angle</title>
+                <title>
+                  {translate('Drag direction ')}
+                  {label}
+                  {translate(' spacing and angle')}
+                </title>
               </circle>
             )}
             {count > 1 && !made && (
@@ -230,14 +240,18 @@ export function SketchLinearPatternManipulator({
                   e.stopPropagation();
                   onStart(index, e, count - 1);
                 }}>
-                <title>Drag direction {label} to turn it</title>
+                <title>
+                  {translate('Drag direction ')}
+                  {label}
+                  {translate(' to turn it')}
+                </title>
               </circle>
             )}
             <text
               data-pattern-count={index}
               role="button"
               tabIndex={0}
-              aria-label={`Edit instance count ${label}`}
+              aria-label={translate('Edit instance count {{label}}', { label: label })}
               x={end.x + unit.x * 10 * k}
               y={-(end.y + unit.y * 10 * k) - 4 * k}
               fill="currentColor"
@@ -259,7 +273,7 @@ export function SketchLinearPatternManipulator({
                 data-pattern-spacing={index}
                 role="button"
                 tabIndex={0}
-                aria-label={`Edit spacing ${label}`}
+                aria-label={translate('Edit spacing {{label}}', { label: label })}
                 x={anchor.x + step.x / 2 - unit.y * side * 10 * k}
                 y={-(anchor.y + step.y / 2 + unit.x * side * 10 * k)}
                 textAnchor="middle"

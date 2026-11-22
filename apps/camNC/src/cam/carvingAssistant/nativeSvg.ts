@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { generateCarvingAsset, type CarvingGenerationOptions } from './generation';
 import { nativeBudgetRefusal, nativeImageUrl, requestNativeImage, type NativeImageConfig } from './nativeImage';
 
@@ -10,7 +11,8 @@ export type NativeSvgConfig = NativeImageConfig;
  */
 export async function generateNativeSvgAsset(options: CarvingGenerationOptions, native: NativeSvgConfig, fetcher: typeof fetch = fetch) {
   nativeBudgetRefusal(options.limits?.maxCostUsd);
-  if (options.previous) throw new Error('Native SVG generation creates new artwork. Use the text SVG route to revise an existing source.');
+  if (options.previous)
+    throw new Error(translate('Native SVG generation creates new artwork. Use the text SVG route to revise an existing source.'));
   nativeImageUrl(native);
   return generateCarvingAsset({
     ...options,
@@ -25,7 +27,7 @@ export async function generateNativeSvgAsset(options: CarvingGenerationOptions, 
       try {
         svg = new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(atob(base64), char => char.charCodeAt(0)));
       } catch {
-        throw new Error('The native SVG provider returned an unsupported artwork response.');
+        throw new Error(translate('The native SVG provider returned an unsupported artwork response.'));
       }
       return {
         role: 'assistant',
@@ -37,8 +39,8 @@ export async function generateNativeSvgAsset(options: CarvingGenerationOptions, 
             name: 'submit_carving_svg',
             arguments: {
               svg,
-              title: 'Generated carving',
-              summary: 'Native SVG illustration; review subject fidelity and local carving diagnostics.',
+              title: translate('Generated carving'),
+              summary: translate('Native SVG illustration; review subject fidelity and local carving diagnostics.'),
             },
           },
         ],

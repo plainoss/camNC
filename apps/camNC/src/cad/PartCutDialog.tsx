@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import {
   activeDesign,
@@ -102,7 +103,7 @@ export function PartCutDialog({
       : 'error' in fingers
         ? fingers.error
         : !Number.isInteger(fingers.value) || fingers.value < 2
-          ? 'Use a whole number of fingers, at least 2.'
+          ? translate('Use a whole number of fingers, at least 2.')
           : null;
   const [error, setError] = useState<string | null>(null);
   const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter(candidate => candidate !== id) : [...list, id]);
@@ -117,25 +118,25 @@ export function PartCutDialog({
   useEffect(() => onPicked?.({ tools, targets }), [tools, targets, onPicked]);
   const [featureId] = useState(() => step?.id ?? newCadId());
   const result = useMemo<{ error: string } | { change: PartCutChange }>(() => {
-    if (!tools.length || !targets.length) return { error: 'Pick at least one part to cut out, and one to cut it from.' };
+    if (!tools.length || !targets.length) return { error: translate('Pick at least one part to cut out, and one to cut it from.') };
     // A later cut may consume this feature's target. Final visible membership must not invalidate its saved reference.
     const selection = resolvePartCutTargets({ parts: activeDesign(document).parts.filter(isCadPart) }, targets);
-    if (selection.missing.length) return { error: 'A target copy or part is not present. Restore it or choose another target.' };
+    if (selection.missing.length) return { error: translate('A target copy or part is not present. Restore it or choose another target.') };
     if (joint !== 'none' && selection.targets.some(target => target.copyId !== undefined))
-      return { error: 'Split joints on a single target copy are not supported. Choose Cut out or target the source family.' };
+      return { error: translate('Split joints on a single target copy are not supported. Choose Cut out or target the source family.') };
     if (tools.every(id => targets.every(target => cadPartReferenceOwner(document, target)?.id === cadPartReferenceOwner(document, id)?.id)))
-      return { error: 'A part can’t be cut out of itself.' };
+      return { error: translate('A part can’t be cut out of itself.') };
     if (joint === 'none' && !keepTools && tools.some(id => !document.parts.some(part => part.id === id)))
-      return { error: 'Using up a single copy is not supported. Keep tools to cut with a copy.' };
+      return { error: translate('Using up a single copy is not supported. Keep tools to cut with a copy.') };
     const parsed = parseCadValue(text, { unit: 'mm', variables });
     if ('error' in parsed) return { error: parsed.error };
-    if (parsed.value < 0) return { error: 'A clearance can’t be less than nothing.' };
+    if (parsed.value < 0) return { error: translate('A clearance can’t be less than nothing.') };
     if (fingersError) return { error: fingersError };
     let cornerRelief: CadPartCut['cornerRelief'] = relief === 'off' ? null : undefined;
     if (relief === 'dogbone') {
       const diameter = parseCadValue(diameterText, { unit: 'mm', variables });
       if ('error' in diameter) return { error: diameter.error };
-      if (!(diameter.value > 0)) return { error: 'A dogbone needs a cutter diameter greater than zero.' };
+      if (!(diameter.value > 0)) return { error: translate('A dogbone needs a cutter diameter greater than zero.') };
       cornerRelief = { diameter: diameter.value, ...(diameter.expression && { diameterExpression: diameter.expression }) };
     }
     const split: CadPartCut['split'] =
@@ -174,7 +175,7 @@ export function PartCutDialog({
     if ('error' in result) return setError(result.error);
     onSave(result.change);
   };
-  const name = (id: string) => cadPartReferenceName(document, id) ?? 'a removed part';
+  const name = (id: string) => cadPartReferenceName(document, id) ?? translate('a removed part');
   const box = (which: Box, label: string, chosen: string[], choose: (ids: string[]) => void) => (
     <div
       className="cad-feature-selection cad-part-cut-box"
@@ -190,7 +191,7 @@ export function PartCutDialog({
               {name(id)}
               <button
                 type="button"
-                aria-label={`Take ${name(id)} out of ${label.toLowerCase()}`}
+                aria-label={translate('Take {{value1}} out of {{value2}}', { value1: name(id), value2: label.toLowerCase() })}
                 onClick={event => {
                   event.stopPropagation();
                   choose(chosen.filter(candidate => candidate !== id));
@@ -201,13 +202,15 @@ export function PartCutDialog({
           ))}
         </ul>
       ) : (
-        <span className="cad-feature-hint">{active === which ? 'Click parts in the view or the parts list' : 'None yet'}</span>
+        <span className="cad-feature-hint">
+          {active === which ? translate('Click parts in the view or the parts list') : translate('None yet')}
+        </span>
       )}
     </div>
   );
   return (
     <FeatureDialog
-      title="Cut parts"
+      title={translate('Cut parts')}
       okLabel={step ? 'Save' : 'Cut'}
       okDisabled={!!fingersError}
       onOk={save}
@@ -216,11 +219,11 @@ export function PartCutDialog({
       {box('tools', 'Tools', tools, setTools)}
       {box('targets', 'Targets', targets, setTargets)}
       <label className="cad-part-cut-clearance">
-        Clearance
+        {translate('Clearance ')}
         <CadValueInput
           bare
           value={text}
-          aria-label="Clearance"
+          aria-label={translate('Clearance')}
           spellCheck={false}
           aria-invalid={error ? true : undefined}
           onChange={event => setText(event.target.value)}
@@ -230,33 +233,33 @@ export function PartCutDialog({
       {joint === 'none' && (
         <label>
           <input type="checkbox" checked={keepTools} onChange={event => setKeepTools(event.target.checked)} />
-          Keep tools
+          {translate('Keep tools ')}
         </label>
       )}
       <label>
-        Joint
+        {translate('Joint ')}
         <select value={joint} onChange={event => setJoint(event.target.value as Joint)}>
-          <option value="none">Cut out</option>
-          <option value="half">Half lap</option>
-          <option value="fingers">Finger joint</option>
+          <option value="none">{translate('Cut out')}</option>
+          <option value="half">{translate('Half lap')}</option>
+          <option value="fingers">{translate('Finger joint')}</option>
         </select>
       </label>
-      {joint !== 'none' && <p className="cad-feature-hint">Both parts are kept.</p>}
+      {joint !== 'none' && <p className="cad-feature-hint">{translate('Both parts are kept.')}</p>}
       <label>
-        Corner relief
+        {translate('Corner relief ')}
         <select value={relief} onChange={event => setRelief(event.target.value as Relief)}>
-          <option value="inherit">Inherit</option>
-          <option value="off">Off</option>
-          <option value="dogbone">Dogbone</option>
+          <option value="inherit">{translate('Inherit')}</option>
+          <option value="off">{translate('Off')}</option>
+          <option value="dogbone">{translate('Dogbone')}</option>
         </select>
       </label>
       {relief === 'dogbone' && (
         <label className="cad-part-cut-clearance">
-          Cutter diameter
+          {translate('Cutter diameter ')}
           <CadValueInput
             bare
             value={diameterText}
-            aria-label="Cutter diameter"
+            aria-label={translate('Cutter diameter')}
             spellCheck={false}
             onChange={event => setDiameterText(event.target.value)}
           />
@@ -265,12 +268,12 @@ export function PartCutDialog({
       )}
       {joint === 'fingers' && (
         <label className="cad-part-cut-clearance">
-          Fingers
+          {translate('Fingers ')}
           <CadValueInput
             bare
             unit="scalar"
             value={fingersText}
-            aria-label="Fingers"
+            aria-label={translate('Fingers')}
             spellCheck={false}
             aria-invalid={fingersError ? true : undefined}
             aria-describedby={fingersError ? 'cad-part-cut-fingers-error' : undefined}
@@ -291,7 +294,7 @@ export function PartCutDialog({
       {onRemove && (
         <div className="cad-part-cut-actions">
           <button type="button" onClick={onRemove}>
-            Delete step
+            {translate('Delete step ')}
           </button>
         </div>
       )}

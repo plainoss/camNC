@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { createCadPart, type CadPoint, type CadSketch } from '@wbcnc/cad';
 import { addDrawingRelations, drawnSelection, withSizeExpressions } from './drawingCommit';
 import { idleDrawingGesture, transitionDrawingGesture } from './drawingGesture';
@@ -10,8 +11,8 @@ export class UnsupportedSketchInput extends Error {}
 
 /** The tools that run without a browser, with their visible names and shortcuts. */
 export const HEADLESS_SKETCH_TOOLS: readonly { id: RectangleTool; label: string; key: string }[] = [
-  { id: 'rectangle', label: 'Corner rectangle', key: 'g' },
-  { id: 'centerRectangle', label: 'Center rectangle', key: 'r' },
+  { id: 'rectangle', label: translate('Corner rectangle'), key: 'g' },
+  { id: 'centerRectangle', label: translate('Center rectangle'), key: 'r' },
 ];
 
 export interface HeadlessSketchOptions {
@@ -49,7 +50,7 @@ export function createHeadlessSketch({ sketch: initial, pxPerMm = 3 }: HeadlessS
     return drawingClickPoint(sketch, raw, { project, directSnap: hit, preferredPointIds: hovered });
   };
   const drawingTool = () => {
-    if (!isRectangleTool(tool)) throw new UnsupportedSketchInput(`Pointer input with the ${tool} tool`);
+    if (!isRectangleTool(tool)) throw new UnsupportedSketchInput(translate('Pointer input with the {{value1}} tool', { value1: tool }));
     return tool;
   };
   const clearPending = () => {

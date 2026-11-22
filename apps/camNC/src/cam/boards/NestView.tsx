@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { HoleMiddle } from '@wbcnc/cam';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { useId, useState } from 'react';
@@ -44,10 +45,10 @@ export interface FixtureEditing {
 
 /** For people: what happens to the piece in the middle of a through hole. */
 const kHoleStates: Record<HoleMiddle['state'], string> = {
-  vacuum: 'small enough for the vacuum',
-  cleared: 'cleared by the bit',
-  loose: 'comes loose: tape it, screw it down, or clear it',
-  screwed: 'held by a screw',
+  vacuum: translate('small enough for the vacuum'),
+  cleared: translate('cleared by the bit'),
+  loose: translate('comes loose: tape it, screw it down, or clear it'),
+  screwed: translate('held by a screw'),
 };
 
 /**
@@ -260,7 +261,7 @@ export function NestView({
       height={pxPerMm && (h + 2 * pad) * pxPerMm}
       className={className}
       role={interactive ? 'group' : 'img'}
-      aria-label={label ?? `Board ${w} by ${h} mm with ${nest.placements.length} parts`}>
+      aria-label={label ?? translate('Board {{w}} by {{h}} mm with {{value3}} parts', { w: w, h: h, value3: nest.placements.length })}>
       <defs>
         <pattern id={cleared} width={u / 120} height={u / 120} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width={u / 120} height={u / 120} className="fill-sky-500/15" />
@@ -332,7 +333,11 @@ export function NestView({
               data-item={p.id}
               role={interactive ? 'button' : undefined}
               tabIndex={interactive ? 0 : undefined}
-              aria-label={interactive ? `${inst.name}: drag, or move with the arrow keys; Enter opens its menu` : undefined}
+              aria-label={
+                interactive
+                  ? translate('{{value1}}: drag, or move with the arrow keys; Enter opens its menu', { value1: inst.name })
+                  : undefined
+              }
               onPointerDown={onPartPointerDown && (e => onPartPointerDown(p.id, e))}
               onDoubleClick={onTabsChange && holdOf(p.id) ? e => addTab(p.id, e) : undefined}
               onKeyDown={onPartKeyDown && (e => onPartKeyDown(p.id, e))}
@@ -373,7 +378,14 @@ export function NestView({
                       data-hole-state={m.state}
                       role={pick && 'button'}
                       tabIndex={pick && 0}
-                      aria-label={pick && `Hole in ${inst.name}, its ${Math.round(m.size)} mm middle: ${kHoleStates[m.state]}. Change it.`}
+                      aria-label={
+                        pick &&
+                        translate('Hole in {{value1}}, its {{value2}} mm middle: {{value3}}. Change it.', {
+                          value1: inst.name,
+                          value2: Math.round(m.size),
+                          value3: kHoleStates[m.state],
+                        })
+                      }
                       // While placing a screw, the click goes through: onto the piece, where it holds.
                       className={cn(pick ? 'cursor-pointer outline-none [&:focus-visible>path]:stroke-primary' : 'pointer-events-none')}
                       onPointerDown={pick && (e => e.stopPropagation())}
@@ -438,7 +450,7 @@ export function NestView({
                 r={stroke * 9}
                 className="fill-none stroke-red-600 dark:stroke-red-500"
                 strokeWidth={stroke * 2.5}>
-                <title>{`${h.part}: this tab holds nothing`}</title>
+                <title>{translate('{{value1}}: this tab holds nothing', { value1: h.part })}</title>
               </circle>
             ))
         )}
@@ -465,7 +477,10 @@ export function NestView({
                 <g
                   key={`tab-${item}-${i}`}
                   role="button"
-                  aria-label={`${h.part}: tab ${i + 1}, drag along the outline to move; double-click or Delete removes it`}
+                  aria-label={translate('{{value1}}: tab {{value2}}, drag along the outline to move; double-click or Delete removes it', {
+                    value1: h.part,
+                    value2: i + 1,
+                  })}
                   tabIndex={0}
                   className="group cursor-move outline-none"
                   onPointerDown={e => {
@@ -507,8 +522,8 @@ export function NestView({
                   }}>
                   <title>
                     {h.tabs.length > 1
-                      ? `${h.part}: drag the tab along the outline; double-click removes it`
-                      : `${h.part}: its only tab, drag it along the outline`}
+                      ? translate('{{value1}}: drag the tab along the outline; double-click removes it', { value1: h.part })
+                      : translate('{{value1}}: its only tab, drag it along the outline', { value1: h.part })}
                   </title>
                   {/* The whole bar takes the pointer, not only the ring on it. */}
                   {tabBar(tabSegments, t.at).map(([a, b], k) => (
@@ -635,7 +650,14 @@ export function NestView({
               data-hold-preview={isPreview ? hp.kind : undefined}
               role={interactive ? 'button' : undefined}
               tabIndex={interactive ? 0 : undefined}
-              aria-label={interactive ? `${hp.kind === 'screw' ? 'Screw' : 'Clamp'} ${i + 1}: drag to move, Delete removes it` : undefined}
+              aria-label={
+                interactive
+                  ? translate('{{value1}} {{value2}}: drag to move, Delete removes it', {
+                      value1: hp.kind === 'screw' ? translate('Screw') : translate('Clamp'),
+                      value2: i + 1,
+                    })
+                  : undefined
+              }
               className={cn(interactive && 'cursor-grab outline-none active:cursor-grabbing', isPreview && 'opacity-85')}
               // A preview follows the pointer: if it took the click, nothing could be placed where the pointer is.
               style={isPreview ? { pointerEvents: 'none' } : undefined}
@@ -732,10 +754,13 @@ export function NestView({
               <circle cx={hp.x} cy={hp.y} r={Math.max(Math.max(box.w, box.h) / 2, u / 60)} className="fill-transparent" />
               <title>
                 {bad && !isPreview && !isMoving
-                  ? 'The bit would hit this: move it into the waste.'
+                  ? translate('The bit would hit this: move it into the waste.')
                   : hp.kind === 'clamp' && hp.w !== undefined
-                    ? `Clamp: ${hp.w} mm wide, reaching ${hp.d} mm in`
-                    : `${hp.kind === 'screw' ? 'Screw' : 'Clamp'} ⌀${hp.d} mm`}
+                    ? translate('Clamp: {{value1}} mm wide, reaching {{value2}} mm in', { value1: hp.w, value2: hp.d })
+                    : translate('{{value1}} ⌀{{value2}} mm', {
+                        value1: hp.kind === 'screw' ? translate('Screw') : translate('Clamp'),
+                        value2: hp.d,
+                      })}
               </title>
             </g>
           );
@@ -788,7 +813,8 @@ export function NestView({
           textAnchor="middle"
           fontSize={u / 55}
           className="pointer-events-none fill-emerald-600 font-mono dark:fill-emerald-400">
-          ±{Math.round(fixtures.play.r)} mm
+          ±{Math.round(fixtures.play.r)}
+          {translate(' mm ')}
         </text>
       )}
       {!quiet && (
@@ -797,7 +823,7 @@ export function NestView({
           y={padMm === undefined ? pad * 0.8 : u / 22}
           fontSize={u / 50}
           className="pointer-events-none fill-emerald-700 dark:fill-emerald-400">
-          XY zero · lower left
+          {translate('XY zero · lower left ')}
         </text>
       )}
     </svg>

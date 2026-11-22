@@ -1,3 +1,4 @@
+import { t as translate, workerLanguageName } from '@wbcnc/i18n';
 import type { RemapStepParams } from '@/depth/remapPipeline';
 import type { VideoPipelineWorkerAPI, WorkerSettings } from '@/depth/videoPipeline.worker';
 import { createVideoStreamProcessor, registerThreeJsTransferHandlers } from '@wbcnc/video-worker-utils';
@@ -32,7 +33,7 @@ export interface DepthBlendDeps {
 }
 
 function connectWorker(): DepthBlendWorkerConnection {
-  const worker = new Worker(new URL('./videoPipeline.worker.ts', import.meta.url), { type: 'module' });
+  const worker = new Worker(new URL('./videoPipeline.worker.ts', import.meta.url), { type: 'module', name: workerLanguageName() });
   return {
     proxy: Comlink.wrap<VideoPipelineWorkerAPI>(worker) as unknown as VideoPipelineWorkerAPI,
     terminate: () => worker.terminate(),
@@ -145,7 +146,7 @@ export class DepthBlendManager {
 
     const { source, params } = this.desired;
     if (!source || !params) {
-      throw new Error('[DepthBlendManager] Cannot initialise without videoSource and params');
+      throw new Error(translate('[DepthBlendManager] Cannot initialise without videoSource and params'));
     }
 
     this.connection ??= this.deps.connect();

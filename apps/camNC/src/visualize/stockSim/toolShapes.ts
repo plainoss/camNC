@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { ToolInfo } from '../guess-tools';
 
 export type ToolKind = 'flat' | 'ball' | 'vbit';
@@ -14,9 +15,9 @@ export interface ToolShape {
 export type ToolShapeChoice = 'auto' | 'flat' | 'ball' | 'vbit60' | 'vbit90';
 
 export const kToolShapeChoices: { value: ToolShapeChoice; label: string }[] = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'flat', label: 'Flat' },
-  { value: 'ball', label: 'Ball' },
+  { value: 'auto', label: translate('Auto') },
+  { value: 'flat', label: translate('Flat') },
+  { value: 'ball', label: translate('Ball') },
   { value: 'vbit60', label: 'V 60°' },
   { value: 'vbit90', label: 'V 90°' },
 ];

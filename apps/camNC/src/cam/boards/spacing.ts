@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { BoardV1, Retention } from '../boards';
 
 /** Narrowest strip of stock, mm, that holds a tab after the cuts on both sides of it (the hold check's). */
@@ -32,11 +33,18 @@ export function tabRoomFix(nest: { gap: number; margin: number }, bit: number, p
   const gap = boardGap(bit, 'tabs'),
     margin = defaultMargin(bit, 'tabs');
   const wider = [
-    ...(nest.gap < gap ? [`the gap between parts to ${gap} mm`] : []),
-    ...(nest.margin < margin ? [`the margin to ${margin} mm`] : []),
+    ...(nest.gap < gap ? [translate('the gap between parts to {{value1}} mm', { value1: gap })] : []),
+    ...(nest.margin < margin ? [translate('the margin to {{value1}} mm', { value1: margin })] : []),
   ];
-  if (wider.length) return `The spacing is too tight for tabs with the ⌀${bit} bit: widen ${wider.join(' and ')}, use a smaller bit`;
-  return `Give ${parts === 1 ? 'it' : 'them'} more room (a wider gap or margin, or move ${parts === 1 ? 'it' : 'them'}), use a smaller bit`;
+  if (wider.length)
+    return translate('The spacing is too tight for tabs with the ⌀{{value1}} bit: widen {{value2}}, use a smaller bit', {
+      value1: bit,
+      value2: wider.join(' and '),
+    });
+  return translate('Give {{value1}} more room (a wider gap or margin, or move {{value2}}), use a smaller bit', {
+    value1: parts === 1 ? translate('it') : translate('them'),
+    value2: parts === 1 ? translate('it') : translate('them'),
+  });
 }
 
 /**
@@ -44,7 +52,12 @@ export function tabRoomFix(nest: { gap: number; margin: number }, bit: number, p
  * outline cut eats into its neighbour. Blocks the job.
  */
 export function spacingProblem(board: Pick<BoardV1, 'name'>, nest: { gap: number; margin: number }, bit: number): string | null {
-  if (nest.gap < bit + 1) return `Board ${board.name}: the ${nest.gap} mm gap between parts is too narrow for the ⌀${bit} bit.`;
+  if (nest.gap < bit + 1)
+    return translate('Board {{value1}}: the {{value2}} mm gap between parts is too narrow for the ⌀{{value3}} bit.', {
+      value1: board.name,
+      value2: nest.gap,
+      value3: bit,
+    });
   return null;
 }
 
@@ -60,9 +73,13 @@ export function edgeNote(
 ): string | null {
   // No parts, no outline cuts (a carving's board).
   if (nest.margin >= bit || !board.items.length) return null;
-  const past = `Board ${board.name}: the outline cuts run past the board edge (${nest.margin} mm margin, ⌀${bit} bit).`;
+  const past = translate('Board {{value1}}: the outline cuts run past the board edge ({{value2}} mm margin, ⌀{{value3}} bit).', {
+    value1: board.name,
+    value2: nest.margin,
+    value3: bit,
+  });
   // The hold check blocks the job if the bit would hit a fixture.
   return board.fixtures?.length
-    ? `${past} Keep screws and clamps clear of it: the job is blocked if the bit would hit one.`
-    : `${past} Fine if nothing is clamped or screwed there.`;
+    ? translate('{{value1}} Keep screws and clamps clear of it: the job is blocked if the bit would hit one.', { value1: past })
+    : translate('{{value1}} Fine if nothing is clamped or screwed there.', { value1: past });
 }

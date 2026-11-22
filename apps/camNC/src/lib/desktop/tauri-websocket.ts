@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Channel, invoke } from '@tauri-apps/api/core';
 
 /** Messages of Tauri's websocket plugin (`tauri-plugin-websocket`). */
@@ -74,7 +75,7 @@ export class TauriWebSocket extends EventTarget {
   }
 
   send(data: string | ArrayBuffer | ArrayBufferView) {
-    if (this.readyState !== TauriWebSocket.OPEN) throw new DOMException('WebSocket is not open', 'InvalidStateError');
+    if (this.readyState !== TauriWebSocket.OPEN) throw new DOMException(translate('WebSocket is not open'), 'InvalidStateError');
     if (typeof data === 'string') {
       this.post({ type: 'Text', data });
     } else {

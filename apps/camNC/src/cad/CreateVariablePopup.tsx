@@ -1,13 +1,14 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
-const kUnsupported = 'Not available yet';
+const kUnsupported = translate('Not available yet');
 export type VariableKind = 'length' | 'angle' | 'number' | 'any';
 const kinds: { kind: VariableKind; label: string }[] = [
-  { kind: 'length', label: 'Length' },
-  { kind: 'angle', label: 'Angle' },
-  { kind: 'number', label: 'Number' },
-  { kind: 'any', label: 'Any' },
+  { kind: 'length', label: translate('Length') },
+  { kind: 'angle', label: translate('Angle') },
+  { kind: 'number', label: translate('Number') },
+  { kind: 'any', label: translate('Any') },
 ];
 
 /**
@@ -40,7 +41,7 @@ export function CreateVariablePopup({
   return createPortal(
     <div
       role="dialog"
-      aria-label="Create variable"
+      aria-label={translate('Create variable')}
       className="cad-create-variable"
       // Kept inside the window, as a field near its edge would push it off.
       style={{
@@ -58,25 +59,25 @@ export function CreateVariablePopup({
         }
       }}>
       <header>
-        <strong>Create variable</strong>
+        <strong>{translate('Create variable')}</strong>
         <span>
-          <button type="button" aria-label="Create" className="cad-create-variable-ok" onClick={create}>
+          <button type="button" aria-label={translate('Create')} className="cad-create-variable-ok" onClick={create}>
             ✓
           </button>
-          <button type="button" aria-label="Cancel" className="cad-create-variable-cancel" onClick={onCancel}>
+          <button type="button" aria-label={translate('Cancel')} className="cad-create-variable-cancel" onClick={onCancel}>
             ✕
           </button>
         </span>
       </header>
-      <div role="tablist" aria-label="Variable scope" className="cad-feature-tabs">
+      <div role="tablist" aria-label={translate('Variable scope')} className="cad-feature-tabs">
         <button type="button" role="tab" aria-selected>
-          Feature
+          {translate('Feature ')}
         </button>
         <button type="button" role="tab" aria-selected={false} disabled title={kUnsupported}>
-          Configuration
+          {translate('Configuration ')}
         </button>
       </div>
-      <div role="tablist" aria-label="Variable type" className="cad-feature-tabs">
+      <div role="tablist" aria-label={translate('Variable type')} className="cad-feature-tabs">
         {kinds.map(entry => (
           <button key={entry.kind} type="button" role="tab" aria-selected={kind === entry.kind} onClick={() => setKind(entry.kind)}>
             {entry.label}
@@ -84,16 +85,16 @@ export function CreateVariablePopup({
         ))}
       </div>
       <label>
-        Name
-        <input aria-label="Name" value={name} autoFocus onChange={event => setName(event.target.value)} />
+        {translate('Name ')}
+        <input aria-label={translate('Name')} value={name} autoFocus onChange={event => setName(event.target.value)} />
       </label>
       <label>
-        Value
-        <input aria-label="Value" value={value} onChange={event => setValue(event.target.value)} />
+        {translate('Value ')}
+        <input aria-label={translate('Value')} value={value} onChange={event => setValue(event.target.value)} />
       </label>
       <label>
-        Description
-        <input aria-label="Description" value={description} onChange={event => setDescription(event.target.value)} />
+        {translate('Description ')}
+        <input aria-label={translate('Description')} value={description} onChange={event => setDescription(event.target.value)} />
       </label>
       {problem && (
         <span role="alert" className="cad-variable-field-problem">

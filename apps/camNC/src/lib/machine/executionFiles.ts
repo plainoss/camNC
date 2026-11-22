@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CncApi } from '../fluidnc/cnc-api';
 import { getExistingCncApi } from '../fluidnc/machineInstance';
 import { isDemoMode } from '../demo/demo-mode';
@@ -183,7 +184,7 @@ export function cleanupRetiredExecutionFiles(api: CncApi, options: ExecutionFile
         if (expirePending(item.key, item.state!)) continue;
         if (protectedFiles([head.stored, head.record]).has(item.file!.toLowerCase())) continue;
         if (item.state!.pendingUpload) {
-          if (typeof api.listFiles !== 'function') throw new Error('Cannot inspect the pending execution upload yet.');
+          if (typeof api.listFiles !== 'function') throw new Error(translate('Cannot inspect the pending execution upload yet.'));
           if (!listed) {
             const listing = await api.listFiles();
             listed = new Set(listing.files.flatMap(file => basename(file.name)?.toLowerCase() ?? []));

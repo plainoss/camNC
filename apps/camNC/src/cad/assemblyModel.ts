@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   evaluateCadPartFamily,
   evaluateCadPart,
@@ -85,7 +86,7 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
         const evaluated =
           geometry.parts?.find(shape => shape.partId === part.id) ??
           (profile && withEdgeRounds(part, withPartCuts(document, evaluateCadPartFamily(part, profile).part)).part);
-        if (!evaluated) return { part, problem: 'Its sketch needs fixing first.' };
+        if (!evaluated) return { part, problem: translate('Its sketch needs fixing first.') };
         const shape = nativePart(evaluated);
         // A copy is meshed on its own only when it's mirrored or cut differently; the rest share the part's mesh.
         let mirrored: Shape | undefined;

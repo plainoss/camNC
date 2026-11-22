@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { shownLengthText, useDesignUnits } from './designUnits';
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type Ref } from 'react';
 import { cadValueHasUnit } from './valueExpressions';
@@ -100,7 +101,7 @@ export function CadValueInput({
   const options = menu
     ? [
         ...(fields?.variables ?? []).filter(variable => variable.name.toLowerCase().startsWith(menu.typed.toLowerCase())),
-        { name: '', shown: 'New variable' },
+        { name: '', shown: translate('New variable') },
       ]
     : [];
   // New variable opens the Create variable popup, filled from the field: what was typed after `#`, and its value.
@@ -239,7 +240,7 @@ export function CadValueInput({
         <ul
           className="cad-variable-menu"
           role="listbox"
-          aria-label="Variables"
+          aria-label={translate('Variables')}
           style={(() => {
             const box = own.current?.getBoundingClientRect();
             return box ? { left: box.left, top: box.bottom + 2, minWidth: Math.max(160, box.width) } : undefined;
@@ -281,9 +282,9 @@ export function CadValueInput({
             const typedUnit =
               variable.kind === 'angle' ? 'deg' : variable.kind === 'number' ? 'scalar' : variable.kind === 'length' ? 'mm' : unit;
             const refused = !variable.name
-              ? 'Name the variable.'
+              ? translate('Name the variable.')
               : !variable.value
-                ? 'Give the variable a value.'
+                ? translate('Give the variable a value.')
                 : fields.define(variable.name, variable.value, typedUnit);
             if (refused) return setCreating({ ...creating, problem: refused });
             // The field names it, ready for Enter to apply, as the reference leaves it.

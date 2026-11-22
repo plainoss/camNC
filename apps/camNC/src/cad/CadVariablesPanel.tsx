@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import {
   cadExpressionNames,
@@ -83,8 +84,8 @@ function VariableRow({
       }}>
       <input
         className="cad-variable-name"
-        aria-label="Variable name"
-        placeholder="name"
+        aria-label={translate('Variable name')}
+        placeholder={translate('name')}
         autoFocus={!variable}
         value={name}
         spellCheck={false}
@@ -95,8 +96,8 @@ function VariableRow({
       <span aria-hidden="true">=</span>
       <input
         className="cad-variable-expression"
-        aria-label={`Value of ${variable?.name ?? (name || 'the new variable')}`}
-        placeholder="600 mm"
+        aria-label={translate('Value of {{value1}}', { value1: variable?.name ?? (name || 'the new variable') })}
+        placeholder={translate('600 mm')}
         value={expression}
         spellCheck={false}
         aria-invalid={message ? true : undefined}
@@ -107,14 +108,14 @@ function VariableRow({
         <button
           type="button"
           className="cad-variable-delete"
-          aria-label={`Delete ${variable.name}`}
-          title={`Delete ${variable.name}`}
+          aria-label={translate('Delete {{value1}}', { value1: variable.name })}
+          title={translate('Delete {{value1}}', { value1: variable.name })}
           onClick={() => setError(onDelete())}>
           ×
         </button>
       )}
       {result && !message && worksOut(variable!.expression) && (
-        <output className="cad-variable-result" aria-label={`${variable!.name} is`}>
+        <output className="cad-variable-result" aria-label={translate('{{value1}} is', { value1: variable!.name })}>
           {shown(result)}
         </output>
       )}
@@ -146,15 +147,15 @@ export function CadVariablesPanel({
     return null;
   };
   return (
-    <section className="cad-variables" aria-label="Variables">
+    <section className="cad-variables" aria-label={translate('Variables')}>
       <div className="cad-panel-heading">
-        <h2>Variables</h2>
-        <button type="button" aria-label="Add variable" onClick={() => setAdding(true)}>
+        <h2>{translate('Variables')}</h2>
+        <button type="button" aria-label={translate('Add variable')} onClick={() => setAdding(true)}>
           ＋
         </button>
       </div>
       {!variables.length && !adding && (
-        <p className="cad-variables-hint">Name a size, like width or board, and type the name into any dimension.</p>
+        <p className="cad-variables-hint">{translate('Name a size, like width or board, and type the name into any dimension.')}</p>
       )}
       <ul>
         {variables.map(variable => (

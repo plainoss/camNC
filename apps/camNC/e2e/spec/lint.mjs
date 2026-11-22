@@ -14,21 +14,57 @@ export const ALLOWED = {
   // `click x,y` is a pick on an open sketch's drawing, as `viewpick` is there.
   // A dimension's pick is the edge and then where its label goes: a second pick in the same step.
   pick: { steps: ['viewpick', 'click'], then: ['viewpick', 'click'] },
-  // A context menu is two selects: `featuremenu` (the right-click) and `menuitem` (the choice).
+  // A context menu is a `featuremenu` (the right-click) and a `menuitem` (the choice): two selects, or one.
   // Double-clicking a row (`feature`) or a dimension label (`editdim`) selects it, and so does a dialog's choice list.
   select: {
     // `key Enter` takes the highlighted choice of a field's list, such as New variable.
-    steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'partmenu', 'menuitem', 'patterncount', 'patternspacing', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click', 'shiftclick', 'drag', 'panelclose', 'featurefilter', 'viewmenu', 'dialogoption', 'key Enter'],
-    // "Select A, then (Shift-click) B" is one step: each shift-click adds to what the first input selected.
-    then: ['shiftclick'],
+    steps: [
+      'selectpart',
+      'selectfeature',
+      'feature',
+      'featureeye',
+      'featuremenu',
+      'partmenu',
+      'menuitem',
+      'patterncount',
+      'patternspacing',
+      'dialogfocus',
+      'dialogtab',
+      'dialogselect',
+      'editdim',
+      'click',
+      'shiftclick',
+      'drag',
+      'panelclose',
+      'featurefilter',
+      'viewmenu',
+      'dialogoption',
+      'key Enter',
+    ],
+    // "Select A, then (Shift-click) B" is one step: each shift-click adds to what the first input selected. A
+    // right-click and the item chosen from its menu may be one step too, as "right-click the row, Suppress".
+    then: ['shiftclick', 'menuitem'],
   },
   command: { steps: ['studiotool', 'searchtool', 'key', 'tool'] },
-  draw: { steps: ['rect', 'circle', 'line', 'arc'] },
+  // Drawing ends with Escape, putting the tool down, as a spec step may say.
+  draw: { steps: ['rect', 'circle', 'line', 'arc'], then: ['key Escape'] },
   // A value typed into a box a chip or dimension opened: double-click it, type, and Enter (or Tab, moving on).
   // A part taken out of a selection box with its chip's cross is a field's input too.
   // A dimension's value is typed into the box double-clicking its label (`editdim`) opens.
   field: {
-    steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'dialogremove', 'featurefilter', 'field', 'type', 'patterncount', 'patternspacing', 'editdim'],
+    steps: [
+      'dialogfill',
+      'dialogselect',
+      'dialogcheck',
+      'dialogtab',
+      'dialogremove',
+      'featurefilter',
+      'field',
+      'type',
+      'patterncount',
+      'patternspacing',
+      'editdim',
+    ],
     then: ['field', 'type', 'key Enter', 'key Tab'],
   },
   // A dialog's own accept button, as a panel's "+" that saves what's typed, is pressed with `dialogfocus`.
@@ -56,13 +92,16 @@ export function parseMarker(marker) {
 
 /** Findings for one scenario: every spec step whose inputs are not exactly one allowed input. */
 export function lintScenario(scenario) {
-  const findings = [], setup = [], groups = [];
+  const findings = [],
+    setup = [],
+    groups = [];
   let current = null;
   for (const step of scenario.steps ?? []) {
     if (step && typeof step === 'object' && 'spec' in step) {
       const marker = parseMarker(step.spec);
       if (marker.error) findings.push({ spec: String(step.spec), problem: marker.error });
-      else if (groups.length && marker.n <= groups.at(-1).n) findings.push({ spec: String(step.spec), problem: `spec step ${marker.n} comes after step ${groups.at(-1).n}` });
+      else if (groups.length && marker.n <= groups.at(-1).n)
+        findings.push({ spec: String(step.spec), problem: `spec step ${marker.n} comes after step ${groups.at(-1).n}` });
       current = marker.error ? null : { ...marker, inputs: [] };
       if (current) groups.push(current);
       continue;
@@ -82,7 +121,12 @@ export function lintScenario(scenario) {
     });
     if (!first) findings.push({ spec: `${n} ${kind}`, problem: 'no input', allowed: steps });
     else if (!matches(first, steps) || extra.length)
-      findings.push({ spec: `${n} ${kind}`, problem: !matches(first, steps) ? 'input not allowed for this kind' : `${extra.length} extra input${extra.length > 1 ? 's' : ''}`, allowed: steps, inputs });
+      findings.push({
+        spec: `${n} ${kind}`,
+        problem: !matches(first, steps) ? 'input not allowed for this kind' : `${extra.length} extra input${extra.length > 1 ? 's' : ''}`,
+        allowed: steps,
+        inputs,
+      });
   }
   if (!groups.length) findings.push({ spec: null, problem: 'no spec markers' });
   return { id: scenario.id, ok: !findings.length, steps: groups.length, setup, findings };

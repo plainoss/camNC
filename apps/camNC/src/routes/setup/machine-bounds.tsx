@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { PageHeader } from '@/components/page-header';
 import { isCameraReady, useStore } from '@/store/store';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -18,11 +19,11 @@ function RouteComponent() {
   });
   return (
     <div className="w-full h-full">
-      <PageHeader title="Machine Bounds" />
+      <PageHeader title={translate('Machine Bounds')} />
       <div className="flex justify-center p-1 flex-row">
         <Card className="w-full max-w-xl">
           <CardHeader>
-            <CardTitle>Machine Bounds</CardTitle>
+            <CardTitle>{translate('Machine Bounds')}</CardTitle>
           </CardHeader>
           <CardContent>
             <MachineBoundsForm

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Color, ShaderMaterial } from 'three';
 
 /** Flat part color and a constant-size diagonal hatch, independent of model scale and scene lighting. */
@@ -7,7 +8,7 @@ export function sectionCapMaterial(color: string, opacity: number, pixelRatio: n
   const ink = fill.clone().lerp(new Color(luminance < 0.12 ? '#ffffff' : '#000000'), 0.55);
   const alpha = Math.max(0, Math.min(1, opacity));
   return new ShaderMaterial({
-    name: 'Section cap hatch',
+    name: translate('Section cap hatch'),
     uniforms: {
       fillColor: { value: fill },
       hatchColor: { value: ink },

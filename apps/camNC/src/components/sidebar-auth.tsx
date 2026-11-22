@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react';
 import { SidebarFooter, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@wbcnc/ui/components/sidebar';
 import { isDemoMode } from '@/lib/demo/demo-mode';
@@ -32,12 +33,12 @@ export function SidebarAuthStatus() {
         </SignedIn>
         <SignedOut>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Sign in" className="w-full cursor-pointer">
+            <SidebarMenuButton asChild tooltip={translate('Sign in')} className="w-full cursor-pointer">
               <SignInButton mode="modal" forceRedirectUrl="/">
                 <div className="flex items-center gap-2">
                   <LogIn className="size-4" />
-                  <span>Sign in</span>
-                  <span className="text-xs text-muted-foreground">to sync settings</span>
+                  <span>{translate('Sign in')}</span>
+                  <span className="text-xs text-muted-foreground">{translate('to sync settings')}</span>
                 </div>
               </SignInButton>
             </SidebarMenuButton>

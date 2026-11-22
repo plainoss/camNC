@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cv2 } from '@wbcnc/load-opencv';
 import { Matrix3, Vector3 } from 'three';
 
@@ -35,7 +36,7 @@ export function matrix3ToCV(matrix: Matrix3, type: number = cv2.CV_64F): cv2.Mat
 export function cvToMatrix3(cvMat: cv2.Mat): Matrix3 {
   // Check dimensions
   if (cvMat.rows !== 3 || cvMat.cols !== 3) {
-    throw new Error('OpenCV matrix must be 3x3 to convert to Three.js Matrix3');
+    throw new Error(translate('OpenCV matrix must be 3x3 to convert to Three.js Matrix3'));
   }
 
   let data: Float32Array | Float64Array;
@@ -46,7 +47,7 @@ export function cvToMatrix3(cvMat: cv2.Mat): Matrix3 {
   } else if (cvMat.type() === cv2.CV_64F) {
     data = cvMat.data64F;
   } else {
-    throw new Error('Unsupported OpenCV matrix type. Must be CV_32F or CV_64F');
+    throw new Error(translate('Unsupported OpenCV matrix type. Must be CV_32F or CV_64F'));
   }
 
   // Convert from row-major (OpenCV) to column-major (Three.js)
@@ -79,7 +80,7 @@ export function vector3ToCV(vector: Vector3, type: number = cv2.CV_64F): cv2.Mat
 export function cvToVector3(cvMat: cv2.Mat): Vector3 {
   // Check dimensions
   if (!((cvMat.rows === 3 && cvMat.cols === 1) || (cvMat.rows === 1 && cvMat.cols === 3))) {
-    throw new Error('OpenCV matrix must be 3x1 or 1x3 to convert to Three.js Vector3');
+    throw new Error(translate('OpenCV matrix must be 3x1 or 1x3 to convert to Three.js Vector3'));
   }
 
   let data: Float32Array | Float64Array;
@@ -90,7 +91,7 @@ export function cvToVector3(cvMat: cv2.Mat): Vector3 {
   } else if (cvMat.type() === cv2.CV_64F) {
     data = cvMat.data64F;
   } else {
-    throw new Error('Unsupported OpenCV matrix type. Must be CV_32F or CV_64F');
+    throw new Error(translate('Unsupported OpenCV matrix type. Must be CV_32F or CV_64F'));
   }
 
   return new Vector3(data[0], data[1], data[2]);

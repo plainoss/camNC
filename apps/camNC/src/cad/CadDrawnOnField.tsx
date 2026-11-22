@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import type { CadDocument, CadDrawnOn, CadPart, CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -52,9 +53,12 @@ export function CadDrawnOnField({
   };
   return (
     <div className="cad-drawn-on-field">
-      <p className="cad-thickness-hint">Drawn on {drawnOnName(document, part.drawnOn.on)}.</p>
+      <p className="cad-thickness-hint">
+        {translate('Drawn on ')}
+        {drawnOnName(document, part.drawnOn.on)}.
+      </p>
       <label htmlFor={id} className="cad-number-field">
-        Starting offset
+        {translate('Starting offset ')}
         <span>
           <CadValueInput
             bare
@@ -100,7 +104,7 @@ export function CadDrawnOnField({
               onChange(next);
             }}
           />
-          Grows into the face
+          {translate('Grows into the face ')}
         </label>
       )}
       {error && (

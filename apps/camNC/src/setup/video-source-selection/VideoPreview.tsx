@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useVideoSource } from '@wbcnc/go2webrtc/use-video-source';
 import { VideoDimensions } from '@wbcnc/go2webrtc/video-source';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
@@ -44,7 +45,7 @@ const VideoPreviewInner = ({ connectionUrl, ref, ...props }: VideoPreviewInnerPr
           height: videoRef.current.videoHeight,
         };
       }
-      throw new Error('could not get max resolution');
+      throw new Error(translate('could not get max resolution'));
     },
   }));
 

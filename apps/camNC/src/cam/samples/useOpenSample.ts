@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { exitDemo, getRehearsalId, isDemoMode, isLocalPreviewDemo } from '@/lib/demo/demo-mode';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
@@ -28,10 +29,10 @@ export function useOpenSample() {
     } catch (e) {
       setError(
         e instanceof DOMException
-          ? 'The sample could not be saved in this browser. Check storage and browser permissions, then try again.'
+          ? translate('The sample could not be saved in this browser. Check storage and browser permissions, then try again.')
           : e instanceof Error
             ? e.message
-            : 'The sample could not be saved. Try again.'
+            : translate('The sample could not be saved. Try again.')
       );
     } finally {
       setPending(false);

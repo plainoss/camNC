@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 export interface CurveSegment {
   type: 'L' | 'Q' | 'C';
   x1: number;
@@ -32,10 +33,10 @@ export function flattenCurveContours(paths: CurveContour[], tolerance: number, m
   };
   return paths.map(path => {
     const first = path.segments[0];
-    if (++count > maxPoints) throw new Error('Smooth curve CAM approximation exceeds its point budget.');
+    if (++count > maxPoints) throw new Error(translate('Smooth curve CAM approximation exceeds its point budget.'));
     const points: Point[] = [{ x: first.x1, y: first.y1 }];
     const add = (point: Point) => {
-      if (++count > maxPoints) throw new Error('Smooth curve CAM approximation exceeds its point budget.');
+      if (++count > maxPoints) throw new Error(translate('Smooth curve CAM approximation exceeds its point budget.'));
       points.push(point);
     };
     for (const segment of path.segments) {
@@ -43,9 +44,9 @@ export function flattenCurveContours(paths: CurveContour[], tolerance: number, m
         add({ x: segment.x2, y: segment.y2 });
         continue;
       }
-      if (segment.x3 === undefined || segment.y3 === undefined) throw new Error('Invalid quadratic curve.');
+      if (segment.x3 === undefined || segment.y3 === undefined) throw new Error(translate('Invalid quadratic curve.'));
       if (segment.type === 'C') {
-        if (segment.x4 === undefined || segment.y4 === undefined) throw new Error('Invalid cubic curve.');
+        if (segment.x4 === undefined || segment.y4 === undefined) throw new Error(translate('Invalid cubic curve.'));
         const stack = [
           {
             a: { x: segment.x1, y: segment.y1 },
@@ -61,7 +62,7 @@ export function flattenCurveContours(paths: CurveContour[], tolerance: number, m
             add(b);
             continue;
           }
-          if (depth > 16) throw new Error('Cubic flattening exceeded its subdivision budget.');
+          if (depth > 16) throw new Error(translate('Cubic flattening exceeded its subdivision budget.'));
           const mid = (p: Point, q: Point) => ({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
           const ac = mid(a, c),
             cd = mid(c, d),
@@ -82,7 +83,7 @@ export function flattenCurveContours(paths: CurveContour[], tolerance: number, m
           add(b);
           continue;
         }
-        if (depth > 16) throw new Error('Curve flattening exceeded its subdivision budget.');
+        if (depth > 16) throw new Error(translate('Curve flattening exceeded its subdivision budget.'));
         const ac = { x: (a.x + c.x) / 2, y: (a.y + c.y) / 2 },
           cb = { x: (c.x + b.x) / 2, y: (c.y + b.y) / 2 };
         const mid = { x: (ac.x + cb.x) / 2, y: (ac.y + cb.y) / 2 };

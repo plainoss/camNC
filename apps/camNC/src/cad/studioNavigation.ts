@@ -1,9 +1,11 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   cadFaceFrame,
   designSteps,
   handOverEmptyExtrude,
   removeCadFeature,
   removeCadVariable,
+  setCadVariableSuppressed,
   removeDatumPlane,
   removeEdgeFillet,
   removePartCut,
@@ -25,7 +27,6 @@ import { keepStepNames } from './keepStepNames';
 import { featureLeadId, hasOutline, ownsItsSketch, replacePart, withoutExtrude, withoutPartsMadeWith } from './editorHelpers';
 import type { faceSketchHost } from './faceSketchHost';
 import type { FeatureAction, FeatureEntry } from './FeatureList';
-import { startHole } from './holeSource';
 import { newSketchPart } from './newSketchPart';
 import type { PatternOpening } from './partPatternKind';
 import { pickedPlane, planeOffsetFrom } from './basePlanes';
@@ -250,7 +251,10 @@ function openDesignStep(editor: StudioNavigationInput, step: DesignStep) {
   if (step.kind === 'extrude')
     return openStudioFeature(editor, documentRef.current.parts.find(p => p.id === step.partId)?.hole ? 'hole' : 'extrude', step.partId);
   if (step.kind === 'move') return openStudioTransform(editor, step.partId, undefined, true);
-  if (step.kind === 'fillet') return openDialog({ kind: 'fillet', partId: step.partId, filletId: step.id });
+  if (step.kind === 'fillet') {
+    const chamfer = documentRef.current.parts.find(p => p.id === step.partId)?.fillets?.find(f => f.id === step.id)?.chamfer;
+    return openDialog({ kind: chamfer ? 'chamfer' : 'fillet', partId: step.partId, filletId: step.id });
+  }
   if (step.kind === 'mirror') return openDialog({ kind: 'mirror', partId: step.partId, joinId: step.id });
   if (step.kind === 'copy') {
     const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
@@ -319,6 +323,10 @@ export function studioFeatureAction(editor: StudioNavigationInput, entry: Featur
         if (sketchBefore.current) return;
       }
       return openDialog({ kind: 'variable', id: entry.id });
+    }
+    if (action === 'suppress') {
+      const variable = current.variables?.find(candidate => candidate.id === entry.id);
+      return commit(setCadVariableSuppressed(current, entry.id, !variable?.suppressed));
     }
     if (action === 'delete') {
       const result = removeCadVariable(current, entry.id);
@@ -402,7 +410,7 @@ export function newStudioPartOn(editor: StudioNavigationInput, on: CadDrawnOn['o
   commit(made.document);
   if (made.inserted) setRolledTo(`${drawn.id}:sketch`);
   const onName = (datum && pickedPlane(documentRef.current, datum)?.name) || drawnOnName(documentRef.current, on);
-  setMessage(`Draw the new part's outline on ${onName}, then finish to see it in place.`);
+  setMessage(translate("Draw the new part's outline on {{value1}}, then finish to see it in place.", { value1: onName }));
   if (studioSession) return openStudioSketch(editor, drawn.id, before);
   setPartId(drawn.id);
   setSelected([]);
@@ -461,7 +469,6 @@ export function runStudioCommand(editor: StudioNavigationInput, command: StudioC
     setSelectedPlane,
     setStudioRefusal,
     sketchRowPicked,
-    userRollback,
   } = editor;
   const openFeature = (kind: 'extrude' | 'pattern' | 'hole', partId: string, before?: CadHistoryMark, patternKind?: PatternOpening) =>
     openStudioFeature(editor, kind, partId, before, patternKind);
@@ -492,11 +499,14 @@ export function runStudioCommand(editor: StudioNavigationInput, command: StudioC
       );
   } else if (command === 'variable') openDialog({ kind: 'variable' });
   else if (command === 'hole') {
-    const at = { partId: part?.id, copyId: cutSelection.pickedCopyId, cancel: () => feature && closeStudioFeature(editor, false) };
-    const read = () => documentRef.current,
-      mark = () => markCadSession(session);
-    startHole({ ...at, rolledTo: userRollback, read, mark, commit, open: openFeature, refuse: setStudioRefusal });
+    // A new Hole opens with nothing picked: its sketch points are clicked in the view, as the reference does. A Hole
+    // step is changed from its row.
+    // A sketch picked from its row first gives the Hole its points, as a sketch selected does in the reference.
+    if (feature) closeStudioFeature(editor, false);
+    const sketchId = part && sketchRowPicked === part.id && part.extrude === false ? part.id : undefined;
+    openDialog({ kind: 'newHole', ...(sketchId && { sketchId }) });
   } else if (command === 'fillet') openDialog({ kind: 'fillet' });
+  else if (command === 'chamfer') openDialog({ kind: 'chamfer' });
   else if (command === 'mirror') {
     if (part) openDialog({ kind: 'mirror', partId: part.id });
   } else if (command === 'plane') {

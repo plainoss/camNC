@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { effect, signal } from '@preact/signals-react';
 import { toast } from '@wbcnc/ui/components/sonner';
 import { cleanupRetiredExecutionFiles, retireExecutionFiles } from './executionFiles';
@@ -141,7 +142,7 @@ export async function showRecordedNativeRun(api: CncApi, record: JobRecord, demo
     await offerResume(
       api,
       record,
-      'Review the original program before starting another machining setup.',
+      translate('Review the original program before starting another machining setup.'),
       undefined,
       demo,
       () => api.host.value === record.host && isDemoMode() === demo && atRest(api.status.value)
@@ -159,7 +160,7 @@ function reserveNativeRecord(record: JobRecord) {
     runReview: record.execution === 'prepared' ? 'requested' : (record.execution ?? 'requested'),
     runPreparationError:
       record.execution === 'prepared'
-        ? 'This preparation did not request execution. Review the original setup; only the previous safe receipt can be resumed.'
+        ? translate('This preparation did not request execution. Review the original setup; only the previous safe receipt can be resumed.')
         : null,
     runRecord: executionReference(record),
   });
@@ -366,15 +367,17 @@ export function watchJobRecovery(api: CncApi) {
         switch (action.kind) {
           case 'restore':
             applyRecord(api, record, { machineState: true });
-            toast.success('Restored the running job', { description: 'Its toolpath, placement and progress are shown again.' });
+            toast.success(translate('Restored the running job'), {
+              description: translate('Its toolpath, placement and progress are shown again.'),
+            });
             break;
           case 'ask':
             runningJobName.value = record.toolpathName;
-            toast('A job camNC started is still running', {
-              description: 'You have loaded a different program since. Show the running job instead?',
+            toast(translate('A job camNC started is still running'), {
+              description: translate('You have loaded a different program since. Show the running job instead?'),
               duration: Infinity,
               action: {
-                label: 'Show running job',
+                label: translate('Show running job'),
                 onClick: () => {
                   const current = api.status.value;
                   if (
@@ -390,15 +393,18 @@ export function watchJobRecovery(api: CncApi) {
             break;
           case 'mismatch':
             runningJobName.value = null;
-            toast.info('A job is running from the SD card', {
-              description: `${action.reason} Its progress is shown without the toolpath.`,
+            toast.info(translate('A job is running from the SD card'), {
+              description: translate('{{value1}} Its progress is shown without the toolpath.', { value1: action.reason }),
             });
             break;
           case 'interrupted':
             await offerResume(
               api,
               record,
-              `The job was last seen at ${action.progress.percent.toFixed(1)}% and is no longer running: the controller was power cycled or reset, or the job ended while camNC was not connected.`,
+              translate(
+                'The job was last seen at {{value1}}% and is no longer running: the controller was power cycled or reset, or the job ended while camNC was not connected.',
+                { value1: action.progress.percent.toFixed(1) }
+              ),
               action.progress,
               demo,
               checkValid
@@ -409,10 +415,10 @@ export function watchJobRecovery(api: CncApi) {
               applyRecord(api, record, { machineState: false });
               break;
             }
-            toast('Job finished or stopped while this page was closed', {
+            toast(translate('Job finished or stopped while this page was closed'), {
               duration: Infinity,
               action: {
-                label: 'Load its program',
+                label: translate('Load its program'),
                 onClick: () => {
                   if (checkValid() && atRest(api.status.value) && mayRestore(record)) {
                     applyRecord(api, record, { machineState: false });
@@ -420,7 +426,7 @@ export function watchJobRecovery(api: CncApi) {
                   }
                 },
               },
-              cancel: { label: 'Dismiss', onClick: () => void discardReceipt(record, demo) },
+              cancel: { label: translate('Dismiss'), onClick: () => void discardReceipt(record, demo) },
             });
             break;
         }
@@ -480,7 +486,7 @@ export async function acknowledgeRunReview() {
     await offerResume(
       api,
       expected,
-      'The previous safe program is still available after the failed preparation was closed.',
+      translate('The previous safe program is still available after the failed preparation was closed.'),
       undefined,
       demo,
       () => api.host.value === expected.host && isDemoMode() === demo && atRest(api.status.value)

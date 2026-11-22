@@ -1,3 +1,4 @@
+import { t as translate, workerLanguageName } from '@wbcnc/i18n';
 import { PageHeader } from '@/components/page-header';
 import { RemapStepParams } from '@/depth/remapPipeline';
 import type { Config, VideoPipelineWorkerAPI } from '@/depth/videoPipeline.worker';
@@ -38,7 +39,10 @@ function RawWebGPURoute() {
     const ctx = canvasRef.current.getContext('bitmaprenderer');
     if (!ctx) return;
 
-    const worker = new Worker(new URL('../../depth/videoPipeline.worker.ts', import.meta.url), { type: 'module' });
+    const worker = new Worker(new URL('../../depth/videoPipeline.worker.ts', import.meta.url), {
+      type: 'module',
+      name: workerLanguageName(),
+    });
     const proxy = Comlink.wrap<VideoPipelineWorkerAPI>(worker);
 
     let stream: ReadableStream<VideoFrame> | MediaStreamTrack;
@@ -87,8 +91,8 @@ function RawWebGPURoute() {
 
   return (
     <div className="relative w-full h-full p-4 space-y-4">
-      <PageHeader title="WebGPU Raw Video Debug" className="absolute" />
-      <div className="flex items-center gap-4 pt-15 text-sm">Mode: depth (streaming)</div>
+      <PageHeader title={translate('WebGPU Raw Video Debug')} className="absolute" />
+      <div className="flex items-center gap-4 pt-15 text-sm">{translate('Mode: depth (streaming)')}</div>
       <div className="flex gap-4 pt-4">
         <canvas ref={canvasRef} width={displaySize[0] * 0.5} height={displaySize[1] * 0.5} className="border" />
       </div>

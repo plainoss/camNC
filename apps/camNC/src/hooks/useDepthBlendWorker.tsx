@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { DepthBlendManager } from '@/depth/depthBlendManager';
 import { RemapStepParams } from '@/depth/remapPipeline';
 import {
@@ -24,7 +25,7 @@ type VideoSourceSrc = ReturnType<typeof useVideoSource>['src'];
 const kVideoErrorToastId = 'depth-blend-video-source-error';
 
 function errorMessage(error: unknown) {
-  return error instanceof Error && error.message ? error.message : 'unknown error';
+  return error instanceof Error && error.message ? error.message : translate('unknown error');
 }
 
 function DepthBlendWorkerInner({ vidSource }: { vidSource: VideoSourceSrc }) {
@@ -44,8 +45,11 @@ function DepthBlendVideoSource({ videoUrl }: { videoUrl: string }) {
     <ErrorBoundary
       fallback={null}
       onError={error => {
-        console.error('Error loading depth blend worker', error);
-        toast.error(`Error loading depth blend worker: ${errorMessage(error)}`, { duration: Infinity, closeButton: true });
+        console.error(translate('Error loading depth blend worker'), error);
+        toast.error(translate('Error loading depth blend worker: {{value1}}', { value1: errorMessage(error) }), {
+          duration: Infinity,
+          closeButton: true,
+        });
       }}>
       <DepthBlendWorkerInner vidSource={src} />
     </ErrorBoundary>
@@ -61,8 +65,8 @@ export function DepthBlendWorker() {
       // Retry when the user picks another video source.
       resetKeys={[videoUrl]}
       onError={error => {
-        console.error('Error connecting to video source', error);
-        toast.error(`Video source failed: ${errorMessage(error)}`, {
+        console.error(translate('Error connecting to video source'), error);
+        toast.error(translate('Video source failed: {{value1}}', { value1: errorMessage(error) }), {
           id: kVideoErrorToastId,
           duration: Infinity,
           closeButton: true,
@@ -92,7 +96,7 @@ export function useDepthBlendWorker(vidSource: VideoSourceSrc) {
   const camSource = useCamSource();
   const bounds = useMachineBoundsOrNull();
   if (!camSource || !bounds) {
-    throw new Error('No camera source found');
+    throw new Error(translate('No camera source found'));
   }
 
   const depthSettings = useDepthSettings();
@@ -140,7 +144,7 @@ export function useDepthBlendWorker(vidSource: VideoSourceSrc) {
         .catch(err => {
           if (cancelled) return;
           console.error(err);
-          toast.error('Failed to start Hide‑Machine', { closeButton: true });
+          toast.error(translate('Failed to start Hide‑Machine'), { closeButton: true });
           // Reset toggle to reflect failure
           setEnabled(false);
         });

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { WebrtcConnectionParams } from '@wbcnc/go2webrtc/url-helpers';
 import { Button } from '@wbcnc/ui/components/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@wbcnc/ui/components/card';
@@ -29,17 +30,19 @@ export function PhoneTab({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Phone via WebRTC</CardTitle>
-        <CardDescription>Use an (old) phone as network camera source.</CardDescription>
+        <CardTitle>{translate('Phone via WebRTC')}</CardTitle>
+        <CardDescription>{translate('Use an (old) phone as network camera source.')}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="w-[200px] h-[200px]">
           <ServeWebrtcQR params={defaults} />
         </div>
         <div className="flex flex-col gap-4">
-          <div className="text-sm text-muted-foreground">Scan the QR code with the phone to use as a camera, then click Connect.</div>
+          <div className="text-sm text-muted-foreground">
+            {translate('Scan the QR code with the phone to use as a camera, then click Connect.')}
+          </div>
           <div>
-            <Button onClick={connect}>Connect</Button>
+            <Button onClick={connect}>{translate('Connect')}</Button>
           </div>
         </div>
       </CardContent>

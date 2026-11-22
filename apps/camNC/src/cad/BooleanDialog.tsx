@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cadPartReferenceName, newCadId, updatePartCut, type CadBooleanOperation, type CadDocument, type CadPartCut } from '@wbcnc/cad';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FeatureDialog } from './FeatureDialog';
@@ -14,9 +15,9 @@ export interface BooleanChange {
 }
 
 const kOperations: { id: CadBooleanOperation; label: string }[] = [
-  { id: 'union', label: 'Union' },
-  { id: 'subtract', label: 'Subtract' },
-  { id: 'intersect', label: 'Intersect' },
+  { id: 'union', label: translate('Union') },
+  { id: 'subtract', label: translate('Subtract') },
+  { id: 'intersect', label: translate('Intersect') },
 ];
 
 /**
@@ -66,11 +67,11 @@ export function BooleanDialog({
   const result = useMemo<{ error: string } | { change: BooleanChange }>(() => {
     const consumeTools = keepTools ? undefined : (true as const);
     if (operation === 'subtract') {
-      if (!tools.length || !targets.length) return { error: 'Pick the parts to subtract, and the parts to subtract them from.' };
-      if (tools.some(id => targets.includes(id))) return { error: 'A part can’t be subtracted from itself.' };
+      if (!tools.length || !targets.length) return { error: translate('Pick the parts to subtract, and the parts to subtract them from.') };
+      if (tools.some(id => targets.includes(id))) return { error: translate('A part can’t be subtracted from itself.') };
       return { change: { operation, tools, targets, consumeTools } };
     }
-    if (tools.length < 2) return { error: 'Pick at least two parts.' };
+    if (tools.length < 2) return { error: translate('Pick at least two parts.') };
     // The part made keeps the place and name of the one made first; a saved step keeps the part it made.
     const order = (id: string) => document.parts.findIndex(part => part.id === id);
     const kept = step?.operation === operation && tools.includes(step.targets[0]!) ? step.targets[0] : undefined;
@@ -92,7 +93,7 @@ export function BooleanDialog({
     };
   }, [document, result, step, featureId]);
   useDialogPreview(candidate, onPreview);
-  const name = (id: string) => cadPartReferenceName(document, id) ?? 'a removed part';
+  const name = (id: string) => cadPartReferenceName(document, id) ?? translate('a removed part');
   const box = (which: Box, label: string, chosen: string[], choose: (ids: string[]) => void) => (
     <div
       className="cad-feature-selection cad-part-cut-box"
@@ -108,7 +109,7 @@ export function BooleanDialog({
               {name(id)}
               <button
                 type="button"
-                aria-label={`Take ${name(id)} out of ${label.toLowerCase()}`}
+                aria-label={translate('Take {{value1}} out of {{value2}}', { value1: name(id), value2: label.toLowerCase() })}
                 onClick={event => {
                   event.stopPropagation();
                   choose(chosen.filter(candidate => candidate !== id));
@@ -119,18 +120,20 @@ export function BooleanDialog({
           ))}
         </ul>
       ) : (
-        <span className="cad-feature-hint">{active === which ? 'Click parts in the view or the parts list' : 'None yet'}</span>
+        <span className="cad-feature-hint">
+          {active === which ? translate('Click parts in the view or the parts list') : translate('None yet')}
+        </span>
       )}
     </div>
   );
   return (
     <FeatureDialog
-      title="Boolean"
+      title={translate('Boolean')}
       onOk={() => ('error' in result ? setError(result.error) : onSave(result.change))}
       onCancel={onClose}
       acceptFromPartsList
       className="cad-part-cut-dialog">
-      <div className="cad-feature-tabs" role="tablist" aria-label="Boolean type">
+      <div className="cad-feature-tabs" role="tablist" aria-label={translate('Boolean type')}>
         {kOperations.map(choice => (
           <button
             key={choice.id}
@@ -150,7 +153,7 @@ export function BooleanDialog({
       {box('tools', 'Tools', tools, setTools)}
       <label>
         <input type="checkbox" checked={keepTools} onChange={event => setKeepTools(event.target.checked)} />
-        Keep tools
+        {translate('Keep tools ')}
       </label>
       {error && (
         <p role="alert" className="cad-thickness-error">
@@ -160,7 +163,7 @@ export function BooleanDialog({
       {onRemove && (
         <div className="cad-part-cut-actions">
           <button type="button" onClick={onRemove}>
-            Delete step
+            {translate('Delete step ')}
           </button>
         </div>
       )}

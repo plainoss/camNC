@@ -1,5 +1,6 @@
+import { parseCadValue } from './valueExpressions';
 import { createContext, useContext, useMemo } from 'react';
-import { formatCadValue, parseCadValue, type CadLengthUnit } from '@wbcnc/cad';
+import { formatCadValue, type CadLengthUnit } from '@wbcnc/cad';
 
 // Legacy documents without a preference retain millimeter input semantics.
 export const DesignUnitContext = createContext<CadLengthUnit>('mm');

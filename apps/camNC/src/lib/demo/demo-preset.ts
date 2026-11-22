@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { ICamSource } from '@/store/store';
 import { useStore } from '@/store/store';
 import { Box2, Matrix3, Vector2, Vector3 } from 'three';
@@ -17,7 +18,7 @@ const kDemoStockHeight = 12;
  */
 function demoCamSource(origin: string): ICamSource {
   return {
-    name: 'Demo camera',
+    name: translate('Demo camera'),
     url: new URL(kDemoVideoPath, origin).href,
     maxResolution: [1280, 960],
     arucoTagSize: 30,

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { EnsureHasCamSource } from '@/components/EnsureHasCamSource';
 import { LoadingVideoOverlay } from '@/components/LoadingVideoOverlay';
 import { PageHeader } from '@/components/page-header';
@@ -45,7 +46,7 @@ function ConfiguredCameraCalibration() {
   const setCalibrationData = useStore(state => state.camSourceSetters.setCalibration);
   const navigate = useNavigate();
   const handleCalibrationComplete = (data: CalibrationResult) => {
-    console.log('Calibration complete', data);
+    console.log(translate('Calibration complete'), data);
     console.log('updating calibration data', data);
     setCalibrationData({
       calibration_matrix: toMatrix3(data.cameraMatrix),
@@ -71,7 +72,7 @@ function ConfiguredCameraCalibration() {
 function RouteComponent() {
   return (
     <div className="w-full h-app flex flex-col gap-1 overflow-hidden">
-      <PageHeader title="Camera Calibration" className="absolute" />
+      <PageHeader title={translate('Camera Calibration')} className="absolute" />
       <Suspense fallback={<LoadingVideoOverlay />}>
         <ConfiguredCameraCalibration />
       </Suspense>

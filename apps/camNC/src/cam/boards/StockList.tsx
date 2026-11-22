@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Button } from '@wbcnc/ui/components/button';
 import { Input } from '@wbcnc/ui/components/input';
 import { Plus, Trash2 } from 'lucide-react';
@@ -12,14 +13,32 @@ const fmt = (v: number) => `${+v.toFixed(1)}`;
 const kStockFields = [
   {
     key: 'thickness',
-    label: 'Thickness',
-    name: 'Stock thickness',
-    placeholder: 'mm',
+    label: translate('Thickness'),
+    name: translate('Stock thickness'),
+    placeholder: translate('mm'),
     range: { min: 0, minExclusive: true, max: 200, unit: 'mm' },
   },
-  { key: 'w', label: 'Width', name: 'Stock width', placeholder: 'mm', range: { min: 0, minExclusive: true, unit: 'mm' } },
-  { key: 'h', label: 'Height', name: 'Stock height', placeholder: 'mm', range: { min: 0, minExclusive: true, unit: 'mm' } },
-  { key: 'quantity', label: 'Count', name: 'Stock quantity', placeholder: 'any', range: { min: 1, integer: true } },
+  {
+    key: 'w',
+    label: translate('Width'),
+    name: translate('Stock width'),
+    placeholder: translate('mm'),
+    range: { min: 0, minExclusive: true, unit: 'mm' },
+  },
+  {
+    key: 'h',
+    label: translate('Height'),
+    name: translate('Stock height'),
+    placeholder: translate('mm'),
+    range: { min: 0, minExclusive: true, unit: 'mm' },
+  },
+  {
+    key: 'quantity',
+    label: translate('Count'),
+    name: translate('Stock quantity'),
+    placeholder: translate('any'),
+    range: { min: 1, integer: true },
+  },
 ] as const;
 
 export function StockList({ stock, onChange }: { stock: StockBoardV1[]; onChange: (s: StockBoardV1[]) => void }) {
@@ -32,21 +51,23 @@ export function StockList({ stock, onChange }: { stock: StockBoardV1[]; onChange
   const quantity = draft.quantity.trim() ? parseDecimal(draft.quantity) : undefined;
   const valid = !problems.length && [draft.thickness, draft.w, draft.h].every(v => v.trim());
   return (
-    <section aria-label="Stock list" className="flex flex-col gap-2">
-      <h3 className="text-[13px] font-semibold">Stock list</h3>
-      {!stock.length && <p className="text-xs text-muted-foreground">No boards yet.</p>}
+    <section aria-label={translate('Stock list')} className="flex flex-col gap-2">
+      <h3 className="text-[13px] font-semibold">{translate('Stock list')}</h3>
+      {!stock.length && <p className="text-xs text-muted-foreground">{translate('No boards yet.')}</p>}
       {stock.map(s => (
         <div key={s.id} className="flex items-center justify-between font-mono text-xs">
           <span>
-            {fmt(s.thickness)} mm · {fmt(s.w)} × {fmt(s.h)}
-            {s.quantity !== undefined && ` · ${s.quantity} pcs`}
+            {fmt(s.thickness)}
+            {translate(' mm · ')}
+            {fmt(s.w)} × {fmt(s.h)}
+            {s.quantity !== undefined && translate(' · {{value1}} pcs', { value1: s.quantity })}
           </span>
-          <Hint text="Remove it from the stock list. Boards already laid out stay as they are.">
+          <Hint text={translate('Remove it from the stock list. Boards already laid out stay as they are.')}>
             <Button
               variant="ghost"
               size="icon"
               className="size-6"
-              aria-label="Remove stock board"
+              aria-label={translate('Remove stock board')}
               onClick={() => onChange(stock.filter(x => x !== s))}>
               <Trash2 className="size-3" />
             </Button>
@@ -91,8 +112,14 @@ export function StockList({ stock, onChange }: { stock: StockBoardV1[]; onChange
             onChange={e => setDraft({ ...draft, [f.key]: e.target.value })}
           />
         ))}
-        <Hint text="Add this board to the stock list: thickness, width and height in mm, count optional." wrap>
-          <Button type="submit" variant="outline" size="icon" className="size-7" aria-label="Add stock board" disabled={!valid}>
+        <Hint text={translate('Add this board to the stock list: thickness, width and height in mm, count optional.')} wrap>
+          <Button
+            type="submit"
+            variant="outline"
+            size="icon"
+            className="size-7"
+            aria-label={translate('Add stock board')}
+            disabled={!valid}>
             <Plus className="size-3" />
           </Button>
         </Hint>
@@ -103,8 +130,9 @@ export function StockList({ stock, onChange }: { stock: StockBoardV1[]; onChange
         </p>
       ))}
       <p className="text-xs text-muted-foreground">
-        Boards you have, in mm, and how many (empty count: as many as needed). “Auto-fill from stock” puts the parts on as little of them as
-        it can and keeps parts you moved by hand where they are.
+        {translate(
+          'Boards you have, in mm, and how many (empty count: as many as needed). “Auto-fill from stock” puts the parts on as little of them as it can and keeps parts you moved by hand where they are. '
+        )}
       </p>
     </section>
   );

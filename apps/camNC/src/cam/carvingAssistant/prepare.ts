@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { simplifyLoop, vConeDepth, type Operation, type LibraryTool } from '@wbcnc/cam';
 import type { BoardV1 } from '../boards';
 import type { CarvingArt, CarvingV1 } from '../carving';
@@ -87,7 +88,7 @@ const bounds = (loops: Loop[]) => {
   return { x0, y0, x1, y1, w: x1 - x0, h: y1 - y0 };
 };
 const abort = (signal?: AbortSignal) => {
-  if (signal?.aborted) throw new DOMException('Artwork preparation stopped.', 'AbortError');
+  if (signal?.aborted) throw new DOMException(translate('Artwork preparation stopped.'), 'AbortError');
 };
 const yieldToStop = async (signal?: AbortSignal) => {
   await new Promise(resolve => setTimeout(resolve, 0));
@@ -105,11 +106,12 @@ export function carvingOutlineSvg(outline: Loop[]): string {
 export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Promise<PreparedCarvingArt> {
   const { art, width, height, detail, carving, board, signal } = options;
   abort(signal);
-  if (![width, height].every(n => Number.isFinite(n) && n >= 2 && n <= 500)) throw new Error('Artwork width and height must be 2–500 mm.');
-  if (!Object.hasOwn(carvingDetailMm, detail)) throw new Error('Unknown carving detail level.');
-  if (!Number.isFinite(board.thickness) || board.thickness <= 0) throw new Error('The board needs a positive finite thickness.');
+  if (![width, height].every(n => Number.isFinite(n) && n >= 2 && n <= 500))
+    throw new Error(translate('Artwork width and height must be 2–500 mm.'));
+  if (!Object.hasOwn(carvingDetailMm, detail)) throw new Error(translate('Unknown carving detail level.'));
+  if (!Number.isFinite(board.thickness) || board.thickness <= 0) throw new Error(translate('The board needs a positive finite thickness.'));
   const source: CarvingArt = art.kind === 'svg' ? { ...art, svg: sanitizeCarvingSvg(art.svg) } : art;
-  if (source.kind === 'text' && source.text.length > 1000) throw new Error('Artwork text is too long.');
+  if (source.kind === 'text' && source.text.length > 1000) throw new Error(translate('Artwork text is too long.'));
   await yieldToStop(signal);
   if (
     options.sourceOutline &&
@@ -121,19 +123,19 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
           loop.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y) || Math.abs(p.x) > 10_000 || Math.abs(p.y) > 10_000)
       ))
   )
-    throw new Error('Smooth source outlines are invalid or exceed the geometry budget.');
+    throw new Error(translate('Smooth source outlines are invalid or exceed the geometry budget.'));
   const drawn = options.sourceOutline
     ? { region: structuredClone(options.sourceOutline) }
     : await outlineArt(source, height, { maxPixels: 750_000, maxMaskRuns: 20_000, simplifyPixels: 1 });
   abort(signal);
   const box = bounds(drawn.region);
-  if (!Number.isFinite(box.w) || box.w <= 0 || box.h <= 0) throw new Error('Artwork has no dark filled shapes to carve.');
+  if (!Number.isFinite(box.w) || box.w <= 0 || box.h <= 0) throw new Error(translate('Artwork has no dark filled shapes to carve.'));
   // Outlines of model-written SVG keep the lower limit: their cleanup below runs on the main thread.
   if (
     drawn.region.length > 500 ||
     drawn.region.reduce((sum, loop) => sum + loop.length, 0) > (options.sourceOutline ? kMaxOutlinePoints : 8000)
   )
-    throw new Error('Artwork is too complex. Request fewer details or simpler filled shapes.');
+    throw new Error(translate('Artwork is too complex. Request fewer details or simpler filled shapes.'));
   const scale = Math.min(width / box.w, height / box.h);
   let outline = drawn.region.map(loop =>
     loop.map(p => ({ x: (p.x - (box.x0 + box.x1) / 2) * scale, y: (p.y - (box.y0 + box.y1) / 2) * scale }))
@@ -158,17 +160,23 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
   if (small.length) {
     // A hole inside a removed island cannot be retained on its own. Skip cleanup if the drawing has holes.
     if (outline.some(loop => area(loop) < 0))
-      report.warnings.push(`${small.length} small filled regions need visual review; holes were preserved.`);
+      report.warnings.push(
+        translate('{{value1}} small filled regions need visual review; holes were preserved.', { value1: small.length })
+      );
     else {
       outline = outline.filter(loop => !small.includes(loop));
       report.removedComponents = small.length;
       report.warnings.push(
-        `Removed ${small.length} isolated filled regions smaller than ${report.minFeatureMm} × ${report.minFeatureMm} mm in area.`
+        translate('Removed {{value1}} isolated filled regions smaller than {{value2}} × {{value3}} mm in area.', {
+          value1: small.length,
+          value2: report.minFeatureMm,
+          value3: report.minFeatureMm,
+        })
       );
     }
   }
   if (!outline.length) {
-    report.errors.push('All filled regions are below this detail level. Enlarge the artwork or choose more detail.');
+    report.errors.push(translate('All filled regions are below this detail level. Enlarge the artwork or choose more detail.'));
     outline = drawn.region.map(loop =>
       loop.map(p => ({ x: (p.x - (box.x0 + box.x1) / 2) * scale, y: (p.y - (box.y0 + box.y1) / 2) * scale }))
     );
@@ -177,7 +185,7 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
   const radius = report.minFeatureMm / 2;
   const simplifyTolerance = options.sourceOutline ? Math.min(0.025, Math.max(0.001, 0.05 - 0.015 * scale)) : report.minFeatureMm / 12;
   if (options.sourceOutline && 0.015 * scale >= 0.049)
-    report.errors.push('Re-trace the original PNG at this larger size to preserve its curve approximation tolerance.');
+    report.errors.push(translate('Re-trace the original PNG at this larger size to preserve its curve approximation tolerance.'));
   // Physical-scale opening removes narrow branches as well as isolated dots; closing detects narrow uncut gaps.
   // These are approximate geometric feature tests. Always report changed area rather than claiming semantic equivalence.
   // Round offsets tessellate every raster corner. Reduce them again within 1/12 of the physical feature threshold,
@@ -192,19 +200,24 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
   report.narrowLandAreaMm2 = Math.max(0, polyArea(narrowLoops));
   report.removedCutAreaFraction = Math.min(1, report.removedCutAreaMm2 / Math.max(1e-9, polyArea(sourceOutline)));
   if (opened.length) outline = opened;
-  else report.errors.push('No filled regions survive the selected physical detail threshold.');
+  else report.errors.push(translate('No filled regions survive the selected physical detail threshold.'));
   report.removedComponents = Math.max(0, report.sourceComponents - opened.filter(loop => area(loop) > 0).length);
   if (report.removedCutAreaMm2 > 0.01)
     report.warnings.push(
-      `Detail preparation removed ${report.removedCutAreaMm2.toFixed(2)} mm² of cut area, including narrow branches or corners. Compare the artwork before applying.`
+      translate(
+        'Detail preparation removed {{value1}} mm² of cut area, including narrow branches or corners. Compare the artwork before applying.',
+        { value1: report.removedCutAreaMm2.toFixed(2) }
+      )
     );
   if (report.removedCutAreaFraction > 0.1)
     report.warnings.push(
-      'This detail level removes more than 10% of the original cut area. Important features may be missing; use a finer detail level or larger size if needed.'
+      translate(
+        'This detail level removes more than 10% of the original cut area. Important features may be missing; use a finer detail level or larger size if needed.'
+      )
     );
   if (report.removedCutAreaFraction > 0.5)
     report.errors.push(
-      'This size and detail level remove more than half of the original artwork. Choose a larger size or finer detail level.'
+      translate('This size and detail level remove more than half of the original artwork. Choose a larger size or finer detail level.')
     );
   report.carvedFraction = Math.min(1, Math.max(0, polyArea(outline)) / (width * height));
   const carvedMessage = carvedFractionMessage(report.carvedFraction);
@@ -212,10 +225,18 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
   else if (report.carvedFraction > kCarvedFractionWarn) report.warnings.push(carvedMessage);
   if (report.narrowLandAreaMm2 > 0.01)
     report.warnings.push(
-      `Approximately ${report.narrowLandAreaMm2.toFixed(2)} mm² of narrow remaining gaps or lands need review at the ${report.minFeatureMm} mm threshold. They were not filled automatically.`
+      translate(
+        'Approximately {{value1}} mm² of narrow remaining gaps or lands need review at the {{value2}} mm threshold. They were not filled automatically.',
+        { value1: report.narrowLandAreaMm2.toFixed(2), value2: report.minFeatureMm }
+      )
     );
   report.warnings.push(
-    `Contours are simplified within ${simplifyTolerance.toFixed(3)} mm after physical detail preparation.${options.sourceOutline ? ' Smooth-source CAM chord approximation stays within 0.05 mm; detail cleanup is reported separately.' : ''}`
+    translate('Contours are simplified within {{value1}} mm after physical detail preparation.{{value2}}', {
+      value1: simplifyTolerance.toFixed(3),
+      value2: options.sourceOutline
+        ? translate(' Smooth-source CAM chord approximation stays within 0.05 mm; detail cleanup is reported separately.')
+        : '',
+    })
   );
   const accepted = bounds(outline);
   // Keep the final ink centered even if cleanup removed an outlying dot.
@@ -230,25 +251,34 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
     .map(spot => ({ ...spot, x: spot.x - centre.x, y: spot.y - centre.y }));
   report.points = outline.reduce((sum, loop) => sum + loop.length, 0);
   if (board.size.fit || ![board.size.w, board.size.h].every(n => Number.isFinite(n) && n > 0))
-    report.errors.push('Carving requires a fixed board size.');
-  else if (accepted.w > board.size.w + 1e-6 || accepted.h > board.size.h + 1e-6) report.errors.push('Artwork does not fit on the board.');
+    report.errors.push(translate('Carving requires a fixed board size.'));
+  else if (accepted.w > board.size.w + 1e-6 || accepted.h > board.size.h + 1e-6)
+    report.errors.push(translate('Artwork does not fit on the board.'));
   const tip = carving.vBit.tipDiameter ?? 0;
   if (tip > 0) {
     const tipReachable = offset(offset(outline, -tip / 2), tip / 2);
     const tipLost = Math.max(0, polyArea(difference(outline, tipReachable)));
     if (tipLost > 0.01)
       report.warnings.push(
-        `The ${tip} mm V-bit tip may leave approximately ${tipLost.toFixed(2)} mm² uncut in thin branches or tight corners. Inspect the actual toolpath preview.`
+        translate(
+          'The {{value1}} mm V-bit tip may leave approximately {{value2}} mm² uncut in thin branches or tight corners. Inspect the actual toolpath preview.',
+          { value1: tip, value2: tipLost.toFixed(2) }
+        )
       );
   }
   const narrow = outline.filter(loop => area(loop) > 0 && Math.min(bounds([loop]).w, bounds([loop]).h) <= tip).length;
-  if (narrow) report.errors.push(`${narrow} filled regions are no wider than the V-bit tip and cannot be carved faithfully.`);
+  if (narrow)
+    report.errors.push(
+      translate('{{value1}} filled regions are no wider than the V-bit tip and cannot be carved faithfully.', { value1: narrow })
+    );
   if (outline.some(loop => Math.min(bounds([loop]).w, bounds([loop]).h) < report.minFeatureMm))
     report.warnings.push(
-      `Some regions are narrower than the ${report.minFeatureMm} mm detail threshold. Inspect small features and remaining gaps.`
+      translate('Some regions are narrower than the {{value1}} mm detail threshold. Inspect small features and remaining gaps.', {
+        value1: report.minFeatureMm,
+      })
     );
   report.warnings.push(
-    'Geometric checks do not establish material strength, visual fidelity or machine acceptance. Review Plan before cutting.'
+    translate('Geometric checks do not establish material strength, visual fidelity or machine acceptance. Review Plan before cutting.')
   );
   await yieldToStop(signal);
   // Bound synchronous CAM work: noisy model output must not monopolize the UI with thousands of offset rings.
@@ -263,21 +293,21 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
   };
   let operations: Operation[] = [];
   if (report.points > kMaxCamPoints || !Number.isFinite(cap) || cap <= 0 || cap > 8 || Math.min(accepted.w, accepted.h) > 250)
-    report.errors.push('Artwork exceeds the bounded assistant CAM check. Use smaller or simpler artwork or a shallower depth.');
+    report.errors.push(translate('Artwork exceeds the bounded assistant CAM check. Use smaller or simpler artwork or a shallower depth.'));
   // CAM's estimator measures the region's actual widest interior with bounded offset probes. Overall artwork
   // dimensions are a poor floor-ring estimate for line illustrations: an 80 mm face can have only 2 mm strokes.
   else if (carvingWork(camInput) / 0.07 > 800_000)
-    report.errors.push('Artwork exceeds the bounded assistant CAM check. Use smaller or simpler artwork or a shallower depth.');
+    report.errors.push(translate('Artwork exceeds the bounded assistant CAM check. Use smaller or simpler artwork or a shallower depth.'));
   else if (!report.errors.length) {
     try {
       operations = await checkCarvingInWorker(camInput, board.thickness, signal);
       abort(signal);
       report.camPasses = operations.reduce((sum, operation) => sum + operation.passes.length, 0);
-      if (!report.camPasses) report.errors.push('The current V-bit produces no cuts for this artwork.');
+      if (!report.camPasses) report.errors.push(translate('The current V-bit produces no cuts for this artwork.'));
       report.warnings.push(...operations.flatMap(operation => operation.warnings ?? []));
     } catch (error) {
       if (signal?.aborted) throw error;
-      report.errors.push(error instanceof Error ? error.message : 'The CAM check failed.');
+      report.errors.push(error instanceof Error ? error.message : translate('The CAM check failed.'));
     }
   }
   report.ok = report.errors.length === 0;
@@ -295,7 +325,10 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
 
 function carvedFractionMessage(fraction: number): string {
   const limit = fraction > kCarvedFractionError ? kCarvedFractionError : kCarvedFractionWarn;
-  return `Most of the drawing is carved away (${Math.round(fraction * 100)}%, limit ${Math.round(limit * 100)}%). Ask for an outline or line-art style, or use white for the background.`;
+  return translate(
+    'Most of the drawing is carved away ({{value1}}%, limit {{value2}}%). Ask for an outline or line-art style, or use white for the background.',
+    { value1: Math.round(fraction * 100), value2: Math.round(limit * 100) }
+  );
 }
 
 /**

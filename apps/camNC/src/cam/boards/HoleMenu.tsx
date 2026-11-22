@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { HoleChoice, HoleMiddle } from '@wbcnc/cam';
 import { kVacuumSlug } from '@wbcnc/cam/settings';
 import {
@@ -33,22 +34,29 @@ export function HoleMenu({
         <span aria-hidden className="absolute" style={{ left, top }} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        <DropdownMenuLabel className="text-xs">Middle of this hole: {+size.toFixed(0)} mm</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs">
+          {translate('Middle of this hole: ')}
+          {+size.toFixed(0)}
+          {translate(' mm')}
+        </DropdownMenuLabel>
         {state === 'screwed' ? (
-          <DropdownMenuItem disabled>A screw holds it. Remove the screw to clear it.</DropdownMenuItem>
+          <DropdownMenuItem disabled>{translate('A screw holds it. Remove the screw to clear it.')}</DropdownMenuItem>
         ) : (
           <>
             <DropdownMenuItem onSelect={() => onChoose('clear')}>
-              <Check className={cn('size-3', state !== 'cleared' && 'invisible')} /> Clear it, about +{addMinutes.toFixed(1)} min
+              <Check className={cn('size-3', state !== 'cleared' && 'invisible')} />
+              {translate(' Clear it, about +')}
+              {addMinutes.toFixed(1)}
+              {translate(' min ')}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onChoose('leave')}>
               <Check className={cn('size-3', state === 'cleared' && 'invisible')} />{' '}
-              {small ? 'Leave it for the vacuum' : 'Leave it: I’ll tape or screw it down'}
+              {small ? translate('Leave it for the vacuum') : translate('Leave it: I’ll tape or screw it down')}
             </DropdownMenuItem>
             {choice && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => onChoose(undefined)}>Decide by its size and time</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => onChoose(undefined)}>{translate('Decide by its size and time')}</DropdownMenuItem>
               </>
             )}
           </>

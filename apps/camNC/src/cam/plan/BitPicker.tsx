@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { LibraryTool } from '@wbcnc/cam';
 import { selectToolPreset } from '@wbcnc/cam/tools';
 import { Link } from '@tanstack/react-router';
@@ -18,11 +19,14 @@ import { ImportToolLibrary } from './ImportToolLibrary';
 const bitLabel = (b: LibraryTool) => `⌀ ${b.diameter} · ${b.name}`;
 const sourceOf = (b: LibraryTool) => {
   const s = b as Partial<StoredBit>;
-  return s.source === 'custom' ? 'added by hand' : s.library ? `library: ${s.library}` : 'built in';
+  return s.source === 'custom' ? translate('added by hand') : s.library ? `library: ${s.library}` : translate('built in');
 };
 /** Flutes and flute length, as far as known: "2 flutes · 22 mm flute length", or "". */
 const bitSpecs = (b: LibraryTool) =>
-  [b.flutes && `${b.flutes} ${b.flutes === 1 ? 'flute' : 'flutes'}`, b.fluteLength && `${+b.fluteLength.toFixed(1)} mm flute length`]
+  [
+    b.flutes && `${b.flutes} ${b.flutes === 1 ? 'flute' : 'flutes'}`,
+    b.fluteLength && translate('{{value1}} mm flute length', { value1: +b.fluteLength.toFixed(1) }),
+  ]
     .filter(Boolean)
     .join(' · ');
 
@@ -36,7 +40,7 @@ function BitOption({ bit }: { bit: LibraryTool }) {
       <span className="flex min-w-0 flex-col items-start gap-0.5">
         <span className="whitespace-normal break-words">{bitLabel(bit)}</span>
         <span className="text-xs text-muted-foreground">
-          {[isBallBit(bit) ? 'Ball end' : '', bitSpecs(bit)].filter(Boolean).join(' · ') || 'Flat end mill'}
+          {[isBallBit(bit) ? translate('Ball end') : '', bitSpecs(bit)].filter(Boolean).join(' · ') || translate('Flat end mill')}
         </span>
       </span>
     </SelectItem>
@@ -79,7 +83,7 @@ function CuttingPreset({
         value={bit.presetId ?? ''}
         aria-describedby={`${id}-help`}
         onChange={event => onChange(selectToolPreset(bit, event.target.value))}>
-        {!currentKnown && <option value={bit.presetId ?? ''}>{bit.presetName ?? 'Current cutting data'}</option>}
+        {!currentKnown && <option value={bit.presetId ?? ''}>{bit.presetName ?? translate('Current cutting data')}</option>}
         {bit.presets.map(preset => (
           <option key={preset.id} value={preset.id}>
             {preset.name}
@@ -87,7 +91,9 @@ function CuttingPreset({
         ))}
       </select>
       <p id={`${id}-help`} className="text-xs text-muted-foreground">
-        Changes this job’s library values. Saved and job overrides still apply. Choose cutting data for your cutter and material.
+        {translate(
+          'Changes this job’s library values. Saved and job overrides still apply. Choose cutting data for your cutter and material. '
+        )}
       </p>
     </div>
   );
@@ -106,17 +112,20 @@ function CustomBitForm({ onAdd, ball = false }: { onAdd: (bit: StoredBit) => voi
     useToolLibrary.getState().addCustom({
       diameter,
       flutes: parseDecimal(flutes) || undefined,
-      name: name.trim() || `${diameter} mm ${ball ? 'ball end' : 'flat'}`,
+      name: name.trim() || `${diameter} mm ${ball ? translate('ball end') : 'flat'}`,
       ...(ball ? { shape: 'ball' as const } : {}),
     });
     onAdd(useToolLibrary.getState().bits.at(-1)!);
   };
   return (
-    <div className="flex flex-col gap-2 rounded-md border p-2.5" role="group" aria-label={ball ? 'Custom ball bit' : 'Custom bit'}>
+    <div
+      className="flex flex-col gap-2 rounded-md border p-2.5"
+      role="group"
+      aria-label={ball ? translate('Custom ball bit') : translate('Custom bit')}>
       <div className="grid grid-cols-[1fr_1fr] gap-2">
         <div className="flex flex-col gap-1">
           <Label htmlFor="custom-bit-d" className="text-xs font-normal text-muted-foreground">
-            Diameter (mm)
+            {translate('Diameter (mm) ')}
           </Label>
           <Input
             id="custom-bit-d"
@@ -136,7 +145,7 @@ function CustomBitForm({ onAdd, ball = false }: { onAdd: (bit: StoredBit) => voi
         </div>
         <div className="flex flex-col gap-1">
           <Label htmlFor="custom-bit-flutes" className="text-xs font-normal text-muted-foreground">
-            Flutes
+            {translate('Flutes ')}
           </Label>
           <Input
             id="custom-bit-flutes"
@@ -157,18 +166,22 @@ function CustomBitForm({ onAdd, ball = false }: { onAdd: (bit: StoredBit) => voi
       </div>
       <div className="flex flex-col gap-1">
         <Label htmlFor="custom-bit-name" className="text-xs font-normal text-muted-foreground">
-          Name
+          {translate('Name ')}
         </Label>
         <Input
           id="custom-bit-name"
           className="h-8"
-          placeholder={ok ? `${diameter} mm ${ball ? 'ball end' : 'flat'}` : 'e.g. 6 mm 2-flute'}
+          placeholder={
+            ok
+              ? translate('{{diameter}} mm {{value2}}', { diameter: diameter, value2: ball ? translate('ball end') : translate('flat') })
+              : translate('e.g. 6 mm 2-flute')
+          }
           value={name}
           onChange={e => setName(e.target.value)}
         />
       </div>
       <Button size="sm" disabled={!ok} onClick={add} className="self-start">
-        Add bit
+        {translate('Add bit ')}
       </Button>
     </div>
   );
@@ -190,7 +203,7 @@ export function BitSettings({ value, onChange }: { value: PlanSettingsV1; onChan
   return (
     <div className="flex flex-col gap-4">
       <section className="flex flex-col gap-1.5">
-        <Label htmlFor="plan-bit">Bit</Label>
+        <Label htmlFor="plan-bit">{translate('Bit')}</Label>
         <Select value={bitKey(value.bit)} onValueChange={k => set({ bit: bits.find(b => bitKey(b) === k)! })}>
           <SelectTrigger id="plan-bit" className="w-full">
             <BitValue bit={value.bit} />
@@ -202,16 +215,17 @@ export function BitSettings({ value, onChange }: { value: PlanSettingsV1; onChan
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          Flat end mill{bitSpecs(value.bit) && ` · ${bitSpecs(value.bit)}`} · {sourceOf(value.bit)}
+          {translate('Flat end mill')}
+          {bitSpecs(value.bit) && translate(' · {{value1}}', { value1: bitSpecs(value.bit) })} · {sourceOf(value.bit)}
         </p>
-        <CuttingPreset bit={value.bit} id="plan-bit-preset" label="Cutting preset" onChange={bit => set({ bit })} />
+        <CuttingPreset bit={value.bit} id="plan-bit-preset" label={translate('Cutting preset')} onChange={bit => set({ bit })} />
         <div className="flex flex-wrap items-center gap-2">
           <ImportToolLibrary onImport={importLibrary} />
           <Button size="sm" variant="outline" aria-expanded={custom} onClick={() => setCustom(c => !c)}>
-            Custom bit…
+            {translate('Custom bit… ')}
           </Button>
           <Button size="sm" variant="link" className="px-1" asChild>
-            <Link to="/settings/bits">Manage bits…</Link>
+            <Link to="/settings/bits">{translate('Manage bits…')}</Link>
           </Button>
         </div>
         {custom && (
@@ -225,7 +239,7 @@ export function BitSettings({ value, onChange }: { value: PlanSettingsV1; onChan
       </section>
 
       <section className="flex flex-col gap-1.5">
-        <Label htmlFor="plan-small-bit">Second, smaller bit (optional)</Label>
+        <Label htmlFor="plan-small-bit">{translate('Second, smaller bit (optional)')}</Label>
         <Select
           value={value.smallBit ? bitKey(value.smallBit) : 'none'}
           onValueChange={k => set({ smallBit: k === 'none' ? undefined : bits.find(b => bitKey(b) === k) })}>
@@ -233,7 +247,7 @@ export function BitSettings({ value, onChange }: { value: PlanSettingsV1; onChan
             {value.smallBit ? <BitValue bit={value.smallBit} /> : <SelectValue />}
           </SelectTrigger>
           <SelectContent className="max-w-[min(26rem,calc(100vw-2rem))]">
-            <SelectItem value="none">None</SelectItem>
+            <SelectItem value="none">{translate('None')}</SelectItem>
             {smaller.map(b => (
               <BitOption key={bitKey(b)} bit={b} />
             ))}
@@ -243,42 +257,46 @@ export function BitSettings({ value, onChange }: { value: PlanSettingsV1; onChan
           <CuttingPreset
             bit={value.smallBit}
             id="plan-small-bit-preset"
-            label="Second bit cutting preset"
+            label={translate('Second bit cutting preset')}
             onChange={smallBit => set({ smallBit })}
           />
         )}
         <p className="text-xs text-muted-foreground">
           {value.smallBit
-            ? 'Cuts what the main bit can’t reach. Boards that need it get a second program: swap the bit and zero Z in between.'
-            : 'For slots or corners narrower than the main bit.'}{' '}
+            ? translate('Cuts what the main bit can’t reach. Boards that need it get a second program: swap the bit and zero Z in between.')
+            : translate('For slots or corners narrower than the main bit.')}{' '}
           <button
             type="button"
             className="underline underline-offset-2 hover:text-foreground"
             aria-expanded={howOpen}
             aria-controls="small-bit-how"
             onClick={() => setHowOpen(o => !o)}>
-            How it works
+            {translate('How it works ')}
           </button>
         </p>
         {howOpen && (
           <ul id="small-bit-how" className="flex list-disc flex-col gap-1 pl-4 text-xs leading-relaxed text-muted-foreground">
-            <li>One setting for the whole job, not per part or per operation.</li>
+            <li>{translate('One setting for the whole job, not per part or per operation.')}</li>
             <li>
-              Each pocket or hole gets the largest bit that fits it. Where a pocket narrows to a slot that bit can’t enter, the smaller bit
-              cuts the slot. Outlines always use the main bit.
+              {translate(
+                'Each pocket or hole gets the largest bit that fits it. Where a pocket narrows to a slot that bit can’t enter, the smaller bit cuts the slot. Outlines always use the main bit. '
+              )}
             </li>
             <li>
-              A board that needs both bits gets two programs, the smaller bit first. The machine queue stops in between to swap the bit and
-              zero Z; XY stays.
+              {translate(
+                'A board that needs both bits gets two programs, the smaller bit first. The machine queue stops in between to swap the bit and zero Z; XY stays. '
+              )}
             </li>
-            <li>For now you can’t pick the bit for one pocket or part.</li>
-            <li>Inside corners the main bit can’t reach are only flagged, not cleaned up with the smaller bit afterwards.</li>
+            <li>{translate('For now you can’t pick the bit for one pocket or part.')}</li>
+            <li>
+              {translate('Inside corners the main bit can’t reach are only flagged, not cleaned up with the smaller bit afterwards.')}
+            </li>
           </ul>
         )}
       </section>
 
       <section className="flex flex-col gap-1.5">
-        <Label htmlFor="plan-round-ball">Ball end for rounded edges</Label>
+        <Label htmlFor="plan-round-ball">{translate('Ball end for rounded edges')}</Label>
         <Select value={bitKey(roundBall)} onValueChange={k => set({ roundBall: balls.find(b => bitKey(b) === k) })}>
           <SelectTrigger id="plan-round-ball" className="w-full">
             <BitValue bit={roundBall} />
@@ -290,11 +308,11 @@ export function BitSettings({ value, onChange }: { value: PlanSettingsV1; onChan
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          Finishes edges the design rounds over, last on each board.{' '}
-          {value.roundBall ? sourceOf(roundBall) : 'Unless you pick one, the largest ball bit you added or imported.'}
+          {translate('Finishes edges the design rounds over, last on each board.')}{' '}
+          {value.roundBall ? sourceOf(roundBall) : translate('Unless you pick one, the largest ball bit you added or imported.')}
         </p>
         <Button size="sm" variant="outline" className="self-start" aria-expanded={customBall} onClick={() => setCustomBall(c => !c)}>
-          Custom ball bit…
+          {translate('Custom ball bit… ')}
         </Button>
         {customBall && (
           <CustomBitForm
@@ -324,13 +342,17 @@ export function BitChip({
   onOpen?: () => void;
 }) {
   const chip = (
-    <Button size="sm" variant="outline" aria-label={`Bit: ⌀${value.bit.diameter} ${value.bit.name}. Change the bit`} onClick={onOpen}>
-      <span className="text-muted-foreground">Bit:</span> ⌀{value.bit.diameter} · {value.bit.name}
+    <Button
+      size="sm"
+      variant="outline"
+      aria-label={translate('Bit: ⌀{{value1}} {{value2}}. Change the bit', { value1: value.bit.diameter, value2: value.bit.name })}
+      onClick={onOpen}>
+      <span className="text-muted-foreground">{translate('Bit:')}</span> ⌀{value.bit.diameter} · {value.bit.name}
       {value.smallBit && <span className="text-muted-foreground">+ ⌀{value.smallBit.diameter}</span>}
       {!onOpen && <ChevronDown />}
     </Button>
   );
-  const hint = 'The bit for the whole job. It sets the margin and gap between parts on the boards, and every toolpath.';
+  const hint = translate('The bit for the whole job. It sets the margin and gap between parts on the boards, and every toolpath.');
   if (onOpen) return <Hint text={hint}>{chip}</Hint>;
   return (
     <Popover>

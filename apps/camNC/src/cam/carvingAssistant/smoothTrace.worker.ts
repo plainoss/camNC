@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import tracer from 'imagetracerjs';
 import { flattenCurveContours, kMaxOutlinePoints } from './curveFlatten';
 import { mergeCurveRuns } from './curveMerge';
@@ -20,7 +21,8 @@ self.onmessage = (
 ) => {
   try {
     const { ink, width, height, tolerancePx } = event.data;
-    if (width * height > 1_000_000 || ink.length !== width * height) throw new Error('Smooth trace input exceeds its pixel budget.');
+    if (width * height > 1_000_000 || ink.length !== width * height)
+      throw new Error(translate('Smooth trace input exceeds its pixel budget.'));
     const data = new Uint8ClampedArray(ink.length * 4);
     for (let i = 0; i < ink.length; i++) {
       data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = ink[i] ? 0 : 255;
@@ -31,7 +33,8 @@ self.onmessage = (
     const originalTracePath = tracer.tracepath.bind(tracer);
     let sourcePointCount = 0;
     tracer.tracepath = (path, lineTolerance, curveTolerance) => {
-      if ((sourcePointCount += path.points.length) > 120_000) throw new Error('Smooth tracing exceeds its source contour budget.');
+      if ((sourcePointCount += path.points.length) > 120_000)
+        throw new Error(translate('Smooth tracing exceeds its source contour budget.'));
       return { ...originalTracePath(path, lineTolerance, curveTolerance), sourcePoints: path.points };
     };
     const traced = tracer.imagedataToTracedata(
@@ -60,12 +63,12 @@ self.onmessage = (
     const paths = roundFit.paths;
     const segmentCount = paths.reduce((sum, path) => sum + path.segments.length, 0);
     if (!paths.length || paths.length > 300 || segmentCount > kMaxSegments)
-      throw new Error('Smooth tracing exceeds its contour budget. Use simpler artwork.');
+      throw new Error(translate('Smooth tracing exceeds its contour budget. Use simpler artwork.'));
     let curves = 0,
       lines = 0;
     const number = (value: number | undefined) => {
       if (value === undefined || !Number.isFinite(value) || Math.abs(value) > 1e6)
-        throw new Error('Smooth tracer returned an invalid coordinate.');
+        throw new Error(translate('Smooth tracer returned an invalid coordinate.'));
       // A hundredth of a tracing pixel is far below what the source resolves, and keeps a detailed trace compact.
       return Number(value.toFixed(2));
     };
@@ -75,10 +78,11 @@ self.onmessage = (
         let endpoint = { x: first.x1, y: first.y1 };
         for (const segment of path.segments) {
           if (Math.hypot(segment.x1 - endpoint.x, segment.y1 - endpoint.y) > 1e-6)
-            throw new Error('Smooth tracer returned a discontinuous contour.');
+            throw new Error(translate('Smooth tracer returned a discontinuous contour.'));
           endpoint = segment.type === 'C' ? { x: segment.x4!, y: segment.y4! } : { x: segment.x2, y: segment.y2 };
         }
-        if (Math.hypot(endpoint.x - first.x1, endpoint.y - first.y1) > 1e-3) throw new Error('Smooth tracer returned an open contour.');
+        if (Math.hypot(endpoint.x - first.x1, endpoint.y - first.y1) > 1e-3)
+          throw new Error(translate('Smooth tracer returned an open contour.'));
         return (
           `M${number(first.x1)},${number(first.y1)}` +
           path.segments
@@ -87,7 +91,7 @@ self.onmessage = (
                 curves++;
                 return `C${number(segment.x2)},${number(segment.y2)} ${number(segment.x3)},${number(segment.y3)} ${number(segment.x4)},${number(segment.y4)}`;
               }
-              if (segment.type !== 'L') throw new Error('Unsupported tracer segment.');
+              if (segment.type !== 'L') throw new Error(translate('Unsupported tracer segment.'));
               lines++;
               return `L${number(segment.x2)},${number(segment.y2)}`;
             })
@@ -96,7 +100,7 @@ self.onmessage = (
         );
       })
       .join('');
-    if (d.length > 170_000) throw new Error('Smooth vector source exceeds its encoded geometry budget.');
+    if (d.length > 170_000) throw new Error(translate('Smooth vector source exceeds its encoded geometry budget.'));
     const holes = paths.filter(path => path.isholepath).length;
     // Emit only checked numeric path data. Never import or insert the library's generated SVG markup.
     self.postMessage({
@@ -109,6 +113,6 @@ self.onmessage = (
       roundRegularized: roundFit.regularized,
     });
   } catch (error) {
-    self.postMessage({ error: error instanceof Error ? error.message : 'Smooth tracing failed.' });
+    self.postMessage({ error: error instanceof Error ? error.message : translate('Smooth tracing failed.') });
   }
 };

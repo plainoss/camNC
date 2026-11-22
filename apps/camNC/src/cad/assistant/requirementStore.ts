@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadProposal } from '@wbcnc/cad-editor/proposal';
 import { validateAssistantRequirements, type AssistantRequirements } from './requirements';
 
@@ -38,5 +39,5 @@ export function requirementProposalRefusal(proposal: CadProposal): string | unde
   const bound = proposals.get(proposal);
   // Non-assistant imports and native cupboard proposals retain their ordinary document guards.
   if (bound && readRequirements(bound.documentId).revision !== bound.revision)
-    return 'Confirmed requirements changed. Check a new proposal before applying.';
+    return translate('Confirmed requirements changed. Check a new proposal before applying.');
 }

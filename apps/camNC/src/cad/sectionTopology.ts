@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 export type SectionVec3 = [number, number, number];
 export interface SectionSegment {
   a: SectionVec3;
@@ -98,7 +99,7 @@ export function sectionEdges(
   const exact = new Map<string, Edge>();
   for (const { a, b } of entries) accumulate(exact, a, b);
   const snap = (point: SectionVec3): SectionVec3 => points[find(point) ?? -1] ?? point;
-  const failure = () => ({ points, edges: [], snap, problem: 'The part mesh has an open or non-manifold boundary.' });
+  const failure = () => ({ points, edges: [], snap, problem: translate('The part mesh has an open or non-manifold boundary.') });
   if (solid && [...exact.values()].some(edge => edge.count > 2)) return failure();
   if (!entries.length || (solid && [...exact.values()].every(edge => edge.count === 2 && edge.balance === 0)))
     return { points, edges: [], snap };
@@ -178,15 +179,15 @@ export function sectionContours(segments: SectionSegment[], tolerance: number) {
     incoming = new Map<number, number>();
   const failed = (problem: string) => ({ ...joined, loops: [] as SectionVec3[][], problem });
   for (const edge of joined.edges) {
-    if (Math.abs(edge.balance) !== 1) return failed('The section boundary overlaps itself.');
+    if (Math.abs(edge.balance) !== 1) return failed(translate('The section boundary overlaps itself.'));
     const a = edge.balance > 0 ? edge.a : edge.b,
       b = edge.balance > 0 ? edge.b : edge.a;
-    if (outgoing.has(a) || incoming.has(b)) return failed('The section boundary branches or touches itself.');
+    if (outgoing.has(a) || incoming.has(b)) return failed(translate('The section boundary branches or touches itself.'));
     outgoing.set(a, b);
     incoming.set(b, a);
   }
   if ([...outgoing.keys()].some(id => !incoming.has(id)) || [...incoming.keys()].some(id => !outgoing.has(id)))
-    return failed('The section boundary is not closed.');
+    return failed(translate('The section boundary is not closed.'));
   const visited = new Set<number>(),
     loops: SectionVec3[][] = [];
   for (const start of outgoing.keys()) {
@@ -194,7 +195,7 @@ export function sectionContours(segments: SectionSegment[], tolerance: number) {
     const ids: number[] = [];
     let next = start;
     do {
-      if (visited.has(next)) return failed('The section boundary is not a simple loop.');
+      if (visited.has(next)) return failed(translate('The section boundary is not a simple loop.'));
       visited.add(next);
       ids.push(next);
       next = outgoing.get(next)!;
@@ -207,7 +208,7 @@ export function sectionContours(segments: SectionSegment[], tolerance: number) {
   const edges = contourSegments.map((edge, index): ContourEdge => ({ ...edge, ...bounds([edge.a, edge.b]), index }));
   if (edges.length) {
     const source = contourTree([...edges]);
-    if (edges.some(edge => contourCrossing(source, edge))) return failed('The section boundary crosses itself.');
+    if (edges.some(edge => contourCrossing(source, edge))) return failed(translate('The section boundary crosses itself.'));
   }
   return { ...joined, loops };
 }

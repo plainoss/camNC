@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cn } from '@wbcnc/ui/lib/utils';
 import type { HoleChoice, HoleMiddle } from '@wbcnc/cam';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@wbcnc/ui/components/dropdown-menu';
@@ -521,10 +522,10 @@ export function BoardDrawings({
               return (
                 <section
                   key={board.id}
-                  aria-label={`${boardLabel(board)} drawing`}
+                  aria-label={translate('{{value1}} drawing', { value1: boardLabel(board) })}
                   data-board-drop={board.id}
                   data-board-drawing
-                  title={selected ? undefined : `Edit ${boardLabel(board)}`}
+                  title={selected ? undefined : translate('Edit {{value1}}', { value1: boardLabel(board) })}
                   style={{ left: spot.x - padPx, top: spot.y - padPx }}
                   onClick={e => {
                     // Not what's on it, nor a menu of it (React brings a portal's clicks here too).
@@ -570,8 +571,13 @@ export function BoardDrawings({
                       quiet={!here}
                       label={
                         boardSizeLabel(board, nest) === '–'
-                          ? `${boardLabel(board)}, empty`
-                          : `${boardLabel(board)}, ${fmt(nest.board.w)} by ${fmt(nest.board.h)} mm, with ${nest.placements.length} parts`
+                          ? translate('{{value1}}, empty', { value1: boardLabel(board) })
+                          : translate('{{value1}}, {{value2}} by {{value3}} mm, with {{value4}} parts', {
+                              value1: boardLabel(board),
+                              value2: fmt(nest.board.w),
+                              value3: fmt(nest.board.h),
+                              value4: nest.placements.length,
+                            })
                       }
                       className={cn(
                         'block shrink-0 touch-none overflow-visible transition-opacity',
@@ -630,7 +636,7 @@ export function BoardDrawings({
                                 if (!settled) {
                                   onNote(
                                     reserved(f, settleInputOf(board, b.nest, instances, bit, nestOptions).input)
-                                      ? 'That spot is kept clear: the XY zero corner is where you probe.'
+                                      ? translate('That spot is kept clear: the XY zero corner is where you probe.')
                                       : `No room here on a ${b.nest.board.w} × ${b.nest.board.h} board. Slide along the edge, or use a bigger board.`
                                   );
                                   return;
@@ -652,7 +658,7 @@ export function BoardDrawings({
                                 setSelectedHold(null);
                                 onBoardEdit(
                                   { ...board, fixtures: (board.fixtures ?? []).filter((_, j) => j !== k) },
-                                  'Removed. Parts stay where they are; Tighten layout closes the gaps.'
+                                  translate('Removed. Parts stay where they are; Tighten layout closes the gaps.')
                                 );
                               },
                             }
@@ -725,7 +731,7 @@ export function BoardDrawings({
                           setSelectedHold(null);
                           onBoardEdit(
                             { ...board, fixtures: (board.fixtures ?? []).filter((_, j) => j !== held) },
-                            'Removed. Parts stay where they are; Tighten layout closes the gaps.'
+                            translate('Removed. Parts stay where they are; Tighten layout closes the gaps.')
                           );
                         };
                         deleteSelected.current = remove;
@@ -735,37 +741,43 @@ export function BoardDrawings({
                             id={`hold-${held}`}
                             title={
                               kind === 'clamp'
-                                ? `Clamp · ${shownFixtures[held]?.kind === 'clamp' ? (shownFixtures[held] as { side: string }).side : ''} edge`
-                                : 'Screw'
+                                ? translate('Clamp · {{value1}} edge', {
+                                    value1: shownFixtures[held]?.kind === 'clamp' ? (shownFixtures[held] as { side: string }).side : '',
+                                  })
+                                : translate('Screw')
                             }
                             at={{ x: hp.x * pxPerMm + padPx, y: (nest.board.h - hp.y) * pxPerMm + padPx }}
                             fields={
                               kind === 'clamp'
                                 ? [
-                                    { key: 'w', label: 'Width', value: hp.w ?? 0 },
-                                    { key: 'd', label: 'Reach', value: hp.d },
-                                    { key: 'height', label: 'Height', value: hp.height ?? 0 },
+                                    { key: 'w', label: translate('Width'), value: hp.w ?? 0 },
+                                    { key: 'd', label: translate('Reach'), value: hp.d },
+                                    { key: 'height', label: translate('Height'), value: hp.height ?? 0 },
                                   ]
                                 : [
-                                    { key: 'd', label: 'Head ⌀', value: hp.d },
-                                    { key: 'height', label: 'Height', value: hp.height ?? 0 },
+                                    { key: 'd', label: translate('Head ⌀'), value: hp.d },
+                                    { key: 'height', label: translate('Height'), value: hp.height ?? 0 },
                                   ]
                             }
                             onField={(key, value) => holds.setHoldSize(held, key, value)}
                             scopes={[
-                              ...(onBoard > 1 ? [{ id: 'board', label: `all ${onBoard} on this board` }] : []),
-                              ...(onAllBoards > onBoard ? [{ id: 'all', label: `all ${onAllBoards} on all boards` }] : []),
+                              ...(onBoard > 1
+                                ? [{ id: 'board', label: translate('all {{onBoard}} on this board', { onBoard: onBoard }) }]
+                                : []),
+                              ...(onAllBoards > onBoard
+                                ? [{ id: 'all', label: translate('all {{onAllBoards}} on all boards', { onAllBoards: onAllBoards }) }]
+                                : []),
                             ]}
                             onApply={(scope, key, value) => holds.applyHoldSize(kind, key, value, scope === 'all')}
                             onDelete={remove}
                             deleteLabel={`Delete this ${name}`}
                             menu={[
                               {
-                                label: `Delete all ${name}s on this board`,
+                                label: translate('Delete all {{name}}s on this board', { name: name }),
                                 icon: <Trash2 className="size-4" />,
                                 onSelect: () => holds.removeAllHolds(kind),
                               },
-                              { label: 'Clamp and screw sizes…', icon: <Ruler className="size-4" />, onSelect: onHoldSizes },
+                              { label: translate('Clamp and screw sizes…'), icon: <Ruler className="size-4" />, onSelect: onHoldSizes },
                             ]}
                           />
                         );
@@ -801,15 +813,17 @@ export function BoardDrawings({
                           <SelectionBar<'width' | 'height'>
                             key={`tab-${selectedTab.part}-${selectedTab.i}`}
                             id="tab"
-                            title={`Tab · ${inst.name}`}
+                            title={translate('Tab · {{value1}}', { value1: inst.name })}
                             note="Size: all tabs on this board"
                             at={{ x: tab.at.x * pxPerMm + padPx, y: (nest.board.h - tab.at.y) * pxPerMm + padPx }}
                             fields={[
-                              { key: 'width', label: 'Length', value: board.tabs.width },
-                              { key: 'height', label: 'Height', value: board.tabs.height },
+                              { key: 'width', label: translate('Length'), value: board.tabs.width },
+                              { key: 'height', label: translate('Height'), value: board.tabs.height },
                             ]}
                             onField={onTabSize}
-                            scopes={others > 1 ? [{ id: 'all', label: `tabs on all ${others} boards` }] : []}
+                            scopes={
+                              others > 1 ? [{ id: 'all', label: translate('tabs on all {{others}} boards', { others: others }) }] : []
+                            }
                             onApply={(_, key, value) => holds.setTabSize(key, value, true)}
                             onDelete={remove}
                             deleteLabel="Delete this tab"
@@ -817,7 +831,7 @@ export function BoardDrawings({
                               reset
                                 ? [
                                     {
-                                      label: 'Place this part’s tabs automatically',
+                                      label: translate('Place this part’s tabs automatically'),
                                       icon: <WandSparkles className="size-4" />,
                                       onSelect: () => {
                                         setSelectedTab(null);
@@ -856,14 +870,18 @@ export function BoardDrawings({
                           />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start">
-                          <DropdownMenuItem onSelect={onHoldSizes}>Clamp and screw sizes…</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={onHoldSizes}>{translate('Clamp and screw sizes…')}</DropdownMenuItem>
                           <DropdownMenuItem
                             onSelect={() => {
                               const fixtures = (board.fixtures ?? []).filter((_, j) => j !== holdMenu);
                               setSelectedHold(null);
-                              onBoardEdit({ ...board, fixtures }, 'Removed. Parts stay where they are; Tighten layout closes the gaps.');
+                              onBoardEdit(
+                                { ...board, fixtures },
+                                translate('Removed. Parts stay where they are; Tighten layout closes the gaps.')
+                              );
                             }}>
-                            Remove this {nest.holds[holdMenu].kind}
+                            {translate('Remove this ')}
+                            {nest.holds[holdMenu].kind}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -890,8 +908,8 @@ export function BoardDrawings({
                               <DropdownMenu modal={false} open={menu} onOpenChange={setMenu}>
                                 <DropdownMenuTrigger asChild>
                                   <button
-                                    aria-label={`${inst.name} menu`}
-                                    title="Move it to another board, or unpin it"
+                                    aria-label={translate('{{value1}} menu', { value1: inst.name })}
+                                    title={translate('Move it to another board, or unpin it')}
                                     className="rounded-full border bg-background px-1 text-muted-foreground shadow-sm hover:text-foreground">
                                     <MoreHorizontal className="size-3.5" />
                                   </button>
@@ -939,7 +957,7 @@ export function BoardDrawings({
             {dragging && (
               <div
                 data-new-board-drop
-                aria-label="New board"
+                aria-label={translate('New board')}
                 style={{
                   left: toPx(table.newBoard).x,
                   top: toPx(table.newBoard).y,
@@ -950,7 +968,8 @@ export function BoardDrawings({
                   'absolute flex items-center justify-center gap-2 rounded-lg border-2 border-dashed bg-background/60 text-center text-sm text-muted-foreground',
                   dragging.target?.kind === 'new' && 'border-primary bg-primary/5 text-foreground'
                 )}>
-                <Plus className="size-4 shrink-0" /> New board
+                <Plus className="size-4 shrink-0" />
+                {translate(' New board ')}
               </div>
             )}
           </div>

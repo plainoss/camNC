@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cadCopyNumber, type CadPart } from '@wbcnc/cad';
 import './cadThicknessField.css';
 
@@ -6,15 +7,19 @@ export function CadCopyNames({ part, onRename }: { part: CadPart; onRename: (cop
   if (!part.copies?.length) return null;
   return (
     <details className="cad-copy-names">
-      <summary>Names of the {part.copies.length + 1} pieces</summary>
+      <summary>
+        {translate('Names of the ')}
+        {part.copies.length + 1}
+        {translate(' pieces')}
+      </summary>
       {part.copies.map((copy, index) => (
         <input
           // A new name typed elsewhere, or undone, starts the box afresh.
           key={`${copy.id}:${copy.name ?? ''}`}
           defaultValue={copy.name ?? ''}
           // The numbered name it gets back when its own is cleared.
-          placeholder={`${part.name} ${cadCopyNumber(part, index)}`}
-          aria-label={`Name of copy ${cadCopyNumber(part, index)}`}
+          placeholder={translate('{{value1}} {{value2}}', { value1: part.name, value2: cadCopyNumber(part, index) })}
+          aria-label={translate('Name of copy {{value1}}', { value1: cadCopyNumber(part, index) })}
           spellCheck={false}
           onBlur={event => {
             if (event.target.value.trim() !== (copy.name ?? '')) onRename(copy.id, event.target.value);

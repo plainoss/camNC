@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useStore } from '@/store/store';
 import { MachinePanelContent } from './MachinePanelContent';
 
@@ -12,7 +13,7 @@ export function MachineDock() {
   return (
     <aside
       className="dark bg-background text-foreground shrink-0 w-[22rem] h-dvh border-l max-sm:fixed max-sm:inset-x-0 max-sm:bottom-14 max-sm:top-auto max-sm:h-[60dvh] max-sm:w-full max-sm:border-l-0 max-sm:border-t max-sm:z-30 max-sm:rounded-t-xl max-sm:shadow-lg"
-      aria-label="Machine panel">
+      aria-label={translate('Machine panel')}>
       <MachinePanelContent onClose={() => setOpen(false)} />
     </aside>
   );

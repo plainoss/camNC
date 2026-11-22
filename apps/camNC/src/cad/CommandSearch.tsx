@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { SketchToolGlyph } from './SketchToolbar';
 import type { SketchToolDefinition } from './sketchTools';
@@ -48,7 +49,7 @@ export function CommandSearch({
       ref={panel}
       popover="auto"
       className="cad-command-palette"
-      aria-label="Search tools"
+      aria-label={translate('Search tools')}
       onToggle={event => {
         if (event.newState === 'closed') onClose(false);
       }}
@@ -80,8 +81,8 @@ export function CommandSearch({
         <input
           ref={input}
           type="search"
-          aria-label="Search tools"
-          placeholder="Search tools…"
+          aria-label={translate('Search tools')}
+          placeholder={translate('Search tools…')}
           value={query}
           role="combobox"
           aria-autocomplete="list"
@@ -93,17 +94,17 @@ export function CommandSearch({
             setIndex(0);
           }}
         />
-        <button type="button" aria-label="Close search" onClick={() => onClose()}>
+        <button type="button" aria-label={translate('Close search')} onClick={() => onClose()}>
           ×
         </button>
       </div>
       {!words.length ? (
-        <p>Start typing to search tools</p>
+        <p>{translate('Start typing to search tools')}</p>
       ) : !matches.length ? (
-        <p role="status">No tools found</p>
+        <p role="status">{translate('No tools found')}</p>
       ) : (
         <>
-          <div id={`${id}-results`} role="listbox" aria-label="Tools" className="cad-command-results">
+          <div id={`${id}-results`} role="listbox" aria-label={translate('Tools')} className="cad-command-results">
             {matches.map(command => (
               <button
                 key={command.id}
@@ -133,15 +134,17 @@ export function CommandSearch({
           </div>
           <div className="cad-command-description">
             <strong>{active?.label}</strong>
-            <p>{active?.description ?? `Activate ${active?.label.toLowerCase()}.`}</p>
+            <p>{active?.description ?? translate('Activate {{value1}}.', { value1: active?.label.toLowerCase() })}</p>
           </div>
         </>
       )}
       <p>
-        Return to this dialog at any time by pressing <kbd>alt/⌥ C</kbd>
+        {translate('Return to this dialog at any time by pressing ')}
+        <kbd>{translate('alt/⌥ C')}</kbd>
       </p>
       <label>
-        <input type="checkbox" checked={highlight} onChange={event => setHighlight(event.target.checked)} /> Highlight tool in toolbar
+        <input type="checkbox" checked={highlight} onChange={event => setHighlight(event.target.checked)} />
+        {translate(' Highlight tool in toolbar ')}
       </label>
     </div>
   );

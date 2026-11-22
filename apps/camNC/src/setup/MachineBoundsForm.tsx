@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getFluidSettingsBounds } from '@/lib/fluidnc/fluidnc-settings';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { useMachineBoundsOrNull, useStore } from '@/store/store';
@@ -18,7 +19,7 @@ function UseFluidNcSettingsButton() {
     e.preventDefault();
     const settings = await getFluidSettingsBounds();
     if (!settings) {
-      toast.error('Could not read FluidNC settings');
+      toast.error(translate('Could not read FluidNC settings'));
       return;
     }
     formContext.setValue('xmin', settings.xmin);
@@ -29,7 +30,7 @@ function UseFluidNcSettingsButton() {
   return (
     // Not a submit button: Enter in a field must submit the form, not read over what was typed.
     <Button type="button" disabled={!isConnected} onClick={handleClick} variant="outline">
-      Read FluidNC Settings
+      {translate('Read FluidNC Settings ')}
     </Button>
   );
 }
@@ -43,11 +44,11 @@ const schema = z
     ymax: z.coerce.number(),
   })
   .refine(data => data.xmax > data.xmin, {
-    message: 'xmax must be greater than xmin',
+    message: translate('xmax must be greater than xmin'),
     path: ['xmax'],
   })
   .refine(data => data.ymax > data.ymin, {
-    message: 'ymax must be greater than ymin',
+    message: translate('ymax must be greater than ymin'),
     path: ['ymax'],
   });
 
@@ -90,11 +91,11 @@ export function MachineBoundsForm({
             name="xmin"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>xmin</FormLabel>
+                <FormLabel>{translate('xmin')}</FormLabel>
                 <FormControl>
                   <Input {...field} type="number" />
                 </FormControl>
-                <FormDescription>Minimum usable x-coordinate</FormDescription>
+                <FormDescription>{translate('Minimum usable x-coordinate')}</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -104,11 +105,11 @@ export function MachineBoundsForm({
             name="xmax"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>xmax</FormLabel>
+                <FormLabel>{translate('xmax')}</FormLabel>
                 <FormControl>
                   <Input {...field} type="number" />
                 </FormControl>
-                <FormDescription>Maximum usable x-coordinate</FormDescription>
+                <FormDescription>{translate('Maximum usable x-coordinate')}</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -118,11 +119,11 @@ export function MachineBoundsForm({
             name="ymin"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>ymin</FormLabel>
+                <FormLabel>{translate('ymin')}</FormLabel>
                 <FormControl>
                   <Input {...field} type="number" />
                 </FormControl>
-                <FormDescription>Minimum usable y-coordinate</FormDescription>
+                <FormDescription>{translate('Minimum usable y-coordinate')}</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -132,11 +133,11 @@ export function MachineBoundsForm({
             name="ymax"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>ymax</FormLabel>
+                <FormLabel>{translate('ymax')}</FormLabel>
                 <FormControl>
                   <Input {...field} type="number" />
                 </FormControl>
-                <FormDescription>Maximum usable y-coordinate</FormDescription>
+                <FormDescription>{translate('Maximum usable y-coordinate')}</FormDescription>
                 <FormMessage />
               </FormItem>
             )}

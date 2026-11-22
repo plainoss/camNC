@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Hint } from '@/cam/Hint';
 import { useMachineBusy } from '@/cam/machine/useMachineBusy';
 import { useId, useRef, useState } from 'react';
@@ -30,9 +31,9 @@ export function RehearsalButton({
   const [error, setError] = useState<string | null>(null);
   if (isDemoMode()) return null;
   const reason = busy
-    ? 'Finish or stop the real machine job first.'
+    ? translate('Finish or stop the real machine job first.')
     : !ready
-      ? 'Wait for every board to pass the planning checks.'
+      ? translate('Wait for every board to pass the planning checks.')
       : undefined;
   const start = async () => {
     if (pending || !ready || busy) return;
@@ -42,7 +43,8 @@ export function RehearsalButton({
     try {
       await launchRehearsal(job, boards, abort.current.signal, boardId);
     } catch (e) {
-      if (!abort.current?.signal.aborted) setError(e instanceof Error ? e.message : 'The rehearsal could not be saved. Try again.');
+      if (!abort.current?.signal.aborted)
+        setError(e instanceof Error ? e.message : translate('The rehearsal could not be saved. Try again.'));
       setPending(false);
     }
   };
@@ -55,7 +57,8 @@ export function RehearsalButton({
         setError(null);
         dialog.current?.showModal();
       }}>
-      <FlaskConical /> Try on demo machine
+      <FlaskConical />
+      {translate(' Try on demo machine ')}
     </Button>
   );
   return (
@@ -78,16 +81,16 @@ export function RehearsalButton({
         aria-labelledby={title}
         className="m-auto w-[calc(100%-2rem)] max-w-md overscroll-contain rounded-xl border bg-background p-6 text-foreground shadow-lg backdrop:overflow-hidden backdrop:overscroll-contain backdrop:bg-black/50">
         <h2 id={title} className="text-lg font-medium">
-          Try this job on a demo machine?
+          {translate('Try this job on a demo machine? ')}
         </h2>
         <p className="mt-3 text-sm text-muted-foreground">
-          Practice positioning the board, homing, probing and running with a simulated FluidNC. No real machine is used.
+          {translate('Practice positioning the board, homing, probing and running with a simulated FluidNC. No real machine is used. ')}
         </p>
         <div className="my-4 rounded-lg bg-muted p-3 text-sm">
           <p className="font-medium">
-            {job.name} · {boards.length} {boards.length === 1 ? 'board' : 'boards'}
+            {job.name} · {boards.length} {boards.length === 1 ? translate('board') : translate('boards')}
           </p>
-          <p className="mt-1">Temporary copy. Your saved project and cut history stay unchanged.</p>
+          <p className="mt-1">{translate('Temporary copy. Your saved project and cut history stay unchanged.')}</p>
         </div>
         {error && (
           <p role="alert" className="mb-4 text-sm text-destructive">
@@ -101,10 +104,10 @@ export function RehearsalButton({
               abort.current?.abort();
               dialog.current?.close();
             }}>
-            Cancel
+            {translate('Cancel ')}
           </Button>
           <Button disabled={pending || !ready || !!busy} onClick={() => void start()}>
-            {pending ? 'Preparing rehearsal…' : 'Start rehearsal'}
+            {pending ? translate('Preparing rehearsal…') : translate('Start rehearsal')}
           </Button>
         </div>
       </dialog>

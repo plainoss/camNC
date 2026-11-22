@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { sketchPatternOwner, setSketchConstruction, isSplineTangentHandle, originId, type CadPoint, type CadSketch } from '@wbcnc/cad';
 import { pickSketchPoint, pickSketchSnap, type CadPickingOptions } from './picking';
 
@@ -158,23 +159,23 @@ export function sketchContextItems(sketch: CadSketch, context: SketchContext, bu
       return [
         {
           action: 'delete-dimensions',
-          label: context.constraintIds.length > 1 ? 'Delete constraints' : 'Delete constraint',
+          label: context.constraintIds.length > 1 ? translate('Delete constraints') : translate('Delete constraint'),
           disabled: busy,
           shortcut: 'Delete',
         },
-        { action: 'clear', label: 'Clear selection', separatorBefore: true, shortcut: 'Space' },
-        { action: 'fit', label: 'Zoom to fit', shortcut: 'F' },
+        { action: 'clear', label: translate('Clear selection'), separatorBefore: true, shortcut: 'Space' },
+        { action: 'fit', label: translate('Zoom to fit'), shortcut: 'F' },
       ];
     }
     if (sketch.constraints.some(c => c.id === id && c.type === 'slot'))
       return [
-        { action: 'delete-dimensions', label: 'Remove slot relation', disabled: busy, shortcut: 'Delete' },
-        { action: 'fit', label: 'Zoom to fit', separatorBefore: true, shortcut: 'F' },
+        { action: 'delete-dimensions', label: translate('Remove slot relation'), disabled: busy, shortcut: 'Delete' },
+        { action: 'fit', label: translate('Zoom to fit'), separatorBefore: true, shortcut: 'F' },
       ];
     return [
-      { action: 'edit-pattern', label: 'Edit pattern', disabled: busy, shortcut: 'Enter' },
-      { action: 'delete-dimensions', label: 'Remove pattern relation', disabled: busy, shortcut: 'Delete' },
-      { action: 'fit', label: 'Zoom to fit', separatorBefore: true, shortcut: 'F' },
+      { action: 'edit-pattern', label: translate('Edit pattern'), disabled: busy, shortcut: 'Enter' },
+      { action: 'delete-dimensions', label: translate('Remove pattern relation'), disabled: busy, shortcut: 'Delete' },
+      { action: 'fit', label: translate('Zoom to fit'), separatorBefore: true, shortcut: 'F' },
     ];
   }
   if (context.target.kind === 'dimension') {
@@ -183,35 +184,39 @@ export function sketchContextItems(sketch: CadSketch, context: SketchContext, bu
     if (!dimension) return [];
     const driven = 'driven' in dimension && dimension.driven === true;
     return [
-      { action: 'edit-dimension', label: 'Edit dimension', disabled: busy || driven, shortcut: 'Enter' },
-      { action: 'toggle-driven', label: `Change to ${driven ? 'driving' : 'driven'} dimension`, disabled: busy },
+      { action: 'edit-dimension', label: translate('Edit dimension'), disabled: busy || driven, shortcut: 'Enter' },
+      {
+        action: 'toggle-driven',
+        label: translate('Change to {{value1}} dimension', { value1: driven ? translate('driving') : translate('driven') }),
+        disabled: busy,
+      },
       {
         action: 'delete-dimensions',
-        label: context.constraintIds.length > 1 ? 'Delete dimensions' : 'Delete dimension',
+        label: context.constraintIds.length > 1 ? translate('Delete dimensions') : translate('Delete dimension'),
         disabled: busy,
         shortcut: 'Delete',
       },
-      { action: 'fit', label: 'Zoom to fit', separatorBefore: true, shortcut: 'F' },
+      { action: 'fit', label: translate('Zoom to fit'), separatorBefore: true, shortcut: 'F' },
     ];
   }
   const items: SketchContextItem[] = [];
   if (context.target.kind === 'entity') {
     if (context.entityIds.some(id => sketchPatternOwner(sketch, id)))
-      items.push({ action: 'edit-pattern', label: 'Edit pattern', disabled: busy });
+      items.push({ action: 'edit-pattern', label: translate('Edit pattern'), disabled: busy });
     const targets = editableEntities(sketch, context.entityIds);
     const allConstruction = targets.length > 0 && targets.every(entity => entity.construction);
     const someConstruction = targets.some(entity => entity.construction);
     items.push(
       {
         action: 'construction',
-        label: 'Construction',
+        label: translate('Construction'),
         checked: allConstruction ? true : someConstruction ? 'indeterminate' : false,
         disabled: busy || !targets.length,
         shortcut: 'Q',
       },
       {
         action: 'delete-entities',
-        label: context.entityIds.length > 1 ? 'Delete sketch entities' : 'Delete sketch entity',
+        label: context.entityIds.length > 1 ? translate('Delete sketch entities') : translate('Delete sketch entity'),
         disabled: busy || !targets.length,
         shortcut: 'Delete',
       }
@@ -220,13 +225,13 @@ export function sketchContextItems(sketch: CadSketch, context: SketchContext, bu
   items.push(
     {
       action: 'clear',
-      label: 'Clear selection',
+      label: translate('Clear selection'),
       disabled: !context.entityIds.length && !context.constraintIds.length,
       separatorBefore: items.length > 0,
       shortcut: 'Space',
     },
-    { action: 'fit', label: 'Zoom to fit', shortcut: 'F' }
+    { action: 'fit', label: translate('Zoom to fit'), shortcut: 'F' }
   );
-  if (context.entityIds.length) items.push({ action: 'fit-selection', label: 'Zoom to selection' });
+  if (context.entityIds.length) items.push({ action: 'fit-selection', label: translate('Zoom to selection') });
   return items;
 }

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { invoke } from '@tauri-apps/api/core';
 
 /** An IP camera the desktop app found on the local network. */
@@ -47,12 +48,12 @@ export function cameraLabel(camera: FoundCamera) {
 
 /** RTSP paths of common cameras, for cameras without ONVIF. */
 export const kRtspPresets = [
-  { label: 'Reolink, main stream (H.264)', path: '/h264Preview_01_main' },
-  { label: 'Reolink, main stream (H.265 models)', path: '/h265Preview_01_main' },
-  { label: 'Reolink, sub stream', path: '/h264Preview_01_sub' },
-  { label: 'Hikvision', path: '/Streaming/Channels/101' },
-  { label: 'Dahua / Amcrest', path: '/cam/realmonitor?channel=1&subtype=0' },
-  { label: 'TP-Link Tapo', path: '/stream1' },
+  { label: translate('Reolink, main stream (H.264)'), path: '/h264Preview_01_main' },
+  { label: translate('Reolink, main stream (H.265 models)'), path: '/h265Preview_01_main' },
+  { label: translate('Reolink, sub stream'), path: '/h264Preview_01_sub' },
+  { label: translate('Hikvision'), path: '/Streaming/Channels/101' },
+  { label: translate('Dahua / Amcrest'), path: '/cam/realmonitor?channel=1&subtype=0' },
+  { label: translate('TP-Link Tapo'), path: '/stream1' },
 ] as const;
 
 /** An RTSP URL with the login percent-encoded, so passwords with special characters work. */

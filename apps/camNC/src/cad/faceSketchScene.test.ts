@@ -9,7 +9,8 @@ it('carries the actual underside and pocket-floor planes in local part coordinat
   const view = { cameraState: { current: null }, aspect: 2 };
   expect(faceSketchScene(source, part.id, 'underside', view)?.frame).toMatchObject({
     origin: [0, 0, 0],
-    x: [-1, 0, 0],
+    // Seen from below, as the Top plane is: the studio's x, its y the other way.
+    x: [1, 0, 0],
     normal: [0, 0, -1],
   });
   part.sketch = addRectangle(part.sketch, { x: 20, y: 20, width: 40, height: 30 });

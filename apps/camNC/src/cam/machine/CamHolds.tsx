@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Line } from '@react-three/drei';
 import { CanvasLabel } from '@/scene/CanvasLabel';
 import { holdBox, pathClearance } from '@wbcnc/cam/holdPoints';
@@ -63,7 +64,10 @@ export function CamHolds({ overlay }: { overlay: BoardOverlay }) {
             {bad && (
               <CanvasLabel position={[h.x, h.y, 0.5]} offset={[16, -10]}>
                 <span className="block max-w-full rounded bg-red-500 px-1.5 py-0.5 text-xs font-medium text-white shadow-[0_1px_3px_rgba(0,0,0,0.6)]">
-                  {`${clamp ? 'Clamp' : 'Screw'} ${i + 1}: the bit would hit it`}
+                  {translate('{{value1}} {{value2}}: the bit would hit it', {
+                    value1: clamp ? translate('Clamp') : translate('Screw'),
+                    value2: i + 1,
+                  })}
                 </span>
               </CanvasLabel>
             )}

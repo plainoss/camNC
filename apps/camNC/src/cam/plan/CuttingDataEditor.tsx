@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { LibraryTool } from '@wbcnc/cam';
 import { Button } from '@wbcnc/ui/components/button';
 import { Input } from '@wbcnc/ui/components/input';
@@ -105,12 +106,17 @@ export function CuttingDataEditor({
             </Hint>
             {(source[field] === 'job' || source[field] === 'saved') && !(field in draft) ? (
               <Hint
-                text={`Forget this change and use the ${saved?.[field] !== undefined && source[field] === 'job' ? 'saved' : 'library or default'} value again.`}>
+                text={translate('Forget this change and use the {{value1}} value again.', {
+                  value1: saved?.[field] !== undefined && source[field] === 'job' ? translate('saved') : translate('library or default'),
+                })}>
                 <Button
                   size="icon"
                   variant="ghost"
                   className="size-7"
-                  aria-label={`${label}: back to the ${saved?.[field] !== undefined && source[field] === 'job' ? 'saved' : 'library or default'} value`}
+                  aria-label={translate('{{label}}: back to the {{value2}} value', {
+                    label: label,
+                    value2: saved?.[field] !== undefined && source[field] === 'job' ? translate('saved') : translate('library or default'),
+                  })}
                   onClick={() => undo(field)}>
                   <RotateCcw className="size-3.5" />
                 </Button>
@@ -138,7 +144,8 @@ export function CuttingDataEditor({
               if (onJobChange && job) onJobChange(Object.fromEntries(Object.entries(job).filter(([f]) => !(f in parsed))));
               done();
             }}>
-            Save for {bitName(bit)} + {material}
+            {translate('Save for ')}
+            {bitName(bit)} + {material}
           </Button>
           {onJobChange && (
             <Button
@@ -148,11 +155,11 @@ export function CuttingDataEditor({
                 onJobChange({ ...job, ...parsed });
                 done();
               }}>
-              Only this job
+              {translate('Only this job ')}
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={done}>
-            Cancel
+            {translate('Cancel ')}
           </Button>
         </div>
       )}

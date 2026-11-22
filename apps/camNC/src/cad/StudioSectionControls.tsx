@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { SectionViewPanel } from './SectionViewPanel';
 import type { useStudioSection } from './useStudioSection';
 
@@ -7,16 +8,22 @@ type Section = ReturnType<typeof useStudioSection>;
 export function StudioSectionControls({ section, enabled }: { section: Section; enabled: boolean }) {
   return section.active ? (
     <>
-      <button type="button" aria-label="Edit section view" aria-pressed={section.editing} disabled={!enabled} onClick={section.edit}>
-        Edit section view
+      <button
+        type="button"
+        aria-label={translate('Edit section view')}
+        aria-pressed={section.editing}
+        disabled={!enabled}
+        onClick={section.edit}>
+        {translate('Edit section view ')}
       </button>
-      <button type="button" aria-keyshortcuts="Shift+X" title="Turn off section view (Shift+X)" onClick={section.turnOff}>
-        Turn off section view
+      <button type="button" aria-keyshortcuts="Shift+X" title={translate('Turn off section view (Shift+X)')} onClick={section.turnOff}>
+        {translate('Turn off section view ')}
       </button>
     </>
   ) : (
-    <button type="button" aria-label="Section view" aria-keyshortcuts="Shift+X" disabled={!enabled} onClick={section.start}>
-      Section view <kbd>⇧ X</kbd>
+    <button type="button" aria-label={translate('Section view')} aria-keyshortcuts="Shift+X" disabled={!enabled} onClick={section.start}>
+      {translate('Section view ')}
+      <kbd>⇧ X</kbd>
     </button>
   );
 }

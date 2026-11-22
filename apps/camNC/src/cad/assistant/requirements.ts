@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cadCopyName, evaluatedPartCopy, type CadDocument, type CadPoint, type EvaluatedCadPart } from '@wbcnc/cad';
 import { compactCadReport, type CadReport } from '@wbcnc/cad-script';
 
@@ -40,17 +41,17 @@ export const requirementLengths = [
 export function validateAssistantRequirements(input: AssistantRequirements): AssistantRequirements {
   const allowed = new Set<string>(['part', 'sourcePartCount', 'holeCount', 'pocketCount', 'preserveExistingIds', ...requirementLengths]);
   for (const [key, value] of Object.entries(input)) {
-    if (!allowed.has(key)) throw new Error(`Unknown requirement: ${key}.`);
+    if (!allowed.has(key)) throw new Error(translate('Unknown requirement: {{key}}.', { key: key }));
     if (value === undefined) continue;
     if (key === 'part') {
       if (typeof value !== 'string' || !value.trim() || value.length > 256)
-        throw new Error('Enter a part name or ID, or leave the target blank.');
+        throw new Error(translate('Enter a part name or ID, or leave the target blank.'));
     } else if (key === 'preserveExistingIds') {
-      if (typeof value !== 'boolean') throw new Error('Choose whether existing IDs must be preserved.');
+      if (typeof value !== 'boolean') throw new Error(translate('Choose whether existing IDs must be preserved.'));
     } else if (key === 'sourcePartCount' || key === 'holeCount' || key === 'pocketCount') {
-      if (!Number.isSafeInteger(value) || Number(value) < 0) throw new Error('Counts must be non-negative integers.');
+      if (!Number.isSafeInteger(value) || Number(value) < 0) throw new Error(translate('Counts must be non-negative integers.'));
     } else if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > 1_000_000) {
-      throw new Error(`${key} must be a positive finite length in mm.`);
+      throw new Error(translate('{{key}} must be a positive finite length in mm.', { key: key }));
     }
   }
   // Clearing an optional field must remove it from confirmed state, including its active badge and revision comparison.

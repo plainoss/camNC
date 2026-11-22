@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadSketch } from '@wbcnc/cad';
 import type { ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
 import type { SketchTool } from './sketchTools';
@@ -22,18 +23,18 @@ export function sketchPendingFinishReason({
   /** The fillet or chamfer preview can be applied as it stands. */
   cornerReady?: boolean;
 }): string | null {
-  if (tool === 'slot' && selected) return 'Create the slot or press Escape before finishing the sketch.';
+  if (tool === 'slot' && selected) return translate('Create the slot or press Escape before finishing the sketch.');
   // A linear pattern being set up is applied as the sketch is confirmed, as it's edited in place.
-  if (tool === 'circularPattern' && selected) return 'Apply the pattern or press Escape before finishing the sketch.';
-  if (tool === 'transform' && selected) return 'Apply the transform or press Escape before finishing the sketch.';
-  if (splitting) return 'Choose the second split point or press Escape before finishing the sketch.';
+  if (tool === 'circularPattern' && selected) return translate('Apply the pattern or press Escape before finishing the sketch.');
+  if (tool === 'transform' && selected) return translate('Apply the transform or press Escape before finishing the sketch.');
+  if (splitting) return translate('Choose the second split point or press Escape before finishing the sketch.');
   if ((tool === 'fillet' || tool === 'chamfer') && selected && !cornerReady)
-    return `Fix the ${tool} preview or press Escape before finishing the sketch.`;
+    return translate('Fix the {{value1}} preview or press Escape before finishing the sketch.', { value1: tool });
   if (modification.phase === 'mirror' && modification.entityIds.length)
-    return 'Choose the mirror line or press Escape before finishing the sketch.';
+    return translate('Choose the mirror line or press Escape before finishing the sketch.');
   if (modification.phase === 'extend' && modification.entityId)
-    return 'Place the extended endpoint or press Escape before finishing the sketch.';
-  return drawing ? 'Complete the current shape or press Escape before finishing the sketch.' : null;
+    return translate('Place the extended endpoint or press Escape before finishing the sketch.');
+  return drawing ? translate('Complete the current shape or press Escape before finishing the sketch.') : null;
 }
 
 /**
@@ -46,12 +47,12 @@ export function openSketchFinishReason(
   problems: readonly string[],
   state: { checking: boolean; pending: string | null; edgeOnBoard: boolean; thickness: boolean; face: boolean; studio: boolean }
 ): string | null {
-  if (state.checking) return 'Wait for the current sketch check to finish.';
+  if (state.checking) return translate('Wait for the current sketch check to finish.');
   if (state.pending || state.edgeOnBoard) return state.pending;
-  if (!state.face && !state.thickness) return 'Enter a valid part thickness before finishing the sketch.';
+  if (!state.face && !state.thickness) return translate('Enter a valid part thickness before finishing the sketch.');
   if (problems.length) return problems.join(' ');
   // A Part Studio sketch confirms even when it's empty, as the reference's does: a feature using it then fails instead.
   if (state.studio) return null;
   const drawn = !!sketch?.entities.some(e => e.type !== 'point' && !e.construction);
-  return state.face || drawn ? null : 'Draw an outline before finishing the sketch.';
+  return state.face || drawn ? null : translate('Draw an outline before finishing the sketch.');
 }

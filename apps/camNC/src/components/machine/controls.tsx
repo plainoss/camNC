@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import {
   kStandardScreenAxes,
@@ -33,7 +34,7 @@ import { isCadEditorActive } from '@wbcnc/cad-editor/keyboardOwnership';
 
 function report(promise: Promise<unknown>, what: string) {
   return promise.catch(err => {
-    toast.error(`${what} failed`, { description: err instanceof Error ? err.message : String(err) });
+    toast.error(translate('{{what}} failed', { what: what }), { description: err instanceof Error ? err.message : String(err) });
   });
 }
 
@@ -60,7 +61,12 @@ export function PositionLine({ showFeed = false }: { showFeed?: boolean }) {
         </span>
       ))}
       {showFeed && <span>F {status?.feed ?? 0}</span>}
-      {status?.pins && <span>Pn {status.pins}</span>}
+      {status?.pins && (
+        <span>
+          {translate('Pn ')}
+          {status.pins}
+        </span>
+      )}
     </div>
   );
 }
@@ -78,13 +84,14 @@ function StepPicker({ steps, value, onChange, label }: { steps: number[]; value:
     <Label className="flex flex-row items-center gap-1 text-xs font-normal">
       <span className="w-4 text-muted-foreground">{label}</span>
       <select
-        aria-label={`${label} jog step`}
+        aria-label={translate('{{label}} jog step', { label: label })}
         className="h-7 flex-1 rounded-md border bg-transparent px-1 text-xs"
         value={value}
         onChange={e => onChange(Number(e.target.value))}>
         {steps.map(step => (
           <option key={step} value={step}>
-            {step} mm
+            {step}
+            {translate(' mm ')}
           </option>
         ))}
       </select>
@@ -232,7 +239,11 @@ function JogButton({
         </Button>
       </PopoverAnchor>
       <PopoverContent side="top" className="flex w-auto flex-col gap-2 p-2">
-        <p className="text-xs font-medium">Move {name} by</p>
+        <p className="text-xs font-medium">
+          {translate('Move ')}
+          {name}
+          {translate(' by')}
+        </p>
         <div className="flex flex-row gap-1">
           {steps.map(size => (
             <Button
@@ -245,16 +256,18 @@ function JogButton({
                 if (keep) onSetStep(size);
                 setOpen(false);
               }}>
-              {size} mm
+              {size}
+              {translate(' mm ')}
             </Button>
           ))}
         </div>
         <div className="flex flex-row items-center justify-between gap-2">
           <label className="flex items-center gap-1.5 text-xs">
-            <Checkbox checked={keep} onCheckedChange={v => setKeep(v === true)} /> Use as the usual step
+            <Checkbox checked={keep} onCheckedChange={v => setKeep(v === true)} />
+            {translate(' Use as the usual step ')}
           </label>
           <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>
-            Cancel
+            {translate('Cancel ')}
           </Button>
         </div>
       </PopoverContent>
@@ -305,7 +318,7 @@ export function JogPanel() {
                 size="icon"
                 variant="outline"
                 className="size-9 [&_svg]:size-3.5"
-                title="Cancel jog"
+                title={translate('Cancel jog')}
                 disabled={!api.isConnected.value}
                 onClick={() => api.jogCancel()}>
                 {icon}
@@ -326,8 +339,8 @@ export function JogPanel() {
               micro={kMicroStepXY}
               onMove={distance => jogXY(step.x, step.y, distance)}
               onSetStep={setStepXY}
-              title={`Jog ${label}. Hold for other sizes, Shift for a micro step.`}
-              aria-label={`Jog ${label}`}>
+              title={translate('Jog {{label}}. Hold for other sizes, Shift for a micro step.', { label: label })}
+              aria-label={translate('Jog {{label}}', { label: label })}>
               {icon}
               {/* Axis buttons only; diagonals keep their label in the tooltip. */}
               {(sx === 0 || sy === 0) && <span className="text-[10px] leading-none font-mono">{label}</span>}
@@ -347,7 +360,7 @@ export function JogPanel() {
             micro={kMicroStepZ}
             onMove={distance => jogZ(1, distance)}
             onSetStep={setStepZ}
-            title="Jog Z+. Hold for other sizes, Shift for a micro step.">
+            title={translate('Jog Z+. Hold for other sizes, Shift for a micro step.')}>
             Z+ <ArrowUp />
           </JogButton>
           <JogButton
@@ -360,11 +373,11 @@ export function JogPanel() {
             micro={kMicroStepZ}
             onMove={distance => jogZ(-1, distance)}
             onSetStep={setStepZ}
-            title="Jog Z−. Hold for other sizes, Shift for a micro step.">
+            title={translate('Jog Z−. Hold for other sizes, Shift for a micro step.')}>
             Z− <ArrowDown />
           </JogButton>
         </div>
-        <StepPicker label="XY" steps={kStepsXY} value={prefs.jogStepXY} onChange={v => setPrefs({ jogStepXY: v })} />
+        <StepPicker label={translate('XY')} steps={kStepsXY} value={prefs.jogStepXY} onChange={v => setPrefs({ jogStepXY: v })} />
         <StepPicker label="Z" steps={kStepsZ} value={prefs.jogStepZ} onChange={v => setPrefs({ jogStepZ: v })} />
         <KeyboardJogToggle />
       </div>
@@ -382,9 +395,9 @@ function KeyboardJogToggle() {
       variant="ghost"
       className={cn('h-6 self-end px-1.5 text-xs font-normal text-muted-foreground', on && 'text-amber-700 dark:text-amber-400')}
       aria-pressed={on}
-      title="Arrow keys jog X and Y as in Top View, PgUp/PgDn jog Z. Hold to move, or hold Shift for one micro step per press."
+      title={translate('Arrow keys jog X and Y as in Top View, PgUp/PgDn jog Z. Hold to move, or hold Shift for one micro step per press.')}
       onClick={() => setPrefs({ keyboardJog: !on })}>
-      <Keyboard /> {on ? 'Keyboard on' : 'Keyboard off'}
+      <Keyboard /> {on ? translate('Keyboard on') : translate('Keyboard off')}
     </Button>
   );
 }
@@ -395,7 +408,7 @@ export function JogFeeds() {
   return (
     <div className="flex flex-row gap-3 items-center text-xs">
       <Label className="text-xs">
-        XY feed
+        {translate('XY feed ')}
         <Input
           type="number"
           className="h-7 w-20"
@@ -404,7 +417,7 @@ export function JogFeeds() {
         />
       </Label>
       <Label className="text-xs">
-        Z feed
+        {translate('Z feed ')}
         <Input
           type="number"
           className="h-7 w-20"
@@ -422,13 +435,13 @@ export function SpindleSetting() {
   const setPrefs = useStore(s => s.setMachinePrefs);
   return (
     <Label className="text-sm flex flex-row gap-2 items-center">
-      Spindle switched
+      {translate('Spindle switched ')}
       <select
         className="rounded-md border bg-transparent px-1.5 py-0.5"
         value={spindle}
         onChange={e => setPrefs({ spindleSwitch: e.target.value as 'hand' | 'controller' })}>
-        <option value="hand">by hand (a router)</option>
-        <option value="controller">by the controller (M3/M5)</option>
+        <option value="hand">{translate('by hand (a router)')}</option>
+        <option value="controller">{translate('by the controller (M3/M5)')}</option>
       </select>
     </Label>
   );
@@ -461,7 +474,9 @@ export function ProbeSettings() {
         {field('Feed', 'probeFeed')}
       </div>
       <p className="text-xs text-muted-foreground">
-        Clip on, plate under the bit. Probes down with <code>G38.2</code> and sets Z zero to the plate thickness.
+        {translate('Clip on, plate under the bit. Probes down with ')}
+        <code>G38.2</code>
+        {translate(' and sets Z zero to the plate thickness. ')}
       </p>
     </div>
   );
@@ -494,10 +509,10 @@ function OverrideSlider({ kind, label }: { kind: 'feed' | 'spindle'; label: stri
       <Button
         size="sm"
         variant="ghost"
-        title="Reset to 100%"
+        title={translate('Reset to 100%')}
         onClick={() => api.setOverride(kind, 100)}
         disabled={!api.isConnected.value || current === 100}>
-        Reset
+        {translate('Reset ')}
       </Button>
     </div>
   );
@@ -509,10 +524,10 @@ export function OverridesPanel() {
   const rapid = api.overrides.value.rapid;
   return (
     <div className="flex flex-col gap-2">
-      <OverrideSlider kind="feed" label="Feed override %" />
-      <OverrideSlider kind="spindle" label="Spindle override %" />
+      <OverrideSlider kind="feed" label={translate('Feed override %')} />
+      <OverrideSlider kind="spindle" label={translate('Spindle override %')} />
       <div className="flex flex-row gap-1 items-center text-xs">
-        <span className="text-muted-foreground w-16">Rapids</span>
+        <span className="text-muted-foreground w-16">{translate('Rapids')}</span>
         {[25, 50, 100].map(pct => (
           <Button key={pct} size="sm" variant={rapid === pct ? 'default' : 'outline'} onClick={() => api.setOverride('rapid', pct)}>
             {pct}%

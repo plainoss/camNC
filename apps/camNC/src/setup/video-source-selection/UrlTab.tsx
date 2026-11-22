@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UrlConnectionParams } from '@wbcnc/go2webrtc/url-helpers';
 import { Button } from '@wbcnc/ui/components/button';
@@ -19,8 +20,8 @@ export function UrlTab({ defaults, onConnect }: { defaults: UrlConnectionParams;
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Video Stream URL</CardTitle>
-        <CardDescription>Mainly intended for dev/testing purposes.</CardDescription>
+        <CardTitle>{translate('Video Stream URL')}</CardTitle>
+        <CardDescription>{translate('Mainly intended for dev/testing purposes.')}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -30,16 +31,16 @@ export function UrlTab({ defaults, onConnect }: { defaults: UrlConnectionParams;
               name="url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Stream URL</FormLabel>
+                  <FormLabel>{translate('Stream URL')}</FormLabel>
                   <FormControl>
                     <Input placeholder="https://example.com/stream.mp4" {...field} />
                   </FormControl>
-                  <FormDescription>URL of the video stream you want to use. Only https URLs are supported.</FormDescription>
+                  <FormDescription>{translate('URL of the video stream you want to use. Only https URLs are supported.')}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit">Connect</Button>
+            <Button type="submit">{translate('Connect')}</Button>
           </form>
         </Form>
 

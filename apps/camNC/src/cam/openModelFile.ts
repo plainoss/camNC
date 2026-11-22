@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { parseCadDocument } from '@wbcnc/cad';
 import { toast } from '@wbcnc/ui/components/sonner';
 import { createJob, importDesignJob, kDesignFile, kModelFile, type CamJobV1 } from './jobDb';
@@ -14,16 +15,20 @@ export function pickModelFile(): Promise<File | null> {
   });
 }
 
-export const kNotAModel = 'Not a STEP, STL or design file';
+export const kNotAModel = translate('Not a STEP, STL or design file');
 
 /** A file picked via "All files" (or dropped) that is no model: say so instead of doing nothing. */
 export function toastNotAModel(fileName: string) {
-  toast.error(kNotAModel, { description: `${fileName} can't be opened here. Open a .step, .stp, .stl or camNC design .json file.` });
+  toast.error(kNotAModel, {
+    description: translate("{{fileName}} can't be opened here. Open a .step, .stp, .stl or camNC design .json file.", {
+      fileName: fileName,
+    }),
+  });
 }
 
 export async function createJobFromFile(file: File): Promise<CamJobV1> {
   if (kDesignFile.test(file.name)) return importDesignFile(file);
-  if (!kModelFile.test(file.name)) throw new Error(`${kNotAModel}: ${file.name}`);
+  if (!kModelFile.test(file.name)) throw new Error(translate('{{kNotAModel}}: {{value2}}', { kNotAModel: kNotAModel, value2: file.name }));
   return createJob(file);
 }
 
@@ -36,7 +41,12 @@ async function importDesignFile(file: File): Promise<CamJobV1> {
   try {
     document = parseCadDocument(JSON.parse(await file.text()));
   } catch (cause) {
-    throw new Error(`${file.name} isn't a camNC design: ${cause instanceof Error ? cause.message : String(cause)}`);
+    throw new Error(
+      translate("{{value1}} isn't a camNC design: {{value2}}", {
+        value1: file.name,
+        value2: cause instanceof Error ? cause.message : String(cause),
+      })
+    );
   }
   return importDesignJob(document, file.name);
 }
@@ -50,6 +60,12 @@ export function modelReadError(fileName: string, error: unknown): string {
   // Our own messages are already for people.
   if (/missing|no planar faces/.test(raw)) return raw;
   if (/\.stl$/i.test(fileName))
-    return `${fileName} could not be read: the STL file may be damaged or incomplete. Export it again from your CAD program and open the new file.`;
-  return `${fileName} could not be read: the STEP file may be damaged or incomplete. Export it again from your CAD program as STEP and open the new file.`;
+    return translate(
+      '{{value1}} could not be read: the STL file may be damaged or incomplete. Export it again from your CAD program and open the new file.',
+      { value1: fileName }
+    );
+  return translate(
+    '{{value1}} could not be read: the STEP file may be damaged or incomplete. Export it again from your CAD program as STEP and open the new file.',
+    { value1: fileName }
+  );
 }

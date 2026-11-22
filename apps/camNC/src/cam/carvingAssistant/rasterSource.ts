@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CarvingGenerationConstraints } from './generation';
 import { smoothTrace } from './smoothTrace';
 import {
@@ -30,7 +31,7 @@ export interface TracedCarvingRaster {
 }
 
 const abort = (signal?: AbortSignal) => {
-  if (signal?.aborted) throw new DOMException('Raster tracing stopped.', 'AbortError');
+  if (signal?.aborted) throw new DOMException(translate('Raster tracing stopped.'), 'AbortError');
 };
 const maxSourcePixels = 4_000_000;
 const maxTracePixels = 1_000_000;
@@ -38,30 +39,31 @@ const maxTracePixels = 1_000_000;
 /** Validate the PNG dimensions before invoking a decoder: compressed images must not allocate an unbounded canvas. */
 function pngBytes(base64: string): { bytes: Uint8Array<ArrayBuffer>; width: number; height: number } {
   if (!base64 || base64.length > 2_800_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64))
-    throw new Error('Use a PNG source no larger than 2 MB.');
+    throw new Error(translate('Use a PNG source no larger than 2 MB.'));
   let bytes: Uint8Array<ArrayBuffer>;
   try {
     bytes = Uint8Array.from(atob(base64), value => value.charCodeAt(0));
   } catch {
-    throw new Error('The raster provider returned invalid PNG data.');
+    throw new Error(translate('The raster provider returned invalid PNG data.'));
   }
   const signature = [137, 80, 78, 71, 13, 10, 26, 10];
   if (bytes.length > 2_000_000 || bytes.length < 33 || !signature.every((value, i) => bytes[i] === value))
-    throw new Error('Use a PNG source no larger than 2 MB.');
+    throw new Error(translate('Use a PNG source no larger than 2 MB.'));
   const data = new DataView(bytes.buffer);
-  if (data.getUint32(8) !== 13 || String.fromCharCode(...bytes.slice(12, 16)) !== 'IHDR') throw new Error('The PNG header is invalid.');
+  if (data.getUint32(8) !== 13 || String.fromCharCode(...bytes.slice(12, 16)) !== 'IHDR')
+    throw new Error(translate('The PNG header is invalid.'));
   const width = data.getUint32(16),
     height = data.getUint32(20);
   if (!width || !height || width * height > maxSourcePixels)
-    throw new Error('Raster sources must contain at most four million pixels before decoding.');
+    throw new Error(translate('Raster sources must contain at most four million pixels before decoding.'));
   let cursor = 8,
     chunks = 0;
   while (cursor + 12 <= bytes.length) {
     const length = data.getUint32(cursor);
     const kind = String.fromCharCode(...bytes.slice(cursor + 4, cursor + 8));
-    if (cursor + length + 12 > bytes.length || ++chunks > 4096) throw new Error('The PNG chunks are invalid or too complex.');
+    if (cursor + length + 12 > bytes.length || ++chunks > 4096) throw new Error(translate('The PNG chunks are invalid or too complex.'));
     // A small APNG can contain many full-sized frames. Only static artwork is permitted by the decode bound.
-    if (kind === 'acTL' || kind === 'fcTL' || kind === 'fdAT') throw new Error('Use a static PNG, without animated frames.');
+    if (kind === 'acTL' || kind === 'fcTL' || kind === 'fdAT') throw new Error(translate('Use a static PNG, without animated frames.'));
     cursor += length + 12;
     if (kind === 'IEND') break;
   }
@@ -86,7 +88,8 @@ export async function traceCarvingPngFile(
   signal?: AbortSignal
 ): Promise<TracedCarvingRaster> {
   abort(signal);
-  if (file.size > 2_000_000 || (file.type && file.type !== 'image/png')) throw new Error('Choose a static PNG file no larger than 2 MB.');
+  if (file.size > 2_000_000 || (file.type && file.type !== 'image/png'))
+    throw new Error(translate('Choose a static PNG file no larger than 2 MB.'));
   const bytes = new Uint8Array(await file.arrayBuffer());
   abort(signal);
   let binary = '';
@@ -103,7 +106,7 @@ export async function traceCarvingPng(
 ): Promise<TracedCarvingRaster> {
   abort(signal);
   if ([constraints.widthMm, constraints.heightMm, constraints.minFeatureMm].some(value => !Number.isFinite(value) || value <= 0))
-    throw new Error('Raster tracing requires a positive physical size and detail threshold.');
+    throw new Error(translate('Raster tracing requires a positive physical size and detail threshold.'));
   const { bytes, width, height } = pngBytes(base64);
   const image = new Image();
   const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
@@ -112,13 +115,14 @@ export async function traceCarvingPng(
   try {
     image.src = url;
     const interrupted = new Promise<never>((_, reject) => {
-      onAbort = () => reject(new DOMException('Raster tracing stopped.', 'AbortError'));
+      onAbort = () => reject(new DOMException(translate('Raster tracing stopped.'), 'AbortError'));
       signal?.addEventListener('abort', onAbort, { once: true });
-      timer = setTimeout(() => reject(new Error('The PNG source took too long to decode.')), 10_000);
+      timer = setTimeout(() => reject(new Error(translate('The PNG source took too long to decode.'))), 10_000);
     });
     await Promise.race([image.decode(), interrupted]);
     abort(signal);
-    if (image.naturalWidth !== width || image.naturalHeight !== height) throw new Error('PNG decoded dimensions do not match its header.');
+    if (image.naturalWidth !== width || image.naturalHeight !== height)
+      throw new Error(translate('PNG decoded dimensions do not match its header.'));
     // Decode at most 4m source pixels, then trace at most 1m. Standard image output can exceed the working grid
     // without allocating a second full-source canvas or silently changing the original saved preview dimensions.
     const scale = Math.min(1, Math.sqrt(maxTracePixels / (width * height)));
@@ -132,7 +136,7 @@ export async function traceCarvingPng(
     canvas.width = traceWidth;
     canvas.height = traceHeight;
     const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) throw new Error('This browser cannot trace raster artwork.');
+    if (!context) throw new Error(translate('This browser cannot trace raster artwork.'));
     context.fillStyle = 'white';
     context.fillRect(0, 0, traceWidth, traceHeight);
     context.drawImage(image, 0, 0, traceWidth, traceHeight);
@@ -149,7 +153,7 @@ export async function traceCarvingPng(
       ink[i] = 1;
       count++;
       if ((i % traceWidth === 0 || !ink[i - 1]) && ++runs > 20_000)
-        throw new Error('Artwork has too many pixel runs. Use simpler filled shapes.');
+        throw new Error(translate('Artwork has too many pixel runs. Use simpler filled shapes.'));
       const x = i % traceWidth,
         y = Math.floor(i / traceWidth);
       x0 = Math.min(x0, x);
@@ -157,8 +161,9 @@ export async function traceCarvingPng(
       y0 = Math.min(y0, y);
       y1 = Math.max(y1, y + 1);
     }
-    if (!count) throw new Error('The image has no dark filled regions to carve.');
-    if (count > ink.length * 0.9) throw new Error('The image is mostly dark background. Request black artwork on a white background.');
+    if (!count) throw new Error(translate('The image has no dark filled regions to carve.'));
+    if (count > ink.length * 0.9)
+      throw new Error(translate('The image is mostly dark background. Request black artwork on a white background.'));
     const pixelsPerMm = Math.max((x1 - x0) / constraints.widthMm, (y1 - y0) / constraints.heightMm);
     // Never fit below about a pixel: the source cannot resolve finer detail, and a sub-pixel tolerance follows the
     // anti-aliasing staircase, which multiplies the curve count (about four times on 1024 px generated line art).
@@ -166,7 +171,8 @@ export async function traceCarvingPng(
     const physicalNoiseAreaPx = ((constraints.minFeatureMm * pixelsPerMm) / 2) ** 2;
     const noiseAreaPx = Math.max(2, physicalNoiseAreaPx);
     const specks = removeTraceSpecks(ink, traceWidth, noiseAreaPx);
-    if (!ink.some(Boolean)) throw new Error('Physical noise cleanup removed all artwork. Use a finer detail level or larger artwork.');
+    if (!ink.some(Boolean))
+      throw new Error(translate('Physical noise cleanup removed all artwork. Use a finer detail level or larger artwork.'));
     // Anti-aliased edges leave pixel-sized light gaps where two dark shapes nearly touch. Fill those below the physical
     // threshold; no tool leaves such an island. A pixel that is physically large, as in a small source, stays a counter.
     const pinholes = fillTracePinholes(ink, traceWidth, physicalNoiseAreaPx);
@@ -195,7 +201,7 @@ export async function traceCarvingPng(
     abort(signal);
     const topology = traceMaskTopology(ink, traceWidth);
     if (!topology.components || topology.components + topology.holes > 300)
-      throw new Error('Raster tracing is too complex. Request fewer details or simpler line art.');
+      throw new Error(translate('Raster tracing is too complex. Request fewer details or simpler line art.'));
     const smooth = await smoothTrace(
       ink,
       traceWidth,
@@ -222,8 +228,10 @@ export async function traceCarvingPng(
     )
       throw new Error(
         featurePx < 2
-          ? 'Smooth tracing changed filled components or holes. The image has fewer than two pixels across this minimum feature: choose a coarser detail level or a smaller size.'
-          : 'Smooth tracing changed filled components or holes. Use a larger size or finer detail level.'
+          ? translate(
+              'Smooth tracing changed filled components or holes. The image has fewer than two pixels across this minimum feature: choose a coarser detail level or a smaller size.'
+            )
+          : translate('Smooth tracing changed filled components or holes. Use a larger size or finer detail level.')
       );
     // Judge coverage by the average edge displacement, not overlap: a thin-stroke drawing loses overlap from the same
     // sub-pixel edge shift that a filled shape barely notices (about 93% against 99% on 1024 px line art at Simple).
@@ -237,34 +245,69 @@ export async function traceCarvingPng(
       coverage.boundaryErrorPx > boundaryLimitPx ||
       coverage.maxBoundaryErrorPx > 2 * boundaryLimitPx
     )
-      throw new Error('Smooth tracing exceeded its measured coverage or boundary-error budget. Use a larger source or simpler artwork.');
+      throw new Error(
+        translate('Smooth tracing exceeded its measured coverage or boundary-error budget. Use a larger source or simpler artwork.')
+      );
     const warnings = [
-      'Raster tracing converts dark pixels to filled cut regions. Shading, color and anti-aliasing are discarded; compare the original image and traced contours.',
-      `Smooth tracing uses ${smooth.curves} cubic curves and ${smooth.lines} lines; ${topology.components} filled components and ${topology.holes} holes remain. Gentle curve joins have aligned tangents; sharp corners and straight edges are retained.`,
-      `Measured raster contour boundary error is ${(coverage.boundaryErrorPx / pixelsPerMm).toFixed(3)} mm; coverage overlap ${(coverage.intersectionOverUnion * 100).toFixed(2)}%; enlargement cannot recover image detail. Compare the source and smooth trace.`,
-      `Removed ${specks.components} isolated dark specks (${specks.pixels} tracing pixels) below the physical noise threshold. Small intended marks can also be removed.`,
+      translate(
+        'Raster tracing converts dark pixels to filled cut regions. Shading, color and anti-aliasing are discarded; compare the original image and traced contours.'
+      ),
+      translate(
+        'Smooth tracing uses {{value1}} cubic curves and {{value2}} lines; {{value3}} filled components and {{value4}} holes remain. Gentle curve joins have aligned tangents; sharp corners and straight edges are retained.',
+        { value1: smooth.curves, value2: smooth.lines, value3: topology.components, value4: topology.holes }
+      ),
+      translate(
+        'Measured raster contour boundary error is {{value1}} mm; coverage overlap {{value2}}%; enlargement cannot recover image detail. Compare the source and smooth trace.',
+        { value1: (coverage.boundaryErrorPx / pixelsPerMm).toFixed(3), value2: (coverage.intersectionOverUnion * 100).toFixed(2) }
+      ),
+      translate(
+        'Removed {{value1}} isolated dark specks ({{value2}} tracing pixels) below the physical noise threshold. Small intended marks can also be removed.',
+        { value1: specks.components, value2: specks.pixels }
+      ),
       ...(closedGapPixels
-        ? [`Closed light gaps at most two tracing pixels wide (${closedGapPixels} pixels), below half the minimum feature size.`]
+        ? [
+            translate('Closed light gaps at most two tracing pixels wide ({{value1}} pixels), below half the minimum feature size.', {
+              value1: closedGapPixels,
+            }),
+          ]
         : []),
       ...(openedSliverPixels
-        ? [`Removed dark slivers about two tracing pixels wide (${openedSliverPixels} pixels), below half the minimum feature size.`]
+        ? [
+            translate('Removed dark slivers about two tracing pixels wide ({{value1}} pixels), below half the minimum feature size.', {
+              value1: openedSliverPixels,
+            }),
+          ]
         : []),
       ...(pinholes.components
-        ? [`Filled ${pinholes.components} enclosed light pinholes (${pinholes.pixels} tracing pixels) below the physical noise threshold.`]
+        ? [
+            translate('Filled {{value1}} enclosed light pinholes ({{value2}} tracing pixels) below the physical noise threshold.', {
+              value1: pinholes.components,
+              value2: pinholes.pixels,
+            }),
+          ]
         : []),
-      `Curve-fitting microcorners spanning less than ${Math.min(1, constraints.minFeatureMm)} mm are smoothed; original long corners remain pinned.`,
+      translate('Curve-fitting microcorners spanning less than {{value1}} mm are smoothed; original long corners remain pinned.', {
+        value1: Math.min(1, constraints.minFeatureMm),
+      }),
     ];
     if (smooth.roundRegularized)
       warnings.push(
-        'Near-elliptical contours were fitted as smooth ellipses, including round pupils or counters, and checked against the original pixel coverage.'
+        translate(
+          'Near-elliptical contours were fitted as smooth ellipses, including round pupils or counters, and checked against the original pixel coverage.'
+        )
       );
     if (traceWidth !== width || traceHeight !== height)
       warnings.push(
-        `The ${width} × ${height} pixel source was downsampled to a ${traceWidth} × ${traceHeight} tracing grid. The original image is retained.`
+        translate(
+          'The {{value1}} × {{value2}} pixel source was downsampled to a {{value3}} × {{value4}} tracing grid. The original image is retained.',
+          { value1: width, value2: height, value3: traceWidth, value4: traceHeight }
+        )
       );
     if (1 / pixelsPerMm > constraints.minFeatureMm / 2)
       warnings.push(
-        'The source image has fewer than two pixels across the requested minimum feature. Enlarge details or request simpler artwork.'
+        translate(
+          'The source image has fewer than two pixels across the requested minimum feature. Enlarge details or request simpler artwork.'
+        )
       );
     return {
       svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${traceWidth} ${traceHeight}"><path fill="black" fill-rule="evenodd" d="${smooth.d}"/></svg>`,

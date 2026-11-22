@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { PresentCanvas } from '@/scene/PresentCanvas';
 import { useCalibrationData, useCamResolution, useVideoUrl } from '@/store/store';
 import { type ThreeElements } from '@react-three/fiber';
@@ -128,7 +129,7 @@ function UnskewTsl() {
   // Handle missing video source - videoSrc is now handled in UnskewedVideoMesh
   const videoSrc = useVideoUrl();
   if (!calibrationData || !calibrationData.calibration_matrix || !calibrationData.distortion_coefficients || !videoSrc) {
-    throw new Error('Missing calibration data or video source');
+    throw new Error(translate('Missing calibration data or video source'));
   }
 
   return (

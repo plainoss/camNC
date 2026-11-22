@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { kCarvingBoard, placeItem } from '../carving';
 import { carvingBounds } from '../carvingView';
 import type { CamJobV1 } from '../jobDb';
@@ -101,7 +102,13 @@ function clearBox(items: NonNullable<CamJobV1['carving']>['items'], w: number, h
 export function variantBrief(prompt: string, style: CarvingStyle, index: number, count: number): string {
   const lines = [prompt.trim()];
   lines.push(style === 'bold' ? 'Style: bold, broad filled shapes with few interior lines.' : 'Style: clean line art with filled strokes.');
-  if (count > 1) lines.push(`Variant ${index + 1} of ${count}: choose a clearly different composition or pose from the other variants.`);
+  if (count > 1)
+    lines.push(
+      translate('Variant {{value1}} of {{value2}}: choose a clearly different composition or pose from the other variants.', {
+        value1: index + 1,
+        value2: count,
+      })
+    );
   return lines.join('\n');
 }
 
@@ -141,13 +148,13 @@ export async function prepareVariant(options: {
   const { job, variant, target, detail, mode, targetId, signal } = options;
   const carving = job.carving,
     board = job.boards?.[0];
-  if (!carving || !board) throw new Error('Open a carving with a board first.');
+  if (!carving || !board) throw new Error(translate('Open a carving with a board first.'));
   let asset = variant.asset!;
   const key = preparationKey(job, target, detail, mode, targetId);
   const constraints = { widthMm: target.w, heightMm: target.h, detail, minFeatureMm: carvingDetailMm[detail] };
   if (asset.rasterPreview && variant.tracedFor !== traceKey(target, detail)) {
     const raster = boundedCarvingRasterPreview(asset.rasterPreview);
-    if (!raster) throw new Error('The saved raster source is invalid or exceeds the image limits.');
+    if (!raster) throw new Error(translate('The saved raster source is invalid or exceeds the image limits.'));
     const traced = await traceCarvingPng(raster.slice(raster.indexOf(',') + 1), constraints, signal);
     asset = { ...asset, svg: traced.svg, warnings: traced.warnings, sourceOutline: traced.sourceOutline };
   }
@@ -174,7 +181,13 @@ export async function prepareVariant(options: {
     });
     return { key, asset, prepared, proposal };
   } catch (cause) {
-    return { key, asset, prepared, proposal: null, refusal: cause instanceof Error ? cause.message : 'This artwork cannot go here.' };
+    return {
+      key,
+      asset,
+      prepared,
+      proposal: null,
+      refusal: cause instanceof Error ? cause.message : translate('This artwork cannot go here.'),
+    };
   }
 }
 

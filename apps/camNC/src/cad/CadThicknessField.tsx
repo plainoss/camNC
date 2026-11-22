@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { lengthUnitScale, useDesignUnits } from './designUnits';
 import { CAD_MIN_THICKNESS, type CadLengthUnit, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -36,7 +37,9 @@ function thicknessValue(
 ): { value: number; expression?: string } | { error: string } {
   const parsed = parseCadValue(text, { unit: 'mm', variables });
   if ('error' in parsed) return parsed;
-  return parsed.value >= CAD_MIN_THICKNESS ? parsed : { error: `Thickness must be at least ${minimumText(lengthUnit)}.` };
+  return parsed.value >= CAD_MIN_THICKNESS
+    ? parsed
+    : { error: translate('Thickness must be at least {{value1}}.', { value1: minimumText(lengthUnit) }) };
 }
 
 /** Invalid drafts stay visible until corrected or explicitly canceled; blur never moves focus. */
@@ -100,7 +103,7 @@ export function CadThicknessField({
   return (
     <div className="cad-thickness-field">
       <label className="cad-number-field" htmlFor={id}>
-        Thickness
+        {translate('Thickness ')}
         <span>
           <CadValueInput
             id={id}
@@ -147,7 +150,8 @@ export function CadThicknessField({
         </span>
       </label>
       <p id={`${id}-hint`} className="cad-thickness-hint">
-        {minimumText(lengthUnit)} minimum. Units, arithmetic and variables accepted.
+        {minimumText(lengthUnit)}
+        {translate(' minimum. Units, arithmetic and variables accepted. ')}
       </p>
       {error && (
         <p id={`${id}-error`} role="alert" className="cad-thickness-error">

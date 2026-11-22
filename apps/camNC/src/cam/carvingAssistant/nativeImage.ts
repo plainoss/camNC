@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { providerUrl, type ProviderRequest } from '@/cad/assistant/provider';
 
 export interface NativeImageConfig {
@@ -11,12 +12,15 @@ export interface NativeImageConfig {
 /** Image models receive art direction only. Physical dimensions and tool limits belong to local preparation. */
 export function buildRasterArtPrompt(subject: string, detail: 'simple' | 'balanced' | 'detailed'): string {
   const level = { simple: 'Low', balanced: 'Balanced', detailed: 'Higher' }[detail];
-  return `Black and white monochrome line art of ${subject.trim()}. ${level} level of detail, suitable for carving. White background, no shading or text.`;
+  return translate(
+    'Black and white monochrome line art of {{value1}}. {{value2}} level of detail, suitable for carving. White background, no shading or text.',
+    { value1: subject.trim(), value2: level }
+  );
 }
 
 export function nativeImageUrl(config: NativeImageConfig): string {
   if (!config.model.trim() || !config.key.trim() || !['low', 'medium', 'high'].includes(config.quality))
-    throw new Error('Choose a native image model, key and image quality.');
+    throw new Error(translate('Choose a native image model, key and image quality.'));
   const chatUrl = providerUrl({
     kind: 'compatible',
     protocol: 'chat',
@@ -45,7 +49,7 @@ export async function requestNativeImage(
 ): Promise<string> {
   const url = nativeImageUrl(config);
   if (format === 'svg' && isGeminiEndpoint(config.endpoint))
-    throw new Error('Gemini image models make PNG images only. Set Image output to "Monochrome image (PNG), traced locally".');
+    throw new Error(translate('Gemini image models make PNG images only. Set Image output to "Monochrome image (PNG), traced locally".'));
   if (request.signal.aborted) throw new DOMException('Stopped', 'AbortError');
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -58,7 +62,7 @@ export async function requestNativeImage(
     request.signal.addEventListener('abort', abort, { once: true });
     timer = setTimeout(() => {
       controller.abort();
-      reject(new Error('Native image generation took too long. Try again or choose lower image quality.'));
+      reject(new Error(translate('Native image generation took too long. Try again or choose lower image quality.')));
     }, request.timeoutMs ?? 90_000);
   });
   const operation = async () => {
@@ -92,12 +96,16 @@ export async function requestNativeImage(
         ),
       });
     } catch {
-      throw new Error('Could not reach the native image provider. Check browser access and the endpoint.');
+      throw new Error(translate('Could not reach the native image provider. Check browser access and the endpoint.'));
     }
     if (!response.ok)
-      throw new Error(`Native image request failed (HTTP ${response.status}). Check model/project format and size support, and quota.`);
+      throw new Error(
+        translate('Native image request failed (HTTP {{value1}}). Check model/project format and size support, and quota.', {
+          value1: response.status,
+        })
+      );
     const reader = response.body?.getReader();
-    if (!reader) throw new Error('The native image provider returned no artwork.');
+    if (!reader) throw new Error(translate('The native image provider returned no artwork.'));
     const chunks: Uint8Array[] = [];
     let bytes = 0;
     const limit = format === 'png' ? 2_800_000 : 100_000;
@@ -107,7 +115,7 @@ export async function requestNativeImage(
       bytes += next.value.length;
       if (bytes > limit) {
         await reader.cancel();
-        throw new Error('The native artwork exceeds the response limit.');
+        throw new Error(translate('The native artwork exceeds the response limit.'));
       }
       chunks.push(next.value);
     }
@@ -122,7 +130,7 @@ export async function requestNativeImage(
       if (payload.data?.length !== 1 || typeof payload.data[0].b64_json !== 'string') throw new Error();
       return payload.data[0].b64_json;
     } catch {
-      throw new Error('The native image provider returned an unsupported artwork response.');
+      throw new Error(translate('The native image provider returned an unsupported artwork response.'));
     }
   };
   try {
@@ -136,5 +144,7 @@ export async function requestNativeImage(
 /** Image/SVG authoring charges cannot be inferred from text token prices. */
 export function nativeBudgetRefusal(maxCostUsd: number | undefined): void {
   if (maxCostUsd !== undefined)
-    throw new Error('Native generation has unknown combined image and SVG cost. A dollar-capped run requires the text SVG route.');
+    throw new Error(
+      translate('Native generation has unknown combined image and SVG cost. A dollar-capped run requires the text SVG route.')
+    );
 }

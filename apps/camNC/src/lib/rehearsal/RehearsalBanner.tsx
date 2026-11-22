@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useStore } from '@/store/store';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { useState } from 'react';
@@ -13,14 +14,15 @@ export function RehearsalBanner() {
   return (
     <div
       role="region"
-      aria-label="Machine rehearsal"
+      aria-label={translate('Machine rehearsal')}
       className={cn(
         'fixed bottom-3 max-md:bottom-17 left-3 md:left-[calc(var(--app-rail,0rem)+0.75rem)] z-50 flex max-w-[calc(100vw-1.5rem)] flex-col gap-2 rounded-lg border bg-background p-3 text-sm shadow-lg',
         machinePanelOpen && 'max-sm:bottom-[calc(60dvh+0.75rem)]'
       )}>
       <div className="flex flex-wrap items-center gap-3">
         <span className="flex items-center gap-1.5 font-medium">
-          <FlaskConical className="size-4" /> Demo machine · temporary rehearsal
+          <FlaskConical className="size-4" />
+          {translate(' Demo machine · temporary rehearsal ')}
         </span>
         <Button
           size="sm"
@@ -29,16 +31,19 @@ export function RehearsalBanner() {
             setLeaving(true);
             void leaveRehearsal();
           }}>
-          <Undo2 /> {leaving ? 'Returning…' : 'Return to CAM'}
+          <Undo2 /> {leaving ? translate('Returning…') : translate('Return to CAM')}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => location.reload()}>
-          Restart rehearsal
+          {translate('Restart rehearsal ')}
         </Button>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs text-muted-foreground">{getActiveRehearsal()?.job.name} · your saved project is unchanged</span>
-        <div className="flex items-center gap-1" role="group" aria-label="Simulation speed">
-          <span className="text-xs text-muted-foreground">Speed</span>
+        <span className="text-xs text-muted-foreground">
+          {getActiveRehearsal()?.job.name}
+          {translate(' · your saved project is unchanged')}
+        </span>
+        <div className="flex items-center gap-1" role="group" aria-label={translate('Simulation speed')}>
+          <span className="text-xs text-muted-foreground">{translate('Speed')}</span>
           {[1, 4, 16].map(value => (
             <Button
               key={value}
@@ -56,10 +61,11 @@ export function RehearsalBanner() {
         </div>
       </div>
       <details className="text-xs">
-        <summary>How to rehearse</summary>
+        <summary>{translate('How to rehearse')}</summary>
         <p className="mt-2 max-w-xl text-muted-foreground">
-          Place and align the board in Top View. In the machine panel, home, set XY zero and probe Z, then run. Pause or stop as you would
-          on your controller. Rehearsal progress is discarded when you return or reload.
+          {translate(
+            'Place and align the board in Top View. In the machine panel, home, set XY zero and probe Z, then run. Pause or stop as you would on your controller. Rehearsal progress is discarded when you return or reload. '
+          )}
         </p>
       </details>
     </div>

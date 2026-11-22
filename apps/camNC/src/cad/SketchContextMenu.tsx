@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Fragment, useRef } from 'react';
 import { Check, Focus, Maximize, MousePointer2, Pencil, Ruler, Trash2 } from 'lucide-react';
 import type { CadSketch } from '@wbcnc/cad';
@@ -42,13 +43,13 @@ export function SketchContextMenu({ sketch, context, busy = false, onClose, onAc
   const name =
     context.target.kind === 'constraint'
       ? isPatternRelation(sketch, context.target.id)
-        ? 'Sketch pattern menu'
-        : 'Sketch constraint menu'
+        ? translate('Sketch pattern menu')
+        : translate('Sketch constraint menu')
       : context.target.kind === 'dimension'
-        ? 'Sketch dimension menu'
+        ? translate('Sketch dimension menu')
         : context.target.kind === 'entity'
-          ? 'Sketch geometry menu'
-          : 'Sketch menu';
+          ? translate('Sketch geometry menu')
+          : translate('Sketch menu');
   const activate = (action: SketchContextAction) => {
     // The dimension editor takes focus itself; menu dismissal must not steal that new input's focus.
     restoreCanvasFocus.current = action !== 'edit-dimension' && action !== 'edit-pattern';
@@ -105,7 +106,7 @@ export function SketchContextMenu({ sketch, context, busy = false, onClose, onAc
                 confirm.onConfirm();
               }}>
               <Check aria-hidden="true" />
-              <span>Confirm sketch</span>
+              <span>{translate('Confirm sketch')}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>

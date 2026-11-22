@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadPoint } from '@wbcnc/cad';
 import type { PointerEvent, Ref } from 'react';
 import { CadValueInput } from './CadValueInput';
@@ -22,7 +23,7 @@ export function SketchSlotControls({
 }) {
   return (
     <form
-      aria-label="Slot"
+      aria-label={translate('Slot')}
       className="cad-create-size cad-slot-editor"
       onSubmit={e => {
         e.preventDefault();
@@ -35,17 +36,23 @@ export function SketchSlotControls({
         }
       }}>
       <label>
-        Diameter <CadValueInput aria-label="Slot width" inputRef={inputRef} value={width} onChange={e => onWidth(e.target.value)} />
+        {translate('Diameter ')}
+        <CadValueInput aria-label={translate('Slot width')} inputRef={inputRef} value={width} onChange={e => onWidth(e.target.value)} />
       </label>
       <label>
-        <input type="checkbox" aria-label="Select connected slot path" checked={chain} onChange={e => onChain(e.target.checked)} />
-        Connected path
+        <input
+          type="checkbox"
+          aria-label={translate('Select connected slot path')}
+          checked={chain}
+          onChange={e => onChain(e.target.checked)}
+        />
+        {translate('Connected path ')}
       </label>
       <button type="submit" disabled={!!error}>
-        Create slot
+        {translate('Create slot ')}
       </button>
       <button type="button" onClick={onCancel}>
-        Cancel slot
+        {translate('Cancel slot ')}
       </button>
       {error && (
         <span role="alert" className="cad-error">
@@ -81,7 +88,7 @@ export function SketchSlotWidthHandle({
         e.stopPropagation();
         onStart(e);
       }}>
-      <title>Drag slot diameter</title>
+      <title>{translate('Drag slot diameter')}</title>
     </circle>
   );
 }

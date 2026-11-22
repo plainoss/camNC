@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { placeItem, withItems, type CarvingItemV1 } from '../carving';
 import type { CamJobV1 } from '../jobDb';
 import { kDefaultPlan } from '../planSettings';
@@ -82,7 +83,7 @@ export function savedCarvingEnvelope(
 export function generatedCarvingProblem(job: CamJobV1): string | null {
   const stale = job.carving?.items.find(item => item.generated && item.generated.checkedFor !== carvingSuitabilityKey(job, item));
   return stale
-    ? 'Generated artwork changed size, placement or cutting settings. Recheck it in the carving assistant before planning.'
+    ? translate('Generated artwork changed size, placement or cutting settings. Recheck it in the carving assistant before planning.')
     : null;
 }
 
@@ -101,7 +102,7 @@ function itemFits(job: CamJobV1, item: CarvingItemV1): boolean {
 /** Candidate positions touch existing boxes or board edges; prefer the closest clear position to the center. */
 function clearPlacement(job: CamJobV1, item: CarvingItemV1): { x: number; y: number } {
   const board = job.boards![0];
-  if (board.size.fit) throw new Error('Choose a fixed board size.');
+  if (board.size.fit) throw new Error(translate('Choose a fixed board size.'));
   const boardSize = board.size;
   const own = carvingBounds(item.outline)!;
   const taken = job.carving!.items.flatMap(other => {
@@ -136,7 +137,9 @@ function clearPlacement(job: CamJobV1, item: CarvingItemV1): { x: number; y: num
     );
   });
   if (!found)
-    throw new Error('There is no clear space for this artwork. Reduce its size, move existing items, or replace the selected artwork.');
+    throw new Error(
+      translate('There is no clear space for this artwork. Reduce its size, move existing items, or replace the selected artwork.')
+    );
   return found;
 }
 
@@ -153,10 +156,10 @@ export function createCarvingProposal(
   }
 ): CarvingProposal {
   const board = job.boards?.[0];
-  if (!job.carving || !board || board.size.fit) throw new Error('Open a carving with a fixed board first.');
-  if (!prepared.report.ok || !prepared.outline.length) throw new Error('Resolve the carving checks before offering a proposal.');
+  if (!job.carving || !board || board.size.fit) throw new Error(translate('Open a carving with a fixed board first.'));
+  if (!prepared.report.ok || !prepared.outline.length) throw new Error(translate('Resolve the carving checks before offering a proposal.'));
   const target = options.mode === 'replace' ? job.carving.items.find(item => item.id === options.targetId) : undefined;
-  if (options.mode === 'replace' && !target) throw new Error('Select the artwork to replace.');
+  if (options.mode === 'replace' && !target) throw new Error(translate('Select the artwork to replace.'));
   const item: CarvingItemV1 = {
     id: target?.id ?? crypto.randomUUID(),
     art: structuredClone(prepared.art),
@@ -180,7 +183,8 @@ export function createCarvingProposal(
     },
   };
   if (options.mode === 'add' && !options.at) Object.assign(item, clearPlacement(job, item));
-  if (!itemFits(job, item)) throw new Error('The artwork does not fit on the board here. Move the dashed box or make it smaller.');
+  if (!itemFits(job, item))
+    throw new Error(translate('The artwork does not fit on the board here. Move the dashed box or make it smaller.'));
   const placed = carvingBounds(placeItem(item))!;
   if (
     job.carving.items.some(other => {
@@ -189,19 +193,20 @@ export function createCarvingProposal(
       return box && placed.x0 < box.x1 && placed.x1 > box.x0 && placed.y0 < box.y1 && placed.y1 > box.y0;
     })
   )
-    throw new Error('The artwork overlaps another item. Move the dashed box to a clear spot or make it smaller.');
+    throw new Error(translate('The artwork overlaps another item. Move the dashed box to a clear spot or make it smaller.'));
   item.generated!.checkedFor = carvingSuitabilityKey(job, item);
   return { jobId: job.id, base: carvingProposalBase(job), mode: options.mode, item, report: structuredClone(prepared.report) };
 }
 
 export function carvingProposalRefusal(job: CamJobV1, proposal: CarvingProposal): string | null {
-  if (job.id !== proposal.jobId || !job.carving) return 'This proposal belongs to another carving.';
-  if (carvingProposalBase(job) !== proposal.base) return 'The carving or board changed. Recheck the artwork before applying.';
+  if (job.id !== proposal.jobId || !job.carving) return translate('This proposal belongs to another carving.');
+  if (carvingProposalBase(job) !== proposal.base) return translate('The carving or board changed. Recheck the artwork before applying.');
   if (!proposal.report.ok || proposal.report.errors.length || !itemFits(job, proposal.item))
-    return 'The artwork has unresolved carving checks.';
+    return translate('The artwork has unresolved carving checks.');
   if (proposal.mode === 'replace' && !job.carving.items.some(item => item.id === proposal.item.id))
-    return 'The artwork to replace no longer exists.';
-  if (proposal.mode === 'add' && job.carving.items.some(item => item.id === proposal.item.id)) return 'This artwork was already added.';
+    return translate('The artwork to replace no longer exists.');
+  if (proposal.mode === 'add' && job.carving.items.some(item => item.id === proposal.item.id))
+    return translate('This artwork was already added.');
   return null;
 }
 

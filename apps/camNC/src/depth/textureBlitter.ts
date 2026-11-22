@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 /** For converting a GPUTexture to an ImageBitmap while keeping it on the GPU. */
 export class TextureBlitter {
   private readonly device: GPUDevice;
@@ -15,7 +16,7 @@ export class TextureBlitter {
     // Create offscreen canvas & WebGPU context
     this.canvas = new OffscreenCanvas(width, height);
     const ctx = this.canvas.getContext('webgpu') as GPUCanvasContext | null;
-    if (!ctx) throw new Error('Failed to obtain WebGPU context');
+    if (!ctx) throw new Error(translate('Failed to obtain WebGPU context'));
     this.ctx = ctx;
 
     this.ctx.configure({

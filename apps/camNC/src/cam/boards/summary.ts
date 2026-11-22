@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { BoardNest } from '../boards';
 
 /**
@@ -6,7 +7,7 @@ import type { BoardNest } from '../boards';
  */
 export function layoutSummary(boards: { nest: Pick<BoardNest, 'board' | 'yield' | 'placements'> }[]) {
   const used = boards.filter(b => b.nest.placements.length);
-  if (!used.length) return 'No part placed yet.';
+  if (!used.length) return translate('No part placed yet.');
   const area = used.reduce((a, b) => a + b.nest.board.w * b.nest.board.h, 0);
   const parts = used.reduce((a, b) => a + b.nest.yield * b.nest.board.w * b.nest.board.h, 0);
   const empty = boards.length - used.length;

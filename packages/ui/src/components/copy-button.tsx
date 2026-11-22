@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { CheckIcon, ClipboardIcon } from 'lucide-react';
 import * as React from 'react';
 
@@ -28,7 +29,7 @@ export function CopyButton({ value, variant = 'ghost', ...props }: CopyButtonPro
         setHasCopied(true);
       }}
       {...props}>
-      <span className="sr-only">Copy</span>
+      <span className="sr-only">{translate('Copy')}</span>
       {hasCopied ? <CheckIcon /> : <ClipboardIcon />}
     </Button>
   );

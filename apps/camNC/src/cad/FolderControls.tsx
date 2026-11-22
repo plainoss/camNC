@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   cadFolderSteps,
   deleteCadFolder,
@@ -58,16 +59,16 @@ export function useFolderControls({
             y={menu.y}
             onClose={closeMenu}
             items={[
-              { label: 'Settings…', onSelect: () => setDialog({ kind: 'settings', id: folder.id }) },
-              { label: 'Rename', onSelect: () => setDialog({ kind: 'rename', id: folder.id }) },
+              { label: translate('Settings…'), onSelect: () => setDialog({ kind: 'settings', id: folder.id }) },
+              { label: translate('Rename'), onSelect: () => setDialog({ kind: 'rename', id: folder.id }) },
               {
-                label: folder.suppressed ? 'Unsuppress' : 'Suppress',
+                label: folder.suppressed ? translate('Unsuppress') : translate('Suppress'),
                 onSelect: () => apply(setCadFolderSuppressed(document, folder.id, !folder.suppressed)),
               },
               ...(onRollTo
                 ? [
                     {
-                      label: 'Roll to here',
+                      label: translate('Roll to here'),
                       onSelect: () => {
                         const last = cadFolderSteps(document, folder.id).at(-1);
                         if (last) onRollTo(last.id);
@@ -75,8 +76,8 @@ export function useFolderControls({
                     },
                   ]
                 : []),
-              { label: 'Unpack folder', onSelect: () => apply({ document: dissolveCadFolder(document, folder.id) }) },
-              { label: 'Delete folder and contents', onSelect: () => apply(deleteCadFolder(document, folder.id)) },
+              { label: translate('Unpack folder'), onSelect: () => apply({ document: dissolveCadFolder(document, folder.id) }) },
+              { label: translate('Delete folder and contents'), onSelect: () => apply(deleteCadFolder(document, folder.id)) },
             ]}
           />
         )}

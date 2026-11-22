@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { useStore } from '@/store/store';
 import { openGcodeFile } from '@/visualize/openGcodeFile';
@@ -39,23 +40,24 @@ function JobStep() {
   const offset = useStore(s => s.toolpathOffset);
   return (
     <SetupStep
-      label="Job"
+      label={translate('Job')}
       state={hasToolpath && stockHeight > 0 ? 'done' : 'todo'}
-      title={<span className="truncate">{hasToolpath ? (name ?? 'Program loaded') : 'Open a G-code file'}</span>}
+      title={<span className="truncate">{hasToolpath ? (name ?? translate('Program loaded')) : translate('Open a G-code file')}</span>}
       summary={hasToolpath && stockHeight > 0 ? `stock ${stockHeight} mm` : undefined}
       action={
         <Button size="sm" variant="outline" disabled={locked} onClick={openGcodeFile}>
-          <FolderOpen /> Open…
+          <FolderOpen />
+          {translate(' Open… ')}
         </Button>
       }>
       <div className="flex flex-row items-center gap-2">
-        <span className="flex-1">Stock height</span>
+        <span className="flex-1">{translate('Stock height')}</span>
         <Input
           type="number"
           step="0.1"
           min={0}
           className="h-7 w-20"
-          aria-label="Stock height (mm)"
+          aria-label={translate('Stock height (mm)')}
           disabled={locked}
           value={stockHeight}
           onChange={e => {
@@ -63,11 +65,13 @@ function JobStep() {
             if (!Number.isNaN(value) && value >= 0) setStockHeight(value);
           }}
         />
-        <span className="text-xs text-muted-foreground">mm</span>
+        <span className="text-xs text-muted-foreground">{translate('mm')}</span>
       </div>
       {hasToolpath && (
         <p className="text-xs text-muted-foreground">
-          Placed at X {offset.x.toFixed(2)} Y {offset.y.toFixed(2)}. Drag it on the camera view to place it roughly.
+          {translate('Placed at X ')}
+          {offset.x.toFixed(2)} Y {offset.y.toFixed(2)}
+          {translate('. Drag it on the camera view to place it roughly. ')}
         </p>
       )}
     </SetupStep>
@@ -77,7 +81,7 @@ function JobStep() {
 /** Always in view while preparing: moving the bit is part of placing the board and zeroing. */
 function JogStep({ onEditMacros }: { onEditMacros: () => void }) {
   return (
-    <section aria-label="Jog" className="flex flex-col gap-2 rounded-lg border px-3 py-2">
+    <section aria-label={translate('Jog')} className="flex flex-col gap-2 rounded-lg border px-3 py-2">
       <JogPanel />
       <MacroButtons onEdit={onEditMacros} />
     </section>
@@ -91,16 +95,17 @@ function ToolsDrawer() {
     <Collapsible open={open} onOpenChange={setOpen} className="flex flex-col gap-3">
       <CollapsibleTrigger asChild>
         <Button variant="ghost" size="sm" className="-ml-1 self-start px-1 text-muted-foreground">
-          <ChevronRight className={cn('transition-transform', open && 'rotate-90')} /> <Wrench /> Tools: feeds, probe
+          <ChevronRight className={cn('transition-transform', open && 'rotate-90')} /> <Wrench />
+          {translate(' Tools: feeds, probe ')}
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-4">
         {open && (
           <>
-            <Section title="Jog feed">
+            <Section title={translate('Jog feed')}>
               <JogFeeds />
             </Section>
-            <Section title="Probe">
+            <Section title={translate('Probe')}>
               <ProbeSettings />
             </Section>
           </>

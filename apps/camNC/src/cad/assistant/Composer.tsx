@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useRef, type RefObject } from 'react';
 import type { AssistantImage } from './provider';
 import { readAssistantImage } from './images';
@@ -43,14 +44,14 @@ export function Composer({
         event.preventDefault();
         onSend();
       }}>
-      <span className="cad-assistant-context" title="Sent with your message">
+      <span className="cad-assistant-context" title={translate('Sent with your message')}>
         {context}
       </span>
       <label>
-        <span className="cad-assistant-sr">Message</span>
+        <span className="cad-assistant-sr">{translate('Message')}</span>
         <textarea
           ref={composer}
-          placeholder="Describe your idea, or ask for a change…"
+          placeholder={translate('Describe your idea, or ask for a change…')}
           value={text}
           onChange={event => onText(event.target.value)}
           aria-keyshortcuts="Control+Enter Meta+Enter"
@@ -69,7 +70,7 @@ export function Composer({
         ref={picker}
         type="file"
         hidden
-        aria-label="Reference image"
+        aria-label={translate('Reference image')}
         accept="image/png,image/jpeg,image/webp,image/gif"
         disabled={!attachable}
         onChange={event => {
@@ -83,13 +84,13 @@ export function Composer({
             .finally(() => onReadingImage(false));
         }}
       />
-      {!imagesSupported && <small>Enable image support in Connection to attach a reference.</small>}
+      {!imagesSupported && <small>{translate('Enable image support in Connection to attach a reference.')}</small>}
       {images.map((image, index) => (
         <div key={index} className="cad-assistant-attachment">
           <img src={`data:${image.mediaType};base64,${image.data}`} alt={image.name} />
           <span>{image.name}</span>
           <button type="button" onClick={() => onImages(previous => previous.filter((_, at) => at !== index))}>
-            Remove image
+            {translate('Remove image ')}
           </button>
         </div>
       ))}
@@ -97,20 +98,25 @@ export function Composer({
         <button
           type="button"
           className="cad-assistant-attach"
-          aria-label="Add reference image"
-          title={imagesSupported ? 'Add reference image (PNG, JPG, WebP or GIF, up to 3)' : 'Enable image support in Connection'}
+          aria-label={translate('Add reference image')}
+          title={
+            imagesSupported
+              ? translate('Add reference image (PNG, JPG, WebP or GIF, up to 3)')
+              : translate('Enable image support in Connection')
+          }
           disabled={!attachable}
           onClick={() => picker.current?.click()}>
-          <span aria-hidden="true">＋</span> Image
+          <span aria-hidden="true">＋</span>
+          {translate(' Image ')}
         </button>
-        <small className="cad-assistant-shortcut">⌘ / Ctrl + Enter to send</small>
+        <small className="cad-assistant-shortcut">{translate('⌘ / Ctrl + Enter to send')}</small>
         {running ? (
           <button type="button" onClick={onStop}>
-            Stop
+            {translate('Stop ')}
           </button>
         ) : (
           <button type="submit" className="cad-assistant-primary" disabled={!canSend}>
-            Send
+            {translate('Send ')}
           </button>
         )}
       </div>

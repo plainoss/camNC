@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import type { CadCutDepth, CadValueScope } from '@wbcnc/cad';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
@@ -34,10 +35,10 @@ export function RegionDepthField({
     valid = 'value' in parsed && parsed.value >= 0,
     value = 'value' in parsed ? parsed.value : NaN;
   return (
-    <div className="cad-region-depth" style={style} role="group" aria-label="Cut depth">
+    <div className="cad-region-depth" style={style} role="group" aria-label={translate('Cut depth')}>
       <input
         ref={input}
-        aria-label={`Depth in ${lengthUnit}`}
+        aria-label={translate('Depth in {{lengthUnit}}', { lengthUnit: lengthUnit })}
         aria-invalid={!valid}
         title={'error' in parsed ? parsed.error : undefined}
         spellCheck={false}
@@ -52,10 +53,10 @@ export function RegionDepthField({
       />
       <span className="cad-muted">{lengthUnit}</span>
       <button type="button" onClick={() => onChoose('through')}>
-        Through
+        {translate('Through ')}
       </button>
       <button type="button" onClick={() => onChoose(0)}>
-        No cut
+        {translate('No cut ')}
       </button>
     </div>
   );

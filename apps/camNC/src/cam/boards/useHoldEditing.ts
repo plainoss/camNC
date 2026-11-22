@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { HoldKind } from '@wbcnc/cam/holdPoints';
 import { edgeBands, reserved, type Fixture } from '@wbcnc/cam/settle';
 import { useEffect, useState } from 'react';
@@ -150,8 +151,11 @@ export function useHoldEditing({
       settled
         ? layoutChange(nest, shown, instances)
         : reserved(f, input)
-          ? 'That spot is kept clear: the XY zero corner is where you probe.'
-          : `No room here on a ${nest.board.w} × ${nest.board.h} board. Slide along the edge, or use a bigger board.`
+          ? translate('That spot is kept clear: the XY zero corner is where you probe.')
+          : translate('No room here on a {{value1}} × {{value2}} board. Slide along the edge, or use a bigger board.', {
+              value1: nest.board.w,
+              value2: nest.board.h,
+            })
     );
   };
   /** Keep what's previewed: looked at harder than while the pointer was moving. */
@@ -176,22 +180,31 @@ export function useHoldEditing({
     if (!added) {
       onNote(
         !before
-          ? 'No clamp spot has room on this layout. Try a bigger board, tape or screws.'
+          ? translate('No clamp spot has room on this layout. Try a bigger board, tape or screws.')
           : around
-            ? 'These holds already surround the work’s middle, so there’s nothing to add.'
-            : 'These holds don’t surround the work’s middle, and no clamp spot here would fix that. Try a bigger board, tape or screws.'
+            ? translate('These holds already surround the work’s middle, so there’s nothing to add.')
+            : translate(
+                'These holds don’t surround the work’s middle, and no clamp spot here would fix that. Try a bigger board, tape or screws.'
+              )
       );
       return;
     }
     const clamps = `${added} clamp${added > 1 ? 's' : ''}`;
     const short = around
       ? ''
-      : ' They don’t surround the work’s middle, so they aren’t enough on their own: try a bigger board, tape or screws.';
+      : translate(' They don’t surround the work’s middle, so they aren’t enough on their own: try a bigger board, tape or screws.');
     onBoardEdit(
       next,
       grew > 0
-        ? `No edge had room, so the board grew ${grew} mm on each side, to ${shown.board.w} × ${shown.board.h}. Suggested ${clamps}.${short} Parts and holds moved with it. Drag or remove any of them.`
-        : `Suggested ${clamps}.${short} ${layoutChange(nest, shown, instances)} Drag or remove any of them.`
+        ? translate(
+            'No edge had room, so the board grew {{value1}} mm on each side, to {{value2}} × {{value3}}. Suggested {{value4}}.{{value5}} Parts and holds moved with it. Drag or remove any of them.',
+            { value1: grew, value2: shown.board.w, value3: shown.board.h, value4: clamps, value5: short }
+          )
+        : translate('Suggested {{value1}}.{{value2}} {{value3}} Drag or remove any of them.', {
+            value1: clamps,
+            value2: short,
+            value3: layoutChange(nest, shown, instances),
+          })
     );
   };
   /** Exactly one clamp more or fewer than the board has; everything else stays. */
@@ -203,13 +216,16 @@ export function useHoldEditing({
     if ((next.fixtures?.length ?? 0) === (board.fixtures?.length ?? 0)) {
       onNote(
         more
-          ? 'No clear spot for another clamp: none left with room to slide, a quarter of the work from the next on its edge.'
+          ? translate('No clear spot for another clamp: none left with room to slide, a quarter of the work from the next on its edge.')
           : 'Taking any clamp away would leave the work not surrounded, so they all stay.'
       );
       return;
     }
     setSelectedHold(null);
-    onBoardEdit(next, `One clamp ${more ? 'more' : 'fewer'}. Everything else stays where it is.`);
+    onBoardEdit(
+      next,
+      translate('One clamp {{value1}}. Everything else stays where it is.', { value1: more ? translate('more') : translate('fewer') })
+    );
   };
   // Where clamps fit on the selected board, once its layout has settled: a moment's work, so not on every render.
   const [bands, setBands] = useState<ReturnType<typeof edgeBands> | undefined>();
@@ -267,10 +283,13 @@ export function useHoldEditing({
       return settled;
     });
     if (!changed) {
-      onNote(`No room for that size: the ${kind}s stay as they are.`);
+      onNote(translate('No room for that size: the {{value1}}s stay as they are.', { value1: kind }));
       return;
     }
-    onBoardsEdit(next, `Changed ${named(kind, changed)}.${full ? ` ${named(kind, full)} kept their size: no room for it.` : ''}`);
+    onBoardsEdit(
+      next,
+      `Changed ${named(kind, changed)}.${full ? translate(' {{value1}} kept their size: no room for it.', { value1: named(kind, full) }) : ''}`
+    );
   };
   /** Tabs are one shape on a board: this board's, or those of all boards with tabs that aren't cut. */
   const setTabSize = (key: 'width' | 'height', value: number, all: boolean) => {
@@ -279,14 +298,14 @@ export function useHoldEditing({
         ? b.board
         : { ...b.board, tabs: { ...b.board.tabs, [key]: value } }
     );
-    onBoardsEdit(next, all ? 'Changed the tabs on all boards.' : 'Changed the tabs on this board.');
+    onBoardsEdit(next, all ? translate('Changed the tabs on all boards.') : translate('Changed the tabs on this board.'));
   };
   const removeAllHolds = (kind: HoldKind) => {
     if (!selectedBoard) return;
     setSelectedHold(null);
     onBoardEdit(
       { ...selectedBoard.board, fixtures: (selectedBoard.board.fixtures ?? []).filter(f => f.kind !== kind) },
-      `All ${kind}s on this board removed. Parts stay where they are; Tighten layout closes the gaps.`
+      translate('All {{value1}}s on this board removed. Parts stay where they are; Tighten layout closes the gaps.', { value1: kind })
     );
   };
 

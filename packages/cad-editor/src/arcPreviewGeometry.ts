@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadPoint } from '@wbcnc/cad';
 import { tangentArcFrom, threePointArc } from './geometry';
 
@@ -28,14 +29,14 @@ export function buildArcPreview({ mode, pending, cursor, tangent }: ArcPreviewIn
   const arc = actualArc || (mode === 'threePoint' ? provisionalArc(start, end, tangent) : null);
   const instruction =
     phase === 'end'
-      ? 'Click arc end'
+      ? translate('Click arc end')
       : actualArc
         ? phase === 'tangent'
-          ? 'Click tangent arc end'
-          : 'Click point on arc'
+          ? translate('Click tangent arc end')
+          : translate('Click point on arc')
         : phase === 'tangent'
-          ? 'Move away from tangent line'
-          : 'Move off chord to shape arc';
+          ? translate('Move away from tangent line')
+          : translate('Move off chord to shape arc');
   return { phase, start, end, cursor, arc, provisional: !actualArc, instruction };
 }
 

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { numeric, type ConstraintTool } from './cadEditorShared';
 import {
   CAD_GEOMETRY_TOLERANCE,
@@ -47,7 +48,7 @@ export function acceptSketchLinearPattern(editor: SketchEditorInput): string | n
     setMessage(message);
     return message;
   };
-  if (!sketch || !parsedLinear.ok) return refused(parsedLinear.ok ? 'Select source geometry.' : parsedLinear.message);
+  if (!sketch || !parsedLinear.ok) return refused(parsedLinear.ok ? translate('Select source geometry.') : parsedLinear.message);
   const existing = patternEditId && sketch.constraints.find(c => c.id === patternEditId);
   const same =
     existing &&
@@ -75,8 +76,10 @@ export function acceptSketchLinearPattern(editor: SketchEditorInput): string | n
   setSelected([]);
   setSelectedConstraints([result.patternId]);
   if (result.releasedConstraintIds.length)
-    setPatternNotice(`${result.releasedConstraintIds.length} relations on removed instances were released.`);
-  setMessage('Linear pattern applied. Double-click its pattern icon or use Edit pattern to change it.');
+    setPatternNotice(
+      translate('{{value1}} relations on removed instances were released.', { value1: result.releasedConstraintIds.length })
+    );
+  setMessage(translate('Linear pattern applied. Double-click its pattern icon or use Edit pattern to change it.'));
   return null;
 }
 
@@ -94,7 +97,7 @@ export function acceptSketchCircularPattern(editor: SketchEditorInput) {
     setSelectedConstraints,
     sketch,
   } = editor;
-  if (!sketch || !parsedCircular.ok) return setMessage(parsedCircular.ok ? 'Select source geometry.' : parsedCircular.message);
+  if (!sketch || !parsedCircular.ok) return setMessage(parsedCircular.ok ? translate('Select source geometry.') : parsedCircular.message);
   const old = patternEditId && sketch.constraints.find(c => c.id === patternEditId),
     center = old && old.type === 'circularPattern' ? sketch.entities.find(e => e.id === old.centerId) : undefined;
   if (
@@ -122,8 +125,10 @@ export function acceptSketchCircularPattern(editor: SketchEditorInput) {
   setSelected([]);
   setSelectedConstraints([result.patternId]);
   if (result.releasedConstraintIds.length)
-    setPatternNotice(`${result.releasedConstraintIds.length} relations on removed instances were released.`);
-  setMessage('Circular pattern applied. Double-click its pattern icon or use Edit pattern to change it.');
+    setPatternNotice(
+      translate('{{value1}} relations on removed instances were released.', { value1: result.releasedConstraintIds.length })
+    );
+  setMessage(translate('Circular pattern applied. Double-click its pattern icon or use Edit pattern to change it.'));
 }
 
 export function acceptSketchFillet(editor: SketchEditorInput) {
@@ -146,7 +151,7 @@ export function acceptSketchFillet(editor: SketchEditorInput) {
         ? filletPreview.message
         : filletSelection && !filletSelection.ok
           ? filletSelection.message
-          : 'Select corners to fillet.'
+          : translate('Select corners to fillet.')
     );
     return;
   }
@@ -163,7 +168,7 @@ export function acceptSketchFillet(editor: SketchEditorInput) {
   chooseTool('select');
   setSelected([]);
   setSelectedConstraints([radiusId]);
-  setMessage('Fillets created. Double-click the shared radius to edit the group.');
+  setMessage(translate('Fillets created. Double-click the shared radius to edit the group.'));
 }
 
 /**
@@ -192,7 +197,8 @@ export function acceptSketchChamfer(editor: SketchEditorInput) {
   } = editor;
   if (!chamferPreview?.ok)
     return setMessage(
-      chamferPreview?.message ?? (chamferSelection && !chamferSelection.ok ? chamferSelection.message : 'Select corners to chamfer.')
+      chamferPreview?.message ??
+        (chamferSelection && !chamferSelection.ok ? chamferSelection.message : translate('Select corners to chamfer.'))
     );
   const next = structuredClone(chamferPreview.sketch);
   chamferPreview.dimensionIds.forEach((id, index) => {
@@ -204,7 +210,7 @@ export function acceptSketchChamfer(editor: SketchEditorInput) {
   chooseTool('select');
   setSelected([]);
   setSelectedConstraints(chamferPreview.dimensionIds);
-  setMessage('Chamfers created. Double-click either setback dimension to edit the group.');
+  setMessage(translate('Chamfers created. Double-click either setback dimension to edit the group.'));
 }
 
 export function acceptSketchOffset(editor: SketchEditorInput): string | null {
@@ -222,7 +228,7 @@ export function acceptSketchOffset(editor: SketchEditorInput): string | null {
     variableScope,
   } = editor;
   if (modification.phase !== 'offset' || !modification.entityIds.length) return null;
-  if (!offsetPreview?.ok) return rejectValue(offsetPreview?.message ?? 'Select curves to offset.', offsetInput.current);
+  if (!offsetPreview?.ok) return rejectValue(offsetPreview?.message ?? translate('Select curves to offset.'), offsetInput.current);
   const parsed = parseCadValue(modification.text, { unit: 'mm', variables: variableScope });
   const next =
     'value' in parsed && parsed.expression
@@ -236,7 +242,7 @@ export function acceptSketchOffset(editor: SketchEditorInput): string | null {
   changeSketch(next);
   setModification(previous => transitionModification(previous, { type: 'complete' }));
   setSelected([]);
-  setMessage('Offset created. Double-click its dimension to edit; select more curves to offset again.');
+  setMessage(translate('Offset created. Double-click its dimension to edit; select more curves to offset again.'));
   svg.current?.focus();
   return null;
 }
@@ -262,7 +268,7 @@ export function applySketchConicRho(editor: SketchEditorInput): string | null {
   if (!sketch || !part || !conicEditing) return null;
   try {
     const parsed = parseCadValue(rhoInput.current?.value ?? rho, { unit: 'scalar' });
-    if ('error' in parsed) return rejectValue(`Conic rho: ${parsed.error}`, rhoInput.current);
+    if ('error' in parsed) return rejectValue(translate('Conic rho: {{value1}}', { value1: parsed.error }), rhoInput.current);
     const next = replacePart(documentRef.current, part.id, current => ({
       ...current,
       sketch: setConicRho(current.sketch, conicEditing, parsed.value),
@@ -274,7 +280,7 @@ export function applySketchConicRho(editor: SketchEditorInput): string | null {
     const curveId = conicEditing;
     chooseTool('select');
     setSelected([curveId]);
-    setMessage('Conic applied. Drag its control point to reshape it.');
+    setMessage(translate('Conic applied. Drag its control point to reshape it.'));
     return null;
   } catch (error) {
     return rejectValue(error instanceof Error ? error.message : String(error), rhoInput.current);
@@ -327,11 +333,11 @@ export function removeSketchSelection(editor: SketchEditorInput, entityIds: read
   }
   if (!sketch) return;
   if (!constraintIds.length && entityIds.length && entityIds.every(id => isSplineTangentHandle(sketch, id))) {
-    setMessage('Spline tangent handles cannot be deleted individually. Select the curve to delete it.');
+    setMessage(translate('Spline tangent handles cannot be deleted individually. Select the curve to delete it.'));
     return;
   }
   if (!constraintIds.length && entityIds.length && entityIds.every(id => sketch.entities.some(e => e.id === id && e.faceEdge))) {
-    setMessage('The edges of the face this part is drawn on stay. Draw onto them so the part follows that face.');
+    setMessage(translate('The edges of the face this part is drawn on stay. Draw onto them so the part follows that face.'));
     return;
   }
   let next = sketch;
@@ -406,7 +412,7 @@ export function constrainSketch(editor: SketchEditorInput, type: ConstraintTool)
   if (constraintMode === type) {
     setConstraintMode(null);
     setSelected([]);
-    setMessage('Click geometry to select. Drag to move. Shift-click adds to selection.');
+    setMessage(translate('Click geometry to select. Drag to move. Shift-click adds to selection.'));
     svg.current?.focus();
     return;
   }
@@ -463,7 +469,9 @@ export function sketchContextAction(editor: SketchEditorInput, action: SketchCon
     else if (constraint && numeric(constraint)) {
       commit(setDimensionDriven(documentRef.current, id, !constraint.driven));
       setDimension(null);
-      setMessage(constraint.driven ? 'Dimension is driving the geometry.' : 'Reference dimension follows the geometry.');
+      setMessage(
+        constraint.driven ? translate('Dimension is driving the geometry.') : translate('Reference dimension follows the geometry.')
+      );
     }
   }
 }

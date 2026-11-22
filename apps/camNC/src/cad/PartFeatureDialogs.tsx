@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
   type CadDrawnOn,
@@ -83,7 +84,7 @@ export function PartPatternDialog({
       // A circular pattern is named as its row is, "Circular pattern 1".
       title={
         (circular && designSteps(document).find(step => step.id === part.pattern?.id)?.label) ||
-        `${circular ? 'Circular' : 'Linear'} pattern · ${part.name}`
+        translate('{{value1}} pattern · {{value2}}', { value1: circular ? translate('Circular') : translate('Linear'), value2: part.name })
       }
       onOk={onOk}
       onCancel={onCancel}
@@ -91,18 +92,18 @@ export function PartPatternDialog({
       okReason={blockedReason ?? problem}>
       {blockedReason && <p role="alert">{blockedReason}</p>}
       {/* Copies are new parts; joining them to, cutting them from or intersecting them with others isn't offered yet. */}
-      <div className="cad-feature-tabs cad-static-tabs" role="tablist" aria-label="Pattern operation">
+      <div className="cad-feature-tabs cad-static-tabs" role="tablist" aria-label={translate('Pattern operation')}>
         <span role="tab" aria-selected>
-          New
+          {translate('New ')}
         </span>
         {['Add', 'Remove', 'Intersect'].map(label => (
-          <span key={label} role="tab" aria-selected={false} aria-disabled title="Not available yet">
+          <span key={label} role="tab" aria-selected={false} aria-disabled title={translate('Not available yet')}>
             {label}
           </span>
         ))}
       </div>
       <label htmlFor={`${id}-type`} className="cad-number-field">
-        Pattern type
+        {translate('Pattern type ')}
         <span>
           <select
             id={`${id}-type`}
@@ -117,13 +118,13 @@ export function PartPatternDialog({
               setAxisPending(pending);
               onChange(document => setPartPattern(document, part.id, pending ? { ...pattern, suppressed: true } : pattern));
             }}>
-            <option value="linear">Linear</option>
-            <option value="circular">Circular</option>
+            <option value="linear">{translate('Linear')}</option>
+            <option value="circular">{translate('Circular')}</option>
           </select>
         </span>
       </label>
       <DialogPartField
-        label="Entities to pattern"
+        label={translate('Entities to pattern')}
         name={part.name}
         pick={partPick ?? null}
         onActivate={() => {

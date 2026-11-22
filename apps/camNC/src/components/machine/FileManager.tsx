@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { errorText } from '@/lib/machine/jobs';
 import {
@@ -36,7 +37,7 @@ export function FileManager() {
     try {
       setFiles((await api.listFiles()).files);
     } catch (err) {
-      toast.error('Could not list SD files', { description: errorText(err) });
+      toast.error(translate('Could not list SD files'), { description: errorText(err) });
     } finally {
       setBusy(false);
     }
@@ -55,7 +56,11 @@ export function FileManager() {
       const file = input.files?.[0];
       if (!file) return;
       const promise = file.text().then(text => api.uploadGcode(text, file.name));
-      toast.promise(promise, { loading: `Uploading ${file.name}…`, success: 'Uploaded', error: err => `Upload failed: ${errorText(err)}` });
+      toast.promise(promise, {
+        loading: `Uploading ${file.name}…`,
+        success: 'Uploaded',
+        error: err => translate('Upload failed: {{value1}}', { value1: errorText(err) }),
+      });
       await promise.catch(() => {});
       void refresh();
     };
@@ -66,14 +71,16 @@ export function FileManager() {
     <div className="flex flex-col gap-2">
       <div className="flex flex-row gap-2">
         <Button size="sm" variant="outline" disabled={!connected || busy} onClick={refresh}>
-          <RefreshCw /> Refresh
+          <RefreshCw />
+          {translate(' Refresh ')}
         </Button>
         <Button size="sm" variant="outline" disabled={!connected} onClick={uploadLocalFile}>
-          <FileUp /> Upload file…
+          <FileUp />
+          {translate(' Upload file… ')}
         </Button>
       </div>
       <ul className="flex flex-col divide-y text-sm" data-testid="sd-files">
-        {files?.length === 0 && <li className="text-muted-foreground py-2">SD card is empty</li>}
+        {files?.length === 0 && <li className="text-muted-foreground py-2">{translate('SD card is empty')}</li>}
         {files?.map(file => (
           <li key={file.name} className="flex flex-row items-center gap-2 py-1">
             <span className="flex-1 truncate" title={file.name}>
@@ -85,14 +92,18 @@ export function FileManager() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  title="Run"
+                  title={translate('Run')}
                   disabled={!idle}
                   onClick={() =>
-                    api.runFile(file.name).catch(err => toast.error(`Could not run ${file.name}`, { description: errorText(err) }))
+                    api
+                      .runFile(file.name)
+                      .catch(err =>
+                        toast.error(translate('Could not run {{value1}}', { value1: file.name }), { description: errorText(err) })
+                      )
                   }>
                   <Play />
                 </Button>
-                <Button size="icon" variant="ghost" title="Delete" disabled={!idle} onClick={() => setToDelete(file.name)}>
+                <Button size="icon" variant="ghost" title={translate('Delete')} disabled={!idle} onClick={() => setToDelete(file.name)}>
                   <Trash2 />
                 </Button>
               </>
@@ -103,19 +114,22 @@ export function FileManager() {
       <AlertDialog open={toDelete !== null} onOpenChange={open => !open && setToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {toDelete}?</AlertDialogTitle>
-            <AlertDialogDescription>The file is removed from the SD card.</AlertDialogDescription>
+            <AlertDialogTitle>
+              {translate('Delete ')}
+              {toDelete}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>{translate('The file is removed from the SD card.')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{translate('Cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() =>
                 api
                   .deleteFile(toDelete!)
                   .then(refresh)
-                  .catch(err => toast.error('Delete failed', { description: errorText(err) }))
+                  .catch(err => toast.error(translate('Delete failed'), { description: errorText(err) }))
               }>
-              Delete
+              {translate('Delete ')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useStore } from '@/store/store';
 import { Button } from '@wbcnc/ui/components/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@wbcnc/ui/components/card';
@@ -11,10 +12,11 @@ export function TryDemoCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Explore a demo machine</CardTitle>
+        <CardTitle>{translate('Explore a demo machine')}</CardTitle>
         <CardDescription>
-          Practice machine controls with a simulated FluidNC and a recorded camera example. Bring your own G-code if you like. Machine
-          settings are discarded; demo projects save locally in this browser.
+          {translate(
+            'Practice machine controls with a simulated FluidNC and a recorded camera example. Bring your own G-code if you like. Machine settings are discarded; demo projects save locally in this browser. '
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -22,13 +24,14 @@ export function TryDemoCard() {
         <div className="flex flex-row flex-wrap items-center gap-2">
           <Button asChild>
             <a href="/demo?machine=1">
-              <FlaskConical /> Open the demo
+              <FlaskConical />
+              {translate(' Open the demo ')}
             </a>
           </Button>
           <details>
-            <summary className="cursor-pointer text-sm text-muted-foreground">Camera options</summary>
+            <summary className="cursor-pointer text-sm text-muted-foreground">{translate('Camera options')}</summary>
             <Button asChild variant="ghost">
-              <a href="/demo?camera=off">Without a camera</a>
+              <a href="/demo?camera=off">{translate('Without a camera')}</a>
             </Button>
           </details>
         </div>

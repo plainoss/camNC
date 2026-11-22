@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import { edgeFilletProblems, type CadDocument, type CadFolder, type CadPart } from '@wbcnc/cad';
 import { useCallback, useState } from 'react';
@@ -78,7 +79,7 @@ export function PartsList({
       {renaming === key ? (
         <input
           className="cad-feature-rename"
-          aria-label={`New name for ${name}`}
+          aria-label={translate('New name for {{name}}', { name: name })}
           defaultValue={name}
           autoFocus
           onFocus={event => event.currentTarget.select()}
@@ -122,8 +123,11 @@ export function PartsList({
         <button
           type="button"
           className="cad-part-eye"
-          aria-label={`${hiddenParts.has(key) ? 'Show' : 'Hide'} ${name}`}
-          title={hiddenParts.has(key) ? 'Show in the view' : 'Hide in the view'}
+          aria-label={translate('{{value1}} {{name}}', {
+            value1: hiddenParts.has(key) ? translate('Show') : translate('Hide'),
+            name: name,
+          })}
+          title={hiddenParts.has(key) ? translate('Show in the view') : translate('Hide in the view')}
           aria-pressed={!hiddenParts.has(key)}
           onClick={() => onToggleHidden(key)}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -158,7 +162,7 @@ export function PartsList({
           <li key={folder.id} className="cad-parts-folder">
             <details open>
               <summary>{folder.name}</summary>
-              <ul aria-label={`${folder.name} parts`}>
+              <ul aria-label={translate('{{value1}} parts', { value1: folder.name })}>
                 {rows.filter(candidate => folder.partIds.includes(candidate.part.id)).map(renderRow)}
               </ul>
             </details>
@@ -167,7 +171,7 @@ export function PartsList({
       });
   return (
     <>
-      <ul className="cad-part-list" aria-label="Parts" hidden={hidden}>
+      <ul className="cad-part-list" aria-label={translate('Parts')} hidden={hidden}>
         {listed}
       </ul>
       {menu && (
@@ -177,22 +181,27 @@ export function PartsList({
           y={menu.y}
           onClose={closeMenu}
           items={[
-            { label: 'Rename', onSelect: () => setRenaming(menu.key) },
+            { label: translate('Rename'), onSelect: () => setRenaming(menu.key) },
             ...(onEdit
               ? [
-                  { label: 'Properties…', onSelect: () => setPanel({ kind: 'properties', key: menu.key, name: menu.name }) },
-                  { label: 'Assign material…', onSelect: () => setPanel({ kind: 'material', key: menu.key, name: menu.name }) },
+                  { label: translate('Properties…'), onSelect: () => setPanel({ kind: 'properties', key: menu.key, name: menu.name }) },
+                  { label: translate('Assign material…'), onSelect: () => setPanel({ kind: 'material', key: menu.key, name: menu.name }) },
                   // With a material, a part has a mass and a center to it.
                   ...(rows.find(row => row.key === menu.key)?.part.material
-                    ? [{ label: 'Show center of mass', onSelect: () => setPanel({ kind: 'properties', key: menu.key, name: menu.name }) }]
+                    ? [
+                        {
+                          label: translate('Show center of mass'),
+                          onSelect: () => setPanel({ kind: 'properties', key: menu.key, name: menu.name }),
+                        },
+                      ]
                     : []),
                 ]
               : []),
-            { label: hiddenParts.has(menu.key) ? 'Show' : 'Hide', onSelect: () => onToggleHidden(menu.key) },
+            { label: hiddenParts.has(menu.key) ? translate('Show') : translate('Hide'), onSelect: () => onToggleHidden(menu.key) },
             ...(transparent
               ? [
                   {
-                    label: 'Make transparent…',
+                    label: translate('Make transparent…'),
                     onSelect: () => {
                       transparent[1](new Set([...transparent[0], menu.key]));
                       setSeeThrough(true);
@@ -202,7 +211,7 @@ export function PartsList({
                   ...(transparent[0].size || seeThrough
                     ? [
                         {
-                          label: 'Exit make transparent',
+                          label: translate('Exit make transparent'),
                           onSelect: () => {
                             transparent[1](new Set());
                             setSeeThrough(false);
@@ -220,7 +229,7 @@ export function PartsList({
               const only = { partId: row.part.id, ...(copyId && { copyId }) };
               return [
                 {
-                  label: 'Export…',
+                  label: translate('Export…'),
                   onSelect: () => setExporting(shownPartsTarget(exportDocument, rolledTo, { name: menu.name, only })),
                 },
               ];
@@ -232,11 +241,14 @@ export function PartsList({
               return [
                 ...(onSketchCopy
                   ? [
-                      { label: 'Sketch on this copy’s top', onSelect: () => onSketchCopy(row.part.id, copyId, 'top') },
-                      { label: 'Sketch on this copy’s underside', onSelect: () => onSketchCopy(row.part.id, copyId, 'underside') },
+                      { label: translate('Sketch on this copy’s top'), onSelect: () => onSketchCopy(row.part.id, copyId, 'top') },
+                      {
+                        label: translate('Sketch on this copy’s underside'),
+                        onSelect: () => onSketchCopy(row.part.id, copyId, 'underside'),
+                      },
                     ]
                   : []),
-                ...(onDetachCopy ? [{ label: 'Detach copy', onSelect: () => onDetachCopy(row.part.id, copyId) }] : []),
+                ...(onDetachCopy ? [{ label: translate('Detach copy'), onSelect: () => onDetachCopy(row.part.id, copyId) }] : []),
               ];
             })(),
           ]}

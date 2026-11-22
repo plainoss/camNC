@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { MATERIALS } from '@wbcnc/cam/settings';
 import { Popover, PopoverContent, PopoverTrigger } from '@wbcnc/ui/components/popover';
@@ -44,7 +45,7 @@ export function BoardRail({
   showBoard: (id: string) => void;
 }) {
   return (
-    <nav aria-label="Boards" className="flex min-w-0 flex-wrap items-center gap-1">
+    <nav aria-label={translate('Boards')} className="flex min-w-0 flex-wrap items-center gap-1">
       <button
         type="button"
         aria-current={allShown ? 'page' : undefined}
@@ -56,7 +57,8 @@ export function BoardRail({
           'flex items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-xs whitespace-nowrap hover:bg-muted',
           allShown && 'border-primary/60 bg-muted'
         )}>
-        <LayoutGrid className="size-3.5 shrink-0" /> All boards
+        <LayoutGrid className="size-3.5 shrink-0" />
+        {translate(' All boards ')}
       </button>
       {boards.map(({ board, nest }) => {
         const over = overRail && overRail !== 'new' && overRail.board === board.id ? overRail : null;
@@ -68,7 +70,7 @@ export function BoardRail({
             data-rail-drop={board.id}
             aria-label={boardLabel(board)}
             aria-current={board.id === selectedId && !allShown ? 'true' : undefined}
-            title={`${boardLabel(board)}: go to it, or drop a part on it`}
+            title={translate('{{value1}}: go to it, or drop a part on it', { value1: boardLabel(board) })}
             onClick={() => {
               onOpen(board.id);
               showBoard(board.id);
@@ -88,19 +90,25 @@ export function BoardRail({
               )}
             />
             {board.name}
-            {nest.unplaced.length > 0 && <span className="font-medium text-amber-600 dark:text-amber-400">{nest.unplaced.length} off</span>}
+            {nest.unplaced.length > 0 && (
+              <span className="font-medium text-amber-600 dark:text-amber-400">
+                {nest.unplaced.length}
+                {translate(' off')}
+              </span>
+            )}
           </button>
         );
       })}
       {dragging && (
         <div
           data-new-board-drop
-          aria-label="New board"
+          aria-label={translate('New board')}
           className={cn(
             'flex items-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground',
             overRail === 'new' && 'border-primary bg-primary/5 text-foreground'
           )}>
-          <Plus className="size-3" /> New board
+          <Plus className="size-3" />
+          {translate(' New board ')}
         </div>
       )}
     </nav>
@@ -131,14 +139,18 @@ export function SelectedBoardHead({
       ) : (
         <span className="whitespace-nowrap text-muted-foreground">
           {MATERIALS[selJob.board.material].name[0].toUpperCase() + MATERIALS[selJob.board.material].name.slice(1)}{' '}
-          {fmt(selJob.board.thickness)} mm · <span className="font-mono text-xs">{boardSizeLabel(selJob.board, selNest)}</span>
+          {fmt(selJob.board.thickness)}
+          {translate(' mm · ')}
+          <span className="font-mono text-xs">{boardSizeLabel(selJob.board, selNest)}</span>
         </span>
       )}
       <span className="truncate font-mono text-xs leading-4 text-muted-foreground" data-offcut-row>
         <span data-offcut-label>
-          {selOffcut ? `Offcut ${Math.round(selOffcut.w)} × ${Math.round(selOffcut.h)}` : 'No offcut over 60 mm'}
+          {selOffcut
+            ? translate('Offcut {{value1}} × {{value2}}', { value1: Math.round(selOffcut.w), value2: Math.round(selOffcut.h) })
+            : translate('No offcut over 60 mm')}
         </span>
-        {selNest.placements.length > 0 && ` · Yield ${Math.round(selNest.yield * 100)} %`}
+        {selNest.placements.length > 0 && translate(' · Yield {{value1}} %', { value1: Math.round(selNest.yield * 100) })}
       </span>
     </div>
   );
@@ -161,7 +173,12 @@ export function ArmedToolBar({
       data-armed-bar
       className="absolute top-24 left-1/2 z-20 flex max-w-[calc(100%-1rem)] -translate-x-1/2 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-background px-3 py-1.5 text-xs shadow-lg">
       <span className="whitespace-nowrap">
-        {tool === 'clamp' ? 'Click near an edge.' : tool === 'screw' ? 'Click in the waste.' : 'Click on a part’s outline.'} Esc to stop.
+        {tool === 'clamp'
+          ? translate('Click near an edge.')
+          : tool === 'screw'
+            ? translate('Click in the waste.')
+            : translate('Click on a part’s outline.')}
+        {translate(' Esc to stop. ')}
       </span>
       {tool !== 'tab' &&
         (tool === 'clamp'
@@ -189,13 +206,13 @@ export function ArmedToolBar({
                 className="h-6 w-14 px-1 text-right font-mono text-xs"
                 onCommit={value => holds.setNewSizes({ ...holds.newSizes, [tool]: { ...holds.newSizes[tool], [key]: value } })}
               />
-              mm
+              {translate('mm ')}
             </label>
           );
         })}
       {tool !== 'tab' && (
         <button type="button" className="whitespace-nowrap text-primary hover:underline" onClick={onHoldSizes}>
-          Clamp and screw sizes…
+          {translate('Clamp and screw sizes… ')}
         </button>
       )}
     </div>
@@ -224,31 +241,36 @@ export function DrawingControls({
         <PopoverTrigger asChild>
           <button
             type="button"
-            aria-label="What the drawing shows"
-            title="What the drawing shows"
+            aria-label={translate('What the drawing shows')}
+            title={translate('What the drawing shows')}
             className="rounded-md border bg-background/90 p-1.5 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground">
             <CircleHelp className="size-3.5" />
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" className="flex w-60 flex-col gap-1.5 text-xs text-muted-foreground">
           <span>
-            <span className="text-violet-500 dark:text-violet-400">■</span> part outline
+            <span className="text-violet-500 dark:text-violet-400">■</span>
+            {translate(' part outline ')}
           </span>
           <span>
-            <span className="text-violet-600 dark:text-violet-500">■</span> pocket
+            <span className="text-violet-600 dark:text-violet-500">■</span>
+            {translate(' pocket ')}
           </span>
           {boards.some(b => b.board.retention === 'tabs') && (
             <span>
-              <span className="text-amber-600 dark:text-amber-500">■</span> tab
+              <span className="text-amber-600 dark:text-amber-500">■</span>
+              {translate(' tab ')}
             </span>
           )}
           {anyHolds && (
             <>
               <span>
-                <span className="text-foreground">⊕</span> screw or clamp (drag to move, right-click for its menu)
+                <span className="text-foreground">⊕</span>
+                {translate(' screw or clamp (drag to move, right-click for its menu) ')}
               </span>
               <span>
-                <span className="text-red-500">▨</span> blocked for the bit
+                <span className="text-red-500">▨</span>
+                {translate(' blocked for the bit ')}
               </span>
             </>
           )}
@@ -257,8 +279,8 @@ export function DrawingControls({
       <div className="flex items-center gap-0.5 rounded-md border bg-background/90 p-0.5 shadow-sm">
         <button
           type="button"
-          aria-label="Zoom out"
-          title="Zoom out (Ctrl/⌘ + wheel)"
+          aria-label={translate('Zoom out')}
+          title={translate('Zoom out (Ctrl/⌘ + wheel)')}
           onClick={() => zoomTo(pxPerMm / 1.25)}
           className="rounded p-1 hover:bg-muted disabled:opacity-40">
           <Minus className="size-3.5" />
@@ -268,14 +290,19 @@ export function DrawingControls({
         </span>
         <button
           type="button"
-          aria-label="Zoom in"
-          title="Zoom in (Ctrl/⌘ + wheel)"
+          aria-label={translate('Zoom in')}
+          title={translate('Zoom in (Ctrl/⌘ + wheel)')}
           onClick={() => zoomTo(pxPerMm * 1.25)}
           disabled={pxPerMm >= kMaxScale}
           className="rounded p-1 hover:bg-muted disabled:opacity-40">
           <Plus className="size-3.5" />
         </button>
-        <button type="button" aria-label="Fit boards to view" title="Fit to view" onClick={showAll} className="rounded p-1 hover:bg-muted">
+        <button
+          type="button"
+          aria-label={translate('Fit boards to view')}
+          title={translate('Fit to view')}
+          onClick={showAll}
+          className="rounded p-1 hover:bg-muted">
           <Maximize className="size-3.5" />
         </button>
       </div>

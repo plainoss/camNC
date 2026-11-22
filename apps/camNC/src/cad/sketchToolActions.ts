@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { type Point, type SketchPoint, type Tool } from './cadEditorShared';
 import { initialCircularPatternParameters } from './circularPatternParameters';
 import {
@@ -143,7 +144,7 @@ export function chooseSketchTool(editor: SketchEditorInput, next: Tool) {
   if (next === 'line' && tool === 'arc' && contextualArc && lineContinuation && chain) {
     setTool('line');
     setContextualArc(false);
-    setMessage('Click the next line endpoint, or press A to continue with an arc.');
+    setMessage(translate('Click the next line endpoint, or press A to continue with an arc.'));
     svg.current?.focus();
     return;
   }
@@ -156,13 +157,13 @@ export function chooseSketchTool(editor: SketchEditorInput, next: Tool) {
     setConstraintMode(null);
     setDimension(null);
     setPalette(false);
-    setMessage('From the current endpoint: click the arc end, then a point on the arc.');
+    setMessage(translate('From the current endpoint: click the arc end, then a point on the arc.'));
     svg.current?.focus();
     return;
   }
   if (next === 'tangentArc' && tool === 'tangentArc') {
     setTool('line');
-    setMessage('Click the next line endpoint, or press Shift+A to continue with a tangent arc.');
+    setMessage(translate('Click the next line endpoint, or press Shift+A to continue with a tangent arc.'));
     svg.current?.focus();
     return;
   }
@@ -179,7 +180,7 @@ export function chooseSketchTool(editor: SketchEditorInput, next: Tool) {
       setPending([]);
       setChain(null);
       setLineContinuation(false);
-      setMessage('Click an endpoint of a line or arc, then click the tangent arc end.');
+      setMessage(translate('Click an endpoint of a line or arc, then click the tangent arc end.'));
       svg.current?.focus();
       return;
     }
@@ -188,7 +189,7 @@ export function chooseSketchTool(editor: SketchEditorInput, next: Tool) {
     setDimension(null);
     setPalette(false);
     setPending([{ x: anchor.point.x, y: anchor.point.y }]);
-    setMessage('Click the end of the tangent arc. The line tool resumes automatically.');
+    setMessage(translate('Click the end of the tangent arc. The line tool resumes automatically.'));
     svg.current?.focus();
     return;
   }
@@ -203,58 +204,77 @@ export function chooseSketchTool(editor: SketchEditorInput, next: Tool) {
   setDimension(null);
   setMessage(
     next === 'offset'
-      ? 'Select curves to offset. Type a distance or press Enter to edit; click to place. Shift-click adds curves.'
+      ? translate('Select curves to offset. Type a distance or press Enter to edit; click to place. Shift-click adds curves.')
       : next === 'mirror'
         ? selected.length
-          ? 'Select the mirror line.'
-          : 'Select entities, then choose Mirror line.'
+          ? translate('Select the mirror line.')
+          : translate('Select entities, then choose Mirror line.')
         : next === 'extend'
-          ? 'Select near the end to extend, then click its new end or a boundary.'
+          ? translate('Select near the end to extend, then click its new end or a boundary.')
           : next === 'select'
-            ? 'Click geometry to select. Drag to move. Shift-click adds to selection.'
+            ? translate('Click geometry to select. Drag to move. Shift-click adds to selection.')
             : isRectangleTool(next)
               ? rectanglePrompt(next)
               : next === 'inscribedPolygon' || next === 'circumscribedPolygon'
-                ? 'Click the center, set the construction circle, then choose 3–50 sides and click or press Enter.'
+                ? translate('Click the center, set the construction circle, then choose 3–50 sides and click or press Enter.')
                 : next === 'alignedRectangle'
-                  ? 'Click the first edge start and end, then the perpendicular extent.'
+                  ? translate('Click the first edge start and end, then the perpendicular extent.')
                   : next === 'ellipse'
-                    ? 'Click the center, then the first axis radius, then the second axis radius.'
+                    ? translate('Click the center, then the first axis radius, then the second axis radius.')
                     : next === 'threePointCircle'
-                      ? 'Click three points along the circle circumference.'
+                      ? translate('Click three points along the circle circumference.')
                       : next === 'circle'
-                        ? 'Click or drag from the center to a point on the circle. Or enter a radius below.'
+                        ? translate('Click or drag from the center to a point on the circle. Or enter a radius below.')
                         : next === 'centerPointArc'
-                          ? 'Click the arc center, start, then end. Move around the center to choose its sweep.'
+                          ? translate('Click the arc center, start, then end. Move around the center to choose its sweep.')
                           : next === 'arc'
-                            ? 'Click the start, end, then a point on the arc.'
+                            ? translate('Click the start, end, then a point on the arc.')
                             : next === 'point'
-                              ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
+                              ? translate('Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.')
                               : next === 'line'
-                                ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
+                                ? translate(
+                                    'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
+                                  )
                                 : next === 'slot'
-                                  ? 'Select source curves, set the slot diameter, then click empty space or press Enter. Select more paths to share the same width.'
+                                  ? translate(
+                                      'Select source curves, set the slot diameter, then click empty space or press Enter. Select more paths to share the same width.'
+                                    )
                                   : next === 'circularPattern'
-                                    ? 'Select geometry, then set instances, center and sweep. Drag the center or sweep handle; Enter or click empty space applies.'
+                                    ? translate(
+                                        'Select geometry, then set instances, center and sweep. Drag the center or sweep handle; Enter or click empty space applies.'
+                                      )
                                     : next === 'linearPattern'
-                                      ? 'Select geometry, then set instance counts, spacing and directions. Enter or click empty space applies; Escape cancels.'
+                                      ? translate(
+                                          'Select geometry, then set instance counts, spacing and directions. Enter or click empty space applies; Escape cancels.'
+                                        )
                                       : next === 'transform'
-                                        ? 'Select geometry, then drag the manipulator or enter translation, rotation and scale. Enter or click empty space applies; Escape cancels.'
+                                        ? translate(
+                                            'Select geometry, then drag the manipulator or enter translation, rotation and scale. Enter or click empty space applies; Escape cancels.'
+                                          )
                                         : next === 'split'
-                                          ? 'Click a curve to split it. Closed curves require two distinct split points.'
+                                          ? translate('Click a curve to split it. Closed curves require two distinct split points.')
                                           : next === 'trim'
-                                            ? 'Click an interval to trim between intersections or placed points.'
+                                            ? translate('Click an interval to trim between intersections or placed points.')
                                             : next === 'chamfer'
-                                              ? 'Select a shared corner or two adjacent lines, then enter both setback distances.'
+                                              ? translate(
+                                                  'Select a shared corner or two adjacent lines, then enter both setback distances.'
+                                                )
                                               : next === 'fillet'
-                                                ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
+                                                ? translate(
+                                                    'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
+                                                  )
                                                 : next === 'conic'
-                                                  ? 'Click the start, end, then control point. Enter rho to shape the conic.'
+                                                  ? translate('Click the start, end, then control point. Enter rho to shape the conic.')
                                                   : next === 'spline' || next === 'bezier'
-                                                    ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
+                                                    ? translate(
+                                                        'Click {{value1}} points. Double-click the last point or press Enter to finish.',
+                                                        { value1: next === 'spline' ? translate('fit') : translate('control') }
+                                                      )
                                                     : next === 'curveControlPoint'
-                                                      ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
-                                                      : 'Select a line, circle, point pair or existing dimension.'
+                                                      ? translate(
+                                                          'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
+                                                        )
+                                                      : translate('Select a line, circle, point pair or existing dimension.')
   );
   svg.current?.focus();
 }
@@ -345,9 +365,9 @@ export function addSketchShape(editor: SketchEditorInput, end?: Point) {
     }
   } else if (tool === 'circle') {
     const radiusValue = end ? null : parseCadValue(radius, { unit: 'mm', variables: variableScope });
-    if (radiusValue && 'error' in radiusValue) return setMessage(`Circle radius: ${radiusValue.error}`);
+    if (radiusValue && 'error' in radiusValue) return setMessage(translate('Circle radius: {{value1}}', { value1: radiusValue.error }));
     const r = end ? Math.hypot(end.x - start.x, end.y - start.y) : radiusValue!.value;
-    if (!Number.isFinite(r) || r < 0.1) return setMessage('Radius must be greater than zero.');
+    if (!Number.isFinite(r) || r < 0.1) return setMessage(translate('Radius must be greater than zero.'));
     next = addCircle(sketch, { ...start, radius: r, construction, dimensioned: end === undefined });
     if (!end && radiusValue?.expression) sizeExpressions.Diameter = `2*(${radiusValue.expression})`;
   } else if (tool === 'line' && end) {
@@ -365,7 +385,7 @@ export function addSketchShape(editor: SketchEditorInput, end?: Point) {
     }
   } else if (tool === 'tangentArc' && anchor && end) {
     const arc = tangentArcFrom(anchor.point, anchor.tangent, end);
-    if (!arc) return setMessage('Choose an arc endpoint away from its tangent line.');
+    if (!arc) return setMessage(translate('Choose an arc endpoint away from its tangent line.'));
     next = addArc(sketch, { ...arc, construction });
     const created = next.entities.at(-1);
     if (created?.type === 'arc') {
@@ -374,11 +394,11 @@ export function addSketchShape(editor: SketchEditorInput, end?: Point) {
       continued = { pointId: endId, curveId: created.id };
     }
     setTool('line');
-    setMessage('Click the next line endpoint, or Shift+A for another tangent arc.');
+    setMessage(translate('Click the next line endpoint, or Shift+A for another tangent arc.'));
   } else if (tool === 'conic' && pending[1] && end) {
     try {
       const parsedRho = parseCadValue(rho, { unit: 'scalar' });
-      if ('error' in parsedRho) return setMessage(`Conic rho: ${parsedRho.error}`);
+      if ('error' in parsedRho) return setMessage(translate('Conic rho: {{value1}}', { value1: parsedRho.error }));
       next = addConic(sketch, { start, end: pending[1], control: end, rho: parsedRho.value, construction });
     } catch (error) {
       return setMessage(error instanceof Error ? error.message : String(error));
@@ -397,7 +417,7 @@ export function addSketchShape(editor: SketchEditorInput, end?: Point) {
     }
   } else if (tool === 'arc' && pending[1] && end) {
     const arc = threePointArc(start, pending[1], end);
-    if (!arc || arc.radius < 0.1) return setMessage('Three points on the arc must not lie on one straight line.');
+    if (!arc || arc.radius < 0.1) return setMessage(translate('Three points on the arc must not lie on one straight line.'));
     next = addArc(sketch, { ...arc, construction });
     if (contextualArc) {
       const created = next.entities.at(-1);
@@ -447,10 +467,11 @@ export function addSketchShape(editor: SketchEditorInput, end?: Point) {
       setRho(String(curve.rho));
     }
   }
-  if (polygonTool) setMessage('Click the center, set the construction circle, then choose 3–50 sides and click or press Enter.');
-  if (tool === 'threePointCircle') setMessage('Click three points along the circle circumference.');
-  if (tool === 'centerPointArc') setMessage('Click the arc center, start, then end. Move around the center to choose its sweep.');
-  if (tool === 'alignedRectangle') setMessage('Click the first edge start and end, then the perpendicular extent.');
+  if (polygonTool) setMessage(translate('Click the center, set the construction circle, then choose 3–50 sides and click or press Enter.'));
+  if (tool === 'threePointCircle') setMessage(translate('Click three points along the circle circumference.'));
+  if (tool === 'centerPointArc')
+    setMessage(translate('Click the arc center, start, then end. Move around the center to choose its sweep.'));
+  if (tool === 'alignedRectangle') setMessage(translate('Click the first edge start and end, then the perpendicular extent.'));
   setDrawingCue(null);
   setSnapCue(null);
   setChain(continued);

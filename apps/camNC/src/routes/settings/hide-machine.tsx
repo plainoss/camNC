@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { PageHeader } from '@/components/page-header';
 import { isDepthBlendSupported } from '@/depth/depthBlendManager';
 import { useDepthSettings, useSetDepthSettings } from '@/store/store';
@@ -21,12 +22,12 @@ function HideMachineComponent() {
 }
 
 const fpsOptions: { label: string; value: number }[] = [
-  { label: 'Every 5 s', value: 0.2 },
-  { label: 'Every 2 s', value: 0.5 },
-  { label: '1 fps', value: 1 },
-  { label: '2 fps', value: 2 },
-  { label: '5 fps', value: 5 },
-  { label: '10 fps', value: 10 },
+  { label: translate('Every 5 s'), value: 0.2 },
+  { label: translate('Every 2 s'), value: 0.5 },
+  { label: translate('1 fps'), value: 1 },
+  { label: translate('2 fps'), value: 2 },
+  { label: translate('5 fps'), value: 5 },
+  { label: translate('10 fps'), value: 10 },
 ];
 
 const defaultSettings = {
@@ -58,7 +59,7 @@ function HideMachineSettings() {
 
   function onSubmit(data: z.infer<typeof schema>) {
     setDepthSettings(data);
-    toast.success('Depth settings saved');
+    toast.success(translate('Depth settings saved'));
   }
 
   function handleReset() {
@@ -67,23 +68,24 @@ function HideMachineSettings() {
 
   return (
     <div className="w-full h-full">
-      <PageHeader title="Hide-Machine Settings" />
+      <PageHeader title={translate('Hide-Machine Settings')} />
       <div className="container mx-auto max-w-xl py-6 space-y-6">
         <ClientOnly>
           {!isDepthBlendSupported() && (
             <Alert variant="destructive">
-              <AlertTitle>WebGPU not supported</AlertTitle>
-              <AlertDescription>This feature requires WebGPU, which is not supported by your browser yet.</AlertDescription>
+              <AlertTitle>{translate('WebGPU not supported')}</AlertTitle>
+              <AlertDescription>{translate('This feature requires WebGPU, which is not supported by your browser yet.')}</AlertDescription>
             </Alert>
           )}
         </ClientOnly>
         <p className="text-sm text-muted-foreground">
-          This experimental feature estimates monocular depth using the Depth&nbsp;Anything V2 model to mask objects above the work surface
-          and &quot;hide&quot; the machine (only tested with the{' '}
+          {translate(
+            'This experimental feature estimates monocular depth using the Depth Anything V2 model to mask objects above the work surface and "hide" the machine (only tested with the'
+          )}{' '}
           <a href="https://docs.v1e.com/lowrider/" target="_blank" rel="noreferrer" className="underline">
-            LowRider V4 beam
+            {translate('LowRider V4 beam ')}
           </a>
-          ). The algorithm assumes the largest depth cluster is the table and masks everything above a configurable offset.
+          {translate('). The algorithm assumes the largest depth cluster is the table and masks everything above a configurable offset. ')}
         </p>
 
         <Form {...form}>
@@ -94,7 +96,7 @@ function HideMachineSettings() {
               name="frameRateLimit"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Depth Estimation Interval</FormLabel>
+                  <FormLabel>{translate('Depth Estimation Interval')}</FormLabel>
                   <FormControl>
                     <Select value={field.value.toString()} onValueChange={v => field.onChange(parseFloat(v))}>
                       <SelectTrigger className="w-full">
@@ -109,7 +111,7 @@ function HideMachineSettings() {
                       </SelectContent>
                     </Select>
                   </FormControl>
-                  <FormDescription>Throttle frame rate to reduce (GPU) load</FormDescription>
+                  <FormDescription>{translate('Throttle frame rate to reduce (GPU) load')}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -123,7 +125,7 @@ function HideMachineSettings() {
                 <FormItem>
                   <FormControl>
                     <Slider
-                      label="Background Mask Margin"
+                      label={translate('Background Mask Margin')}
                       value={field.value}
                       onChange={v => field.onChange(v)}
                       minValue={0}
@@ -132,7 +134,7 @@ function HideMachineSettings() {
                     />
                   </FormControl>
                   <FormDescription>
-                    Margin to add around mask when computing background to avoid artifacts from shadows etc.
+                    {translate('Margin to add around mask when computing background to avoid artifacts from shadows etc. ')}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -147,7 +149,7 @@ function HideMachineSettings() {
                 <FormItem>
                   <FormControl>
                     <Slider
-                      label="Render Mask Margin"
+                      label={translate('Render Mask Margin')}
                       value={field.value}
                       onChange={v => field.onChange(v)}
                       minValue={0}
@@ -155,7 +157,9 @@ function HideMachineSettings() {
                       step={1}
                     />
                   </FormControl>
-                  <FormDescription>Margin to add around mask when rendering to avoid artifacts from edges of the mask.</FormDescription>
+                  <FormDescription>
+                    {translate('Margin to add around mask when rendering to avoid artifacts from edges of the mask.')}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -169,7 +173,7 @@ function HideMachineSettings() {
                 <FormItem>
                   <FormControl>
                     <Slider
-                      label="Minimum Mask Opacity"
+                      label={translate('Minimum Mask Opacity')}
                       value={field.value}
                       onChange={v => field.onChange(v)}
                       minValue={0}
@@ -177,7 +181,7 @@ function HideMachineSettings() {
                       step={0.01}
                     />
                   </FormControl>
-                  <FormDescription>Machine will always be visible with at least this opacity.</FormDescription>
+                  <FormDescription>{translate('Machine will always be visible with at least this opacity.')}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -191,7 +195,7 @@ function HideMachineSettings() {
                 <FormItem>
                   <FormControl>
                     <Slider
-                      label="Relative Offset Above Table to Mask"
+                      label={translate('Relative Offset Above Table to Mask')}
                       value={field.value}
                       onChange={v => field.onChange(v)}
                       minValue={0}
@@ -205,9 +209,9 @@ function HideMachineSettings() {
             />
 
             <div className="flex gap-2">
-              <Button type="submit">Save</Button>
+              <Button type="submit">{translate('Save')}</Button>
               <Button type="button" variant="secondary" onClick={handleReset}>
-                Reset to Defaults
+                {translate('Reset to Defaults ')}
               </Button>
             </div>
           </form>

@@ -1,12 +1,13 @@
+import { t as translate } from '@wbcnc/i18n';
 import { parseConnectionString, RtcConnectionParams } from '@wbcnc/go2webrtc/url-helpers';
 
 const kSourceLabels: Record<string, string> = {
-  rtsp: 'network camera',
+  rtsp: translate('network camera'),
   go2rtc: 'go2rtc',
   webtorrent: 'go2rtc (webtorrent)',
   webrtc: 'phone',
   webcam: 'webcam',
-  url: 'video URL',
+  url: translate('video URL'),
 };
 
 function sourceType(url: string) {
@@ -39,7 +40,7 @@ function hostOf(url: string) {
 export function suggestCameraName(params: RtcConnectionParams): string {
   switch (params.type) {
     case 'rtsp':
-      return `Network camera ${hostOf(params.url) ?? ''}`.trim();
+      return translate('Network camera {{value1}}', { value1: hostOf(params.url) ?? '' }).trim();
     case 'webcam':
       return 'Webcam';
     case 'webrtc':

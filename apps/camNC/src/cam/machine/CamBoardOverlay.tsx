@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { isJobOfToolpath } from '@/lib/machine/jobs';
 import { useStore } from '@/store/store';
@@ -98,22 +99,38 @@ export function CamBoardOverlay() {
             <meshBasicMaterial color={kTab} transparent opacity={past(t) ? 0.35 : 1} />
           </mesh>
         ))}
-        {next && <Label at={next.at} text={`Next: tab ${next.index} of ${overlay.tabs!.length}`} tone="tab" />}
+        {next && (
+          <Label
+            at={next.at}
+            text={translate('Next: tab {{value1}} of {{value2}}', { value1: next.index, value2: overlay.tabs!.length })}
+            tone="tab"
+          />
+        )}
         {firstOfPart && (
           <Label
             at={firstOfPart.at}
-            text={perPart.paused ? `① Take out ${cutting}` : `Cutting ${cutting}’s tabs, then take it out`}
+            text={
+              perPart.paused
+                ? translate('① Take out {{cutting}}', { cutting: cutting })
+                : translate('Cutting {{cutting}}’s tabs, then take it out', { cutting: cutting })
+            }
             tone="tab"
             big={perPart.paused}
           />
         )}
-        {firstOfNext && <Label at={firstOfNext.at} text={`② Next: ${nextTabPart}`} tone="hold" big />}
+        {firstOfNext && (
+          <Label at={firstOfNext.at} text={translate('② Next: {{nextTabPart}}', { nextTabPart: nextTabPart })} tone="hold" big />
+        )}
         {freeing && (
           <>
             <Ring at={freeing.at} tone={perPart.paused ? 'tab' : 'hold'} />
             <Label
               at={{ x: freeing.at.x + 18, y: freeing.at.y }}
-              text={perPart.paused ? `① Take out ${freeing.name}` : `Freeing ${freeing.name}: hold it down`}
+              text={
+                perPart.paused
+                  ? translate('① Take out {{value1}}', { value1: freeing.name })
+                  : translate('Freeing {{value1}}: hold it down', { value1: freeing.name })
+              }
               tone={perPart.paused ? 'tab' : 'hold'}
               big={perPart.paused}
             />
@@ -122,13 +139,18 @@ export function CamBoardOverlay() {
         {nextFree && (
           <>
             <Ring at={nextFree.at} tone="hold" />
-            <Label at={{ x: nextFree.at.x + 18, y: nextFree.at.y }} text={`② Hold ${nextFree.name} next`} tone="hold" big />
+            <Label
+              at={{ x: nextFree.at.x + 18, y: nextFree.at.y }}
+              text={translate('② Hold {{value1}} next', { value1: nextFree.name })}
+              tone="hold"
+              big
+            />
           </>
         )}
         {next && (
           <>
             <Ring at={next.hold} tone="hold" />
-            <Label at={{ x: next.hold.x + 18, y: next.hold.y }} text="Hold here" tone="hold" />
+            <Label at={{ x: next.hold.x + 18, y: next.hold.y }} text={translate('Hold here')} tone="hold" />
           </>
         )}
       </group>

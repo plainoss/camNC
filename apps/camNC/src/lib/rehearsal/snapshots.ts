@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { startOverBoard, type BoardV1 } from '@/cam/boards';
 import type { CuttingData } from '@/cam/cuttingData';
 import type { CamJobV1 } from '@/cam/jobDb';
@@ -59,7 +60,7 @@ async function withSnapshots<T>(mode: IDBTransactionMode, run: (store: IDBObject
       const tx = db.transaction('snapshots', mode);
       const req = run(tx.objectStore('snapshots'));
       tx.oncomplete = () => resolve(req.result);
-      tx.onabort = () => reject(tx.error ?? new Error('Rehearsal could not be saved.'));
+      tx.onabort = () => reject(tx.error ?? new Error(translate('Rehearsal could not be saved.')));
       tx.onerror = () => reject(tx.error);
     });
   } finally {
@@ -90,7 +91,7 @@ export async function loadSnapshot(id: string, now = Date.now()): Promise<Rehear
     !s.cutting ||
     !Array.isArray(s.job.boards)
   ) {
-    throw new Error('This rehearsal has expired or is unavailable. Start a new one from your CAM plan.');
+    throw new Error(translate('This rehearsal has expired or is unavailable. Start a new one from your CAM plan.'));
   }
   return s;
 }

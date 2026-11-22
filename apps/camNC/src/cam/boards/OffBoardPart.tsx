@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { DropdownMenu, DropdownMenuTrigger } from '@wbcnc/ui/components/dropdown-menu';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { MoreHorizontal } from 'lucide-react';
@@ -48,7 +49,7 @@ export function OffBoardPart({
       <svg
         role="button"
         tabIndex={0}
-        aria-label={`${inst.name}: off the board, won’t be cut. Drag it onto a board; Enter opens its menu`}
+        aria-label={translate('{{value1}}: off the board, won’t be cut. Drag it onto a board; Enter opens its menu', { value1: inst.name })}
         data-item={inst.id}
         data-unplaced={inst.name}
         viewBox={`0 ${-r.h} ${r.w} ${r.h}`}
@@ -90,7 +91,7 @@ export function OffBoardPart({
           <DropdownMenu modal={false} open={menuOpen} onOpenChange={onMenuOpen}>
             <DropdownMenuTrigger asChild>
               <button
-                aria-label={`${inst.name} menu`}
+                aria-label={translate('{{value1}} menu', { value1: inst.name })}
                 onPointerDown={e => e.stopPropagation()}
                 className="rounded-full border bg-background px-1 text-muted-foreground shadow-sm hover:text-foreground">
                 <MoreHorizontal className="size-3.5" />

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cadDatumFrame, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { physicalFaceFrame as cadFaceFrame } from './studioGeometryReaders';
 import type { ViewPlane } from '@/cam/model/ModelViewport';
@@ -6,9 +7,9 @@ import type { ViewPlane } from '@/cam/model/ModelViewport';
 export type BasePlane = 'top' | 'front' | 'right';
 
 export const kBasePlanes: { plane: BasePlane; label: string }[] = [
-  { plane: 'top', label: 'Top' },
-  { plane: 'front', label: 'Front' },
-  { plane: 'right', label: 'Right' },
+  { plane: 'top', label: translate('Top') },
+  { plane: 'front', label: translate('Front') },
+  { plane: 'right', label: translate('Right') },
 ];
 
 export const isBasePlane = (id: string): id is BasePlane => kBasePlanes.some(({ plane }) => plane === id);

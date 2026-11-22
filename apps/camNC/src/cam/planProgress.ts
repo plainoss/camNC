@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { create } from 'zustand';
 
 /** A board being planned: how far it got, and when it started (`performance.now()`). */
@@ -43,8 +44,8 @@ export function secondsLeft({ fraction, startedAt }: PlanProgress, now: number):
 
 /** "about 40 s left", in steps that don't flicker: whole seconds under 10, then 5 s, then minutes. */
 export function timeLeftText(seconds: number): string {
-  if (seconds < 1.5) return 'almost done';
+  if (seconds < 1.5) return translate('almost done');
   if (seconds < 10) return `about ${Math.round(seconds)} s left`;
   if (seconds < 60) return `about ${Math.round(seconds / 5) * 5} s left`;
-  return `about ${Math.round(seconds / 60)} min left`;
+  return translate('about {{value1}} min left', { value1: Math.round(seconds / 60) });
 }

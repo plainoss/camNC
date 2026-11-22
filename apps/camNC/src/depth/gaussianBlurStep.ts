@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 // No external imports required – WebGPU types are global in TS.
 
 /**
@@ -29,7 +30,7 @@ export class GaussianBlurStep {
   private dstTex: GPUTexture | null = null;
 
   constructor(device: GPUDevice, radius: number = 7, sigma: number = 4.0) {
-    if (radius < 1 || radius > 32) throw new Error('GaussianBlurStep radius must be between 1 and 32');
+    if (radius < 1 || radius > 32) throw new Error(translate('GaussianBlurStep radius must be between 1 and 32'));
     this.device = device;
     this.radius = Math.floor(radius);
     this.sigma = sigma;

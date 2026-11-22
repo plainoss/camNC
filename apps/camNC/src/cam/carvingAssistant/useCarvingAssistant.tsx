@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CamJobV1 } from '../jobDb';
 import { nativeImageFromConnection } from '../../cad/assistant/modelDefaults';
@@ -127,7 +128,7 @@ export function useCarvingAssistant({
         svg: saved.sourceSvg,
         prompt: saved.prompt,
         summary: saved.summary,
-        title: 'Saved artwork',
+        title: translate('Saved artwork'),
         rasterPreview: saved.sourceRaster,
         warnings: saved.warnings,
       },
@@ -157,7 +158,8 @@ export function useCarvingAssistant({
       if (abort.signal.aborted || !mounted.current || latest.current.key !== forKey) return;
       setVariants(list => list.map(item => (item.id === variant.id ? { ...item, result } : item)));
     } catch (cause) {
-      if (!abort.signal.aborted && mounted.current) setError(cause instanceof Error ? cause.message : 'Unable to prepare this artwork.');
+      if (!abort.signal.aborted && mounted.current)
+        setError(cause instanceof Error ? cause.message : translate('Unable to prepare this artwork.'));
     } finally {
       if (preparation.current === abort) {
         preparation.current = null;
@@ -216,7 +218,7 @@ export function useCarvingAssistant({
   const generate = async (refine: boolean) => {
     const using = credentialsFor();
     if (!using || !prompt.trim() || generation.current || disabled) {
-      if (!using) setError('Connect an AI provider first.');
+      if (!using) setError(translate('Connect an AI provider first.'));
       return;
     }
     const n = refine ? 1 : count;
@@ -229,7 +231,7 @@ export function useCarvingAssistant({
     setVariants(list => [...ids.map(id => ({ id, status: 'generating' as const })), ...list].slice(0, kMaxVariants));
     setGenerating(true);
     setError('');
-    setStatus(n > 1 ? `Generating ${n} variants…` : 'Generating artwork…');
+    setStatus(n > 1 ? `Generating ${n} variants…` : translate('Generating artwork…'));
     const one = async (id: string, index: number) => {
       const options: CarvingGenerationOptions = {
         prompt: variantBrief(prompt, style, index, n),
@@ -260,7 +262,7 @@ export function useCarvingAssistant({
         setPicked(was => (refine ? id : (was ?? id)));
       } catch (cause) {
         if (abort.signal.aborted || !mounted.current) return;
-        const message = redact(cause instanceof Error ? cause.message : 'The artwork could not be generated.');
+        const message = redact(cause instanceof Error ? cause.message : translate('The artwork could not be generated.'));
         setVariants(list => list.map(item => (item.id === id ? { id, status: 'failed', error: message } : item)));
         setError(message);
       }
@@ -275,7 +277,7 @@ export function useCarvingAssistant({
         generation.current = null;
         if (mounted.current) {
           setGenerating(false);
-          setStatus(abort.signal.aborted ? 'Stopped. No artwork was applied.' : '');
+          setStatus(abort.signal.aborted ? translate('Stopped. No artwork was applied.') : '');
         }
       }
     }
@@ -286,7 +288,7 @@ export function useCarvingAssistant({
     setVariants(list => list.filter(item => item.status !== 'generating'));
     setGenerating(false);
     setPreparing(false);
-    setStatus('Stopped. No artwork was applied.');
+    setStatus(translate('Stopped. No artwork was applied.'));
   };
   const importPng = async (file: File) => {
     if (generation.current || disabled) return;
@@ -294,7 +296,7 @@ export function useCarvingAssistant({
     generation.current = abort;
     setGenerating(true);
     setError('');
-    setStatus('Tracing the image on this device…');
+    setStatus(translate('Tracing the image on this device…'));
     const constraints = { widthMm: target.w, heightMm: target.h, detail, minFeatureMm: carvingDetailMm[detail] };
     try {
       const png = await carvingPngFromImage(file);
@@ -313,7 +315,7 @@ export function useCarvingAssistant({
       setStatus('');
     } catch (cause) {
       if (!abort.signal.aborted && mounted.current)
-        setError(cause instanceof Error ? cause.message : 'The PNG image could not be imported.');
+        setError(cause instanceof Error ? cause.message : translate('The PNG image could not be imported.'));
     } finally {
       if (generation.current === abort) {
         generation.current = null;
@@ -329,7 +331,7 @@ export function useCarvingAssistant({
       // The Carve step confirms the edit, with its Undo, as it closes the panel.
       setStatus('');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The proposal could not be applied.');
+      setError(cause instanceof Error ? cause.message : translate('The proposal could not be applied.'));
     }
   };
   const discard = (id: string) => {
@@ -375,7 +377,7 @@ export function useCarvingAssistant({
       available: !!selected,
       on: mode === 'replace',
       set: setReplace,
-      name: selected && selected.art.kind === 'svg' ? selected.art.fileName : 'the selected item',
+      name: selected && selected.art.kind === 'svg' ? selected.art.fileName : translate('the selected item'),
     },
     detail,
     setDetail,

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { PageHeader } from '@/components/page-header';
 import { Array9, matrix3ToRowMajor } from '@/lib/three-plain';
 import { ICamSource, useCamSource, useStore } from '@/store/store';
@@ -49,7 +50,7 @@ const schema = z.object({
       } catch {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Invalid calibration data',
+          message: translate('Invalid calibration data'),
         });
       }
     })
@@ -109,16 +110,16 @@ function CalibrationSettingsForm() {
     if (camSource) {
       setCalibration({ name: camSource.name, url: camSource.url, maxResolution: camSource.maxResolution, ...json });
     } else {
-      toast.error('No camera source configured yet, cannot save');
+      toast.error(translate('No camera source configured yet, cannot save'));
     }
   }
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <p className="text-sm text-muted-foreground">
-          The active camera&apos;s calibration as JSON. To move your setup to another computer or app, use{' '}
+          {translate("The active camera's calibration as JSON. To move your setup to another computer or app, use")}{' '}
           <Link to="/settings/backup" className="underline">
-            Backup &amp; Restore
+            {translate('Backup & Restore ')}
           </Link>
           .
         </p>
@@ -127,7 +128,7 @@ function CalibrationSettingsForm() {
           name="json"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Camera Source Configuration</FormLabel>
+              <FormLabel>{translate('Camera Source Configuration')}</FormLabel>
               <FormControl>
                 <Textarea {...field} />
               </FormControl>
@@ -136,7 +137,7 @@ function CalibrationSettingsForm() {
           )}
         />
 
-        <Button type="submit">Save</Button>
+        <Button type="submit">{translate('Save')}</Button>
       </form>
     </Form>
   );
@@ -145,7 +146,7 @@ function CalibrationSettingsForm() {
 function RouteComponent() {
   return (
     <div className="w-full h-full">
-      <PageHeader title="Edit Settings" />
+      <PageHeader title={translate('Edit Settings')} />
       <div className="flex justify-center p-1 flex-row">
         <Card className="w-full max-w-xl">
           <CardContent>

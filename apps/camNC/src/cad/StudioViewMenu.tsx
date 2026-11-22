@@ -1,9 +1,10 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef, useState } from 'react';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
 import type { StudioCameraRef, StudioCameraState } from './studioCamera';
 import './studioViewMenu.css';
 
-const kUnsupported = 'Not available yet';
+const kUnsupported = translate('Not available yet');
 type Camera = NonNullable<ViewRequest['camera']>;
 interface NamedView {
   name: string;
@@ -87,24 +88,24 @@ export function StudioViewMenu({
   return (
     <>
       <div className="cad-view-menu" ref={menu}>
-        <button type="button" aria-label="View menu" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <button type="button" aria-label={translate('View menu')} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
           ▾
         </button>
         {open && (
-          <div role="menu" aria-label="View menu">
+          <div role="menu" aria-label={translate('View menu')}>
             {item('Isometric', () => go({ name: 'iso', direction: [1, -1, 1] }))}
             {item('Dimetric', () => go({ name: 'iso', direction: [1, -1, 0.8] }))}
             {item('Trimetric', () => go({ name: 'iso', direction: [0.8, -1, 0.6] }))}
-            {item('Graphics preferences…')}
-            {item('Named views…', () => {
+            {item(translate('Graphics preferences…'))}
+            {item(translate('Named views…'), () => {
               setPanel(true);
               setOpen(false);
             })}
-            {item('Previous view', previous ? () => go({ name: 'fit', camera: previous }) : undefined)}
-            {item('Zoom to fit', () => go({ name: 'fit' }))}
-            {item('Zoom to window')}
+            {item(translate('Previous view'), previous ? () => go({ name: 'fit', camera: previous }) : undefined)}
+            {item(translate('Zoom to fit'), () => go({ name: 'fit' }))}
+            {item(translate('Zoom to window'))}
             {item(
-              'Perspective view',
+              translate('Perspective view'),
               onPerspective &&
                 (() => {
                   onPerspective(!perspective);
@@ -112,40 +113,40 @@ export function StudioViewMenu({
                 }),
               !!perspective
             )}
-            {item('Orient normal to…')}
-            {item('Shaded with edges', undefined, true)}
-            {item('Hidden edges removed', undefined, true)}
-            {item('Tangent edges visible', undefined, true)}
-            {item('View in high quality')}
-            {item('Highlight boundary edges')}
+            {item(translate('Orient normal to…'))}
+            {item(translate('Shaded with edges'), undefined, true)}
+            {item(translate('Hidden edges removed'), undefined, true)}
+            {item(translate('Tangent edges visible'), undefined, true)}
+            {item(translate('View in high quality'))}
+            {item(translate('Highlight boundary edges'))}
             {section?.active ? (
               <>
-                {item('Edit section view…', section.enabled ? () => (section.edit(), setOpen(false)) : undefined)}
-                {item('Turn off section view', () => (section.turnOff(), setOpen(false)))}
+                {item(translate('Edit section view…'), section.enabled ? () => (section.edit(), setOpen(false)) : undefined)}
+                {item(translate('Turn off section view'), () => (section.turnOff(), setOpen(false)))}
               </>
             ) : (
-              item('Section view…', section?.enabled ? () => (section.start(), setOpen(false)) : undefined)
+              item(translate('Section view…'), section?.enabled ? () => (section.start(), setOpen(false)) : undefined)
             )}
           </div>
         )}
       </div>
       {panel && (
-        <section className="cad-named-views" role="dialog" aria-label="Named views">
+        <section className="cad-named-views" role="dialog" aria-label={translate('Named views')}>
           <header>
-            <strong>Named views</strong>
+            <strong>{translate('Named views')}</strong>
             <span>
-              <button type="button" aria-label="Help" title={kUnsupported} disabled>
+              <button type="button" aria-label={translate('Help')} title={kUnsupported} disabled>
                 ?
               </button>
-              <button type="button" aria-label="Close" onClick={() => setPanel(false)}>
+              <button type="button" aria-label={translate('Close')} onClick={() => setPanel(false)}>
                 ✕
               </button>
             </span>
           </header>
           <div className="cad-named-views-row">
             <input
-              aria-label="New view name"
-              placeholder="New view name"
+              aria-label={translate('New view name')}
+              placeholder={translate('New view name')}
               value={name}
               // Typed here, view shortcuts are only letters.
               onKeyDown={event => {
@@ -154,14 +155,14 @@ export function StudioViewMenu({
               }}
               onChange={event => setName(event.target.value)}
             />
-            <button type="button" aria-label="Save view" disabled={!name.trim()} onClick={save}>
+            <button type="button" aria-label={translate('Save view')} disabled={!name.trim()} onClick={save}>
               +
             </button>
           </div>
           {views.length ? (
             <div className="cad-named-views-row">
               <select
-                aria-label="Saved views"
+                aria-label={translate('Saved views')}
                 value={picked}
                 onChange={event => {
                   const view = views.find(candidate => candidate.name === event.target.value);
@@ -169,7 +170,7 @@ export function StudioViewMenu({
                   if (view) go({ name: 'fit', camera: view.camera });
                 }}>
                 <option value="" disabled>
-                  Select a view
+                  {translate('Select a view ')}
                 </option>
                 {views.map(view => (
                   <option key={view.name} value={view.name}>
@@ -177,12 +178,12 @@ export function StudioViewMenu({
                   </option>
                 ))}
               </select>
-              <button type="button" aria-label="Manage view" title={kUnsupported} disabled={!picked}>
+              <button type="button" aria-label={translate('Manage view')} title={kUnsupported} disabled={!picked}>
                 ⚙
               </button>
             </div>
           ) : (
-            <p>No views created</p>
+            <p>{translate('No views created')}</p>
           )}
         </section>
       )}

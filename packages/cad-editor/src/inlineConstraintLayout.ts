@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   constraintEntityIds,
   originId,
@@ -34,18 +35,18 @@ const wrap = (a: number) => ((a % tau) + tau) % tau;
 const midpoint = (a: CadPoint, b: CadPoint) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 const distance = (a: CadPoint, b: CadPoint) => Math.hypot(a.x - b.x, a.y - b.y);
 const labels: Record<InlineConstraintKind, string> = {
-  regularPolygon: 'Regular polygon',
-  linearPattern: 'Linear pattern',
-  circularPattern: 'Circular pattern',
+  regularPolygon: translate('Regular polygon'),
+  linearPattern: translate('Linear pattern'),
+  circularPattern: translate('Circular pattern'),
   slot: 'Slot',
   horizontal: 'Horizontal',
   horizontalPoints: 'Horizontal',
   vertical: 'Vertical',
   verticalPoints: 'Vertical',
   coincident: 'Coincident',
-  pointOnLine: 'Point on line',
-  pointOnCircle: 'Point on circle',
-  pointOnCurve: 'Point on curve',
+  pointOnLine: translate('Point on line'),
+  pointOnCircle: translate('Point on circle'),
+  pointOnCurve: translate('Point on curve'),
   midpoint: 'Midpoint',
   tangent: 'Tangent',
   equal: 'Equal',
@@ -53,7 +54,7 @@ const labels: Record<InlineConstraintKind, string> = {
   perpendicular: 'Perpendicular',
   symmetricPoints: 'Symmetric',
   symmetricCurves: 'Symmetric',
-  fix: 'Fixed point',
+  fix: translate('Fixed point'),
 };
 
 export const fixedConstraintId = (pointId: string) => `fix:${pointId}`;

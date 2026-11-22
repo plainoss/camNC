@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { PageHeader } from '@/components/page-header';
 import { CamPage } from '@/cam/CamPage';
 import { CamJobBar } from '@/cam/CamJobBar';
@@ -62,8 +63,8 @@ function CarveStep() {
   const { jobId } = useParams({ from: '/cam/$jobId/carve' });
   const { data: job, isPending } = useCamJob(jobId);
   if (isPending) return <Shell loading="Opening the carving…" />;
-  if (!job) return <Shell message="This job doesn't exist (any more)." />;
-  if (!job.carving) return <Shell message="This job is not a carving." />;
+  if (!job) return <Shell message={translate("This job doesn't exist (any more).")} />;
+  if (!job.carving) return <Shell message={translate('This job is not a carving.')} />;
   return <CarveEditor key={job.id} job={job} carving={job.carving} board={job.boards?.[0]} />;
 }
 
@@ -188,9 +189,9 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     // Done: the board gets its room back, with the new artwork selected and one step to take it back.
     assistant.setOpen(false);
     const entry = history.current.at(-1);
-    addedToast.current = toast(proposal.mode === 'replace' ? 'Artwork replaced' : 'Artwork added', {
+    addedToast.current = toast(proposal.mode === 'replace' ? translate('Artwork replaced') : translate('Artwork added'), {
       action: {
-        label: 'Undo',
+        label: translate('Undo'),
         // Only while this edit is still the latest: never another edit's, nor after leaving the step.
         onClick: () => {
           if (mounted.current && history.current.at(-1) === entry) undoLatest.current?.();
@@ -496,9 +497,10 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   // A file that couldn't be added is reported, but doesn't stop the items already there from being planned.
   const { adding: addError, ...itemErrors } = errors;
   const error = Object.values(itemErrors).find(Boolean);
-  const problem = error ?? generatedCarvingProblem(job) ?? (board ? carvingProblem(carving, board) : 'This carving has no board.');
+  const problem =
+    error ?? generatedCarvingProblem(job) ?? (board ? carvingProblem(carving, board) : translate('This carving has no board.'));
   const flatBit = (job.plan ?? kDefaultPlan).bit;
-  const flatBitName = flatBit.name ?? `⌀${flatBit.diameter} flat bit`;
+  const flatBitName = flatBit.name ?? translate('⌀{{value1}} flat bit', { value1: flatBit.diameter });
   // One side panel at a time, opened from the board's toolbar; the assistant keeps its own open state for its session.
   const shownPanel: CarvePanel | null = assistant.open ? 'assistant' : panel;
   const panelRef = useRef<HTMLElement>(null);
@@ -532,7 +534,8 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
         actions={
           <Button asChild size="sm" disabled={!!problem || outlining}>
             <Link to="/cam/$jobId/plan" params={{ jobId: job.id }}>
-              <ListOrdered /> Next: Plan
+              <ListOrdered />
+              {translate(' Next: Plan ')}
             </Link>
           </Button>
         }
@@ -543,7 +546,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
             ref={svg}
             role="img"
             tabIndex={0}
-            aria-label={`Board ${size.w} × ${size.h} mm with the carving`}
+            aria-label={translate('Board {{value1}} × {{value2}} mm with the carving', { value1: size.w, value2: size.h })}
             className="absolute inset-y-0 right-0 left-14 h-full w-[calc(100%-3.5rem)] touch-none overflow-visible select-none"
             viewBox={`${-pad} ${-pad} ${frame.w + 2 * pad} ${frame.h + 2 * pad}`}
             onPointerDown={() => {
@@ -652,7 +655,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                     onPointerDown={start('move', shown)}
                   />
                   <rect
-                    aria-label="Drag to resize"
+                    aria-label={translate('Drag to resize')}
                     x={box.x1 - 2.5}
                     y={-box.y0 - 2.5}
                     width={5}
@@ -663,7 +666,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                   />
                   <line x1={0} y1={-box.y1} x2={0} y2={-box.y1 - 8} className="pointer-events-none stroke-primary" strokeWidth={0.5} />
                   <circle
-                    aria-label="Drag to rotate"
+                    aria-label={translate('Drag to rotate')}
                     cx={0}
                     cy={-box.y1 - 8}
                     r={2.5}
@@ -672,7 +675,8 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                     onPointerDown={start('rotate', shown)}
                   />
                   <text x={box.x0} y={-box.y1 - 2} className="pointer-events-none fill-primary text-[4px]">
-                    {(box.x1 - box.x0).toFixed(0)} × {(box.y1 - box.y0).toFixed(0)} mm
+                    {(box.x1 - box.x0).toFixed(0)} × {(box.y1 - box.y0).toFixed(0)}
+                    {translate(' mm ')}
                   </text>
                 </g>
               )}
@@ -729,14 +733,15 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                     y={size.h + grip * 1.6 + 4}
                     textAnchor="end"
                     className="fill-amber-800 stroke-none text-[4px] dark:fill-amber-300">
-                    {size.w} × {size.h} mm
+                    {size.w} × {size.h}
+                    {translate(' mm ')}
                   </text>
                 )}
               </g>
             )}
             <circle cx={0} cy={size.h} r={1.5} className="fill-emerald-500" />
             <text x={0} y={size.h + 6} className="fill-emerald-600 text-[4px]">
-              XY zero · lower left
+              {translate('XY zero · lower left ')}
             </text>
           </svg>
           {editing &&
@@ -763,12 +768,20 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                 <SelectionBar<'height' | 'rotation'>
                   key={editing.id}
                   id="carve"
-                  title={editing.art.kind === 'text' ? 'Lettering' : editing.art.fileName}
+                  title={editing.art.kind === 'text' ? translate('Lettering') : editing.art.fileName}
                   at={at}
                   avoid={assistantBox}
                   fields={[
-                    { key: 'height', label: 'Height', name: 'Height (mm)', value: editing.height, min: 5, max: size.h },
-                    { key: 'rotation', label: 'Angle', name: 'Rotation (°)', value: editing.rotation, unit: '°', min: -360, max: 720 },
+                    { key: 'height', label: translate('Height'), name: 'Height (mm)', value: editing.height, min: 5, max: size.h },
+                    {
+                      key: 'rotation',
+                      label: translate('Angle'),
+                      name: 'Rotation (°)',
+                      value: editing.rotation,
+                      unit: '°',
+                      min: -360,
+                      max: 720,
+                    },
                   ]}
                   onField={(key, value) => {
                     if (key === 'height') void redraw({ ...editing, height: value });
@@ -780,7 +793,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                   deleteLabel={`Delete ${itemName(editing)}`}
                   menu={[
                     {
-                      label: 'Centre on the board',
+                      label: translate('Centre on the board'),
                       icon: <Crosshair className="size-4" />,
                       onSelect: () => updateItem(editing.id, centred(editing, size)),
                     },
@@ -818,16 +831,29 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               );
             })()}
           <div className="absolute top-3 right-3 flex gap-1 rounded-md border bg-background/90 p-0.5 shadow-sm">
-            <button type="button" aria-label="Undo" title="Undo (⌘Z)" disabled={!undo} onClick={undo} className={kToolButton}>
+            <button
+              type="button"
+              aria-label={translate('Undo')}
+              title={translate('Undo (⌘Z)')}
+              disabled={!undo}
+              onClick={undo}
+              className={kToolButton}>
               <Undo2 className="size-[18px]" />
             </button>
-            <button type="button" aria-label="Redo" title="Redo (⇧⌘Z)" disabled={!redo} onClick={redo} className={kToolButton}>
+            <button
+              type="button"
+              aria-label={translate('Redo')}
+              title={translate('Redo (⇧⌘Z)')}
+              disabled={!redo}
+              onClick={redo}
+              className={kToolButton}>
               <Redo2 className="size-[18px]" />
             </button>
           </div>
           {outlining && (
             <div className="absolute top-3 left-3 flex items-center gap-2 rounded bg-background/80 px-2 py-1 text-xs text-muted-foreground">
-              <LoadingSpinner className="size-3" /> Outlining…
+              <LoadingSpinner className="size-3" />
+              {translate(' Outlining… ')}
             </div>
           )}
           <CarveToolbar panel={shownPanel} choosing={choosing} onText={addText} onFile={() => chooseSvg(null)} onPanel={togglePanel} />
@@ -842,12 +868,12 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               {(problem !== kEmptyCarving && problem) ||
                 addError ||
                 (off
-                  ? 'The artwork reaches past the board: move it or make it smaller.'
-                  : 'The cut line runs past the board: move the artwork further onto it, or make the cutout margin smaller.')}
+                  ? translate('The artwork reaches past the board: move it or make it smaller.')
+                  : translate('The cut line runs past the board: move the artwork further onto it, or make the cutout margin smaller.'))}
             </p>
           )}
           <div className="sr-only">
-            <label htmlFor="carve-svg">SVG file</label>
+            <label htmlFor="carve-svg">{translate('SVG file')}</label>
             <input
               id="carve-svg"
               ref={svgInput}
@@ -913,14 +939,18 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
 const kToolButton =
   'flex size-8 items-center justify-center rounded-md text-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-35';
 
-const kPanelNames: Record<CarvePanel, string> = { items: 'Items', settings: 'Board and bit', assistant: 'AI artwork' };
+const kPanelNames: Record<CarvePanel, string> = {
+  items: 'Items',
+  settings: translate('Board and bit'),
+  assistant: translate('AI artwork'),
+};
 
 const rotationOf = (degrees: number) => ((degrees % 360) + 360) % 360;
 
 function Shell({ message, loading }: { message?: string; loading?: string }) {
   return (
     <CamPage className="min-h-dvh md:h-dvh">
-      <PageHeader title="Projects" />
+      <PageHeader title={translate('Projects')} />
       {message && <p className="m-8 text-muted-foreground">{message}</p>}
       {loading && (
         <div className="flex flex-1 items-center justify-center gap-2 text-muted-foreground">

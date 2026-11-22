@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { CamNcLogoIcon } from '@/components/CamNcLogo';
 import { AppSidebar } from '@/components/app-sidebar';
 import { isDemoMode } from '@/lib/demo/demo-mode';
@@ -52,7 +53,7 @@ function RailAccount() {
       </SignedIn>
       <SignedOut>
         <SignInButton mode="modal" forceRedirectUrl="/">
-          <RailButton icon={LogIn} label="Sign in" />
+          <RailButton icon={LogIn} label={translate('Sign in')} />
         </SignInButton>
       </SignedOut>
     </div>
@@ -81,9 +82,9 @@ export function AppRail() {
       )}
       {shown === 'icons' && (
         <nav
-          aria-label="Steps and app menu"
+          aria-label={translate('Steps and app menu')}
           className="dark sticky top-0 hidden h-dvh w-18 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar px-1 py-1.5 text-sidebar-foreground scheme-dark md:flex">
-          <Link to="/visualize/2DView" aria-label="camNC" className="mb-1 flex h-10 items-center justify-center">
+          <Link to="/visualize/2DView" aria-label={translate('camNC')} className="mb-1 flex h-10 items-center justify-center">
             <CamNcLogoIcon className="size-7" />
           </Link>
           <Link
@@ -92,27 +93,27 @@ export function AppRail() {
             activeOptions={{ exact: true }}
             activeProps={{ className: 'text-sidebar-foreground font-semibold' }}>
             <FolderOpen aria-hidden />
-            Projects
+            {translate('Projects ')}
           </Link>
           <span className="my-1 h-px w-10 shrink-0 bg-sidebar-border" />
           {steps.map(step => (
             <RailStep key={step.key} step={step} />
           ))}
           <span className="grow" />
-          <RailButton icon={Menu} label="Menu" onClick={toggleSidebar} />
-          <RailButton icon={ChevronsLeft} label="Hide" onClick={() => setRail('hidden')} />
+          <RailButton icon={Menu} label={translate('Menu')} onClick={toggleSidebar} />
+          <RailButton icon={ChevronsLeft} label={translate('Hide')} onClick={() => setRail('hidden')} />
           <RailAccount />
         </nav>
       )}
       <nav
-        aria-label="Steps"
+        aria-label={translate('Steps')}
         className="dark fixed inset-x-0 bottom-0 z-40 flex h-14 border-t border-sidebar-border bg-sidebar text-sidebar-foreground scheme-dark md:hidden">
         {steps.map(step => (
           <RailStep key={step.key} step={step} className="h-full w-auto flex-1 rounded-none" />
         ))}
         <button type="button" onClick={toggleSidebar} className={cn(kRailItem, kRailOther, 'h-full w-auto flex-1 rounded-none')}>
           <Menu aria-hidden />
-          Menu
+          {translate('Menu ')}
         </button>
       </nav>
     </>
@@ -127,7 +128,7 @@ export function HiddenRailButton({ className }: { className?: string }) {
     <button
       type="button"
       onClick={toggleSidebar}
-      aria-label={current ? `Open the menu, current step ${current.label}` : 'Open the menu'}
+      aria-label={current ? translate('Open the menu, current step {{value1}}', { value1: current.label }) : translate('Open the menu')}
       className={cn(
         'hidden h-8 shrink-0 items-center gap-1.5 rounded-md bg-primary px-2.5 text-sm text-primary-foreground md:inline-flex [&_svg]:size-4',
         className

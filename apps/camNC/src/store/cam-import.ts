@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { adaptCamToResolution, isCamCalibrated } from './cam-resolution';
 import { ICamSource } from './store';
 
@@ -16,10 +17,10 @@ export function hasSetup(camera: ICamSource) {
 
 /** A short summary of how far `camera` is set up. */
 export function setupStatus(camera: ICamSource) {
-  if (isCamCalibrated(camera)) return 'calibrated, markers set';
-  if (camera.calibration) return 'calibrated, markers not set';
-  if (camera.markerPositions?.length) return 'markers measured, not calibrated';
-  return 'not calibrated';
+  if (isCamCalibrated(camera)) return translate('calibrated, markers set');
+  if (camera.calibration) return translate('calibrated, markers not set');
+  if (camera.markerPositions?.length) return translate('markers measured, not calibrated');
+  return translate('not calibrated');
 }
 
 /**

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadDocument } from '@wbcnc/cad';
 import { compactCadReport, type CadViewSelection } from '@wbcnc/cad-script';
 import { checkSvgCandidate, type SvgPlacement } from '../../../../../packages/cad-script/src/svg';
@@ -11,26 +12,27 @@ import { summarizeAssistantReport } from './report';
 export async function checkAssistantSvg(base: CadDocument, input: Record<string, unknown>, signal: AbortSignal, views: CadViewSelection) {
   const args = plainAssistantData(input, 'SVG request');
   if (Object.keys(args).some(key => !['source', 'handle', 'name', 'partName', 'thickness', 'placement'].includes(key)))
-    throw new Error('Unknown SVG request field.');
+    throw new Error(translate('Unknown SVG request field.'));
   if (Number(Object.hasOwn(args, 'source')) + Number(Object.hasOwn(args, 'handle')) !== 1)
-    throw new Error('Supply exactly one SVG source or stored handle.');
+    throw new Error(translate('Supply exactly one SVG source or stored handle.'));
   for (const key of ['source', 'handle', 'name', 'partName'] as const)
-    if (args[key] !== undefined && typeof args[key] !== 'string') throw new Error(`${key} must be text.`);
+    if (args[key] !== undefined && typeof args[key] !== 'string') throw new Error(translate('{{key}} must be text.', { key: key }));
   if (args.thickness !== undefined && (typeof args.thickness !== 'number' || !Number.isFinite(args.thickness)))
-    throw new Error('Thickness must be finite mm.');
+    throw new Error(translate('Thickness must be finite mm.'));
   let placement: SvgPlacement | undefined;
   if (args.placement !== undefined) {
     const data = plainAssistantData(args.placement, 'SVG placement');
     if (Object.keys(data).some(key => !['width', 'height', 'at', 'preserveAspect'].includes(key)))
-      throw new Error('Unknown SVG placement field.');
+      throw new Error(translate('Unknown SVG placement field.'));
     for (const key of ['width', 'height'])
       if (data[key] !== undefined && (typeof data[key] !== 'number' || !Number.isFinite(data[key]) || data[key] <= 0))
-        throw new Error('SVG dimensions must be positive finite mm.');
-    if (data.preserveAspect !== undefined && typeof data.preserveAspect !== 'boolean') throw new Error('preserveAspect must be boolean.');
+        throw new Error(translate('SVG dimensions must be positive finite mm.'));
+    if (data.preserveAspect !== undefined && typeof data.preserveAspect !== 'boolean')
+      throw new Error(translate('preserveAspect must be boolean.'));
     if (data.at !== undefined) {
       const at = assistantDataArray(data.at, 'SVG position');
       if (at.length !== 2 || at.some(value => typeof value !== 'number' || !Number.isFinite(value)))
-        throw new Error('SVG position needs two finite mm coordinates.');
+        throw new Error(translate('SVG position needs two finite mm coordinates.'));
     }
     placement = structuredClone(data) as SvgPlacement;
   }

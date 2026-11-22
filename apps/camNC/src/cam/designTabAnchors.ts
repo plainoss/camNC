@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   closestCurvePoint,
   evaluateCurvePoint,
@@ -27,7 +28,7 @@ const outerLineage = (part: EvaluatedCadPart) =>
       .map(loop => [loop.id, [...loop.entityIds].sort()])
       .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
   );
-const cutSourceIssue = 'The design changed after cutting. Reset or place this part’s tabs for the new setup.';
+const cutSourceIssue = translate('The design changed after cutting. Reset or place this part’s tabs for the new setup.');
 
 function curvePoint(curve: Curve, part: CadPart, parameter: number): CadPoint | null {
   const points = pointsOf(part);
@@ -153,7 +154,7 @@ export function carryDesignTabs(
       // Trim can retain a curve ID while shortening its parameter domain. A changed outer profile lineage cannot
       // safely reuse that curve's old parameter, even when the individual boundary ID still exists.
       if (outerLineage(oldShape) !== outerLineage(nextShape)) {
-        designIssues[instanceId] = 'A tab boundary changed. Reset or place this part’s tabs again on Boards.';
+        designIssues[instanceId] = translate('A tab boundary changed. Reset or place this part’s tabs again on Boards.');
         continue;
       }
       const oldOrigin = min(oldShape),
@@ -181,7 +182,7 @@ export function carryDesignTabs(
         const placed = flipNext(point);
         return { x: placed.x - nextOrigin.x, y: placed.y - nextOrigin.y };
       });
-      if (failed) designIssues[instanceId] = 'A tab boundary changed. Reset or place this part’s tabs again on Boards.';
+      if (failed) designIssues[instanceId] = translate('A tab boundary changed. Reset or place this part’s tabs again on Boards.');
       else tabsAt[instanceId] = mapped;
     }
     return { ...board, tabsAt, designIssues: Object.keys(designIssues).length ? designIssues : undefined };

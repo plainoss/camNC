@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef, type CSSProperties, type RefObject } from 'react';
 import type { CadSketch } from '@wbcnc/cad';
 import { creationValueAt, type CreationValues } from './creationValues';
@@ -57,15 +58,15 @@ export function CreationValueControls({
               }}>
               <CadValueInput
                 inputRef={input}
-                aria-label={`${step.label} value`}
+                aria-label={translate('{{value1}} value', { value1: step.label })}
                 inputMode="decimal"
                 value={state.text}
                 onChange={event => onChange(event.target.value)}
               />
-              <button type="submit" aria-label={`Apply ${step.label.toLowerCase()}`}>
+              <button type="submit" aria-label={translate('Apply {{value1}}', { value1: step.label.toLowerCase() })}>
                 ✓
               </button>
-              <button type="button" aria-label="Cancel drawing value" onClick={onCancel}>
+              <button type="button" aria-label={translate('Cancel drawing value')} onClick={onCancel}>
                 ×
               </button>
             </form>
@@ -76,7 +77,11 @@ export function CreationValueControls({
             type="button"
             className="cad-creation-value"
             style={positions[index]}
-            aria-label={`${step.label}: ${formatLength(value.constraint.value)} ${lengthUnit}. Enter a value`}
+            aria-label={translate('{{value1}}: {{value2}} {{lengthUnit}}. Enter a value', {
+              value1: step.label,
+              value2: formatLength(value.constraint.value),
+              lengthUnit: lengthUnit,
+            })}
             onClick={() => onStart(index)}>
             {formatLength(value.constraint.value)}
           </button>

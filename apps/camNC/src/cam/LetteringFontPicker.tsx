@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Button } from '@wbcnc/ui/components/button';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@wbcnc/ui/components/command';
@@ -118,7 +119,7 @@ export function LetteringFontPicker({
             type="button"
             variant="outline"
             role="combobox"
-            aria-label="Font"
+            aria-label={translate('Font')}
             aria-expanded={open}
             className={cn('min-w-0 flex-1 justify-between', className)}>
             <FontName font={font} />
@@ -126,9 +127,14 @@ export function LetteringFontPicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-0">
-          <Command label="Search fonts" shouldFilter={false}>
-            <CommandInput aria-label="Search fonts" placeholder="Search fonts…" value={search} onValueChange={setSearch} />
-            <div aria-label="Font category" className="flex flex-wrap gap-1 border-b p-2">
+          <Command label={translate('Search fonts')} shouldFilter={false}>
+            <CommandInput
+              aria-label={translate('Search fonts')}
+              placeholder={translate('Search fonts…')}
+              value={search}
+              onValueChange={setSearch}
+            />
+            <div aria-label={translate('Font category')} className="flex flex-wrap gap-1 border-b p-2">
               {Object.entries(categories).map(([key, label]) => (
                 <Button
                   key={key}
@@ -175,7 +181,11 @@ export function LetteringFontPicker({
                 })}
                 {!google.length && (
                   <p className="px-2 py-3 text-xs text-muted-foreground">
-                    {catalogError ? 'Could not open the font catalog.' : catalog.length ? 'No matching families.' : 'Loading fonts…'}
+                    {catalogError
+                      ? translate('Could not open the font catalog.')
+                      : catalog.length
+                        ? translate('No matching families.')
+                        : translate('Loading fonts…')}
                   </p>
                 )}
               </CommandGroup>
@@ -185,7 +195,7 @@ export function LetteringFontPicker({
       </Popover>
       {web && weights.length > 1 && (
         <select
-          aria-label="Font weight"
+          aria-label={translate('Font weight')}
           className="h-9 max-w-24 rounded-md border bg-background px-2"
           value={font.weight}
           onChange={e => onChange({ ...font, weight: Number(e.target.value) })}>

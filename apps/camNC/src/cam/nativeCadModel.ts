@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { smallestCornerRelief, solveCadDocument, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
 import { studioCutParts } from '@/cad/studioGeometry';
 import { profileFeatures, summarizePart, type FlatPart, type MeshRound, type PartFeatures } from '@wbcnc/cam';
@@ -27,7 +28,7 @@ export function nativePart(source: EvaluatedCadPart): {
   below?: PartFeatures;
 } {
   const { features, below, turned, holeSources, offset, size, problem } = profileFeatures(source);
-  if (problem) throw new Error(`${source.name}: ${problem}`);
+  if (problem) throw new Error(translate('{{value1}}: {{problem}}', { value1: source.name, problem: problem }));
   const outer = features.outlines[0]!;
   const holeLoops = source.loops.filter(loop => loop.kind === 'hole').map(loop => loop.id);
   let positions: Float64Array, indices: Uint32Array;
@@ -39,6 +40,13 @@ export function nativePart(source: EvaluatedCadPart): {
       down: round.side === 'top',
       radius: round.radius,
       material: round.material,
+      ...(round.chamfer && { chamfer: true as const }),
+      ...(round.edges && {
+        edges: round.edges.map(([a, b]) => [
+          { x: a.x - offset.x, y: a.y - offset.y },
+          { x: b.x - offset.x, y: b.y - offset.y },
+        ]),
+      }),
     })
   );
   if (source.cuts?.length || rounds.length) ({ positions, indices } = cutPartMesh(features, below ?? undefined, rounds));
@@ -50,8 +58,10 @@ export function nativePart(source: EvaluatedCadPart): {
     indices = geometry.index ? Uint32Array.from(geometry.index.array) : Uint32Array.from({ length: positions.length / 3 }, (_, i) => i);
     geometry.dispose();
   }
-  // CAM runs a roundover bit around each, where one of its radius is in the job.
-  if (rounds.length) features.rounds = rounds.map(({ points, ...round }) => ({ loop: points, ...round }));
+  // CAM runs a roundover bit around each, where one of its radius is in the job. A chamfer isn't milled yet: its edge
+  // is cut square.
+  const rounded = rounds.filter(round => !round.chamfer);
+  if (rounded.length) features.rounds = rounded.map(({ points, ...round }) => ({ loop: points, ...round }));
   // A profile extruded further than it is high (an end profile drawn on a side plane and pushed out to the board's
   // width) is milled lying on its widest faces, from the top, with the profile's height as the stock's thickness.
   const lying = !rounds.length && !below ? laidFlat(source.name, positions, indices, source.thickness) : null;
@@ -141,7 +151,8 @@ function laidFlatPart(
 export async function nativeCadModel(document: CadDocument): Promise<{ model: ModelImport; entries: Map<string, NativeCadEntry> }> {
   const started = performance.now();
   const solved = await solveCadDocument(document);
-  if (solved.status !== 'solved') throw new Error(solved.diagnostics.map(d => d.message).join(' ') || 'The design could not be solved.');
+  if (solved.status !== 'solved')
+    throw new Error(solved.diagnostics.map(d => d.message).join(' ') || translate('The design could not be solved.'));
   const parts = studioCutParts(solved).map(({ part, names }) => {
     const native = nativePart(asMilled(part));
     native.info.names = names;

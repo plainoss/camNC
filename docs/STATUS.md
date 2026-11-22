@@ -31,7 +31,7 @@ Counted from the scenario files, without running them. PASS counts every scenari
 | Domain | Scenarios | PASS | XFAIL | FLAKY | Floor |
 | ------ | --------: | ---: | ----: | ----: | ----: |
 | sketch |       157 |  157 |     0 |     0 |   157 |
-| studio |        32 |   32 |     0 |     0 |    32 |
+| studio |        38 |   38 |     0 |     0 |    38 |
 
 | Group                            | Scenarios | PASS | XFAIL | FLAKY |
 | -------------------------------- | --------: | ---: | ----: | ----: |
@@ -55,22 +55,25 @@ Counted from the scenario files, without running them. PASS counts every scenari
 | `sketch/spline`                  |         8 |    8 |     0 |     0 |
 | `sketch/view`                    |         3 |    3 |     0 |     0 |
 | `studio/boolean`                 |         2 |    2 |     0 |     0 |
+| `studio/chamfer`                 |         1 |    1 |     0 |     0 |
 | `studio/circular-pattern`        |         1 |    1 |     0 |     0 |
 | `studio/cupboard`                |         5 |    5 |     0 |     0 |
 | `studio/dependencies-and-filter` |         1 |    1 |     0 |     0 |
 | `studio/dialog-error-styling`    |         1 |    1 |     0 |     0 |
 | `studio/extrude`                 |         3 |    3 |     0 |     0 |
 | `studio/fillet`                  |         1 |    1 |     0 |     0 |
+| `studio/hole`                    |         2 |    2 |     0 |     0 |
 | `studio/joints`                  |         1 |    1 |     0 |     0 |
 | `studio/material`                |         1 |    1 |     0 |     0 |
 | `studio/measure`                 |         2 |    2 |     0 |     0 |
 | `studio/pattern`                 |         2 |    2 |     0 |     0 |
 | `studio/section`                 |         2 |    2 |     0 |     0 |
 | `studio/section-and-perspective` |         1 |    1 |     0 |     0 |
-| `studio/sketch`                  |         3 |    3 |     0 |     0 |
+| `studio/sketch`                  |         4 |    4 |     0 |     0 |
 | `studio/split`                   |         1 |    1 |     0 |     0 |
 | `studio/stool`                   |         1 |    1 |     0 |     0 |
 | `studio/tray`                    |         2 |    2 |     0 |     0 |
+| `studio/variable`                |         2 |    2 |     0 |     0 |
 | `studio/view`                    |         2 |    2 |     0 |     0 |
 
 ## Checklist

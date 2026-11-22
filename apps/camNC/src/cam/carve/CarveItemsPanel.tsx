@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Button } from '@wbcnc/ui/components/button';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { Image, Sparkles, Trash2, Type } from 'lucide-react';
@@ -20,9 +21,9 @@ export function CarveItemsPanel({
 }) {
   return (
     <>
-      <CarvePanelHeader title="Items" onClose={onClose} />
+      <CarvePanelHeader title={translate('Items')} onClose={onClose} />
       {items.length ? (
-        <ul aria-label="Items" className="grid gap-1">
+        <ul aria-label={translate('Items')} className="grid gap-1">
           {items.map(item => (
             <li key={item.id} className={cn('flex items-center rounded-md', selectedId === item.id && 'bg-muted')}>
               <button
@@ -38,16 +39,24 @@ export function CarveItemsPanel({
                 )}
                 <span className="truncate">{itemName(item)}</span>
               </button>
-              <Button variant="ghost" size="icon" aria-label={`Delete ${itemName(item)}`} onClick={() => onDelete(item.id)}>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={translate('Delete {{value1}}', { value1: itemName(item) })}
+                onClick={() => onDelete(item.id)}>
                 <Trash2 />
               </Button>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-muted-foreground">Nothing on the board yet. Add lettering, an SVG file or AI artwork from the toolbar.</p>
+        <p className="text-muted-foreground">
+          {translate('Nothing on the board yet. Add lettering, an SVG file or AI artwork from the toolbar.')}
+        </p>
       )}
-      {items.length > 0 && !selectedId && <p className="text-xs text-muted-foreground">Select an item to edit it on the board.</p>}
+      {items.length > 0 && !selectedId && (
+        <p className="text-xs text-muted-foreground">{translate('Select an item to edit it on the board.')}</p>
+      )}
     </>
   );
 }

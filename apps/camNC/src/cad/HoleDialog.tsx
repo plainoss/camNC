@@ -1,12 +1,15 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
-import { extrudeStepProblem, type CadDocument, type CadPart, type CadValueScope } from '@wbcnc/cad';
+import { extrudeStepProblem, holeSketch, type CadDocument, type CadPart, type CadValueScope } from '@wbcnc/cad';
 import { useState } from 'react';
-import { CadValueInput } from './CadValueInput';
 import { FeatureDialog } from './FeatureDialog';
+import { HoleFields } from './HoleFields';
+import { holeKindRefusal, holeSettingsOf, holeSpecOf, holeTitle, rememberHole, type HoleSettings } from './holeSettings';
+import { holePointName } from './holePoints';
 
 /**
- * A Hole step: a round hole at each point of a sketch drawn on a part's face, as wide as the diameter, through the part
- * or to a depth. Changes show in the view as they're made.
+ * A Hole step: a round hole at each picked point of a sketch drawn on a part's face, as wide as the diameter, through
+ * the part or to a depth. Changes show in the view as they're made.
  */
 export function HoleDialog({
   document,
@@ -24,87 +27,67 @@ export function HoleDialog({
   onCancel: () => void;
 }) {
   const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
-  const depth = part.remove?.depth ?? 'through';
-  const [diameterText, setDiameterText] = useState(part.hole?.diameterExpression ?? lengthText(part.hole?.diameter ?? 5));
-  const [depthText, setDepthText] = useState(depth === 'through' ? lengthText(10) : (part.remove?.depthExpression ?? lengthText(depth)));
+  const [settings, setSettings] = useState<HoleSettings>(() => holeSettingsOf(part, lengthText));
   const [error, setError] = useState<string | null>(null);
+  const parse = (text: string) => parseCadValue(text, { unit: 'mm', variables });
   // Only a Hole step is written to: opened on anything else, such as a board, the dialog must never turn it into a hole.
-  const change = (next: (p: CadPart) => CadPart) =>
-    onChange(current => ({ ...current, parts: current.parts.map(p => (p.id === part.id && p.hole ? next(p) : p)) }));
-  const apply = (diameter = diameterText, through = depth === 'through', blind = depthText, preview = false) => {
-    const across = parseCadValue(diameter, { unit: 'mm', variables });
-    const deep = parseCadValue(blind, { unit: 'mm', variables });
-    // A blind depth that can't be used is no reason to refuse a hole through the part.
-    const refused =
-      'error' in across
-        ? across.error
-        : !(across.value > 0)
-          ? 'A hole needs a diameter.'
-          : !through && 'error' in deep
-            ? deep.error
-            : !through && !('error' in deep) && !(deep.value > 0)
-              ? 'A hole needs some depth.'
-              : null;
-    if (!preview || !refused) setError(refused);
-    if (refused || 'error' in across || (!through && 'error' in deep)) return;
-    change(p => ({
-      ...p,
-      hole: { diameter: across.value, ...(across.expression && { diameterExpression: across.expression }) },
-      remove:
-        through || 'error' in deep
-          ? { depth: 'through' }
-          : { depth: deep.value, ...(deep.expression && { depthExpression: deep.expression }) },
+  /** Applies the settings; while a value is being typed, one that can't be used yet waits for the typing to end. */
+  const apply = (next: HoleSettings, typing = false) => {
+    const spec = holeSpecOf(next, parse);
+    if (!typing || !('error' in spec)) setError('error' in spec ? spec.error : null);
+    if ('error' in spec) return;
+    onChange(current => ({
+      ...current,
+      parts: current.parts.map(p =>
+        p.id === part.id && p.hole
+          ? { ...p, hole: { ...spec.hole!, ...(p.hole.points && { points: p.hole.points }) }, remove: { ...p.remove, ...spec.remove! } }
+          : p
+      ),
     }));
   };
-  const problem = part.hole ? extrudeStepProblem(document, part) : `Hole drills at the points of a sketch, not into ${part.name} itself.`;
+  const spec = holeSpecOf(settings, parse);
+  const diameter = 'error' in spec ? null : spec.hole!.diameter;
+  const depth = 'error' in spec || spec.remove!.depth === 'through' ? null : (spec.remove!.depth as number);
+  const refusal = holeKindRefusal(settings);
+  const problem = part.hole
+    ? extrudeStepProblem(document, part)
+    : translate('Hole drills at the points of a sketch, not into {{value1}} itself.', { value1: part.name });
+  const on = part.drawnOn?.on;
+  const board = on && 'partId' in on ? document.parts.find(candidate => candidate.id === on.partId) : undefined;
+  const points = part.hole ? holeSketch(part).entities.filter(entity => entity.type === 'point') : [];
   return (
-    <FeatureDialog title={`Hole · ${part.name}`} okDisabled={!!error || !!problem} onOk={onOk} onCancel={onCancel}>
-      <label className="cad-number-field">
-        Diameter
-        <span>
-          <CadValueInput
-            bare
-            aria-label="Diameter"
-            value={diameterText}
-            onChange={event => {
-              setDiameterText(event.target.value);
-              apply(event.target.value, undefined, undefined, true);
-            }}
-            onBlur={() => apply()}
-            onKeyDown={event => event.key === 'Enter' && apply()}
-          />
-        </span>
-        {lengthUnit}
-      </label>
-      <label className="cad-number-field">
-        Termination
-        <select
-          aria-label="Termination"
-          value={depth === 'through' ? 'through' : 'blind'}
-          onChange={event => apply(undefined, event.target.value === 'through')}>
-          <option value="through">Through</option>
-          <option value="blind">Blind</option>
-        </select>
-      </label>
-      {depth !== 'through' && (
-        <label className="cad-number-field">
-          Depth
-          <span>
-            <CadValueInput
-              bare
-              aria-label="Depth"
-              value={depthText}
-              onChange={event => {
-                setDepthText(event.target.value);
-                apply(undefined, false, event.target.value, true);
-              }}
-              onBlur={() => apply(undefined, false)}
-              onKeyDown={event => event.key === 'Enter' && apply(undefined, false)}
-            />
-          </span>
-          {lengthUnit}
-        </label>
-      )}
+    <FeatureDialog
+      title={holeTitle(settings, diameter, depth)}
+      okDisabled={!!error || !!problem || !!refusal}
+      okReason={refusal}
+      onOk={() => {
+        rememberHole(settings);
+        onOk();
+      }}
+      onCancel={onCancel}>
+      <HoleFields
+        settings={settings}
+        onChange={next => {
+          setSettings(next);
+          apply(next, true);
+        }}
+        onCommit={apply}
+        lengthUnit={lengthUnit}
+        picks={
+          <>
+            <div className="cad-feature-selection">
+              <small>{translate('Sketch points to place holes')}</small>
+              {points.map(point => (
+                <span key={point.id}>{holePointName(document, part.id)}</span>
+              ))}
+            </div>
+            <div className="cad-feature-selection">
+              <small>{translate('Merge scope')}</small>
+              {board && <span>{board.name}</span>}
+            </div>
+          </>
+        }
+      />
       {(error || problem) && (
         <p role="alert" className="cad-thickness-error">
           {error ?? problem}

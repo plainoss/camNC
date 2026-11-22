@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, type CSSProperties, type RefObject } from 'react';
 import type { ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
 import { CadUnitSuffix, CadValueInput } from './CadValueInput';
@@ -34,19 +35,20 @@ export function ModificationControls({
   }, [editing, selectAll, inputRef]);
   if (state.phase === 'mirror')
     return (
-      <div className="cad-modify-controls cad-mirror-controls" role="group" aria-label="Mirror selection">
+      <div className="cad-modify-controls cad-mirror-controls" role="group" aria-label={translate('Mirror selection')}>
         <button type="button" aria-pressed={state.picking === 'entities'} onClick={() => onMirrorPicking('entities')}>
-          Entities ({state.entityIds.length})
+          {translate('Entities (')}
+          {state.entityIds.length})
         </button>
         <button
           type="button"
           aria-pressed={state.picking === 'axis'}
           disabled={!state.entityIds.length}
           onClick={() => onMirrorPicking('axis')}>
-          Mirror line
+          {translate('Mirror line ')}
         </button>
-        <button type="button" aria-label="Cancel mirror" onClick={onCancel}>
-          Cancel
+        <button type="button" aria-label={translate('Cancel mirror')} onClick={onCancel}>
+          {translate('Cancel ')}
         </button>
       </div>
     );
@@ -61,10 +63,10 @@ export function ModificationControls({
       }}>
       {state.editing ? (
         <label>
-          Offset{' '}
+          {translate('Offset')}{' '}
           <CadValueInput
             inputRef={inputRef}
-            aria-label="Offset distance"
+            aria-label={translate('Offset distance')}
             inputMode="decimal"
             value={state.text}
             aria-invalid={!!error}
@@ -79,14 +81,14 @@ export function ModificationControls({
           />
         </label>
       ) : (
-        <button type="button" aria-label="Edit offset distance" onClick={onEdit}>
+        <button type="button" aria-label={translate('Edit offset distance')} onClick={onEdit}>
           {state.text} <CadUnitSuffix text={state.text} />
         </button>
       )}
-      <button type="submit" aria-label="Apply offset">
+      <button type="submit" aria-label={translate('Apply offset')}>
         ✓
       </button>
-      <button type="button" aria-label="Cancel offset" onClick={onCancel}>
+      <button type="button" aria-label={translate('Cancel offset')} onClick={onCancel}>
         ×
       </button>
       {error && (

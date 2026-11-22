@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { RehearsalBanner } from '../rehearsal/RehearsalBanner';
 import { useStore } from '@/store/store';
 import { useNavigate } from '@tanstack/react-router';
@@ -15,8 +16,8 @@ const kSpeeds = [1, 4, 16];
 function SpeedControl() {
   const [speed, setSpeed] = useState(() => getDemoMachine()?.speed ?? 4);
   return (
-    <div className="flex flex-row items-center gap-1 text-xs" role="group" aria-label="Simulation speed">
-      <span className="text-muted-foreground">Speed</span>
+    <div className="flex flex-row items-center gap-1 text-xs" role="group" aria-label={translate('Simulation speed')}>
+      <span className="text-muted-foreground">{translate('Speed')}</span>
       {kSpeeds.map(value => (
         <button
           key={value}
@@ -49,24 +50,28 @@ export function DemoBanner() {
       <DemoTour />
       <div
         role="region"
-        aria-label="Demo mode"
+        aria-label={translate('Demo mode')}
         className="fixed bottom-3 max-md:bottom-17 left-3 md:left-[calc(var(--app-rail,0rem)+0.75rem)] z-50 flex max-w-[calc(100vw-1.5rem)] flex-row flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-background/95 px-3 py-2 text-sm shadow-lg backdrop-blur">
         <span className="flex flex-row items-center gap-1.5 font-medium">
-          <FlaskConical className="size-4" /> Demo machine
+          <FlaskConical className="size-4" />
+          {translate(' Demo machine ')}
         </span>
         <SpeedControl />
         <Button size="sm" variant="ghost" className="h-7 px-2" onClick={openDemoTour}>
-          <CircleHelp /> Tour
+          <CircleHelp />
+          {translate(' Tour ')}
         </Button>
         <Button size="sm" className="h-7 px-2" onClick={() => exitDemo('/start')}>
-          <Wrench /> Set up my machine
+          <Wrench />
+          {translate(' Set up my machine ')}
         </Button>
         <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => exitDemo('/')}>
-          <LogOut /> Exit
+          <LogOut />
+          {translate(' Exit ')}
         </Button>
         {!hasToolpath && (
           <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => navigate({ to: '/demo' })}>
-            Reload demo job
+            {translate('Reload demo job ')}
           </Button>
         )}
       </div>

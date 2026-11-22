@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { CamJobRehearsal } from '@/start/CamJobRehearsal';
 import { PageHeader } from '@/components/page-header';
 import { useOpenSample } from '@/cam/samples/useOpenSample';
@@ -50,9 +51,12 @@ function StartComponent() {
     navigate({ to: '/visualize/2DView' });
     // With a program loaded: no "open a file" hint.
     if (fromCam || toolpath) return;
-    toast.info('Open a G-code file with O or drop one on the page. With a machine connected, double-click the bed to jog there.', {
-      duration: 10_000,
-    });
+    toast.info(
+      translate('Open a G-code file with O or drop one on the page. With a machine connected, double-click the bed to jog there.'),
+      {
+        duration: 10_000,
+      }
+    );
   }
 
   function saveBedAndOpenWorkspace() {
@@ -65,9 +69,15 @@ function StartComponent() {
   useEffect(() => {
     if (!toolpath || toolpath === toolpathOnEntry.current) return;
     if (!picked && !savedBed && !readBed) {
-      toast.info(`Showing it on a ${bed.xmax - bed.xmin} × ${bed.ymax - bed.ymin} mm bed. Change the size under Work area in the menu.`, {
-        duration: 10_000,
-      });
+      toast.info(
+        translate('Showing it on a {{value1}} × {{value2}} mm bed. Change the size under Work area in the menu.', {
+          value1: bed.xmax - bed.xmin,
+          value2: bed.ymax - bed.ymin,
+        }),
+        {
+          duration: 10_000,
+        }
+      );
     }
     saveBedAndOpenWorkspace();
     // Only when a new program arrives.
@@ -77,7 +87,7 @@ function StartComponent() {
   return (
     <DarkScope>
       <div className="dark flex h-app w-full flex-col text-foreground" style={{ background: kDepthSceneBackground }}>
-        <PageHeader title={fromCam ? 'Pick your bed' : 'Get started'} className="dark" />
+        <PageHeader title={fromCam ? translate('Pick your bed') : translate('Get started')} className="dark" />
         <div className="relative min-h-0 flex-1">
           <DrawnBed bounds={bed} className="absolute inset-0 size-full p-3" />
           <div className="absolute inset-0 flex flex-col gap-2 overflow-auto p-5">
@@ -98,29 +108,31 @@ function StartComponent() {
               {fromCam ? (
                 <>
                   <p role="status" className="text-sm">
-                    <span className="font-medium">Pick your bed first.</span> Then camNC shows your CAM program on it: connect your FluidNC,
-                    or choose a bed size.
+                    <span className="font-medium">{translate('Pick your bed first.')}</span>
+                    {translate(' Then camNC shows your CAM program on it: connect your FluidNC, or choose a bed size. ')}
                   </p>
-                  <Button onClick={saveBedAndOpenWorkspace}>Show on this bed</Button>
+                  <Button onClick={saveBedAndOpenWorkspace}>{translate('Show on this bed')}</Button>
                   {jobId ? (
                     <div className="w-full border-t pt-3">
                       <CamJobRehearsal jobId={jobId} boardId={boardId} />
                     </div>
                   ) : (
                     <p className="text-sm">
-                      To rehearse your job,{' '}
+                      {translate('To rehearse your job,')}{' '}
                       <Link to="/cam" className="underline">
-                        open its CAM plan
+                        {translate('open its CAM plan ')}
                       </Link>{' '}
-                      and choose “Try on demo machine”.
+                      {translate('and choose “Try on demo machine”. ')}
                     </p>
                   )}
                 </>
               ) : (
                 <>
                   <div>
-                    <h1 className="font-medium">Drop a file on your bed</h1>
-                    <p className="text-sm text-muted-foreground">G-code shows on the bed. A STEP or STL model starts a cutting plan.</p>
+                    <h1 className="font-medium">{translate('Drop a file on your bed')}</h1>
+                    <p className="text-sm text-muted-foreground">
+                      {translate('G-code shows on the bed. A STEP or STL model starts a cutting plan.')}
+                    </p>
                   </div>
                   <div className="flex flex-row flex-wrap justify-center gap-2">
                     <Button
@@ -128,14 +140,15 @@ function StartComponent() {
                         const file = await pickFile();
                         if (file) await openFile(file);
                       }}>
-                      <FileUp aria-hidden /> Choose file
+                      <FileUp aria-hidden />
+                      {translate(' Choose file ')}
                     </Button>
                     <Button variant="outline" disabled={sample.pending} onClick={() => void sample.open()}>
-                      {sample.pending ? 'Opening sample…' : 'Use a sample'}
+                      {sample.pending ? translate('Opening sample…') : translate('Use a sample')}
                     </Button>
                     {(picked || savedBed || readBed) && (
                       <Button variant="ghost" onClick={saveBedAndOpenWorkspace}>
-                        Open workspace
+                        {translate('Open workspace ')}
                       </Button>
                     )}
                   </div>
@@ -152,14 +165,14 @@ function StartComponent() {
                 {/* A full page load, so that demo mode is decided before the app starts. */}
                 {!isDemoMode() && !hasCamera && (
                   <a href="/demo" className="underline">
-                    Try the demo
+                    {translate('Try the demo ')}
                   </a>
                 )}
                 <Link to="/setup/url-entry" search={hasCamera ? { new: true } : {}} className="underline">
-                  Add a camera
+                  {translate('Add a camera ')}
                 </Link>
                 <Link to="/settings/backup" className="underline">
-                  Restore a backup
+                  {translate('Restore a backup ')}
                 </Link>
               </div>
             )}

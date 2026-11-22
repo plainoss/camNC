@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import { useMemo, useState } from 'react';
 import { addChangesNothing } from './addChangesNothing';
@@ -65,7 +66,7 @@ type ExtrudeOperation = 'new' | 'add' | 'remove' | 'intersect';
  * the board the sketch is drawn on, as a pocket or a hole.
  */
 
-const kUnsupported = 'Not available yet';
+const kUnsupported = translate('Not available yet');
 export function ExtrudeDialog({
   document,
   part,
@@ -163,14 +164,14 @@ export function ExtrudeDialog({
     if (next !== 'new') {
       const refused =
         copyFaceOperationProblem(part) ||
-        (part.thin && 'A thin board can only be a new part.') ||
+        (part.thin && translate('A thin board can only be a new part.')) ||
         (isCadBody(document, part) && partIsBuiltOn(document, part, next === 'add' ? mergeable[0] : undefined)) ||
-        (next === 'add' && !mergeable.length && 'There’s no part yet to add to. Make one with New first.') ||
-        (next === 'intersect' && !mergeable.length && 'There’s no part yet to intersect with. Make one with New first.') ||
+        (next === 'add' && !mergeable.length && translate('There’s no part yet to add to. Make one with New first.')) ||
+        (next === 'intersect' && !mergeable.length && translate('There’s no part yet to intersect with. Make one with New first.')) ||
         (next === 'remove' &&
           (() => {
             if (part.drawnOn && ('plane' in part.drawnOn.on || typeof part.drawnOn.on.face === 'object'))
-              return preceding.length ? null : 'There’s no part yet to cut. Make one with New first.';
+              return preceding.length ? null : translate('There’s no part yet to cut. Make one with New first.');
             const support = removeSupport(document, part);
             return 'error' in support ? support.error : null;
           })());
@@ -241,7 +242,8 @@ export function ExtrudeDialog({
   /** Remove with the depth as typed, or all the way through. Whether it was taken. */
   const remove = (through: boolean, text = removeDepthText, preview = false) => {
     const parsed = through ? { value: 'through' as const } : parseCadValue(text, { unit: 'mm', variables });
-    const refused = 'error' in parsed ? parsed.error : parsed.value !== 'through' && !(parsed.value > 0) ? 'A cut needs some depth.' : null;
+    const refused =
+      'error' in parsed ? parsed.error : parsed.value !== 'through' && !(parsed.value > 0) ? translate('A cut needs some depth.') : null;
     if (!preview || !refused) setRemoveError(refused);
     if ('error' in parsed || refused) return false;
     onChange(current =>
@@ -271,20 +273,27 @@ export function ExtrudeDialog({
       : regionCount === null
         ? sketchName
         : regionCount === 0
-          ? 'No region picked yet'
+          ? translate('No region picked yet')
           : regionCount === 1
-            ? `Face of ${sketchName}`
+            ? translate('Face of {{value1}}', { value1: sketchName })
             : entries === 1
-              ? `Faces of ${sketchName}`
+              ? translate('Faces of {{value1}}', { value1: sketchName })
               : null;
   // Faces picked apart are listed one by one, as the reference lists them.
   // Lines picked for a thin extrude are listed one by one, as edges of their sketch.
   const listed =
     part.thinWall && part.thinEdges?.length
-      ? part.thinEdges.map(id => <span key={id}>{`Edge of ${sketchName}`}</span>)
+      ? part.thinEdges.map(id => <span key={id}>{translate('Edge of {{sketchName}}', { sketchName: sketchName })}</span>)
       : (selection ??
         (alsoMade.length ? Array.from({ length: regionCount ?? 0 }, () => 1) : regionEntrySizes(document, part, part.regions ?? [])).map(
-          (size, i) => <span key={i}>{`${size > 1 ? 'Faces' : 'Face'} of ${sketchName}`}</span>
+          (size, i) => (
+            <span key={i}>
+              {translate('{{value1}} of {{sketchName}}', {
+                value1: size > 1 ? translate('Faces') : translate('Face'),
+                sketchName: sketchName,
+              })}
+            </span>
+          )
         ));
   const board = operation === 'remove' ? removeSupport(document, part) : null;
   const spatialRemove = isSpatialRemoval(part);
@@ -337,7 +346,7 @@ export function ExtrudeDialog({
   /** Takes the typed depth, or says why not. Whether it was taken. */
   const applyDepth = (text = depthText, preview = false) => {
     const parsed = parseCadValue(text, { unit: 'mm', variables });
-    const refused = 'error' in parsed ? parsed.error : parsed.value <= 0 ? 'A thin board needs some depth.' : null;
+    const refused = 'error' in parsed ? parsed.error : parsed.value <= 0 ? translate('A thin board needs some depth.') : null;
     if (!preview || !refused) setDepthError(refused);
     if ('error' in parsed || refused) return false;
     setThin({
@@ -349,22 +358,32 @@ export function ExtrudeDialog({
   };
   return (
     <FeatureDialog
-      title={designStepLabel(document, `${part.id}:extrude`) ?? part.extrudeName ?? `Extrude · ${part.name}`}
+      title={
+        designStepLabel(document, `${part.id}:extrude`) ?? part.extrudeName ?? translate('Extrude · {{value1}}', { value1: part.name })
+      }
       okDisabled={!thicknessValid || !!depthError || !!profileError || !!stepProblem || !!removeError}
       failing={operation === 'add' ? stepProblem : null}
       onOk={onOk}
       onCancel={onCancel}>
       {/* New makes the sketch a part of its own; Add joins it to one; Remove cuts it out of the board it's drawn on. */}
-      <div className="cad-feature-tabs" role="tablist" aria-label="Extrude operation">
+      <div className="cad-feature-tabs" role="tablist" aria-label={translate('Extrude operation')}>
         {(['new', 'add', 'remove', 'intersect'] as const).map(choice => (
           <button key={choice} type="button" role="tab" aria-selected={operation === choice} onClick={() => switchTo(choice)}>
-            {choice === 'new' ? 'New' : choice === 'add' ? 'Add' : choice === 'remove' ? 'Remove' : 'Intersect'}
+            {choice === 'new'
+              ? translate('New')
+              : choice === 'add'
+                ? translate('Add')
+                : choice === 'remove'
+                  ? translate('Remove')
+                  : translate('Intersect')}
           </button>
         ))}
       </div>
       <ViewInfoBanner
         message={
-          unchangedAdd ? 'Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.' : null
+          unchangedAdd
+            ? translate('Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.')
+            : null
         }
       />
       {intersectProblem && (
@@ -381,20 +400,20 @@ export function ExtrudeDialog({
         <div className="cad-feature-selection" data-active={stepProblem && part.addTo !== '' ? '' : undefined}>
           <small>
             {part.faceProfile
-              ? 'Face to extrude'
+              ? translate('Face to extrude')
               : part.thinWall
-                ? 'Faces and sketch regions to extrude'
+                ? translate('Faces and sketch regions to extrude')
                 : operation === 'add'
-                  ? 'Regions to add'
-                  : 'Sketch to cut'}
+                  ? translate('Regions to add')
+                  : translate('Sketch to cut')}
           </small>
           <span className="cad-feature-selection-entries">{listed}</span>
           <button type="button" aria-pressed={profilePicking} onClick={onPickProfile}>
-            Select profile
+            {translate('Select profile ')}
           </button>
           {!part.faceProfile && (
             <button type="button" onClick={onEditSketch}>
-              Edit sketch
+              {translate('Edit sketch ')}
             </button>
           )}
         </div>
@@ -415,19 +434,23 @@ export function ExtrudeDialog({
                 )
               }
             />
-            Merge with all
+            {translate('Merge with all ')}
           </label>
           {/* As the reference's boxes: the part as a chip with a cross; empty, the box is the active pick. */}
           {!part.mergeAll && (
-            <div className="cad-feature-selection" role="group" aria-label="Merge scope" data-active={mergeTarget ? undefined : ''}>
-              <small>Merge scope</small>
+            <div
+              className="cad-feature-selection"
+              role="group"
+              aria-label={translate('Merge scope')}
+              data-active={mergeTarget ? undefined : ''}>
+              <small>{translate('Merge scope')}</small>
               {mergeTarget ? (
                 <span className="cad-feature-selection-entries">
                   <span className="cad-feature-chip">
                     {mergeTarget.name}
                     <button
                       type="button"
-                      aria-label={`Take ${mergeTarget.name} out of merge scope`}
+                      aria-label={translate('Take {{value1}} out of merge scope', { value1: mergeTarget.name })}
                       onClick={() => {
                         setOperationError(null);
                         onChange(current => changePart(current, part.id, p => ({ ...p, addTo: '' })));
@@ -438,7 +461,7 @@ export function ExtrudeDialog({
                 </span>
               ) : (
                 <select
-                  aria-label="Merge scope"
+                  aria-label={translate('Merge scope')}
                   className="cad-feature-selection-pick"
                   value=""
                   onChange={event => {
@@ -448,7 +471,7 @@ export function ExtrudeDialog({
                     setOperationError(refused);
                     if (!refused) onChange(current => changePart(current, part.id, p => ({ ...p, addTo: into.id })));
                   }}>
-                  <option value="">Select a part</option>
+                  <option value="">{translate('Select a part')}</option>
                   {mergeable.map(candidate => (
                     <option key={candidate.id} value={candidate.id}>
                       {candidate.name}
@@ -463,16 +486,16 @@ export function ExtrudeDialog({
         <>
           {!spatialRemove && board && !('error' in board) && (
             <div className="cad-feature-selection">
-              <small>Parts to cut</small>
+              <small>{translate('Parts to cut')}</small>
               <span>{board.board.name}</span>
             </div>
           )}
           {spatialRemove && (
             <label className="cad-number-field">
-              Parts to cut
+              {translate('Parts to cut ')}
               <select
                 multiple
-                aria-label="Parts to cut"
+                aria-label={translate('Parts to cut')}
                 value={removalTargets(document, part).map(target => target.id)}
                 onChange={event => {
                   const targets = Array.from(event.target.selectedOptions, option => option.value);
@@ -489,7 +512,7 @@ export function ExtrudeDialog({
             </label>
           )}
           <label className="cad-number-field">
-            End type
+            {translate('End type ')}
             <select
               value={part.upTo || pickingFace ? 'upTo' : part.remove!.depth === 'through' ? 'through' : 'blind'}
               onChange={event => {
@@ -498,18 +521,18 @@ export function ExtrudeDialog({
                 setUpTo(null);
                 remove(event.target.value === 'through');
               }}>
-              <option value="blind">Blind</option>
-              <option value="through">Through all</option>
-              <option value="upTo">Up to face</option>
+              <option value="blind">{translate('Blind')}</option>
+              <option value="through">{translate('Through all')}</option>
+              <option value="upTo">{translate('Up to face')}</option>
             </select>
           </label>
           {!part.upTo && !pickingFace && part.remove!.depth !== 'through' && (
             <label className="cad-number-field">
-              Depth
+              {translate('Depth ')}
               <span>
                 <CadValueInput
                   bare
-                  aria-label="Cut depth"
+                  aria-label={translate('Cut depth')}
                   value={removeDepthText}
                   spellCheck={false}
                   aria-invalid={removeError ? true : undefined}
@@ -539,12 +562,12 @@ export function ExtrudeDialog({
       <>
         {(operation === 'new' || (operation === 'remove' && part.thinWall)) && part.drawnOn && (
           // Solid pushes the sketch's face out by the thickness; Thin stands a board on a line drawn edge-on.
-          <div className="cad-feature-tabs" role="tablist" aria-label="Extrude type">
+          <div className="cad-feature-tabs" role="tablist" aria-label={translate('Extrude type')}>
             <button type="button" role="tab" aria-selected={!part.thin && !part.thinWall} onClick={() => setThinWall(false)}>
-              Solid
+              {translate('Solid ')}
             </button>
             <button type="button" role="tab" aria-selected={false} disabled title={kUnsupported}>
-              Surface
+              {translate('Surface ')}
             </button>
             <button
               type="button"
@@ -556,22 +579,26 @@ export function ExtrudeDialog({
                 const parsed = parseCadValue(depthText, { unit: 'mm', variables });
                 setThin({ depth: 'error' in parsed || parsed.value <= 0 ? 100 : parsed.value, midPlane: true });
               }}>
-              Thin
+              {translate('Thin ')}
             </button>
           </div>
         )}
         {operation === 'new' && (
           <div className="cad-feature-selection" data-active={profileError && !part.regions?.length ? '' : undefined}>
             <small>
-              {part.faceProfile ? 'Face to extrude' : part.thinWall ? 'Faces and sketch regions to extrude' : 'Sketch to extrude'}
+              {part.faceProfile
+                ? translate('Face to extrude')
+                : part.thinWall
+                  ? translate('Faces and sketch regions to extrude')
+                  : translate('Sketch to extrude')}
             </small>
             <span className="cad-feature-selection-entries">{listed}</span>
             <button type="button" aria-pressed={profilePicking} onClick={onPickProfile}>
-              Select profile
+              {translate('Select profile ')}
             </button>
             {!part.faceProfile && (
               <button type="button" onClick={onEditSketch}>
-                Edit sketch
+                {translate('Edit sketch ')}
               </button>
             )}
           </div>
@@ -585,7 +612,7 @@ export function ExtrudeDialog({
         )}
         {/* Nothing picked yet isn't a problem, only what to do next. */}
         {profileError && !part.faceProfile && part.regions?.length === 0 ? (
-          <p>Pick a region of the sketch in the view.</p>
+          <p>{translate('Pick a region of the sketch in the view.')}</p>
         ) : (
           profileError && (
             <p role="alert" className="cad-thickness-error">
@@ -593,34 +620,34 @@ export function ExtrudeDialog({
                 ? (stepProblem ?? profileError.message)
                 : part.regions
                   ? profileError.message
-                  : 'Pick a region of the sketch in the view.'}
+                  : translate('Pick a region of the sketch in the view.')}
             </p>
           )
         )}
         {solidControls && !part.thin && part.drawnOn && (
           <label className="cad-number-field">
-            End type
+            {translate('End type ')}
             <select
-              aria-label="End type"
+              aria-label={translate('End type')}
               value={part.upTo || pickingFace ? 'upTo' : 'blind'}
               onChange={event => {
                 if (event.target.value === 'upTo') return startPickingFace();
                 stopPickingFace();
                 setUpTo(null);
               }}>
-              <option value="blind">Blind</option>
+              <option value="blind">{translate('Blind')}</option>
               <option value="next" disabled>
-                Up to next
+                {translate('Up to next ')}
               </option>
-              <option value="upTo">Up to face</option>
+              <option value="upTo">{translate('Up to face')}</option>
               <option value="part" disabled>
-                Up to part
+                {translate('Up to part ')}
               </option>
               <option value="vertex" disabled>
-                Up to vertex
+                {translate('Up to vertex ')}
               </option>
               <option value="through" disabled>
-                Through all
+                {translate('Through all ')}
               </option>
             </select>
           </label>
@@ -629,14 +656,18 @@ export function ExtrudeDialog({
           <button
             type="button"
             className="cad-feature-selection"
-            aria-label="Up to"
+            aria-label={translate('Up to')}
             data-active={pickingFace ? '' : undefined}
             onClick={startPickingFace}>
-            <small>Up to</small>
+            <small>{translate('Up to')}</small>
             <span>
               {part.upTo
-                ? `${document.planes?.find(plane => plane.id === part.upToDatum)?.name ?? drawnOnName(document, part.upTo)}, ${formatLength(part.thickness)} ${lengthUnit} away`
-                : 'Pick a plane or a face'}
+                ? translate('{{value1}}, {{value2}} {{lengthUnit}} away', {
+                    value1: document.planes?.find(plane => plane.id === part.upToDatum)?.name ?? drawnOnName(document, part.upTo),
+                    value2: formatLength(part.thickness),
+                    lengthUnit: lengthUnit,
+                  })
+                : translate('Pick a plane or a face')}
             </span>
           </button>
         )}
@@ -656,20 +687,20 @@ export function ExtrudeDialog({
                 )
               }
             />
-            Symmetric
+            {translate('Symmetric ')}
           </label>
         )}
         {solidControls && !part.thin && part.drawnOn && (
           <>
             <label title={kUnsupported}>
               <input type="checkbox" disabled />
-              Draft
+              {translate('Draft ')}
             </label>
             {/* A symmetric extrude has both its ends set by the one depth. */}
             {!part.symmetric && (
               <label title={kUnsupported}>
                 <input type="checkbox" disabled />
-                Second end position
+                {translate('Second end position ')}
               </label>
             )}
           </>
@@ -679,8 +710,8 @@ export function ExtrudeDialog({
           <button
             type="button"
             className="cad-flip-direction"
-            aria-label="Flip direction"
-            title="Extrude the other way"
+            aria-label={translate('Flip direction')}
+            title={translate('Extrude the other way')}
             // An Intersect goes into what's below by default, so pressed is the other way, as for a new part.
             aria-pressed={part.remove ? removalInward(part) : part.intersect ? !part.drawnOn.inward : !!part.drawnOn.inward}
             onClick={() =>
@@ -721,11 +752,11 @@ export function ExtrudeDialog({
         {part.thin && (
           <>
             <label className="cad-number-field">
-              Depth
+              {translate('Depth ')}
               <span>
                 <CadValueInput
                   bare
-                  aria-label="Depth"
+                  aria-label={translate('Depth')}
                   value={depthText}
                   spellCheck={false}
                   aria-invalid={depthError ? true : undefined}
@@ -756,7 +787,7 @@ export function ExtrudeDialog({
                 checked={!!part.thin.midPlane}
                 onChange={event => setThin({ ...part.thin!, midPlane: event.target.checked })}
               />
-              Mid plane
+              {translate('Mid plane ')}
             </label>
           </>
         )}

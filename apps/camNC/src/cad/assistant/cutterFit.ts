@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadDocument } from '@wbcnc/cad';
 import type { CadReport } from '@wbcnc/cad-script';
 import type { AssistantRequirementCheck } from './requirements';
@@ -57,7 +58,10 @@ export function cutterCheck(
     passed: false,
     expected: cutter,
     actual: bit ?? kDefaultCheckBit,
-    message: `The user cuts with a ⌀${cutter} mm bit. Check this design with bit: ${cutter}, so its mortise corners are measured for that cutter.`,
+    message: translate(
+      'The user cuts with a ⌀{{cutter}} mm bit. Check this design with bit: {{cutter}}, so its mortise corners are measured for that cutter.',
+      { cutter: cutter }
+    ),
   };
 }
 
@@ -75,7 +79,10 @@ export function cutterFitNotes(
   const notes: string[] = [];
   if (requestedCutter(requests) === undefined)
     notes.push(
-      `No cutter diameter was given, so the mortise corners were checked only for the default ⌀${kDefaultCheckBit} mm bit. Say which bit you cut with to check them for it.`
+      translate(
+        'No cutter diameter was given, so the mortise corners were checked only for the default ⌀{{value1}} mm bit. Say which bit you cut with to check them for it.',
+        { value1: kDefaultCheckBit }
+      )
     );
   for (const warning of report?.warnings ?? []) if (warning.code === 'corner-unreachable') notes.push(warning.message);
   return notes;

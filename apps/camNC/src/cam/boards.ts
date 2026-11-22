@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { FlipRegistration, HoldDown } from '@wbcnc/cam';
 import { edgeDir, holdBox, kDefaultStickout, pathClearance, type HoldKind, type HoldPoint } from '@wbcnc/cam/holdPoints';
 import { nestRects, type NestResult, type Placement, type Rect } from '@wbcnc/cam/nest';
@@ -153,7 +154,7 @@ export function cutBoardWith<B extends Pick<BoardV1, 'cut' | 'items'>>(boards: B
 }
 
 /** "Cut" or "Partly cut", for a cut board. */
-export const cutLabel = (board: Pick<BoardV1, 'cut'>) => (board.cut?.all ? 'Cut' : 'Partly cut');
+export const cutLabel = (board: Pick<BoardV1, 'cut'>) => (board.cut?.all ? 'Cut' : translate('Partly cut'));
 
 /**
  * The fields a cut board keeps: everything that decides where its parts are and what holds it. What it may still
@@ -236,8 +237,8 @@ export const holdSettingsOf = (b: BoardV1): Partial<BoardV1> => ({
 
 export const kRetentionLabels: Record<Retention, string> = {
   tabs: 'Tabs',
-  skin: 'Bottom skin',
-  none: 'Nothing, I watch them',
+  skin: translate('Bottom skin'),
+  none: translate('Nothing, I watch them'),
 };
 
 /** "2 clamps, 1 screw". */
@@ -283,10 +284,11 @@ export const boardLabel = (board: Pick<BoardV1, 'name'>) => (/^([A-Z]|B\d+)$/.te
 
 /** Why a board can't have this name: it's in messages at the machine and in the G-code file's name. */
 export function boardNameProblem(name: string, boards: Pick<BoardV1, 'id' | 'name'>[], id: string): string | null {
-  if (!name) return 'A board needs a name.';
-  if (name.length > 30) return 'That name is too long: 30 characters at most.';
-  if (/[/\\:*?"<>|]/.test(name)) return 'A board’s name goes in the G-code file’s name, so it can’t have any of / \\ : * ? " < > |.';
-  if (boards.some(b => b.id !== id && b.name === name)) return `There already is a board called ${name}.`;
+  if (!name) return translate('A board needs a name.');
+  if (name.length > 30) return translate('That name is too long: 30 characters at most.');
+  if (/[/\\:*?"<>|]/.test(name))
+    return translate('A board’s name goes in the G-code file’s name, so it can’t have any of / \\ : * ? " < > |.');
+  if (boards.some(b => b.id !== id && b.name === name)) return translate('There already is a board called {{value1}}.', { value1: name });
   return null;
 }
 
@@ -901,17 +903,25 @@ export function holdVerdict(
 ): { tone: 'ok' | 'warn' | 'none'; text: string } {
   const fixtures = board.fixtures ?? [];
   const names = fixtureCount(fixtures);
-  if (board.taped) return { tone: 'ok', text: names ? `${names} and tape.` : 'Tape holds this board.' };
-  if (!fixtures.length) return { tone: 'none', text: 'Nothing fastens this board. If that’s the plan, you hold it down by hand.' };
+  if (board.taped)
+    return { tone: 'ok', text: names ? translate('{{value1}} and tape.', { value1: names }) : translate('Tape holds this board.') };
+  if (!fixtures.length)
+    return { tone: 'none', text: translate('Nothing fastens this board. If that’s the plan, you hold it down by hand.') };
   const around = holdsSurroundWork(fixtures, nest, hw, instances);
   return around
     ? {
         tone: 'ok',
-        text: `${names} around the work’s middle, which should stop it turning. Force isn’t checked here. The Plan step checks each piece as it’s cut.`,
+        text: translate(
+          '{{value1}} around the work’s middle, which should stop it turning. Force isn’t checked here. The Plan step checks each piece as it’s cut.',
+          { value1: names }
+        ),
       }
     : {
         tone: 'warn',
-        text: `${names}: the board can still turn. A hold on the other side of the work’s middle would help. This is a note, not a block.`,
+        text: translate(
+          '{{value1}}: the board can still turn. A hold on the other side of the work’s middle would help. This is a note, not a block.',
+          { value1: names }
+        ),
       };
 }
 
@@ -928,14 +938,14 @@ export function layoutChange(
       : [];
   });
   const grew = after.board.w > before.board.w || after.board.h > before.board.h;
-  if (!moved.length && !grew) return 'Fits as is. No part moves.';
+  if (!moved.length && !grew) return translate('Fits as is. No part moves.');
   const [m] = moved;
   const how =
     m &&
     `${moved.map(x => x.name).join(', ')} ${moved.length > 1 ? 'move' : 'moves'} ${Math.round(Math.hypot(m.dx, m.dy))} mm ${
       Math.abs(m.dx) >= Math.abs(m.dy) ? (m.dx > 0 ? 'right' : 'left') : m.dy > 0 ? 'up' : 'down'
     }.`;
-  return `${how ?? ''} ${grew ? `Board grows to ${after.board.w} × ${after.board.h}.` : 'Board size unchanged.'}`.trim();
+  return `${how ?? ''} ${grew ? translate('Board grows to {{value1}} × {{value2}}.', { value1: after.board.w, value2: after.board.h }) : translate('Board size unchanged.')}`.trim();
 }
 
 export { layoutSummary } from './boards/summary';

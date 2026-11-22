@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   dropPart,
   holdSettingsOf,
@@ -56,7 +57,10 @@ const mm = (v: number) => +v.toFixed(1);
 /** Why a body can't be cut on this machine: its size against the largest board the machine holds. */
 export function tooBigReason(inst: PartInstance, machine: { w: number; h: number }, margin: number): string {
   const inside = `${mm(machine.w - 2 * margin)} × ${mm(machine.h - 2 * margin)} mm`;
-  return `${inst.name} (${mm(inst.size[0])} × ${mm(inst.size[1])} mm) is too big for the machine: its largest board is ${mm(machine.w)} × ${mm(machine.h)} mm, ${inside} inside the edge margins.`;
+  return translate(
+    '{{value1}} ({{value2}} × {{value3}} mm) is too big for the machine: its largest board is {{value4}} × {{value5}} mm, {{value6}} inside the edge margins.',
+    { value1: inst.name, value2: mm(inst.size[0]), value3: mm(inst.size[1]), value4: mm(machine.w), value5: mm(machine.h), value6: inside }
+  );
 }
 
 /** A board takes another body only with room to spare: no part `before` places comes off it in `after`. */
@@ -80,12 +84,18 @@ export function moveOnto(
   const fits = !nestBoard(board, instances, bit, { ...opts, holds: false }).unplaced.includes(id);
   if (fits && keepsParts(target, board, instances, bit, opts)) return { board };
   const empty = !nestBoard(target, instances, bit, { ...opts, holds: false }).placements.some(p => p.id !== id);
-  return { full: `${empty ? 'too small' : 'full'}${target.size.fit && opts.machine ? ' and can’t grow within the machine' : ''}` };
+  return {
+    full: `${empty ? translate('too small') : 'full'}${target.size.fit && opts.machine ? translate(' and can’t grow within the machine') : ''}`,
+  };
 }
 
 /** Why a move by hand was refused: the board has no room, and the body stays where it was. */
 export const moveRefusedNote = (name: string, target: BoardV1, full: string) =>
-  `${name} doesn’t fit on board ${target.name}: it’s ${full}. It stays where it is.`;
+  translate('{{value1}} doesn’t fit on board {{value2}}: it’s {{value3}}. It stays where it is.', {
+    value1: name,
+    value2: target.name,
+    value3: full,
+  });
 
 export interface OffBoardPlacement {
   boards: BoardV1[];
@@ -150,13 +160,22 @@ export function placeOffBoardNote(
   const byId = new Map(instances.map(i => [i.id, i]));
   const name = (id: string) => byId.get(id)?.name ?? id;
   const notPlaced = tooBig.length + onCut.length > 0;
-  const done = !placed.length ? '' : notPlaced ? `Placed on boards: ${placed.map(name).join(', ')}.` : 'Parts off the boards placed.';
+  const done = !placed.length
+    ? ''
+    : notPlaced
+      ? translate('Placed on boards: {{value1}}.', { value1: placed.map(name).join(', ') })
+      : translate('Parts off the boards placed.');
   const big = tooBig.map(({ id, margin }) => {
     const inst = byId.get(id);
-    return inst && machine ? `${tooBigReason(inst, machine, margin)} It stays off the boards.` : `${name(id)} fits on no board.`;
+    return inst && machine
+      ? translate('{{value1}} It stays off the boards.', { value1: tooBigReason(inst, machine, margin) })
+      : translate('{{value1}} fits on no board.', { value1: name(id) });
   });
   const cut = onCut.length
-    ? `Not placed: ${onCut.map(name).join(', ')} ${onCut.length === 1 ? 'is' : 'are'} on already-cut boards. Start over on a new sheet first.`
+    ? translate('Not placed: {{value1}} {{value2}} on already-cut boards. Start over on a new sheet first.', {
+        value1: onCut.map(name).join(', '),
+        value2: onCut.length === 1 ? translate('is') : translate('are'),
+      })
     : '';
-  return [done, ...big, cut].filter(Boolean).join(' ') || 'No parts could be placed.';
+  return [done, ...big, cut].filter(Boolean).join(' ') || translate('No parts could be placed.');
 }

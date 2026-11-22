@@ -1,3 +1,4 @@
+import { t as translate, getLanguage } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { explainAlarm, kUnknownAlarmHelp, TravelBounds } from '@/lib/machine/alarms';
 import { useMachineBoundsOrNull } from '@/store/store';
@@ -6,7 +7,9 @@ import { toast } from '@wbcnc/ui/components/sonner';
 import { Home, LockOpen, OctagonX } from 'lucide-react';
 
 function report(promise: Promise<unknown>, what: string) {
-  return promise.catch(err => toast.error(`${what} failed`, { description: err instanceof Error ? err.message : String(err) }));
+  return promise.catch(err =>
+    toast.error(translate('{{what}} failed', { what: what }), { description: err instanceof Error ? err.message : String(err) })
+  );
 }
 
 const fmt = (n: number) => n.toFixed(2);
@@ -27,34 +30,39 @@ export function AlarmCard({ onShowConsole }: { onShowConsole?: () => void }) {
   const travel: TravelBounds = bounds ? { X: { min: bounds.min.x, max: bounds.max.x }, Y: { min: bounds.min.y, max: bounds.max.y } } : {};
   // Only an alarm the controller has not left since is the current one.
   const known = lastAlarm && !lastAlarm.cleared ? lastAlarm : null;
-  const help = known ? explainAlarm(known, travel) : { title: 'Alarm', ...kUnknownAlarmHelp };
+  const help = known ? explainAlarm(known, travel) : { title: translate('Alarm'), ...kUnknownAlarmHelp };
   const recent = known ? [] : api.consoleLines.value.slice(-5);
 
   return (
     <div className="rounded-md bg-red-600 text-white p-3 text-sm flex flex-col gap-2" role="alert" data-testid="alarm-card">
       <div className="flex flex-row items-baseline justify-between gap-2">
         <b>{help.title}</b>
-        {known && <span className="text-xs text-red-100">{new Date(known.at).toLocaleTimeString()}</span>}
+        {known && <span className="text-xs text-red-100">{new Date(known.at).toLocaleTimeString(getLanguage())}</span>}
       </div>
       <p>{help.cause}</p>
       <p className="text-red-50">
-        <b>Fix:</b> {help.fix}
+        <b>{translate('Fix:')}</b> {help.fix}
       </p>
       {known?.mpos && (
         <p className="text-xs text-red-100 font-mono">
-          At machine X {fmt(known.mpos.x)} Y {fmt(known.mpos.y)} Z {fmt(known.mpos.z)}
-          {known.job && ` · ${known.job.file.split('/').pop()} ${known.job.percent.toFixed(1)} %`}
+          {translate('At machine X ')}
+          {fmt(known.mpos.x)} Y {fmt(known.mpos.y)} Z {fmt(known.mpos.z)}
+          {known.job &&
+            translate(' · {{value1}} {{value2}} %', { value1: known.job.file.split('/').pop(), value2: known.job.percent.toFixed(1) })}
         </p>
       )}
       {(known?.messages.length ?? 0) > 0 && (
         <ul className="text-xs font-mono bg-red-700/60 rounded p-1.5 flex flex-col gap-0.5">
           {known!.messages.map((message, i) => (
-            <li key={i}>[MSG:{message}]</li>
+            <li key={i}>
+              {translate('[MSG:')}
+              {message}]
+            </li>
           ))}
         </ul>
       )}
       {recent.length > 0 && (
-        <ul className="text-xs font-mono bg-red-700/60 rounded p-1.5 flex flex-col gap-0.5" aria-label="Last console lines">
+        <ul className="text-xs font-mono bg-red-700/60 rounded p-1.5 flex flex-col gap-0.5" aria-label={translate('Last console lines')}>
           {recent.map((line, i) => (
             <li key={i} className="truncate">
               {line.text}
@@ -68,19 +76,22 @@ export function AlarmCard({ onShowConsole }: { onShowConsole?: () => void }) {
           size="sm"
           variant="secondary"
           disabled={!connected}
-          title="Soft reset (Ctrl-X): clears the alarm's lock-out and the planner"
+          title={translate("Soft reset (Ctrl-X): clears the alarm's lock-out and the planner")}
           onClick={() => api.softReset()}>
-          <OctagonX /> Reset
+          <OctagonX />
+          {translate(' Reset ')}
         </Button>
         <Button size="sm" variant="secondary" disabled={!connected} onClick={() => report(api.home(), 'Homing')}>
-          <Home /> Home all
+          <Home />
+          {translate(' Home all ')}
         </Button>
         <Button size="sm" variant="secondary" disabled={!connected} onClick={() => report(api.unlock(), 'Unlock')}>
-          <LockOpen /> Unlock
+          <LockOpen />
+          {translate(' Unlock ')}
         </Button>
         {onShowConsole && (
           <Button size="sm" variant="link" className="text-white ml-auto px-0" onClick={onShowConsole}>
-            Show console
+            {translate('Show console ')}
           </Button>
         )}
       </div>

@@ -1,10 +1,11 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Link } from '@tanstack/react-router';
 import type { ComponentProps } from 'react';
 import type { AppStep } from './useAppSteps';
 
 /** A step as a link or a button, whichever it takes to get there. */
 export function StepControl({ step, children, ...props }: { step: AppStep } & ComponentProps<'button'>) {
-  const label = props['aria-label'] ?? (step.key === 'machine' ? 'At the machine' : undefined);
+  const label = props['aria-label'] ?? (step.key === 'machine' ? translate('At the machine') : undefined);
   if (step.current)
     return (
       <button {...props} aria-label={label} type="button" aria-current="step">
@@ -13,7 +14,7 @@ export function StepControl({ step, children, ...props }: { step: AppStep } & Co
     );
   if (step.disabled)
     return (
-      <button {...props} aria-label={label} type="button" disabled title="Open a project first">
+      <button {...props} aria-label={label} type="button" disabled title={translate('Open a project first')}>
         {children}
       </button>
     );

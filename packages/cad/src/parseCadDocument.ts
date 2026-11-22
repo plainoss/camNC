@@ -1,19 +1,18 @@
 import { validateExtrudeSettings } from './validateExtrudeSettings';
-import { slotIssue } from './slot';
-import { linearPatternIssue } from './pattern';
 import { cadVariableNameError } from './valueExpressions';
 import { nestedDeeperThan } from './nestingDepth';
 import { validPartCutSplit } from './partCutSplit';
-import { CAD_DOCUMENT_VERSION, type CadDirection, type CadDocument, type CadPart, type CadPlacement, type CadSketch } from './types';
-import { splineHandleIssue, withSplineHandleSegments } from './splineHandles';
-import { constraintEntityIds, entityPointIds } from './entityReferences';
+import { CAD_DOCUMENT_VERSION, type CadDocument, type CadSketch } from './types';
+import { withSplineHandleSegments } from './splineHandles';
 import { cadFolderIssue, cadFolderStepIssue } from './folderModel';
 import { designSteps } from './designSteps';
-import { validCircularPartPattern } from './circularPartPattern';
 import { constructionShapeIssue } from './constructionShape';
 import { migrateDesignUnitNumbers } from './lengthUnits';
 import { partCutReliefIssue } from './partCutRelief';
 import { copyOperationSourceIssue } from './copyOperationSource';
+import { number, reference } from './parseCadChecks';
+import { checkCadPartSetup } from './parseCadPart';
+import { checkCadSketch } from './parseCadSketch';
 
 /** Reject invalid source shapes early when loading portable documents. Geometric errors stay editable. */
 export function parseCadDocument(input: unknown): CadDocument {
@@ -40,12 +39,6 @@ export function parseCadDocument(input: unknown): CadDocument {
     if (typeof id !== 'string' || !id || into.has(id)) throw new Error('CAD IDs must be unique nonempty strings');
     into.add(id);
   };
-  const number = (value: unknown) => {
-    if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error('CAD numeric fields must be finite numbers');
-  };
-  const reference = (value: unknown) => {
-    if (typeof value !== 'string' || !value) throw new Error('CAD references must be nonempty strings');
-  };
   if (d.variables !== undefined) {
     if (!Array.isArray(d.variables)) throw new Error('Invalid CAD variables');
     const names = new Set<string>();
@@ -56,6 +49,9 @@ export function parseCadDocument(input: unknown): CadDocument {
         throw new Error('Invalid CAD variable name');
       if (typeof variable.expression !== 'string') throw new Error('Invalid CAD variable');
       if (variable.before !== undefined && typeof variable.before !== 'string') throw new Error('Invalid CAD variable');
+      if (variable.suppressed !== undefined && variable.suppressed !== true) throw new Error('Invalid CAD variable');
+      for (const key of ['after', 'description'] as const)
+        if (variable[key] !== undefined && typeof variable[key] !== 'string') throw new Error('Invalid CAD variable');
       names.add(variable.name);
     }
   }
@@ -71,39 +67,6 @@ export function parseCadDocument(input: unknown): CadDocument {
       number(plane.offset);
     }
   }
-  const checkPlacement = (placement: CadPlacement) => {
-    const { position, rotation, positionExpressions } = placement ?? ({} as CadPlacement);
-    if (!Array.isArray(position) || position.length !== 3 || !Array.isArray(rotation) || rotation.length !== 4)
-      throw new Error('Invalid CAD placement');
-    [...position, ...rotation].forEach(number);
-    if (Math.abs(Math.hypot(...rotation) - 1) > 1e-6) throw new Error('Invalid CAD placement');
-    if (
-      positionExpressions !== undefined &&
-      (!Array.isArray(positionExpressions) ||
-        positionExpressions.length !== 3 ||
-        positionExpressions.some(e => e !== null && typeof e !== 'string'))
-    )
-      throw new Error('Invalid CAD placement');
-  };
-  const checkDirection = (direction: CadDirection) => {
-    const { along, flip } = direction ?? ({} as CadDirection);
-    const face = along && typeof along === 'object' && 'face' in along ? along.face : undefined;
-    if (
-      !along ||
-      typeof along !== 'object' ||
-      ('plane' in along
-        ? !['top', 'front', 'right'].includes(along.plane)
-        : typeof along.partId !== 'string' ||
-          !(face === 'top' || face === 'underside' || (face && typeof face === 'object' && typeof face.edge === 'string'))) ||
-      (flip !== undefined && typeof flip !== 'boolean')
-    )
-      throw new Error('Invalid CAD direction');
-  };
-  const checkVector = (vector: unknown) => {
-    if (!Array.isArray(vector) || vector.length !== 3) throw new Error('Invalid CAD transform vector');
-    // Iteration visits sparse slots too; a missing component is not a finite coordinate.
-    for (const value of vector) number(value);
-  };
   if (d.partCuts !== undefined) {
     if (!Array.isArray(d.partCuts)) throw new Error('Invalid CAD part cuts');
     for (const step of d.partCuts) {
@@ -136,205 +99,7 @@ export function parseCadDocument(input: unknown): CadDocument {
       throw new Error('Invalid CAD part');
     number(p.thickness);
     validateExtrudeSettings(p, number, reference);
-    if (p.copies !== undefined) {
-      if (!Array.isArray(p.copies)) throw new Error('Invalid CAD part copies');
-      for (const copy of p.copies) {
-        if (!copy || typeof copy !== 'object') throw new Error('Invalid CAD part copy');
-        addId(copy.id);
-        if (copy.mirrored !== undefined && typeof copy.mirrored !== 'boolean') throw new Error('Invalid CAD part copy');
-        if (copy.name !== undefined && typeof copy.name !== 'string') throw new Error('Invalid CAD part copy');
-        if (copy.number !== undefined && (!Number.isInteger(copy.number) || copy.number < 2)) throw new Error('Invalid CAD part copy');
-        if (copy.pattern !== undefined && typeof copy.pattern !== 'string') throw new Error('Invalid CAD part copy');
-        if (copy.placement !== undefined) checkPlacement(copy.placement);
-        if (copy.along !== undefined) {
-          checkDirection(copy.along);
-          number(copy.along.distance);
-          if (copy.along.distanceExpression !== undefined && typeof copy.along.distanceExpression !== 'string')
-            throw new Error('Invalid CAD copy distance expression');
-        }
-      }
-    }
-    if (p.pattern !== undefined) {
-      if (
-        p.pattern?.excluded !== undefined &&
-        (!Array.isArray(p.pattern.excluded) ||
-          p.pattern.excluded.some(index => !Number.isInteger(index) || index < 1 || index >= 200) ||
-          new Set(p.pattern.excluded).size !== p.pattern.excluded.length)
-      )
-        throw new Error('Invalid CAD pattern exclusions');
-      if (p.pattern?.circular !== undefined && !validCircularPartPattern(p.pattern.circular))
-        throw new Error('Invalid CAD circular part pattern');
-      if (p.pattern?.direction !== undefined) checkDirection(p.pattern.direction);
-      const vector = p.pattern?.vector;
-      if (
-        vector !== undefined &&
-        !(Array.isArray(vector) && vector.length === 3 && vector.every(Number.isFinite) && Math.hypot(...vector) > 0)
-      )
-        throw new Error('Invalid CAD pattern vector');
-      const { second, skipped, centered } = p.pattern ?? {};
-      const unit = (v: unknown) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite) && Math.hypot(...(v as number[])) > 0;
-      if (
-        (centered !== undefined && centered !== true) ||
-        (second !== undefined &&
-          (!second ||
-            !unit(second.vector) ||
-            !Number.isInteger(second.count) ||
-            second.count < 1 ||
-            second.count > 200 ||
-            !Number.isFinite(second.spacing) ||
-            (second.spacingExpression !== undefined && typeof second.spacingExpression !== 'string') ||
-            (second.countExpression !== undefined && typeof second.countExpression !== 'string') ||
-            (second.centered !== undefined && second.centered !== true))) ||
-        (skipped !== undefined &&
-          (!Array.isArray(skipped) || skipped.some(at => !Array.isArray(at) || at.length !== 2 || !at.every(Number.isInteger))))
-      )
-        throw new Error('Invalid CAD pattern grid');
-      const { id, axis, count, spacing, countExpression, spacingExpression } = p.pattern ?? ({} as NonNullable<CadPart['pattern']>);
-      if (
-        typeof id !== 'string' ||
-        !['x', 'y', 'z'].includes(axis) ||
-        !Number.isInteger(count) ||
-        count < 1 ||
-        count > 200 ||
-        !Number.isFinite(spacing) ||
-        (countExpression !== undefined && typeof countExpression !== 'string') ||
-        (spacingExpression !== undefined && typeof spacingExpression !== 'string')
-      )
-        throw new Error('Invalid CAD part pattern');
-    }
-    if (p.placement !== undefined) checkPlacement(p.placement);
-    // History details are formatted during folder validation below, before geometry is evaluated.
-    if (p.moved !== undefined) {
-      const moved = p.moved;
-      if (!moved || typeof moved !== 'object' || Array.isArray(moved)) throw new Error('Invalid CAD part transform');
-      if ('by' in moved) {
-        checkVector(moved.by);
-        if (
-          moved.byExpressions !== undefined &&
-          (!Array.isArray(moved.byExpressions) ||
-            moved.byExpressions.length !== 3 ||
-            [...moved.byExpressions].some(expression => expression !== null && typeof expression !== 'string'))
-        )
-          throw new Error('Invalid CAD transform expressions');
-        if (moved.turn !== undefined) {
-          const turn = moved.turn;
-          if (!turn || typeof turn !== 'object' || Array.isArray(turn)) throw new Error('Invalid CAD turn');
-          checkVector(turn.about);
-          checkVector(turn.axis);
-          if (Math.hypot(...turn.axis) === 0) throw new Error('Invalid CAD turn axis');
-          number(turn.degrees);
-          if (turn.degreesExpression !== undefined && typeof turn.degreesExpression !== 'string') throw new Error('Invalid CAD turn');
-        }
-      } else {
-        checkDirection(moved);
-        number(moved.distance);
-      }
-    }
-    if (p.fillets !== undefined) {
-      if (!Array.isArray(p.fillets)) throw new Error('Invalid CAD fillets');
-      for (const fillet of p.fillets) {
-        if (!fillet || typeof fillet !== 'object' || !Array.isArray(fillet.corners)) throw new Error('Invalid CAD fillet');
-        addId(fillet.id);
-        for (const corner of fillet.corners) reference(corner);
-        number(fillet.radius);
-        if (fillet.radiusExpression !== undefined && typeof fillet.radiusExpression !== 'string') throw new Error('Invalid CAD fillet');
-        if (fillet.suppressed !== undefined && typeof fillet.suppressed !== 'boolean') throw new Error('Invalid CAD fillet');
-        if (fillet.rims !== undefined) {
-          if (!Array.isArray(fillet.rims)) throw new Error('Invalid CAD fillet');
-          for (const rim of fillet.rims)
-            if (
-              !rim ||
-              typeof rim !== 'object' ||
-              (rim.side !== 'top' && rim.side !== 'underside') ||
-              !Array.isArray(rim.loops) ||
-              !rim.loops.length ||
-              rim.loops.some((loop: unknown) => typeof loop !== 'string' || !loop) ||
-              (rim.face !== undefined && rim.face !== true)
-            )
-              throw new Error('Invalid CAD fillet');
-        }
-      }
-    }
-    if (p.thinWall !== undefined) {
-      const wall = p.thinWall;
-      if (!wall || typeof wall !== 'object') throw new Error('Invalid CAD thin wall');
-      number(wall.thickness1);
-      number(wall.thickness2);
-      if (wall.thickness1 < 0 || wall.thickness2 < 0 || wall.thickness1 + wall.thickness2 <= 0) throw new Error('Invalid CAD thin wall');
-      for (const key of ['thickness1Expression', 'thickness2Expression'] as const)
-        if (wall[key] !== undefined && typeof wall[key] !== 'string') throw new Error('Invalid CAD thin wall');
-      if (wall.midPlane !== undefined && wall.midPlane !== true) throw new Error('Invalid CAD thin wall');
-    }
-    if (
-      p.thinEdges !== undefined &&
-      (!p.thinWall ||
-        !Array.isArray(p.thinEdges) ||
-        !p.thinEdges.length ||
-        p.thinEdges.some(id => typeof id !== 'string' || !p.sketch.entities.some(entity => entity.id === id && entity.type === 'line')))
-    )
-      throw new Error('Invalid CAD thin edges');
-    if (
-      (p.piece !== undefined &&
-        (!p.piece ||
-          typeof p.piece !== 'object' ||
-          !['sketchId', 'regionId', 'by'].every(key => typeof (p.piece as unknown as Record<string, unknown>)[key] === 'string'))) ||
-      (p.pieceOf !== undefined && (!p.pieceOf || typeof p.pieceOf.partId !== 'string' || typeof p.pieceOf.by !== 'string'))
-    )
-      throw new Error('Invalid CAD part piece');
-    if (p.material !== undefined) {
-      const material = p.material as unknown as Record<string, unknown> | null;
-      if (!material || typeof material.name !== 'string' || !material.name) throw new Error('Invalid CAD material');
-      number(material.density);
-    }
-    if (p.split !== undefined) {
-      const split = p.split as unknown as Record<string, unknown> | null;
-      const across = split?.across as Record<string, unknown> | undefined;
-      if (
-        !split ||
-        typeof split.id !== 'string' ||
-        !across ||
-        typeof across !== 'object' ||
-        ('plane' in across ? !['top', 'front', 'right'].includes(across.plane as string) : typeof across.partId !== 'string') ||
-        (split.datum !== undefined && typeof split.datum !== 'string') ||
-        (split.suppressed !== undefined && split.suppressed !== true) ||
-        (split.fromCopy !== undefined && split.fromCopy !== true)
-      )
-        throw new Error('Invalid CAD split');
-      addId(split.id);
-      const line = split.line as Record<string, unknown> | undefined;
-      if (line !== undefined) for (const key of ['x', 'y', 'nx', 'ny'] as const) number(line[key]);
-    }
-    if (p.mirrorJoins !== undefined) {
-      if (!Array.isArray(p.mirrorJoins) || !p.mirrorJoins.length) throw new Error('Invalid CAD mirror');
-      for (const join of p.mirrorJoins) {
-        if (!join || typeof join !== 'object' || !join.across || typeof join.across !== 'object') throw new Error('Invalid CAD mirror');
-        addId(join.id);
-        const across = join.across as Record<string, unknown>;
-        if ('plane' in across ? !['top', 'front', 'right'].includes(across.plane as string) : typeof across.partId !== 'string')
-          throw new Error('Invalid CAD mirror');
-        if (join.datum !== undefined && typeof join.datum !== 'string') throw new Error('Invalid CAD mirror');
-        if (join.suppressed !== undefined && typeof join.suppressed !== 'boolean') throw new Error('Invalid CAD mirror');
-        if (join.line !== undefined) for (const key of ['x', 'y', 'nx', 'ny'] as const) number(join.line[key]);
-      }
-    }
-    if (p.drawnOn !== undefined) {
-      const { on, offset, offsetExpression, inward } = p.drawnOn ?? ({} as NonNullable<CadPart['drawnOn']>);
-      const face = on && typeof on === 'object' && 'face' in on ? on.face : undefined;
-      if (
-        !on ||
-        typeof on !== 'object' ||
-        ('plane' in on
-          ? !['top', 'front', 'right'].includes(on.plane)
-          : typeof on.partId !== 'string' ||
-            (on.copyId !== undefined && typeof on.copyId !== 'string') ||
-            !(face === 'top' || face === 'underside' || (typeof face === 'object' && face && typeof face.edge === 'string'))) ||
-        (offsetExpression !== undefined && typeof offsetExpression !== 'string') ||
-        (inward !== undefined && typeof inward !== 'boolean') ||
-        (p.drawnOn.datum !== undefined && !d.planes?.some(plane => plane.id === p.drawnOn!.datum))
-      )
-        throw new Error('Invalid CAD part support');
-      number(offset);
-    }
+    checkCadPartSetup(p, d, addId);
     if (p.features !== undefined && !Array.isArray(p.features)) throw new Error('Invalid CAD features');
     // A shared sketch, and a Remove step's sketch on the board it cuts, are copies: their IDs are the original's, so
     // they're checked against IDs of their own. Loading migrates every sketch, so each is checked.
@@ -363,261 +128,7 @@ export function parseCadDocument(input: unknown): CadDocument {
       const scope = own ? ids : new Set<string>();
       const add = (id: unknown) => addId(id, scope);
       add(sketch.id);
-      for (const e of sketch.entities) {
-        if (!e || typeof e !== 'object') throw new Error('Invalid CAD entity');
-        add(e.id);
-        if (!['point', 'line', 'circle', 'ellipse', 'arc', 'conic', 'bezier', 'spline'].includes(e.type))
-          throw new Error('Unknown CAD entity');
-        if (e.construction !== undefined && typeof e.construction !== 'boolean') throw new Error('Invalid construction flag');
-        if (e.taken !== undefined && (e.taken !== true || !e.faceEdge)) throw new Error('Invalid taken face edge');
-        if (e.type === 'point') {
-          number(e.x);
-          number(e.y);
-          if (e.fixed !== undefined && typeof e.fixed !== 'boolean') throw new Error('Invalid fixed flag');
-          if (e.standalone !== undefined && typeof e.standalone !== 'boolean') throw new Error('Invalid standalone point flag');
-        } else {
-          if (e.type === 'bezier' || e.type === 'spline') {
-            if (!Array.isArray(e.controlPointIds)) throw new Error('Invalid curve controls');
-          }
-          if (e.type === 'spline') {
-            if (![e.fitPointIds, e.fitParameters, e.knots, e.weights].every(Array.isArray)) throw new Error('Invalid spline data');
-            e.fitPointIds.forEach(reference);
-            e.fitParameters.forEach(number);
-            e.knots.forEach(number);
-            e.weights.forEach(number);
-            number(e.degree);
-            if (e.closed !== undefined && typeof e.closed !== 'boolean') throw new Error('Invalid closed spline flag');
-          }
-          if (e.type === 'ellipse') {
-            number(e.radius);
-            if (!['major', 'minor'].includes(e.primaryAxis)) throw new Error('Invalid ellipse primary axis');
-          }
-          if (e.type === 'conic') number(e.rho);
-          entityPointIds(e).forEach(reference);
-          if (e.type === 'circle' || e.type === 'arc') number(e.radius);
-          if (e.type === 'arc') {
-            number(e.startAngle);
-            number(e.endAngle);
-          }
-        }
-      }
-      const entityMap = new Map(sketch.entities.map(e => [e.id, e]));
-      for (const entity of sketch.entities) {
-        const issue = splineHandleIssue(entity, entityMap);
-        if (issue) throw new Error(issue);
-      }
-      for (const c of sketch.constraints) {
-        if (!c || typeof c !== 'object') throw new Error('Invalid CAD constraint');
-        add(c.id);
-        if (
-          ![
-            'horizontal',
-            'vertical',
-            'coincident',
-            'symmetricPoints',
-            'symmetricCurves',
-            'regularPolygon',
-            'linearPattern',
-            'circularPattern',
-            'slot',
-            'horizontalPoints',
-            'verticalPoints',
-            'pointOnLine',
-            'pointOnCircle',
-            'pointOnCurve',
-            'midpoint',
-            'distance',
-            'distanceX',
-            'distanceY',
-            'pointLineDistance',
-            'lineLineDistance',
-            'pointArcDistance',
-            'lineCircleDistance',
-            'circleCircleDistance',
-            'radius',
-            'diameter',
-            'positionX',
-            'positionY',
-            'parallel',
-            'perpendicular',
-            'equal',
-            'tangent',
-            'angle',
-            'offset',
-          ].includes(c.type)
-        )
-          throw new Error('Unknown CAD constraint');
-        if (c.label !== undefined && typeof c.label !== 'string') throw new Error('Invalid constraint label');
-        if (c.type === 'slot') {
-          const issue = slotIssue(sketch, c);
-          if (issue) throw new Error(issue);
-        }
-        if (c.type === 'symmetricCurves' && c.focusSign !== undefined && c.focusSign !== 1 && c.focusSign !== -1)
-          throw new Error('Invalid ellipse symmetry branch.');
-        if (c.type === 'linearPattern' || c.type === 'circularPattern') {
-          if (
-            !Array.isArray(c.seedKeys) ||
-            !c.seedKeys.length ||
-            c.seedKeys.some(key => typeof key !== 'string') ||
-            new Set(c.seedKeys).size !== c.seedKeys.length ||
-            !Array.isArray(c.instances) ||
-            !Array.isArray(c.exclusions) ||
-            (c.type === 'linearPattern' && (!c.stepX || !c.stepY))
-          )
-            throw new Error('Invalid linear pattern data.');
-          [c.masterX, c.masterY, c.countX, c.countY].forEach(number);
-          if (c.type === 'linearPattern') {
-            [c.stepX.x, c.stepX.y, c.stepY.x, c.stepY.y].forEach(number);
-            const typed = c.expressions;
-            if (
-              typed !== undefined &&
-              (!typed ||
-                typeof typed !== 'object' ||
-                Object.entries(typed).some(
-                  ([key, value]) =>
-                    !['countX', 'countY', 'spacingX', 'spacingY'].includes(key) || (value !== undefined && typeof value !== 'string')
-                ))
-            )
-              throw new Error('Invalid pattern expressions');
-          } else {
-            number(c.angle);
-            if (typeof c.centerId !== 'string' || typeof c.closed !== 'boolean')
-              throw new Error('Invalid circular pattern center or sweep.');
-          }
-          for (const i of c.instances) {
-            if (
-              !i ||
-              !i.idMap ||
-              typeof i.idMap !== 'object' ||
-              Array.isArray(i.idMap) ||
-              !Array.isArray(i.activeIds) ||
-              Object.values(i.idMap).some(id => typeof id !== 'string') ||
-              i.activeIds.some(id => typeof id !== 'string')
-            )
-              throw new Error('Invalid pattern instance map.');
-            number(i.x);
-            number(i.y);
-          }
-          for (const e of c.exclusions) {
-            if (!e || typeof e.seedKey !== 'string') throw new Error('Invalid pattern exclusion.');
-            number(e.x);
-            number(e.y);
-          }
-          const issue = linearPatternIssue(sketch, c);
-          if (issue) throw new Error(issue);
-        }
-        if (c.type === 'regularPolygon') {
-          if (
-            !['inscribed', 'circumscribed'].includes(c.mode) ||
-            !Array.isArray(c.edgeIds) ||
-            c.edgeIds.length < 3 ||
-            c.edgeIds.length > 50 ||
-            new Set(c.edgeIds).size !== c.edgeIds.length
-          )
-            throw new Error('Invalid regular polygon relation.');
-          reference(c.circleId);
-          c.edgeIds.forEach(reference);
-        }
-        if (c.type === 'offset') {
-          if (!Array.isArray(c.members) || c.members.length === 0) throw new Error('An offset needs copied geometry.');
-          for (const member of c.members) {
-            if (!member || !['line', 'circle', 'arc'].includes(member.kind) || (member.side !== 1 && member.side !== -1))
-              throw new Error('Invalid offset member.');
-            if ((member.kind === 'line' || member.kind === 'arc') && typeof member.endpoints !== 'boolean')
-              throw new Error('Invalid offset endpoint relationship.');
-            reference(member.sourceId);
-            reference(member.targetId);
-          }
-        }
-        if ('labelPlacement' in c && c.labelPlacement !== undefined) {
-          if (!('value' in c) || !c.labelPlacement || typeof c.labelPlacement !== 'object')
-            throw new Error('Invalid dimension label placement');
-          const placement = c.labelPlacement;
-          if (placement.kind === 'linear') {
-            if (c.type === 'radius' || c.type === 'diameter' || c.type === 'angle')
-              throw new Error('Invalid dimension label placement kind');
-            number(placement.fraction);
-            number(placement.normalOffset);
-            if (placement.overshoot !== undefined) number(placement.overshoot);
-          } else if (placement.kind === 'radial') {
-            if (c.type !== 'radius' && c.type !== 'diameter') throw new Error('Invalid dimension label placement kind');
-            number(placement.angle);
-            number(placement.radiusRatio);
-            if (placement.radiusRatio < 0) throw new Error('Invalid dimension label radius ratio');
-            if (placement.radiusOffset !== undefined) {
-              number(placement.radiusOffset);
-              if (placement.radiusOffset < 0) throw new Error('Invalid dimension label radius offset');
-            }
-          } else if (placement.kind === 'angle') {
-            if (c.type !== 'angle') throw new Error('Invalid dimension label placement kind');
-            number(placement.radius);
-            number(placement.angleOffset);
-            if (placement.radius < 0) throw new Error('Invalid dimension label radius');
-          } else if (placement.kind === 'fallback') {
-            if (!placement.offset || typeof placement.offset !== 'object') throw new Error('Invalid dimension label fallback');
-            number(placement.offset.x);
-            number(placement.offset.y);
-          } else if (placement.kind === 'absolute') {
-            if (!placement.position || typeof placement.position !== 'object') throw new Error('Invalid dimension label position');
-            number(placement.position.x);
-            number(placement.position.y);
-          } else throw new Error('Invalid dimension label placement kind');
-        }
-        if ('sourceEntityId' in c && c.sourceEntityId !== undefined) {
-          if (c.type !== 'distance' && c.type !== 'distanceX' && c.type !== 'distanceY')
-            throw new Error('Only point-pair dimensions can reference a source line');
-          reference(c.sourceEntityId);
-        }
-        constraintEntityIds(c).forEach(reference);
-        if ((c.type === 'pointArcDistance' || c.type === 'lineCircleDistance') && c.side !== 'inside' && c.side !== 'outside')
-          throw new Error('Invalid circular distance side');
-        if (
-          (c.type === 'pointArcDistance' || c.type === 'lineCircleDistance') &&
-          c.radiusSide !== undefined &&
-          c.radiusSide !== 'near' &&
-          c.radiusSide !== 'far'
-        )
-          throw new Error('Invalid circular witness side');
-        if (
-          c.type === 'circleCircleDistance' &&
-          (![c.radiusASign, c.radiusBSign, c.direction].every(value => value === 1 || value === -1) ||
-            (c.angle !== undefined && !Number.isFinite(c.angle)))
-        )
-          throw new Error('Invalid circular dimension direction');
-        if ('expression' in c && c.expression !== undefined && (!('value' in c) || typeof c.expression !== 'string'))
-          throw new Error('Invalid dimension expression');
-        if ('driven' in c && c.driven !== undefined && (!('value' in c) || typeof c.driven !== 'boolean'))
-          throw new Error('Invalid driven dimension flag');
-        if (c.type === 'angle') {
-          if (c.orientation !== undefined && c.orientation !== 1 && c.orientation !== -1)
-            throw new Error('Invalid angular dimension orientation');
-          if ([c.reversedA, c.reversedB].some(value => value !== undefined && typeof value !== 'boolean'))
-            throw new Error('Invalid angular dimension ray');
-        }
-        if (c.type === 'pointOnCurve') {
-          number(c.parameter);
-          if (c.parameterFixed !== undefined && typeof c.parameterFixed !== 'boolean') throw new Error('Invalid curve parameter flag');
-        }
-        if (
-          [
-            'distance',
-            'distanceX',
-            'distanceY',
-            'pointLineDistance',
-            'lineLineDistance',
-            'pointArcDistance',
-            'lineCircleDistance',
-            'circleCircleDistance',
-            'radius',
-            'diameter',
-            'positionX',
-            'positionY',
-            'angle',
-            'offset',
-          ].includes(c.type)
-        )
-          number((c as { value: unknown }).value);
-      }
+      checkCadSketch(sketch, add);
     }
   }
   const folderIssue = cadFolderIssue(d) || cadFolderStepIssue(d, designSteps(d));

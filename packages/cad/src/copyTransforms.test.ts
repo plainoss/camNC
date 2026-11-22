@@ -282,8 +282,9 @@ it('projects one moved copy consistently for finite face frames and used corners
   const frame = cadFaceFrame(view.document, { partId: f.partId, copyId: f.copyId, face: 'top' });
   expect(frame).not.toHaveProperty('error');
   if ('error' in frame) throw Error(frame.error);
-  expect(frame.origin).toEqual([300, 10, 23]);
-  expect(frame.x).toEqual([0, 1, 0]);
+  // The moved copy's top, 5 up: a face looking up is sketched in the studio's x and y, from its origin below.
+  expect(frame.origin).toEqual([0, 0, 23]);
+  expect(frame.x).toEqual([1, 0, 0]);
   expect(frame.normal).toEqual([0, 0, 1]);
   const world = {
     origin: [0, 0, 0] as [number, number, number],

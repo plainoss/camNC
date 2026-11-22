@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   dimensionForSelection,
   withDimensionPlacement,
@@ -48,7 +49,7 @@ function candidate(sketch: CadSketch, picking: PickingDimension, placement?: Cad
   const preview: CadDimension = { ...result.constraint, id: picking.previewId };
   return {
     state: { ...selection, phase: 'placing', preview, existingConstraintId: result.existingConstraintId },
-    message: 'Select another reference, or click empty space to place the dimension.',
+    message: translate('Select another reference, or click empty space to place the dimension.'),
   };
 }
 

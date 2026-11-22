@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   detectMarkersInStillFrame,
   formatReprojectionError,
@@ -27,21 +28,25 @@ export function RecomputePnpButton() {
 
       if (validMarkers.length < kExpectedMarkerCount) {
         const hidden = kExpectedMarkerCount - validMarkers.length;
-        toast.error('Could not recompute PnP', {
-          description: `${validMarkers.length}/${kExpectedMarkerCount} aruco tags visible, ${hidden} hidden`,
+        toast.error(translate('Could not recompute PnP'), {
+          description: translate('{{value1}}/{{kExpectedMarkerCount}} aruco tags visible, {{hidden}} hidden', {
+            value1: validMarkers.length,
+            kExpectedMarkerCount: kExpectedMarkerCount,
+            hidden: hidden,
+          }),
           position: 'top-right',
         });
         return;
       }
 
       const reprojectionError = setMarkersAndRecompute(validMarkers);
-      toast.success('Recomputed PnP', {
+      toast.success(translate('Recomputed PnP'), {
         description: formatReprojectionError(reprojectionError),
         position: 'top-right',
       });
     } catch (err) {
-      console.error('Failed to recompute PnP', err);
-      toast.error('Failed to recompute PnP', {
+      console.error(translate('Failed to recompute PnP'), err);
+      toast.error(translate('Failed to recompute PnP'), {
         description: err instanceof Error ? err.message : String(err),
         position: 'top-right',
       });
@@ -51,7 +56,13 @@ export function RecomputePnpButton() {
   };
 
   return (
-    <Button variant="ghost" size="icon" className="size-5" title="Recompute PnP now" disabled={recomputing} onClick={handleRecompute}>
+    <Button
+      variant="ghost"
+      size="icon"
+      className="size-5"
+      title={translate('Recompute PnP now')}
+      disabled={recomputing}
+      onClick={handleRecompute}>
       <RefreshCw className={`size-3 ${recomputing ? 'animate-spin' : ''}`} />
     </Button>
   );

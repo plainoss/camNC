@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { kColletClearance, kHoldClearance, nutReaches, pathClearance, type HoldKind } from '@wbcnc/cam/holdPoints';
 import { useId } from 'react';
 
@@ -67,7 +68,7 @@ export function HoldDiagram({
   // The names and the stick-out beside the bit, kept apart from each other however short it is.
   const side = [
     { y: (Y(yMax) + nutHigh) / 2, text: 'spindle', strong: false },
-    { y: (nutHigh + nutLow) / 2, text: 'collet nut', strong: nut },
+    { y: (nutHigh + nutLow) / 2, text: translate('collet nut'), strong: nut },
     { y: (nutLow + tip) / 2, text: `stick-out ${fmt(stickout)}`, strong: false },
     { y: tip, text: `bit ⌀${fmt(bit)}`, strong: false },
   ];
@@ -75,9 +76,15 @@ export function HoldDiagram({
   const sideX = nutR + 10;
 
   return (
-    <figure className="flex flex-col gap-1" aria-label={`What the ${clamp ? 'clamp' : 'screw'} sizes mean`}>
+    <figure
+      className="flex flex-col gap-1"
+      aria-label={translate('What the {{value1}} sizes mean', { value1: clamp ? translate('clamp') : translate('screw') })}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
-        <title>{`Side view at the board's edge, to scale: the ${clamp ? 'clamp' : 'screw'} and the bit with its collet nut at the deepest cut.`}</title>
+        <title>
+          {translate("Side view at the board's edge, to scale: the {{value1}} and the bit with its collet nut at the deepest cut.", {
+            value1: clamp ? translate('clamp') : translate('screw'),
+          })}
+        </title>
         <defs>
           <marker id={arrow} viewBox="0 0 6 6" refX="3" refY="3" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
             <path d="M0,0 L6,3 L0,6 Z" className="fill-muted-foreground" />
@@ -139,10 +146,10 @@ export function HoldDiagram({
         </g>
         {/* Either side of the line between them, so they never run into each other, however small the reach. */}
         <text x={X(reach) - 3} y={dimY - 6} textAnchor="end" className={label}>
-          {clamp ? `reach ${fmt(hold.d)}` : `⌀${fmt(hold.d)}+2`}
+          {clamp ? translate('reach {{value1}}', { value1: fmt(hold.d) }) : translate('⌀{{value1}}+2', { value1: fmt(hold.d) })}
         </text>
         <text x={X(reach) + 3} y={dimY - 6} textAnchor="start" className={label}>
-          {nut ? `nut room ${fmt(keep)}` : fmt(keep)}
+          {nut ? translate('nut room {{value1}}', { value1: fmt(keep) }) : fmt(keep)}
         </text>
         <text x={X(xMin) - 8} y={(holdTop + top) / 2 + 4} textAnchor="end" className={label}>
           {fmt(hold.height)}
@@ -155,25 +162,45 @@ export function HoldDiagram({
       </svg>
       {clamp && (
         <svg viewBox="0 0 320 40" className="w-full" role="img">
-          <title>{`From above: a clamp ${fmt(hold.w ?? 0)} mm wide along the board's edge.`}</title>
+          <title>{translate("From above: a clamp {{value1}} mm wide along the board's edge.", { value1: fmt(hold.w ?? 0) })}</title>
           {/* From above, not to scale: the board's edge at the top, the clamp's toe on it. */}
           <rect x={0} y={14} width={320} height={26} className="fill-amber-200/60 dark:fill-amber-900/40" />
           <rect x={92} y={14} width={36} height={10} className="fill-rose-800/70 dark:fill-rose-400/60" />
           <path d="M92,7 H128" className={dim} strokeWidth={0.75} fill="none" markerStart={marker} markerEnd={marker} />
           <text x={133} y={10} className={label}>
-            {`width ${fmt(hold.w ?? 0)}`}
+            {translate('width {{value1}}', { value1: fmt(hold.w ?? 0) })}
           </text>
         </svg>
       )}
       {nutAbove < 0 && (
         <p role="alert" className="text-xs leading-relaxed text-destructive">
-          {`The stick-out (${fmt(stickout)} mm) is shorter than the deepest cut (${fmt(cut)} mm): the collet nut would hit the board. Mount the bit further out, or check the stick-out.`}
+          {translate(
+            'The stick-out ({{value1}} mm) is shorter than the deepest cut ({{value2}} mm): the collet nut would hit the board. Mount the bit further out, or check the stick-out.',
+            { value1: fmt(stickout), value2: fmt(cut) }
+          )}
         </p>
       )}
       <figcaption className="text-xs leading-relaxed text-muted-foreground">
         {nut
-          ? `The ${clamp ? 'clamp' : 'screw'} stands ${fmt(hold.height)} mm over the board and the collet nut comes down to ${fmt(nutAbove)} mm over the board on the deepest cut (stick-out ${fmt(stickout)} less ${fmt(cut)}), so cuts keep ${fmt(keep)} mm from it for the nut.`
-          : `The collet nut stays ${fmt(nutAbove - hold.height)} mm above the ${clamp ? 'clamp' : 'screw'} even on the deepest cut, so only the bit needs room: its radius + ${kHoldClearance} mm.`}
+          ? translate(
+              'The {{value1}} stands {{value2}} mm over the board and the collet nut comes down to {{value3}} mm over the board on the deepest cut (stick-out {{value4}} less {{value5}}), so cuts keep {{value6}} mm from it for the nut.',
+              {
+                value1: clamp ? translate('clamp') : translate('screw'),
+                value2: fmt(hold.height),
+                value3: fmt(nutAbove),
+                value4: fmt(stickout),
+                value5: fmt(cut),
+                value6: fmt(keep),
+              }
+            )
+          : translate(
+              'The collet nut stays {{value1}} mm above the {{value2}} even on the deepest cut, so only the bit needs room: its radius + {{kHoldClearance}} mm.',
+              {
+                value1: fmt(nutAbove - hold.height),
+                value2: clamp ? translate('clamp') : translate('screw'),
+                kHoldClearance: kHoldClearance,
+              }
+            )}
       </figcaption>
     </figure>
   );

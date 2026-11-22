@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { ShapeUtils, Vector2 } from 'three';
 import type { BodyMesh } from '@/cam/camTypes';
 import {
@@ -99,7 +100,7 @@ function solidProblem(mesh: BodyMesh, triangles: Triangle[], tolerance: number):
   if (!problem) {
     const reference = triangles[0]?.[0] ?? [0, 0, 0];
     const volume = triangles.reduce((sum, [a, b, c]) => sum + dot(sub(a, reference), cross(sub(b, reference), sub(c, reference))) / 6, 0);
-    if (!(volume > 0)) problem = 'The part mesh is not a closed solid with outward faces.';
+    if (!(volume > 0)) problem = translate('The part mesh is not a closed solid with outward faces.');
   }
   solidChecks.set(mesh.positions, { indices: mesh.indices, ...(problem && { problem }) });
   return problem;
@@ -117,18 +118,18 @@ export function sectionGeometry(mesh: BodyMesh, plane: SectionPlane): SectionGeo
     // A finite cut can collapse after conversion to the display mesh's Float32 buffers, especially far from the origin.
     // Keep the source visible with a diagnostic instead of silently returning degenerate faces or a flattened solid.
     if (collapsedTriangles(body) || (cap && collapsedTriangles(cap)) || (finite.length > 0 && !(retainedVolume(body, cap) > 0)))
-      return failed('The section cannot preserve its boundary at the mesh coordinate precision. Move the plane slightly.');
+      return failed(translate('The section cannot preserve its boundary at the mesh coordinate precision. Move the plane slightly.'));
     return { body, cap };
   };
   if (!validPoint(plane.origin) || !validPoint(plane.normal) || !length(plane.normal) || !Number.isFinite(length(plane.normal)))
-    return failed('Choose a finite section plane with a nonzero normal.');
+    return failed(translate('Choose a finite section plane with a nonzero normal.'));
   if (
     mesh.positions.length % 3 ||
     mesh.indices.length % 3 ||
     !mesh.positions.every(Number.isFinite) ||
     !mesh.indices.every(index => Number.isInteger(index) && index >= 0 && index * 3 + 2 < mesh.positions.length)
   )
-    return failed('The part mesh has invalid coordinates or triangle indices.');
+    return failed(translate('The part mesh has invalid coordinates or triangle indices.'));
   if (!mesh.indices.length) return { body: mesh, cap: null };
   const normal = scale(plane.normal, 1 / length(plane.normal));
   let magnitude = 1;
@@ -170,7 +171,7 @@ export function sectionGeometry(mesh: BodyMesh, plane: SectionPlane): SectionGeo
     (_, i) => [0, 1, 2].map(k => sourceVertex(mesh.indices[i * 3 + k]!)) as [Vertex, Vertex, Vertex]
   );
   const triangles = input.map(triangle => triangle.map(vertex => vertex.source) as Triangle).filter(nonzero);
-  if (!triangles.length) return failed('The part mesh has no solid surface.');
+  if (!triangles.length) return failed(translate('The part mesh has no solid surface.'));
   const distances = [...byPosition.values()].map(vertex => vertex.distance);
   if (distances.every(value => value < 0)) return { body: mesh, cap: null };
   if (distances.every(value => value >= 0)) {
@@ -255,7 +256,7 @@ export function sectionGeometry(mesh: BodyMesh, plane: SectionPlane): SectionGeo
     loop.depth = containing.length;
   });
   if (loops.some(loop => loop.area > 0 !== (loop.depth % 2 === 0)))
-    return failed('The part mesh has inconsistent face orientation at the section.');
+    return failed(translate('The part mesh has inconsistent face orientation at the section.'));
   const caps: Triangle[] = [];
   for (const [index, loop] of loops.entries()) {
     if (loop.depth % 2) continue;
@@ -275,7 +276,7 @@ export function sectionGeometry(mesh: BodyMesh, plane: SectionPlane): SectionGeo
   const expectedArea = loops.reduce((sum, loop) => sum + loop.area, 0);
   const capArea = caps.reduce((sum, [a, b, c]) => sum + length(cross(sub(b, a), sub(c, a))) / 2, 0);
   if (Math.abs(expectedArea - capArea) > Math.max(1e-8, expectedArea * 1e-8))
-    return failed('The section contours could not be triangulated without losing material.');
+    return failed(translate('The section contours could not be triangulated without losing material.'));
   const snapCache = new Map<SectionVec3, SectionVec3>();
   const snapped = retained.map(
     triangle =>

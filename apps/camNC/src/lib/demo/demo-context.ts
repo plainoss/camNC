@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 export const kDemoFlag = 'camnc-demo';
 export const kNoCameraFlag = 'camnc-demo-no-camera';
 export const kRehearsalFlag = 'camnc-rehearsal';
@@ -26,7 +27,7 @@ export function detectDemoContext(url: URL, storage: TabStorage | null, options:
   const camera = url.searchParams.get('camera');
   const machineEntry = onEntry && (url.searchParams.get('machine') === '1' || camera !== null || !!fromUrl);
   try {
-    if (!storage) throw new Error('No tab storage');
+    if (!storage) throw new Error(translate('No tab storage'));
     if (onEntry) {
       if (fromUrl) storage.setItem(kRehearsalFlag, fromUrl);
       else storage.removeItem(kRehearsalFlag);

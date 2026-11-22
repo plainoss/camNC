@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Popover, PopoverContent, PopoverTrigger } from '@wbcnc/ui/components/popover';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { ChevronRight } from 'lucide-react';
@@ -20,11 +21,13 @@ export type EditProps = Omit<ComponentProps<typeof CuttingDataEditor>, 'fields'>
 const fmtZ = (z: number) => `${+z.toFixed(2)}`;
 
 const kHints = {
-  depth: 'Where the operation starts and ends cutting, in mm up from the bottom of the board (Z0).',
-  passes: 'How many depths the operation cuts at. More passes take longer but each one is lighter.',
-  stepdown: 'How deep each pass cuts. Less is gentler on the bit and slower. Click a value to change it.',
-  stepover: 'How far each pocket pass moves sideways. Less leaves a smoother floor and is slower. Click a value to change it.',
-  feed: 'How fast the bit moves through the wood, in mm/min; a second value is the slower final pass. Click a value to change it.',
+  depth: translate('Where the operation starts and ends cutting, in mm up from the bottom of the board (Z0).'),
+  passes: translate('How many depths the operation cuts at. More passes take longer but each one is lighter.'),
+  stepdown: translate('How deep each pass cuts. Less is gentler on the bit and slower. Click a value to change it.'),
+  stepover: translate('How far each pocket pass moves sideways. Less leaves a smoother floor and is slower. Click a value to change it.'),
+  feed: translate(
+    'How fast the bit moves through the wood, in mm/min; a second value is the slower final pass. Click a value to change it.'
+  ),
 };
 
 /**
@@ -53,16 +56,16 @@ export function PlanOperations({
     const e = editFor(op);
     return resolveCutting(e.bit, e.material, savedCuttingFor(saved, e.bit, e.material), e.job).values.stepover;
   };
-  const label = `Operations for ${name}`;
+  const label = translate('Operations for {{value1}}', { value1: name });
   return (
     <div className="flex flex-col gap-3">
       <BitsLine plan={plan} />
       <div className="flex items-center gap-2">
-        <div role="group" aria-label="Show operations as" className="flex rounded-md border p-0.5 text-xs">
+        <div role="group" aria-label={translate('Show operations as')} className="flex rounded-md border p-0.5 text-xs">
           {(
             [
-              ['list', 'List', 'One row per operation: select one to see and change its numbers.'],
-              ['table', 'Table', 'Every operation’s numbers side by side.'],
+              ['list', 'List', translate('One row per operation: select one to see and change its numbers.')],
+              ['table', 'Table', translate('Every operation’s numbers side by side.')],
             ] as const
           ).map(([v, text, hint]) => (
             <Hint key={v} text={hint}>
@@ -78,7 +81,7 @@ export function PlanOperations({
         <span className="grow" />
         {playback.selected !== null && (
           <button className="text-xs text-muted-foreground hover:underline" onClick={() => playback.select(null)}>
-            Show all
+            {translate('Show all ')}
           </button>
         )}
       </div>
@@ -115,9 +118,9 @@ function BitsLine({ plan }: { plan: PlanResult }) {
           p.name && /V-bit/.test(p.name)
             ? p.name
             : p.shape === 'ball'
-              ? `${p.diameter} mm ball end`
+              ? translate('{{value1}} mm ball end', { value1: p.diameter })
               : p.shape === 'roundover'
-                ? (p.name ?? `${p.diameter} mm roundover bit`)
+                ? (p.name ?? translate('{{value1}} mm roundover bit', { value1: p.diameter }))
                 : null
         )
       : [];
@@ -126,18 +129,18 @@ function BitsLine({ plan }: { plan: PlanResult }) {
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted/40 px-3 py-2 text-[13px]">
       {plan.bits.map((d, i) => (
         <span key={i} className="flex items-center gap-2">
-          {i > 0 && <span className="text-muted-foreground">→ next program: swap bit, zero Z →</span>}
+          {i > 0 && <span className="text-muted-foreground">{translate('→ next program: swap bit, zero Z →')}</span>}
           <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
             ⌀
           </span>
-          <span className="font-medium">{named[i] ?? `${d} mm flat`}</span>
+          <span className="font-medium">{named[i] ?? translate('{{d}} mm flat', { d: d })}</span>
         </span>
       ))}
       <span className="text-muted-foreground">
         {plan.programs.some(p => p.name && /V-bit/.test(p.name))
-          ? '· flat bottoms first, then the V-bit'
-          : '· smallest bit first, inner features before outlines'}
-        {rounds && ', rounded edges last'}
+          ? translate('· flat bottoms first, then the V-bit')
+          : translate('· smallest bit first, inner features before outlines')}
+        {rounds && translate(', rounded edges last')}
       </span>
     </p>
   );
@@ -177,10 +180,16 @@ function OpNumbers({
   );
   return (
     <>
-      {count > 1 && <p className="text-xs text-muted-foreground">Per op, for each of the {count} identical ops:</p>}
-      <dl aria-label={`${op.label}: numbers`} className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+      {count > 1 && (
+        <p className="text-xs text-muted-foreground">
+          {translate('Per op, for each of the ')}
+          {count}
+          {translate(' identical ops:')}
+        </p>
+      )}
+      <dl aria-label={translate('{{value1}}: numbers', { value1: op.label })} className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
         {line(
-          'Z from bottom',
+          translate('Z from bottom'),
           kHints.depth,
           <>
             {fmtZ(op.zTop)} → {fmtZ(op.zBottom)}
@@ -191,7 +200,8 @@ function OpNumbers({
           'Stepdown',
           kHints.stepdown,
           <CuttingValue edit={edit} field="stepdown">
-            {+op.stepdown.toFixed(2)} mm
+            {+op.stepdown.toFixed(2)}
+            {translate(' mm ')}
           </CuttingValue>
         )}
         {line(
@@ -199,17 +209,19 @@ function OpNumbers({
           kHints.stepover,
           op.kind === 'pocket' ? (
             <CuttingValue edit={edit} field="stepover">
-              {+stepover.toFixed(2)} mm
+              {+stepover.toFixed(2)}
+              {translate(' mm ')}
             </CuttingValue>
           ) : (
             <span className="text-muted-foreground">–</span>
           )
         )}
         {line(
-          op.feeds.length > 1 ? 'Feed / final feed' : 'Feed',
+          op.feeds.length > 1 ? translate('Feed / final feed') : 'Feed',
           kHints.feed,
           <CuttingValue edit={edit} field="feed">
-            {op.feeds.join(' / ')} mm/min
+            {op.feeds.join(' / ')}
+            {translate(' mm/min ')}
           </CuttingValue>
         )}
         {line('Time (sim)', null, formatDuration(seconds))}
@@ -224,22 +236,34 @@ function ProgramNumbers({ group, seconds }: { group: PlanOpGroup; seconds: numbe
   const { pauseEachTab, setPauseEachTab } = useCamMachine();
   return (
     <>
-      <dl aria-label={`${group.label}: numbers`} className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-        <dt className="text-muted-foreground">Z from bottom</dt>
+      <dl
+        aria-label={translate('{{value1}}: numbers', { value1: group.label })}
+        className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+        <dt className="text-muted-foreground">{translate('Z from bottom')}</dt>
         <dd className="font-mono">
           {fmtZ(op.zTop)} → {fmtZ(op.zBottom)}
         </dd>
-        <dt className="text-muted-foreground">{op.feeds.length > 1 ? 'Feed / final feed' : 'Feed'}</dt>
-        <dd className="font-mono">{op.feeds.join(' / ')} mm/min</dd>
-        <dt className="text-muted-foreground">Time (sim)</dt>
-        <dd className="font-mono">{formatDuration(seconds)}, without the pauses</dd>
-        <dt className="text-muted-foreground">Pauses</dt>
+        <dt className="text-muted-foreground">{op.feeds.length > 1 ? translate('Feed / final feed') : translate('Feed')}</dt>
+        <dd className="font-mono">
+          {op.feeds.join(' / ')}
+          {translate(' mm/min')}
+        </dd>
+        <dt className="text-muted-foreground">{translate('Time (sim)')}</dt>
+        <dd className="font-mono">
+          {formatDuration(seconds)}
+          {translate(', without the pauses')}
+        </dd>
+        <dt className="text-muted-foreground">{translate('Pauses')}</dt>
         <dd>{note}</dd>
       </dl>
       {op.program?.kind === 'tabs' && (
         <label className="flex items-center gap-2 text-xs">
-          <Checkbox checked={pauseEachTab} onCheckedChange={v => setPauseEachTab(v === true)} aria-label="Pause before each tab" />
-          Pause before each tab
+          <Checkbox
+            checked={pauseEachTab}
+            onCheckedChange={v => setPauseEachTab(v === true)}
+            aria-label={translate('Pause before each tab')}
+          />
+          {translate('Pause before each tab ')}
         </label>
       )}
     </>
@@ -256,7 +280,10 @@ function CuttingValue({ edit, field, children }: { edit: EditProps; field: Cutti
       <PopoverTrigger asChild>
         <button
           className="-mx-1 rounded px-1 underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 hover:bg-muted"
-          title={`${kCuttingLabels[field].label}: ${kSourceLabels[source[field]]}. Click to change.`}>
+          title={translate('{{value1}}: {{value2}}. Click to change.', {
+            value1: kCuttingLabels[field].label,
+            value2: kSourceLabels[source[field]],
+          })}>
           {children}
         </button>
       </PopoverTrigger>
@@ -270,10 +297,10 @@ function CuttingValue({ edit, field, children }: { edit: EditProps; field: Cutti
 
 /** A bit as people name it: "6 mm ball end", "90° V-bit ⌀6", "6 mm flat". */
 function bitName(tool: OpSummary['tool']) {
-  if (tool.shape === 'ball') return `${tool.diameter} mm ball end`;
+  if (tool.shape === 'ball') return translate('{{value1}} mm ball end', { value1: tool.diameter });
   if (tool.shape === 'v') return `${tool.angle ?? 90}° V-bit ⌀${tool.diameter}`;
-  if (tool.shape === 'roundover') return tool.name ?? `${tool.diameter} mm roundover bit`;
-  return `${tool.diameter} mm flat`;
+  if (tool.shape === 'roundover') return tool.name ?? translate('{{value1}} mm roundover bit', { value1: tool.diameter });
+  return translate('{{value1}} mm flat', { value1: tool.diameter });
 }
 
 /** Every op's numbers side by side; a row selects its op, in the 3D view too. Wide: it scrolls sideways in its box. */
@@ -301,7 +328,13 @@ function OperationsTable({
       <td className={cn('min-w-44 py-2 pr-3', sub && 'pl-6')}>{label}</td>
       <td className={cell}>
         ⌀{op.tool.diameter}
-        {op.tool.shape === 'ball' ? ' ball' : op.tool.shape === 'v' ? ' V' : op.tool.shape === 'roundover' ? ' roundover' : ''}
+        {op.tool.shape === 'ball'
+          ? translate(' ball')
+          : op.tool.shape === 'v'
+            ? ' V'
+            : op.tool.shape === 'roundover'
+              ? translate(' roundover')
+              : ''}
       </td>
       <td className={cell}>
         {fmtZ(op.zTop)} → {fmtZ(op.zBottom)}
@@ -309,17 +342,19 @@ function OperationsTable({
       <td className={cell}>{op.depthSteps}</td>
       <td className={cell}>
         {op.program ? (
-          `${+op.stepdown.toFixed(2)} mm`
+          translate('{{value1}} mm', { value1: +op.stepdown.toFixed(2) })
         ) : (
           <CuttingValue edit={editFor(op)} field="stepdown">
-            {+op.stepdown.toFixed(2)} mm
+            {+op.stepdown.toFixed(2)}
+            {translate(' mm ')}
           </CuttingValue>
         )}
       </td>
       <td className={cn(cell, op.kind !== 'pocket' && 'text-muted-foreground')}>
         {op.kind === 'pocket' ? (
           <CuttingValue edit={editFor(op)} field="stepover">
-            {+stepover(op).toFixed(2)} mm
+            {+stepover(op).toFixed(2)}
+            {translate(' mm ')}
           </CuttingValue>
         ) : (
           '–'
@@ -343,14 +378,14 @@ function OperationsTable({
         <thead>
           <tr className="border-b text-left text-xs text-muted-foreground">
             <th className="py-2 pr-3 pl-1.5 font-medium">#</th>
-            <th className="py-2 pr-3 font-medium">Operation</th>
-            <th className="py-2 pr-3 font-medium">Bit</th>
-            <HeaderCell hint={kHints.depth}>Z from bottom</HeaderCell>
-            <HeaderCell hint={kHints.passes}>Passes</HeaderCell>
-            <HeaderCell hint={kHints.stepdown}>Stepdown</HeaderCell>
-            <HeaderCell hint={kHints.stepover}>Stepover</HeaderCell>
-            <HeaderCell hint={kHints.feed}>Feed</HeaderCell>
-            <th className="py-2 pr-1.5 font-medium whitespace-nowrap">Time (sim)</th>
+            <th className="py-2 pr-3 font-medium">{translate('Operation')}</th>
+            <th className="py-2 pr-3 font-medium">{translate('Bit')}</th>
+            <HeaderCell hint={kHints.depth}>{translate('Z from bottom')}</HeaderCell>
+            <HeaderCell hint={kHints.passes}>{translate('Passes')}</HeaderCell>
+            <HeaderCell hint={kHints.stepdown}>{translate('Stepdown')}</HeaderCell>
+            <HeaderCell hint={kHints.stepover}>{translate('Stepover')}</HeaderCell>
+            <HeaderCell hint={kHints.feed}>{translate('Feed')}</HeaderCell>
+            <th className="py-2 pr-1.5 font-medium whitespace-nowrap">{translate('Time (sim)')}</th>
           </tr>
         </thead>
         <tbody>
@@ -366,7 +401,10 @@ function OperationsTable({
                   {g.note ? (
                     <span className="text-muted-foreground">· {g.note}</span>
                   ) : (
-                    <span className="text-muted-foreground">×{g.count}, per op</span>
+                    <span className="text-muted-foreground">
+                      ×{g.count}
+                      {translate(', per op')}
+                    </span>
                   )}
                 </button>
               ) : g.note ? (
@@ -392,7 +430,9 @@ function OperationsTable({
                 ? [
                     <tr key={`swap:${g.key}`} className="border-b bg-amber-50/60 text-xs dark:bg-amber-950/30">
                       <td colSpan={9} className="py-1.5 pl-1.5 font-medium">
-                        Swap to {bitName(g.op.tool)} · zero Z
+                        {translate('Swap to ')}
+                        {bitName(g.op.tool)}
+                        {translate(' · zero Z ')}
                       </td>
                     </tr>,
                   ]

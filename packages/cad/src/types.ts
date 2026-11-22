@@ -347,7 +347,7 @@ export interface CadPart {
    * A Hole step: a Remove whose sketch's points are the holes' centres, each cut as a round hole this wide, as deep as
    * `remove` says. The sketch's lines and curves only place the points.
    */
-  hole?: { diameter: number; diameterExpression?: string };
+  hole?: CadHoleSpec;
   /**
    * Fillet steps: the part's edges through its thickness, at these corners of its sketch, rounded to a radius. The sketch
    * itself keeps its sharp corners; the part is rounded where it's made.
@@ -727,6 +727,12 @@ export interface CadVariable {
   folderId?: string;
   /** The design step it's listed before, as made while that step was edited: the feature list shows it there. */
   before?: string;
+  /** Switched off: it has no value, so what uses it fails until it's back on, as if it were deleted. */
+  suppressed?: true;
+  /** The design step it's listed after, as made by the Variable tool once that step was the last: the list shows it there. */
+  after?: string;
+  /** What it's for, as written in its dialog. */
+  description?: string;
 }
 
 export interface CadDiagnostic {
@@ -794,6 +800,10 @@ export interface EvaluatedCadRound {
   points: CadPoint[];
   /** Where the part's material is: inside the loop for its outline, outside it for a hole or a cut's opening. */
   material: 'inside' | 'outside';
+  /** Cut off flat at 45° by a Chamfer, `radius` along each face, rather than rounded. */
+  chamfer?: true;
+  /** Only these stretches of the loop, from one point to another along it; the rest stays sharp. */
+  edges?: [CadPoint, CadPoint][];
 }
 export type CadEntityFreedom = 'fully-constrained' | 'underconstrained' | 'unknown';
 export interface CadSketchSolveStatus {
@@ -826,6 +836,8 @@ export interface CadFilletRim {
   loops: string[];
   /** Picked as the face these loops bound, rather than edge by edge: it's listed as that one face. */
   face?: true;
+  /** Only the stretches of these loops along these lines of the part's sketch, picked edge by edge; else all of them. */
+  lines?: string[];
 }
 
 /**
@@ -841,4 +853,18 @@ export interface CadEdgeFillet {
   radius: number;
   radiusExpression?: string;
   suppressed?: true;
+  /** A Chamfer step: its edges cut off flat at 45°, `radius` taken off each face they join (Equal distance). */
+  chamfer?: true;
+}
+
+/** What a Hole step drills: its diameter, and the drill's tip, which the hole's depth doesn't count. */
+export interface CadHoleSpec {
+  diameter: number;
+  diameterExpression?: string;
+  /** The standard drill size it was picked as, in mm; a typed diameter overrides it. */
+  drillSize?: number;
+  /** The drill tip's angle, in degrees, below a blind hole: 118 for a twist drill. */
+  tipAngle?: number;
+  /** The sketch's points the holes are at, as picked; without them, every point of the sketch standing on its own. */
+  points?: string[];
 }

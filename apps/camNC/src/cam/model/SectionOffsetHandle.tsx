@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Html, Line } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
@@ -88,10 +89,10 @@ export function SectionOffsetHandle({ control }: { control: SectionOffsetControl
           type="button"
           role="slider"
           className="cad-section-offset-handle"
-          aria-label="Section offset"
+          aria-label={translate('Section offset')}
           aria-valuenow={control.offset}
           aria-valuetext={`${control.offset} mm`}
-          title={`${control.offset} mm — drag along the normal or use arrow keys`}
+          title={translate('{{value1}} mm — drag along the normal or use arrow keys', { value1: control.offset })}
           onPointerDown={event => {
             event.stopPropagation();
             if (event.button !== 0) return;

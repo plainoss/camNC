@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   cadCuts,
   cadFaceSketches,
@@ -98,7 +99,7 @@ export const topRegions = (regions: CutRegion[]) => regions.filter(entry => entr
 export const cutRegionPath = (region: CadSketchRegion) =>
   [region.points, ...region.holes].map(loop => loop.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z').join(' ');
 
-export const depthLabel = ({ depth }: CutRegion) => (depth === 'through' ? 'Through' : depth === 0 ? 'No cut' : `${depth} mm`);
+export const depthLabel = ({ depth }: CutRegion) => (depth === 'through' ? 'Through' : depth === 0 ? translate('No cut') : `${depth} mm`);
 
 /** A loop that's cut through, or a face region left uncut, needs no feature: it's the default. */
 export function withRegionDepth(

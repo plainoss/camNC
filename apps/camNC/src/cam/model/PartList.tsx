@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Checkbox } from '@wbcnc/ui/components/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@wbcnc/ui/components/dropdown-menu';
 import { cn } from '@wbcnc/ui/lib/utils';
@@ -31,15 +32,18 @@ export function PartList({
   return (
     <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto border-r p-4">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-[15px] font-semibold">Parts</h2>
+        <h2 className="text-[15px] font-semibold">{translate('Parts')}</h2>
         <span className="text-xs text-muted-foreground">
-          {bodies} {bodies === 1 ? 'body' : 'bodies'} · {bodies - count(notMilled)} milled
+          {bodies} {bodies === 1 ? translate('body') : translate('bodies')} · {bodies - count(notMilled)}
+          {translate(' milled ')}
         </span>
       </div>
       {groups.map(([t, ps]) => (
-        <section key={t} className="flex flex-col gap-1.5" aria-label={`${fmt(t)} mm boards`}>
+        <section key={t} className="flex flex-col gap-1.5" aria-label={translate('{{value1}} mm boards', { value1: fmt(t) })}>
           <GroupLabel>
-            {fmt(t)} mm · {count(ps)} {count(ps) === 1 ? 'part' : 'parts'}
+            {fmt(t)}
+            {translate(' mm · ')}
+            {count(ps)} {count(ps) === 1 ? translate('part') : translate('parts')}
           </GroupLabel>
           {ps.map(p => (
             <PartCard
@@ -54,8 +58,8 @@ export function PartList({
           ))}
         </section>
       ))}
-      <section className="flex flex-col gap-1.5" aria-label="Not milled">
-        <GroupLabel>Not milled</GroupLabel>
+      <section className="flex flex-col gap-1.5" aria-label={translate('Not milled')}>
+        <GroupLabel>{translate('Not milled')}</GroupLabel>
         {notMilled.map(p => (
           <PartCard
             key={p.id}
@@ -69,7 +73,7 @@ export function PartList({
         ))}
         {!notMilled.length && (
           <p className="rounded-lg border border-dashed p-3 text-[13px] leading-relaxed text-muted-foreground">
-            Untick 3D-printed or bought parts and they stay out of the boards.
+            {translate('Untick 3D-printed or bought parts and they stay out of the boards. ')}
           </p>
         )}
       </section>
@@ -111,14 +115,15 @@ function PartCard({
   );
   const chips = (
     <span className="flex flex-wrap gap-1.5">
-      {summary.notFlat && <Chip warn>3D part</Chip>}
+      {summary.notFlat && <Chip warn>{translate('3D part')}</Chip>}
       {summary.needsFlip && (
         <Chip warn>
-          <FlipVertical2 className="size-3" /> both sides
+          <FlipVertical2 className="size-3" />
+          {translate(' both sides ')}
         </Chip>
       )}
       {(!summary.notFlat || milled) && summary.chips.map(c => <Chip key={c.label}>{c.label}</Chip>)}
-      {part.names.length > 1 && <Chip>identical, grouped</Chip>}
+      {part.names.length > 1 && <Chip>{translate('identical, grouped')}</Chip>}
     </span>
   );
   return (
@@ -128,11 +133,15 @@ function PartCard({
         selected && 'border-primary bg-muted',
         !milled && 'bg-transparent'
       )}>
-      <Hint text={milled ? 'Milled: it goes on a board. Untick to leave it out.' : 'Not milled: tick to put it on a board.'} side="right">
+      <Hint
+        text={
+          milled ? translate('Milled: it goes on a board. Untick to leave it out.') : translate('Not milled: tick to put it on a board.')
+        }
+        side="right">
         <Checkbox
           checked={milled}
           onCheckedChange={v => onMilledChange(v === true)}
-          aria-label={`Mill ${part.name}`}
+          aria-label={translate('Mill {{value1}}', { value1: part.name })}
           className="mt-0.5 size-[18px]"
         />
       </Hint>
@@ -141,7 +150,7 @@ function PartCard({
           <span className="flex items-center justify-between gap-2">
             <PartNameInput
               part={part}
-              label={`New name for ${part.name}`}
+              label={translate('New name for {{value1}}', { value1: part.name })}
               onRename={onRename}
               onDone={() => setEditing(false)}
               className="-my-1 h-7 flex-1 font-medium"
@@ -157,7 +166,7 @@ function PartCard({
           aria-pressed={selected}
           className={cn('flex min-w-0 flex-1 flex-col gap-1.5 text-left', !milled && 'opacity-60')}>
           <span className="flex justify-between gap-2">
-            <span className="truncate font-medium" title="Double-click to rename">
+            <span className="truncate font-medium" title={translate('Double-click to rename')}>
               {part.name}
               {part.names.length > 1 && <span className="text-muted-foreground"> × {part.names.length}</span>}
             </span>
@@ -169,10 +178,10 @@ function PartCard({
       {/* Not modal: a modal menu hides the rest of the page (aria-hidden, no pointer events) until it has fully closed,
           and "Rename…" opens the name field right away, under it. */}
       <DropdownMenu modal={false}>
-        <Hint text="Rename the part. The new name shows on every step and in the G-code." side="right">
+        <Hint text={translate('Rename the part. The new name shows on every step and in the G-code.')} side="right">
           <DropdownMenuTrigger asChild>
             <button
-              aria-label={`More for ${part.name}`}
+              aria-label={translate('More for {{value1}}', { value1: part.name })}
               className="absolute right-2 top-2 rounded px-1 py-0.5 text-muted-foreground hover:bg-background hover:text-foreground">
               <MoreHorizontal className="size-4" />
             </button>
@@ -189,7 +198,8 @@ function PartCard({
               renaming.current = true;
               setEditing(true);
             }}>
-            <Pencil className="size-3.5" /> Rename…
+            <Pencil className="size-3.5" />
+            {translate(' Rename… ')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

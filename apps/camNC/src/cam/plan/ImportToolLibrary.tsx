@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { LibraryTool } from '@wbcnc/cam';
 import { Button } from '@wbcnc/ui/components/button';
 import { CopyButton } from '@wbcnc/ui/components/copy-button';
@@ -37,35 +38,38 @@ export function ImportToolLibrary({
     <Dialog onOpenChange={open => !open && setResult(null)}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="self-start">
-          Import Fusion tool library…
+          {translate('Import Fusion tool library… ')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Import a Fusion tool library</DialogTitle>
+          <DialogTitle>{translate('Import a Fusion tool library')}</DialogTitle>
           <DialogDescription>
-            Your bits with their feeds, so you can pick them here. Only flat end mills are used for now.
+            {translate('Your bits with their feeds, so you can pick them here. Only flat end mills are used for now. ')}
           </DialogDescription>
         </DialogHeader>
         <ol className="flex list-decimal flex-col gap-3 pl-5 text-sm leading-relaxed">
           <li>
-            <span className="font-medium">Export it from Fusion (easiest):</span> Manufacture › Tool Library, right-click your library ›
-            Export…, save the file (.tools or .json) and choose it below.
+            <span className="font-medium">{translate('Export it from Fusion (easiest):')}</span>
+            {translate(
+              ' Manufacture › Tool Library, right-click your library › Export…, save the file (.tools or .json) and choose it below. '
+            )}
           </li>
           <li>
-            <span className="font-medium">Or choose Fusion’s own file:</span>
+            <span className="font-medium">{translate('Or choose Fusion’s own file:')}</span>
             <span className="mt-1 flex items-center gap-1 rounded-md bg-muted px-2 py-1 font-mono text-xs">
               <span className="min-w-0 flex-1 break-all">{kFusionLibraryPaths.mac}</span>
-              <CopyButton value={kFusionLibraryPaths.mac} aria-label="Copy the path" />
+              <CopyButton value={kFusionLibraryPaths.mac} aria-label={translate('Copy the path')} />
             </span>
             <span className="mt-1 block text-xs text-muted-foreground">
-              The Library folder is hidden in the Mac file picker: press ⌘⇧G, paste the path and press Return. On Windows:{' '}
+              {translate('The Library folder is hidden in the Mac file picker: press ⌘⇧G, paste the path and press Return. On Windows:')}{' '}
               <span className="font-mono">{kFusionLibraryPaths.windows}</span>
             </span>
           </li>
         </ol>
         <Button onClick={() => void choose()} className="self-start">
-          <FileUp /> Choose file…
+          <FileUp />
+          {translate(' Choose file… ')}
         </Button>
         {result && (
           <div
@@ -76,13 +80,17 @@ export function ImportToolLibrary({
             {result.ok ? (
               <>
                 <p className="font-medium">
-                  {result.tools.length} flat end {result.tools.length === 1 ? 'mill' : 'mills'} from {result.file}
-                  {merge && `: ${merge.added} new, ${merge.updated} updated`}
+                  {result.tools.length}
+                  {translate(' flat end ')}
+                  {result.tools.length === 1 ? translate('mill') : translate('mills')}
+                  {translate(' from ')}
+                  {result.file}
+                  {merge && translate(': {{value1}} new, {{value2}} updated', { value1: merge.added, value2: merge.updated })}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">{result.tools.map(t => `⌀${t.diameter} ${t.name}`).join(' · ')}</p>
                 {Object.keys(result.skipped).length > 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Skipped:{' '}
+                    {translate('Skipped:')}{' '}
                     {Object.entries(result.skipped)
                       .map(([type, n]) => `${n} ${type}`)
                       .join(', ')}

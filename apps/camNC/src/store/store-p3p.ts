@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { calculateUndistortionMapsCached } from '@/calibration/rectifyMap';
 import { remapCv } from '@/calibration/remapCv';
 import { computeP3P, projectPoints } from '@/calibration/solveP3P';
@@ -69,7 +70,7 @@ export function setMarkersAndRecompute(markers: IMarker[]): number {
 
 /** Human-readable reprojection error for toasts. */
 export function formatReprojectionError(error: number): string {
-  return `Reprojection error: ${error.toFixed(2)}px (< 1px is very good)`;
+  return translate('Reprojection error: {{value1}}px (< 1px is very good)', { value1: error.toFixed(2) });
 }
 
 /** Machine-space marker corners reprojected into the (undistorted) camera image. */
@@ -109,7 +110,11 @@ export async function getRemappedStillFrame(averageFrames = 25) {
       videoElem.srcObject = src;
     }
     await videoElem.play();
-    imgData = await withTimeout(averageVideoFrames(videoElem, averageFrames), kStillFrameTimeoutMs, 'Timed out capturing still frame');
+    imgData = await withTimeout(
+      averageVideoFrames(videoElem, averageFrames),
+      kStillFrameTimeoutMs,
+      translate('Timed out capturing still frame')
+    );
   } finally {
     // Stop decoding the temporary video element and drop our reference to the source.
     videoElem.pause();

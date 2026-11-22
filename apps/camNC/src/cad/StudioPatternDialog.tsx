@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useLayoutEffect, useRef, useState, type ComponentProps } from 'react';
 import { setPartPattern, type CadDocument, type CadPartPattern } from '@wbcnc/cad';
 import { PartPatternDialog } from './PartFeatureDialogs';
@@ -45,7 +46,9 @@ export function StudioPatternDialog({
     take: (partId, previous) => {
       const target = opening.document.parts.find(candidate => candidate.id === partId);
       if (!target || target.pattern)
-        return `${target?.name ?? 'That part'} already has a pattern. Open it from the feature list to change it.`;
+        return translate('{{value1}} already has a pattern. Open it from the feature list to change it.', {
+          value1: target?.name ?? translate('That part'),
+        });
       // The pattern set up so far moves to it, on the design as it opened, so the part picked before is left unpatterned.
       const set = latestDraft.current.parts.find(candidate => candidate.id === previous)?.pattern;
       const next = set ? setPartPattern(opening.document, partId, movedPattern(set)) : opening.document;
@@ -80,7 +83,7 @@ export function StudioPatternDialog({
       part={draft.parts.find(candidate => candidate.id === partId)!}
       initiallyPatterned={!!opening.document.parts.find(candidate => candidate.id === partId)?.pattern}
       partPick={partPick.pickable ? partPick : null}
-      blockedReason={valid ? null : 'The design changed while this pattern was open. Cancel and open the pattern again.'}
+      blockedReason={valid ? null : translate('The design changed while this pattern was open. Cancel and open the pattern again.')}
       onChange={change => {
         // A picker or field retained by an old dialog must never update a replacement source or another operation.
         if (!canPublish()) return;

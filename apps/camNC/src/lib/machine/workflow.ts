@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { hasProbeOrZeroCommand } from '@/visualize/gcodeChecks';
 import type { MachineTravel, Position } from '@wbcnc/fluidnc';
 
@@ -36,8 +37,9 @@ const kTravelEpsilon = 0.001;
  * Not a block: camNC may have connected after the machine was homed, and only the controller knows. On an unhomed
  * machine the closing `G53` lift goes to a Z that means nothing.
  */
-export const kHomeFirst =
-  'Not homed since camNC connected: this program parks Z in machine coordinates (G53), so home first unless the machine was homed before.';
+export const kHomeFirst = translate(
+  'Not homed since camNC connected: this program parks Z in machine coordinates (G53), so home first unless the machine was homed before.'
+);
 
 export function g53Targets(gcode: string): { axis: 'x' | 'y' | 'z'; value: number }[] {
   const out: { axis: 'x' | 'y' | 'z'; value: number }[] = [];
@@ -80,32 +82,47 @@ export function checkTravel(input: {
     if (min < limits.min - kTravelEpsilon) {
       const by = limits.min - min;
       details.push(
-        `${name} would go to ${fmt(min)}, ${fmt(by)} mm below the ${name} travel ${range}. ` +
+        translate('{{value1}} would go to {{value2}}, {{value3}} mm below the {{value4}} travel {{value5}}. ', {
+          value1: name,
+          value2: fmt(min),
+          value3: fmt(by),
+          value4: name,
+          value5: range,
+        }) +
           (axis === 'z'
-            ? 'The Z zero is too low, or the job cuts too deep.'
-            : `Move the ${name} zero at least ${fmt(by)} mm up, or the job is too large.`)
+            ? translate('The Z zero is too low, or the job cuts too deep.')
+            : translate('Move the {{value1}} zero at least {{value2}} mm up, or the job is too large.', { value1: name, value2: fmt(by) }))
       );
       blocking ||= limits.softLimits;
     }
     if (max > limits.max + kTravelEpsilon) {
       const by = max - limits.max;
       details.push(
-        `${name} would go to ${fmt(max)}, ${fmt(by)} mm above the ${name} travel ${range}. ` +
+        translate('{{value1}} would go to {{value2}}, {{value3}} mm above the {{value4}} travel {{value5}}. ', {
+          value1: name,
+          value2: fmt(max),
+          value3: fmt(by),
+          value4: name,
+          value5: range,
+        }) +
           (axis === 'z'
-            ? 'The Z zero is too high, or the safe height is too large.'
-            : `Move the ${name} zero at least ${fmt(by)} mm down, or the job is too large.`)
+            ? translate('The Z zero is too high, or the safe height is too large.')
+            : translate('Move the {{value1}} zero at least {{value2}} mm down, or the job is too large.', {
+                value1: name,
+                value2: fmt(by),
+              }))
       );
       blocking ||= limits.softLimits;
     }
   }
-  if (!details.length) return { id: 'travel', ok: true, label: 'Within the machine travel' };
+  if (!details.length) return { id: 'travel', ok: true, label: translate('Within the machine travel') };
   return {
     id: 'travel',
     ok: false,
     blocking,
     label: blocking
-      ? 'Leaves the machine travel: the controller would stop with a soft limit alarm'
-      : 'Leaves the machine travel (soft limits are off)',
+      ? translate('Leaves the machine travel: the controller would stop with a soft limit alarm')
+      : translate('Leaves the machine travel (soft limits are off)'),
     details,
   };
 }
@@ -134,7 +151,7 @@ function checkJobTravel(input: {
     ok: false,
     blocking: now.blocking,
     zeroFirst: true,
-    label: 'Set Z first: the old Z zero would leave the machine travel',
+    label: translate('Set Z first: the old Z zero would leave the machine travel'),
   };
 }
 
@@ -179,19 +196,25 @@ export function outsideTravel(mpos: Position, travel: MachineTravel): OutsideTra
 /** Whether the machine can start a move from where it is: see {@link outsideTravel}. */
 export function checkPosition(mpos: Position, travel: MachineTravel): ChecklistItem {
   const outside = outsideTravel(mpos, travel);
-  if (!outside.length) return { id: 'position', ok: true, label: 'The machine is within its travel' };
+  if (!outside.length) return { id: 'position', ok: true, label: translate('The machine is within its travel') };
   const blocking = outside.some(o => o.softLimits);
   return {
     id: 'position',
     ok: false,
     blocking,
     label: blocking
-      ? 'The machine sits outside its travel: the controller would stop the first move, even a Z lift, with a soft limit alarm'
-      : 'The machine sits outside its travel (soft limits are off)',
+      ? translate('The machine sits outside its travel: the controller would stop the first move, even a Z lift, with a soft limit alarm')
+      : translate('The machine sits outside its travel (soft limits are off)'),
     details: outside.map(o => {
       const name = o.axis.toUpperCase();
-      const side = o.at < o.min ? `${fmt(o.min - o.at)} mm below` : `${fmt(o.at - o.max)} mm above`;
-      return `${name} is at ${fmt(o.at)}, ${side} the ${name} travel ${fmt(o.min)} to ${fmt(o.max)}. Move ${name} into the travel first.`;
+      const side =
+        o.at < o.min
+          ? translate('{{value1}} mm below', { value1: fmt(o.min - o.at) })
+          : translate('{{value1}} mm above', { value1: fmt(o.at - o.max) });
+      return translate(
+        '{{value1}} is at {{value2}}, {{value3}} the {{value4}} travel {{value5}} to {{value6}}. Move {{value7}} into the travel first.',
+        { value1: name, value2: fmt(o.at), value3: side, value4: name, value5: fmt(o.min), value6: fmt(o.max), value7: name }
+      );
     }),
   };
 }
@@ -227,14 +250,14 @@ export function zeroGhost(input: {
     if (!limits) continue;
     if (min[axis] < limits.min - kTravelEpsilon) {
       past.push({ min, max: { ...max, [axis]: Math.min(max[axis], limits.min) } });
-      over.push(`${fmt(limits.min - min[axis])} mm past the ${axis.toUpperCase()} limit`);
+      over.push(translate('{{value1}} mm past the {{value2}} limit', { value1: fmt(limits.min - min[axis]), value2: axis.toUpperCase() }));
     }
     if (max[axis] > limits.max + kTravelEpsilon) {
       past.push({ min: { ...min, [axis]: Math.max(min[axis], limits.max) }, max });
-      over.push(`${fmt(max[axis] - limits.max)} mm past the ${axis.toUpperCase()} limit`);
+      over.push(translate('{{value1}} mm past the {{value2}} limit', { value1: fmt(max[axis] - limits.max), value2: axis.toUpperCase() }));
     }
   }
-  return { min, max, past, label: ['Would run here from the current zero', ...over].join(': ').replace(/limit: /g, 'limit, ') };
+  return { min, max, past, label: [translate('Would run here from the current zero'), ...over].join(': ').replace(/limit: /g, 'limit, ') };
 }
 
 interface Rect {
@@ -271,7 +294,7 @@ export function getJobChecklist(input: ChecklistInput): ChecklistItem[] {
   items.push({
     id: 'homed',
     ok: input.homed,
-    label: input.homed ? 'Homed' : needsHoming ? kHomeFirst : 'Not homed since connecting',
+    label: input.homed ? translate('Homed') : needsHoming ? kHomeFirst : translate('Not homed since connecting'),
   });
 
   if (toolpathBounds && machineBounds) {
@@ -280,7 +303,11 @@ export function getJobChecklist(input: ChecklistInput): ChecklistItem[] {
       toolpathBounds.min.y + toolpathOffset.y >= machineBounds.min.y &&
       toolpathBounds.max.x + toolpathOffset.x <= machineBounds.max.x &&
       toolpathBounds.max.y + toolpathOffset.y <= machineBounds.max.y;
-    items.push({ id: 'bounds', ok: inside, label: inside ? 'Inside machine bounds' : 'Toolpath extends outside the machine bounds' });
+    items.push({
+      id: 'bounds',
+      ok: inside,
+      label: inside ? translate('Inside machine bounds') : translate('Toolpath extends outside the machine bounds'),
+    });
   }
 
   const zeroMatches =
@@ -307,18 +334,22 @@ export function getJobChecklist(input: ChecklistInput): ChecklistItem[] {
   items.push({
     id: 'xy-zero',
     ok: zeroMatches,
-    label: zeroMatches ? 'XY zero matches the toolpath' : 'Machine XY zero differs from the toolpath position',
+    label: zeroMatches ? translate('XY zero matches the toolpath') : translate('Machine XY zero differs from the toolpath position'),
   });
 
   const probes = hasProbeOrZeroCommand(gcode);
   items.push({
     id: 'z-zero',
     ok: input.zZeroed || probes,
-    label: probes ? 'G-code sets Z itself' : input.zZeroed ? 'Z zeroed' : 'Z not probed or zeroed since connecting',
+    label: probes
+      ? translate('G-code sets Z itself')
+      : input.zZeroed
+        ? translate('Z zeroed')
+        : translate('Z not probed or zeroed since connecting'),
   });
 
   if (/\bM0?6\b/i.test(gcode)) {
-    items.push({ id: 'tool-change', ok: false, label: 'Contains tool changes (M6): the job pauses there' });
+    items.push({ id: 'tool-change', ok: false, label: translate('Contains tool changes (M6): the job pauses there') });
   }
   return items;
 }

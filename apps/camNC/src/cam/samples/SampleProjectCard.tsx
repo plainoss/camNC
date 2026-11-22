@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef } from 'react';
 import { Button } from '@wbcnc/ui/components/button';
 import { Card, CardContent } from '@wbcnc/ui/components/card';
@@ -20,15 +21,16 @@ export function SampleProjectCard({ autoOpen = false }: { autoOpen?: boolean }) 
           <Box className="size-9" aria-hidden />
         </div>
         <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
-          <span className="text-xs font-medium text-primary">Start with an example</span>
-          <h2 className="text-lg font-medium">Standing shelf</h2>
+          <span className="text-xs font-medium text-primary">{translate('Start with an example')}</span>
+          <h2 className="text-lg font-medium">{translate('Standing shelf')}</h2>
           <p className="text-sm text-muted-foreground">
-            An assembled STEP shelf with multiple parts. Lay them flat, arrange boards and plan the cuts without a machine.
+            {translate('An assembled STEP shelf with multiple parts. Lay them flat, arrange boards and plan the cuts without a machine. ')}
           </p>
           <Button variant="outline" disabled={pending} onClick={() => void open()}>
-            {pending ? 'Opening sample…' : error ? 'Retry sample project' : 'Open sample project'} <ArrowRight aria-hidden />
+            {pending ? translate('Opening sample…') : error ? translate('Retry sample project') : translate('Open sample project')}{' '}
+            <ArrowRight aria-hidden />
           </Button>
-          <p className="text-xs text-muted-foreground">Creates an editable copy saved in this browser.</p>
+          <p className="text-xs text-muted-foreground">{translate('Creates an editable copy saved in this browser.')}</p>
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadPoint, CadSketch } from '@wbcnc/cad';
 import type { CadSelectionBox } from './boxSelection';
 import type { HandleDrag } from './editorGestures';
@@ -169,7 +170,7 @@ export function SketchRemoveCurveLabel({ cursor, pixelScale }: { cursor: CadPoin
       fontSize={13 / pixelScale}
       fill="#c73535"
       pointerEvents="none">
-      Remove curve
+      {translate('Remove curve ')}
     </text>
   );
 }

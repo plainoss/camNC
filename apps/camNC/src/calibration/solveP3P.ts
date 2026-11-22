@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cv2 } from '@wbcnc/load-opencv';
 import { Matrix3, Vector2, Vector3 } from 'three';
 import { cvToMatrix3, cvToVector3, matrix3ToCV } from '../lib/three-cv';
@@ -5,7 +6,7 @@ import { cvToMatrix3, cvToVector3, matrix3ToCV } from '../lib/three-cv';
 // Return 3d machine bound points as 3d CV Mat
 export function markerMachinePosToCv(mp: Vector3[]) {
   if (mp.length < 4) {
-    throw new Error('Must have at least 4 marker positions');
+    throw new Error(translate('Must have at least 4 marker positions'));
   }
   // Create 3D object points
   const objectPoints = cv2.matFromArray(
@@ -30,7 +31,9 @@ export function projectPoints(points: Vector3[], cameraMatrix: Matrix3, R: Matri
 
 export function computeP3P(mp: Vector3[], markersInCam: Vector2[], newCamMatrix: Matrix3) {
   if (mp.length !== markersInCam.length) {
-    throw new Error(`Got ${markersInCam.length} image points for ${mp.length} marker positions`);
+    throw new Error(
+      translate('Got {{value1}} image points for {{value2}} marker positions', { value1: markersInCam.length, value2: mp.length })
+    );
   }
   const objectPoints = markerMachinePosToCv(mp);
   const imagePoints = cv2.matFromArray(
@@ -62,7 +65,7 @@ export function computeP3P(mp: Vector3[], markersInCam: Vector2[], newCamMatrix:
     );
 
     if (!success) {
-      throw new Error('solvePnP failed to find a valid pose.');
+      throw new Error(translate('solvePnP failed to find a valid pose.'));
     }
 
     // Convert rotation vector to rotation matrix

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 // Client for the settings API served by the camNC Worker (worker/index.ts).
 import { isDemoMode } from '@/lib/demo/demo-mode';
 
@@ -23,7 +24,7 @@ export async function fetchUserSettings(): Promise<unknown | null> {
   if (!headers) return null;
   const resp = await fetch('/api/settings', { headers });
   if (resp.status === 404) return null;
-  if (!resp.ok) throw new Error(`Loading settings failed: ${resp.status}`);
+  if (!resp.ok) throw new Error(translate('Loading settings failed: {{value1}}', { value1: resp.status }));
   const body = (await resp.json()) as { settings: unknown };
   return body.settings;
 }
@@ -37,5 +38,5 @@ export async function saveUserSettings(settings: unknown) {
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify(settings),
   });
-  if (!resp.ok) throw new Error(`Saving settings failed: ${resp.status}`);
+  if (!resp.ok) throw new Error(translate('Saving settings failed: {{value1}}', { value1: resp.status }));
 }

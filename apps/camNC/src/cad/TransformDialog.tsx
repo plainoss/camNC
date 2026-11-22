@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -25,11 +26,11 @@ const kAxisLabels = ['X', 'Y', 'Z'] as const;
 type TransformKind = 'xyz' | 'distance' | 'mate' | 'rotate' | 'line';
 /** The points each kind picks in the view, with what each is called on its button and above its value. */
 const kPicks = {
-  from: { label: 'Mate connector', title: 'Connector on the part' },
-  to: { label: 'Mate connector to move to', title: 'Connector to move to' },
-  axis: { label: 'Axis', title: 'Axis' },
-  start: { label: 'Line start', title: 'Line from' },
-  end: { label: 'Line end', title: 'Line to' },
+  from: { label: translate('Mate connector'), title: translate('Connector on the part') },
+  to: { label: translate('Mate connector to move to'), title: translate('Connector to move to') },
+  axis: { label: translate('Axis'), title: translate('Axis') },
+  start: { label: translate('Line start'), title: translate('Line from') },
+  end: { label: translate('Line end'), title: translate('Line to') },
 } as const;
 type PickEnd = keyof typeof kPicks;
 const kKindPicks: Partial<Record<TransformKind, PickEnd[]>> = { mate: ['from', 'to'], rotate: ['axis'], line: ['start', 'end'] };
@@ -157,7 +158,8 @@ export function TransformDialog({
     setError(null);
     pickPoint(picked => {
       setPickingMate(null);
-      if (end === 'from' && (picked.partId !== part.id || picked.copy)) return setError(`Pick the first connector on ${part.name} itself.`);
+      if (end === 'from' && (picked.partId !== part.id || picked.copy))
+        return setError(translate('Pick the first connector on {{value1}} itself.', { value1: part.name }));
       // An edge picked for the line is the whole line, from one end to the other.
       // Picking where the line ends, after its start, an edge gives only its nearest point.
       if ((end === 'start' || (end === 'end' && !picks.start)) && picked.edge)
@@ -203,11 +205,11 @@ export function TransformDialog({
     });
     /** Moves the part itself, from where it's drawn. */
     const saveMove = (next: NonNullable<CadPart['moved']>): CadDocument | { error: string } => {
-      if (!part.drawnOn) return invalid('Only a part drawn on a plane or a face can be moved.');
+      if (!part.drawnOn) return invalid(translate('Only a part drawn on a plane or a face can be moved.'));
       // A part moved already is moved again from there, by X, Y and Z; its own Transform step changes one along a face.
       if (!move && part.moved) {
         if (!('by' in part.moved) || !('by' in next) || part.moved.turn || next.turn)
-          return invalid('This part is already moved. Change its Transform step in the feature list to move it differently.');
+          return invalid(translate('This part is already moved. Change its Transform step in the feature list to move it differently.'));
         const before = part.moved,
           added = next;
         next = {
@@ -229,7 +231,7 @@ export function TransformDialog({
     };
 
     if (kind === 'distance') {
-      if (!direction) return invalid('Pick a plane or a face for the direction.');
+      if (!direction) return invalid(translate('Pick a plane or a face for the direction.'));
       const distance = parseCadValue(distanceText, { unit: 'mm', variables });
       if ('error' in distance) return invalid(distance.error);
       const along = {
@@ -240,7 +242,7 @@ export function TransformDialog({
       };
       if (!copyPart) return saveMove({ along: along.along, distance: along.distance, ...(flip && { flip: true }) });
       const vector = cadDirectionVector(document, along);
-      if (!vector) return invalid('The plane or face picked for the direction is gone. Pick another.');
+      if (!vector) return invalid(translate('The plane or face picked for the direction is gone. Pick another.'));
       const offset = {
         position: vector.map(value => value * distance.value) as [number, number, number],
         rotation: [0, 0, 0, 1] as [number, number, number, number],
@@ -270,17 +272,18 @@ export function TransformDialog({
       !copyPart && move && pick.partId === part.id && current ? unmovedPick(pick, current) : pick;
     if (kind === 'mate') {
       // The part turns so its connector's face meets the other's, then moves so the two points touch.
-      if (!mateFrom || !mateTo) return invalid(`Pick a corner or face middle on ${part.name}, then one to move it to.`);
+      if (!mateFrom || !mateTo)
+        return invalid(translate('Pick a corner or face middle on {{value1}}, then one to move it to.', { value1: part.name }));
       const mate = mateMove(unmoved(mateFrom), mateTo);
       values = mate.by.map(value => ({ value }));
       turn = mate.turn;
     } else if (kind === 'line') {
       // Along the line, by its length, as the reference translates by a line or two points.
       const { start, end } = picks;
-      if (!start || !end) return invalid('Pick an edge for the line, or two points: where it starts and where it ends.');
+      if (!start || !end) return invalid(translate('Pick an edge for the line, or two points: where it starts and where it ends.'));
       values = end.point.map((value, axis) => ({ value: +(value - start.point[axis]!).toFixed(6) }));
     } else if (kind === 'rotate') {
-      if (!axisPick) return invalid('Pick an edge for the axis, or a face: the part turns about the line straight out of it.');
+      if (!axisPick) return invalid(translate('Pick an edge for the axis, or a face: the part turns about the line straight out of it.'));
       const angle = parseCadValue(angleText, { unit: 'deg', variables });
       if ('error' in angle) return invalid(angle.error);
       const axis = unmoved(pickedLine(axisPick));
@@ -371,7 +374,7 @@ export function TransformDialog({
   // Nothing picked yet, its row in the feature list shows red, as a dialog missing its selection does.
   const missing = !editing && !partPick.picked;
   useEffect(() => {
-    setPendingProblem(missing ? 'Select entities to transform or copy. 1 missing selection' : null);
+    setPendingProblem(missing ? translate('Select entities to transform or copy. 1 missing selection') : null);
     return () => setPendingProblem(null);
   }, [missing]);
   return (
@@ -381,7 +384,7 @@ export function TransformDialog({
       onOk={save}
       onCancel={onCancel}>
       <DialogPartField
-        label="Entities to transform or copy"
+        label={translate('Entities to transform or copy')}
         // A new transform starts with nothing picked, as the reference's does.
         name={editing || partPick.picked ? part.name : ''}
         pick={editing ? null : partPick}
@@ -394,9 +397,9 @@ export function TransformDialog({
         }}
       />
       <label className="cad-number-field">
-        Type
+        {translate('Type ')}
         <select
-          aria-label="Transform type"
+          aria-label={translate('Transform type')}
           value={kind}
           onChange={event => {
             const kind = event.target.value as TransformKind;
@@ -407,16 +410,16 @@ export function TransformDialog({
               pickPoint?.(null);
             }
           }}>
-          {pickPoint && <option value="line">Translate by line</option>}
-          <option value="distance">Translate by distance</option>
-          <option value="xyz">Translate by XYZ</option>
-          {pickPoint && <option value="mate">Transform by mate connectors</option>}
-          {pickPoint && <option value="rotate">Rotate</option>}
+          {pickPoint && <option value="line">{translate('Translate by line')}</option>}
+          <option value="distance">{translate('Translate by distance')}</option>
+          <option value="xyz">{translate('Translate by XYZ')}</option>
+          {pickPoint && <option value="mate">{translate('Transform by mate connectors')}</option>}
+          {pickPoint && <option value="rotate">{translate('Rotate')}</option>}
           <option value="copyInPlace" disabled>
-            Copy in place
+            {translate('Copy in place ')}
           </option>
           <option value="scale" disabled>
-            Scale
+            {translate('Scale ')}
           </option>
         </select>
       </label>
@@ -427,16 +430,16 @@ export function TransformDialog({
             className="cad-feature-selection"
             data-active={(picking || !direction) && !partPick.active ? '' : undefined}
             onClick={pick}
-            aria-label="Direction">
-            <small>Direction</small>
-            <span>{direction ? drawnOnName(document, direction) : 'Pick a plane or a face'}</span>
+            aria-label={translate('Direction')}>
+            <small>{translate('Direction')}</small>
+            <span>{direction ? drawnOnName(document, direction) : translate('Pick a plane or a face')}</span>
           </button>
           <label className="cad-number-field">
-            Distance
+            {translate('Distance ')}
             <span>
               <CadValueInput
                 bare
-                aria-label="Distance"
+                aria-label={translate('Distance')}
                 value={distanceText}
                 spellCheck={false}
                 onChange={event => setDistanceText(event.target.value)}
@@ -446,7 +449,7 @@ export function TransformDialog({
           </label>
           <label>
             <input type="checkbox" checked={flip} onChange={event => setFlip(event.target.checked)} />
-            Flip direction
+            {translate('Flip direction ')}
           </label>
         </>
       )}
@@ -460,32 +463,39 @@ export function TransformDialog({
             data-active={(pickingMate === end || !picked) && !partPick.active ? '' : undefined}
             aria-label={kPicks[end].label}
             onClick={() => pickMate(end)}>
-            <small>{end === 'from' ? `Connector on ${part.name}` : kPicks[end].title}</small>
+            <small>{end === 'from' ? translate('Connector on {{value1}}', { value1: part.name }) : kPicks[end].title}</small>
             <span>
               {picked
                 ? picked.edge
-                  ? `Edge of ${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'a part'}, ${formatLength(Math.hypot(...picked.edge.b.map((value, axis) => value - picked.edge!.a[axis]!)))} ${lengthUnit}`
-                  : `${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'Part'} at ${picked.point.map(value => +value.toFixed(2)).join(', ')}`
+                  ? translate('Edge of {{value1}}, {{value2}} {{lengthUnit}}', {
+                      value1: document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'a part',
+                      value2: formatLength(Math.hypot(...picked.edge.b.map((value, axis) => value - picked.edge!.a[axis]!))),
+                      lengthUnit: lengthUnit,
+                    })
+                  : translate('{{value1}} at {{value2}}', {
+                      value1: document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'Part',
+                      value2: picked.point.map(value => +value.toFixed(2)).join(', '),
+                    })
                 : end === 'from' || end === 'to'
-                  ? 'Click a corner or the middle of a face'
-                  : 'Click an edge, a corner or the middle of a face'}
+                  ? translate('Click a corner or the middle of a face')
+                  : translate('Click an edge, a corner or the middle of a face')}
             </span>
           </button>
         );
       })}
       {kind === 'rotate' && (
         <label className="cad-number-field">
-          Angle
+          {translate('Angle ')}
           <span>
             <CadValueInput
               bare
-              aria-label="Angle"
+              aria-label={translate('Angle')}
               value={angleText}
               spellCheck={false}
               onChange={event => setAngleText(event.target.value)}
             />
           </span>
-          deg
+          {translate('deg ')}
         </label>
       )}
       {kind === 'xyz' &&
@@ -508,13 +518,13 @@ export function TransformDialog({
       {!copy && !move && (
         <label>
           <input type="checkbox" checked={copyPart} onChange={event => setCopyPart(event.target.checked)} />
-          Copy part
+          {translate('Copy part ')}
         </label>
       )}
       {copyPart && (
         <label>
           <input type="checkbox" checked={mirrored} onChange={event => setMirrored(event.target.checked)} />
-          Mirror image
+          {translate('Mirror image ')}
         </label>
       )}
       {error && (

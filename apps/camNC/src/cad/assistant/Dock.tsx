@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { evaluateCadDocument, type CadDocument } from '@wbcnc/cad';
 import { compactCadReport, inspectCadDocument } from '@wbcnc/cad-script';
@@ -88,7 +89,7 @@ export function AssistantDock({
   const staleProposal = !!proposal && JSON.stringify(document) !== JSON.stringify(proposal.base);
   const controller = useRef<AbortController | null>(null);
   const activeBase = useRef<string | null>(null);
-  const stopReason = useRef('Stopped. The design is unchanged.');
+  const stopReason = useRef(translate('Stopped. The design is unchanged.'));
   const previousDocument = useRef(JSON.stringify(document));
   const mounted = useRef(true);
   // The last proposal and, once applied, its before and after: applying, undoing and redoing it are the proposal's own
@@ -106,7 +107,11 @@ export function AssistantDock({
           applied.current = { before: contentOf(latestProposal.current.base), after: contentOf(latestProposal.current.document) };
         if (outcome) {
           onCheckedProposal(null);
-          setActivity(next.at(-1)?.proposalOutcome === 'applied' ? 'Proposal applied.' : 'Proposal discarded. The design is unchanged.');
+          setActivity(
+            next.at(-1)?.proposalOutcome === 'applied'
+              ? translate('Proposal applied.')
+              : translate('Proposal discarded. The design is unchanged.')
+          );
         }
       }),
     [document.id, onCheckedProposal]
@@ -116,13 +121,15 @@ export function AssistantDock({
     if (previousDocument.current === snapshot) return;
     previousDocument.current = snapshot;
     if (activeBase.current && activeBase.current !== snapshot) {
-      stopReason.current = 'The design changed. Send again to work from the current design.';
+      stopReason.current = translate('The design changed. Send again to work from the current design.');
       controller.current?.abort();
       setActivity(stopReason.current);
     }
     const content = contentOf(document);
     if (applied.current && (content === applied.current.before || content === applied.current.after)) {
-      setActivity(content === applied.current.before ? 'Proposal undone. The design is back as it was.' : 'Proposal applied.');
+      setActivity(
+        content === applied.current.before ? translate('Proposal undone. The design is back as it was.') : translate('Proposal applied.')
+      );
       return;
     }
     if (readConversation(document.id).length)
@@ -163,7 +170,7 @@ export function AssistantDock({
     const abort = new AbortController();
     controller.current = abort;
     activeBase.current = JSON.stringify(start);
-    stopReason.current = 'Stopped. The design is unchanged.';
+    stopReason.current = translate('Stopped. The design is unchanged.');
     setText('');
     setImages([]);
     setMessages(transcript);
@@ -172,7 +179,7 @@ export function AssistantDock({
     writeConversation(start.id, transcript);
     const turn = holdPending('assistant');
     try {
-      setActivity('Reading the open design…');
+      setActivity(translate('Reading the open design…'));
       const inspected = await inspectCadDocument(start);
       if (abort.signal.aborted) return;
       const result = await runDesignAssistant({
@@ -234,7 +241,7 @@ export function AssistantDock({
           };
         },
         finalize: async (candidate, signal) => {
-          if (!candidate.trustedReport) throw new Error('Missing trusted geometry check.');
+          if (!candidate.trustedReport) throw new Error(translate('Missing trusted geometry check.'));
           const checked = await finalizeBrowserCandidate(
             { ...candidate, report: candidate.trustedReport, parts: candidate.parts ?? [] },
             signal,
@@ -258,16 +265,18 @@ export function AssistantDock({
       }
       setActivity(
         result.status === 'stopped'
-          ? 'Stopped. The design is unchanged.'
+          ? translate('Stopped. The design is unchanged.')
           : result.status === 'exhausted'
-            ? (result.stopReason ?? `Stopped after ${result.checks} checks. No proposal was offered.`)
+            ? (result.stopReason ?? translate('Stopped after {{value1}} checks. No proposal was offered.', { value1: result.checks }))
             : result.proposal
-              ? 'Checked proposal ready to review.'
-              : 'Waiting for your reply.'
+              ? translate('Checked proposal ready to review.')
+              : translate('Waiting for your reply.')
       );
     } catch (cause) {
       if (mounted.current && !abort.signal.aborted)
-        setError(redactAssistantText(cause instanceof Error ? cause.message : 'The assistant could not finish.', credentials.key));
+        setError(
+          redactAssistantText(cause instanceof Error ? cause.message : translate('The assistant could not finish.'), credentials.key)
+        );
     } finally {
       activeBase.current = null;
       if (mounted.current) {
@@ -298,19 +307,21 @@ export function AssistantDock({
     setError('');
   };
   return (
-    <aside className="cad-assistant-dock" aria-label="Design assistant" onKeyDown={event => event.stopPropagation()}>
+    <aside className="cad-assistant-dock" aria-label={translate('Design assistant')} onKeyDown={event => event.stopPropagation()}>
       <header>
-        <h2>Design assistant</h2>
+        <h2>{translate('Design assistant')}</h2>
         {usage?.costUsd != null && (
-          <span className="cad-assistant-cost" title={`Last turn: ${usage.calls} requests, ${usage.checks} checks`}>
+          <span
+            className="cad-assistant-cost"
+            title={translate('Last turn: {{value1}} requests, {{value2}} checks', { value1: usage.calls, value2: usage.checks })}>
             ${usage.costUsd.toFixed(3)}
           </span>
         )}
         <button
           type="button"
           className="cad-assistant-icon"
-          aria-label="New conversation"
-          title="New conversation"
+          aria-label={translate('New conversation')}
+          title={translate('New conversation')}
           disabled={running || !messages.length}
           onClick={newConversation}>
           ＋
@@ -318,13 +329,13 @@ export function AssistantDock({
         <button
           type="button"
           className="cad-assistant-icon"
-          aria-label="Assistant settings"
-          title={credentials ? `Settings · ${connectionLabel(credentials.config)}` : 'Settings'}
+          aria-label={translate('Assistant settings')}
+          title={credentials ? translate('Settings · {{value1}}', { value1: connectionLabel(credentials.config) }) : translate('Settings')}
           disabled={running}
           onClick={() => settingsDialog.show()}>
           ⚙
         </button>
-        <button type="button" className="cad-assistant-close" onClick={onClose} aria-label="Close assistant">
+        <button type="button" className="cad-assistant-close" onClick={onClose} aria-label={translate('Close assistant')}>
           ✕
         </button>
       </header>
@@ -336,7 +347,7 @@ export function AssistantDock({
         sections={[
           {
             id: 'connection',
-            label: 'Connection',
+            label: translate('Connection'),
             content: (
               <ProviderSettings
                 value={credentials}
@@ -349,12 +360,12 @@ export function AssistantDock({
           },
           {
             id: 'brief',
-            label: 'Brief',
+            label: translate('Brief'),
             content: <Requirements value={confirmed.requirements} disabled={running} onConfirm={confirmBrief} />,
           },
           {
             id: 'usage',
-            label: 'Cost and limits',
+            label: translate('Cost and limits'),
             content: <RunSettings value={runSettings} usage={usage} disabled={running} onChange={setRunSettings} />,
           },
         ]}
@@ -408,7 +419,7 @@ export function AssistantDock({
             onReadingImage={value => {
               if (mounted.current) setReadingImage(value);
             }}
-            context={selection ? `⬚ ${selection.name}` : '⬚ Whole studio'}
+            context={selection ? `⬚ ${selection.name}` : translate('⬚ Whole studio')}
             running={running}
             canSend={!readingImage && !!credentials && (!!text.trim() || !!images.length)}
             onSend={() => void send()}

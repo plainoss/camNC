@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   dimensionForSelection,
   dimensionWitnessPoints,
@@ -37,7 +38,7 @@ export function beginCreationValues(
   const steps: CreationValueStep[] = [];
   if (tool === 'line') {
     const line = entities.find(entity => entity.type === 'line');
-    if (line) steps.push({ entityId: line.id, mode: 'distance', label: 'Line length' });
+    if (line) steps.push({ entityId: line.id, mode: 'distance', label: translate('Line length') });
   } else if (tool === 'ellipse') {
     const ellipse = entities.find(e => e.type === 'ellipse');
     if (ellipse) {
@@ -48,29 +49,29 @@ export function beginCreationValues(
           entityId: ellipse.id,
           pointIds: ellipse.primaryAxis === 'major' ? major : minor,
           mode: 'distance',
-          label: 'Primary axis diameter',
+          label: translate('Primary axis diameter'),
         },
         {
           entityId: ellipse.id,
           pointIds: ellipse.primaryAxis === 'major' ? minor : major,
           mode: 'distance',
-          label: 'Secondary axis diameter',
+          label: translate('Secondary axis diameter'),
         }
       );
     }
   } else if (tool === 'inscribedPolygon' || tool === 'circumscribedPolygon') {
     const circle = entities.find(e => e.type === 'circle');
-    if (circle) steps.push({ entityId: circle.id, mode: 'auto', label: 'Polygon diameter' });
+    if (circle) steps.push({ entityId: circle.id, mode: 'auto', label: translate('Polygon diameter') });
   } else if (tool === 'centerPointArc') {
     const arc = entities.find(e => e.type === 'arc');
-    if (arc) steps.push({ entityId: arc.id, mode: 'auto', label: 'Arc radius' });
+    if (arc) steps.push({ entityId: arc.id, mode: 'auto', label: translate('Arc radius') });
   } else if (tool === 'circle' || tool === 'threePointCircle') {
     const circle = entities.find(entity => entity.type === 'circle');
-    if (circle) steps.push({ entityId: circle.id, mode: 'auto', label: 'Circle diameter' });
+    if (circle) steps.push({ entityId: circle.id, mode: 'auto', label: translate('Circle diameter') });
   } else if (tool === 'alignedRectangle') {
     const lines = entities.filter(e => e.type === 'line');
-    if (lines[0]) steps.push({ entityId: lines[0].id, mode: 'distance', label: 'Rectangle width' });
-    if (lines[1]) steps.push({ entityId: lines[1].id, mode: 'distance', label: 'Rectangle height' });
+    if (lines[0]) steps.push({ entityId: lines[0].id, mode: 'distance', label: translate('Rectangle width') });
+    if (lines[1]) steps.push({ entityId: lines[1].id, mode: 'distance', label: translate('Rectangle height') });
   } else if (tool === 'rectangle' || tool === 'centerRectangle') {
     const points = new Map(sketch.entities.flatMap(entity => (entity.type === 'point' ? [[entity.id, entity] as const] : [])));
     const lines = entities.filter(entity => entity.type === 'line');
@@ -88,8 +89,8 @@ export function beginCreationValues(
         return a && b && Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) > 1e-6;
       })
       .sort((a, b) => points.get(a.startId)!.x - points.get(b.startId)!.x)[0];
-    if (horizontal) steps.push({ entityId: horizontal.id, mode: 'distanceX', label: 'Rectangle width' });
-    if (vertical) steps.push({ entityId: vertical.id, mode: 'distanceY', label: 'Rectangle height' });
+    if (horizontal) steps.push({ entityId: horizontal.id, mode: 'distanceX', label: translate('Rectangle width') });
+    if (vertical) steps.push({ entityId: vertical.id, mode: 'distanceY', label: translate('Rectangle height') });
   }
   return steps.length ? { partId, steps, index: 0, editing: false, text: '', selectAll: false, pointer } : null;
 }

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CurveContour, CurveSegment } from './curveFlatten';
 
 /** Convert quadratics exactly to cubics, then align handles at gentle joins. Straight book edges and sharp corners stay. */
@@ -116,8 +117,8 @@ export function smoothCurveJoins(paths: CurveContour[], maxControlMove = 0.5, mi
       }
       if (!subdivide.size) break;
       segments = segments.flatMap((segment, i) => (subdivide.has(i) ? split(segment) : [segment]));
-      if (segments.length > 2000) throw new Error('Smooth tangent fitting exceeds its segment budget.');
-      if (pass === 11) throw new Error('Smooth tangent fitting exceeded its refinement budget.');
+      if (segments.length > 2000) throw new Error(translate('Smooth tangent fitting exceeds its segment budget.'));
+      if (pass === 11) throw new Error(translate('Smooth tangent fitting exceeded its refinement budget.'));
     }
     for (let i = 0; i < segments.length; i++) {
       const before = segments[i],

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   CAD_GEOMETRY_TOLERANCE,
   closestCurvePoint,
@@ -111,27 +112,28 @@ export function selectionMeasurements(
       : metric(curve.type === 'circle' ? 'Diameter' : 'Radius', curve.radius * (curve.type === 'circle' ? 2 : 1));
   }
   const [a, b] = selected as [CadEntity, CadEntity];
-  if (a.type === 'point' && b.type === 'point') return finitePoint(a) && finitePoint(b) ? metric('Minimum distance', distance(a, b)) : [];
+  if (a.type === 'point' && b.type === 'point')
+    return finitePoint(a) && finitePoint(b) ? metric(translate('Minimum distance'), distance(a, b)) : [];
   if (a.type === 'point' || b.type === 'point') {
     const point = a.type === 'point' ? a : b;
     const curve = a.type === 'point' ? b : a;
     if (!finitePoint(point as CadPoint) || !validCurve(curve, points)) return [];
-    return metric('Minimum distance', pointCurveDistance(point as CadPoint, curve, points));
+    return metric(translate('Minimum distance'), pointCurveDistance(point as CadPoint, curve, points));
   }
   if (!validCurve(a, points) || !validCurve(b, points)) return [];
-  const measurements = metric('Minimum distance', curveDistance(a, b, points, sketch));
+  const measurements = metric(translate('Minimum distance'), curveDistance(a, b, points, sketch));
   if (a.type === 'line' && b.type === 'line') {
     // Existing driving dimensions may be temporarily unsolved. Resolve the angle
     // from current geometry and the selected rays, never from stored target values.
     const angle = dimensionForSelection({ ...sketch, constraints: [] }, selectedIds, { mode: 'angle', picks });
     if ('constraint' in angle && angle.constraint.type === 'angle') measurements.push(...metric('Angle', angle.constraint.value, 'deg'));
   } else if (isCircular(a) && isCircular(b)) {
-    measurements.push(...metric('Center distance', distance(points.get(a.centerId)!, points.get(b.centerId)!)));
+    measurements.push(...metric(translate('Center distance'), distance(points.get(a.centerId)!, points.get(b.centerId)!)));
   } else {
     const circular = isCircular(a) ? a : b;
     const line = a.type === 'line' ? a : b;
     if (isCircular(circular))
-      measurements.push(...metric('Center to line', pointCurveDistance(points.get(circular.centerId)!, line, points)));
+      measurements.push(...metric(translate('Center to line'), pointCurveDistance(points.get(circular.centerId)!, line, points)));
   }
   return measurements;
 }

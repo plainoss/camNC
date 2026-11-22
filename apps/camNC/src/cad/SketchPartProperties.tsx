@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   moveFaceSketch,
   removeCadFeature,
@@ -76,8 +77,11 @@ export function SketchPartProperties({
   const sketch = part.sketch;
   return (
     <div className="cad-properties">
-      <h3>{part.name} · Sketch</h3>
-      <label htmlFor="cad-part-name">Part name</label>
+      <h3>
+        {part.name}
+        {translate(' · Sketch')}
+      </h3>
+      <label htmlFor="cad-part-name">{translate('Part name')}</label>
       <input
         id="cad-part-name"
         key={`${part.id}:${part.name}`}
@@ -159,7 +163,8 @@ export function SketchPartProperties({
         .filter(problem => problem.partId === part.id)
         .map((problem, index) => (
           <p key={index} className="cad-variable-problem" role="alert">
-            Can’t follow the variables, so this part keeps its last good shape. {problem.message}
+            {translate('Can’t follow the variables, so this part keeps its last good shape. ')}
+            {problem.message}
           </p>
         ))}
       <button
@@ -172,7 +177,7 @@ export function SketchPartProperties({
           setSelected([]);
           chooseTool('select');
         }}>
-        Delete part
+        {translate('Delete part ')}
       </button>
       {(!!part.features?.length || (faceEditor && part.extrude !== false)) && (
         <PartFeatureList
@@ -192,24 +197,26 @@ export function SketchPartProperties({
       {!studio && (
         <label className="cad-show-constraints">
           <input type="checkbox" checked={showConstraints} onChange={event => onShowConstraints(event.target.checked)} />
-          Show constraints
+          {translate('Show constraints ')}
         </label>
       )}
       {showDimensionMode && (
         <>
           <label className="cad-dimension-mode" htmlFor="cad-dimension-mode">
-            Dimension type
+            {translate('Dimension type ')}
             <select id="cad-dimension-mode" value={dimensionMode} onChange={event => onDimensionMode(event.target.value as DimensionMode)}>
-              <option value="auto">Automatic</option>
-              <option value="distance">Length</option>
-              <option value="distanceX">Horizontal distance</option>
-              <option value="distanceY">Vertical distance</option>
-              <option value="angle">Angle</option>
+              <option value="auto">{translate('Automatic')}</option>
+              <option value="distance">{translate('Length')}</option>
+              <option value="distanceX">{translate('Horizontal distance')}</option>
+              <option value="distanceY">{translate('Vertical distance')}</option>
+              <option value="angle">{translate('Angle')}</option>
             </select>
           </label>
         </>
       )}
-      <p className="cad-muted">Select a constraint and press Delete to remove it. Double-click a dimension to edit its value.</p>
+      <p className="cad-muted">
+        {translate('Select a constraint and press Delete to remove it. Double-click a dimension to edit its value.')}
+      </p>
       {selected.length === 1 &&
         sketch?.entities.some(entity => entity.id === selected[0] && entity.type === 'conic') &&
         tool === 'select' && (
@@ -219,7 +226,7 @@ export function SketchPartProperties({
               const curve = sketch.entities.find(entity => entity.id === selected[0]);
               if (curve?.type === 'conic') onEditConic(curve.id, curve.rho);
             }}>
-            Edit conic rho
+            {translate('Edit conic rho ')}
           </button>
         )}
     </div>

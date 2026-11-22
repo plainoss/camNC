@@ -1,5 +1,7 @@
 'use client';
 
+import { t as translate } from '@wbcnc/i18n';
+
 import * as React from 'react';
 import * as LabelPrimitive from '@radix-ui/react-label';
 import { Slot } from '@radix-ui/react-slot';
@@ -45,7 +47,7 @@ const useFormField = () => {
   const fieldState = getFieldState(fieldContext.name, formState);
 
   if (!fieldContext) {
-    throw new Error('useFormField should be used within <FormField>');
+    throw new Error(translate('useFormField should be used within <FormField>'));
   }
 
   const { id } = itemContext;

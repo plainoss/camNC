@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { plannedReliefBit } from '@/cam/planSettings';
 import { ReliefBitContext } from '@/cad/reliefBit';
 import { DesignName, DesignSettings, type DesignSettingsValue } from '@/cam/DesignSettings';
@@ -46,10 +47,15 @@ const designContextSchema = z.object({
   part: z.string().min(1).optional(),
 });
 type DesignContext = z.infer<typeof designContextSchema>;
-const draftConflictMessage = 'This design changed in another view. Your local sketch is kept; save a copy or use the saved sketch.';
+const draftConflictMessage = translate(
+  'This design changed in another view. Your local sketch is kept; save a copy or use the saved sketch.'
+);
 const draftKeptNotice = (message: string) => {
   const reason = message.trim().split(/(?<=[.!?])\s+/u)[0];
-  return `Draft kept: ${reason.charAt(0).toLowerCase()}${reason.slice(1).replace(/[.!?]$/, '')}.`;
+  return translate('Draft kept: {{value1}}{{value2}}.', {
+    value1: reason.charAt(0).toLowerCase(),
+    value2: reason.slice(1).replace(/[.!?]$/, ''),
+  });
 };
 
 export const Route = createFileRoute('/cam/$jobId/design')({
@@ -64,13 +70,13 @@ function DesignStep() {
   if (isPending)
     return (
       <CamPage className="h-app">
-        <p className="p-6">Opening design…</p>
+        <p className="p-6">{translate('Opening design…')}</p>
       </CamPage>
     );
   if (!job)
     return (
       <CamPage className="h-app">
-        <p className="p-6">This design no longer exists.</p>
+        <p className="p-6">{translate('This design no longer exists.')}</p>
       </CamPage>
     );
   if (!job.design) return <Navigate to="/cam/$jobId/model" params={{ jobId }} replace />;
@@ -123,7 +129,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
   const updateSettings = (value: DesignSettingsValue) => editor.current?.updateSettings(value) ?? false;
   const stageDestination = useRef<CamStageDestination | null>(null);
   const [navigationPending, setNavigationPending] = useState(false);
-  const [status, setStatus] = useState('Draft saved');
+  const [status, setStatus] = useState(translate('Draft saved'));
   const [error, setError] = useState<string | null>(session.conflict ? draftConflictMessage : null);
   const returnToContext = async (jobId: string, destination = context) => {
     if (destination.returnTo === 'machine') {
@@ -147,7 +153,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
   const draft = (document: CadDocument) => {
     if (recoveryInProgress.current || activeSession.current !== session) return;
     if (!keepPendingDesignDraft(initialJob.id, session.saved, document))
-      setError('Reload recovery is unavailable. Wait for Draft saved before reloading.');
+      setError(translate('Reload recovery is unavailable. Wait for Draft saved before reloading.'));
     setSettings({ name: document.name, lengthUnit: document.lengthUnit });
     if (unitPreference.current !== document.lengthUnit) {
       unitPreference.current = document.lengthUnit;
@@ -156,7 +162,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
       setEditorEpoch(epoch => epoch + 1);
     }
     noteDocumentChange();
-    setStatus('Saving draft…');
+    setStatus(translate('Saving draft…'));
     queue.current = trackPending(
       'save',
       queue.current
@@ -168,7 +174,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
           else acknowledgePendingDesignDraft(initialJob.id, document);
           failure.current = null;
           setError(null);
-          setStatus('Draft saved');
+          setStatus(translate('Draft saved'));
         })
         .catch((cause: unknown) => {
           if (activeSession.current !== session) return;
@@ -176,7 +182,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
           if (problem.name === 'CadDraftConflict') setConflicted(true);
           failure.current = problem;
           setError(problem.message);
-          setStatus('Draft could not be saved');
+          setStatus(translate('Draft could not be saved'));
         })
     );
   };
@@ -189,14 +195,14 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     draft(document);
     await queue.current;
     if (failure.current) throw failure.current;
-    setStatus('Finishing sketch…');
+    setStatus(translate('Finishing sketch…'));
     try {
       const saved = await acceptDesign(persisted.current, document);
       show(saved);
       const destination = stageDestination.current;
       await returnToContext(saved.id, destination ? { returnTo: destination.stage, board: destination.board } : context);
     } catch (cause) {
-      setStatus('Draft saved');
+      setStatus(translate('Draft saved'));
       setError(draftKeptNotice(cause instanceof Error ? cause.message : String(cause)));
       throw cause;
     }
@@ -219,7 +225,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
       // Preparation applies valid pending values through the same guarded draft queue.
       // A rejected original write does not prevent preserving the local source in a new job.
       await queue.current;
-      const name = `${document.name} (recovered copy)`;
+      const name = translate('{{value1}} (recovered copy)', { value1: document.name });
       const empty = await createDesignJob(name);
       const copy = { ...structuredClone(document), id: empty.design!.draft.id, name };
       const saved = await saveDesignDraft(empty, copy);
@@ -248,7 +254,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     try {
       await queue.current;
       const current = await getJob(initialJob.id);
-      if (!current?.design) throw new Error('This design no longer exists. Save your local sketch as a copy.');
+      if (!current?.design) throw new Error(translate('This design no longer exists. Save your local sketch as a copy.'));
       discardPendingDesignDraft(initialJob.id);
       endCadSession(session.document.id);
       if (faceEdit) endCadSession(faceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId).id);
@@ -265,7 +271,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
       setEditorEpoch(epoch => epoch + 1);
       setConflicted(false);
       setError(null);
-      setStatus('Draft saved');
+      setStatus(translate('Draft saved'));
       queryClient.setQueryData(camKeys.job(current.id), current);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -276,11 +282,11 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
   };
   const navigateStage = async (destination: CamStageDestination) => {
     if (destination.newTab) {
-      setError('Finish the sketch before opening CAM in another tab.');
+      setError(translate('Finish the sketch before opening CAM in another tab.'));
       return;
     }
     if (faceEdit) {
-      setError('Finish or cancel this face sketch first.');
+      setError(translate('Finish or cancel this face sketch first.'));
       return;
     }
     if (stageDestination.current || !editor.current) return;
@@ -290,7 +296,8 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     try {
       if (!(await editor.current.finish()))
         setError(
-          previous => previous ?? 'Draft kept: complete the current sketch command or resolve the sketch issue before continuing to CAM.'
+          previous =>
+            previous ?? translate('Draft kept: complete the current sketch command or resolve the sketch issue before continuing to CAM.')
         );
     } finally {
       stageDestination.current = null;
@@ -341,9 +348,10 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
                 size="sm"
                 variant="ghost"
                 className="text-muted-foreground"
-                title="Save the whole design, with its sketches and features, as a .json file. Open it again from Projects."
+                title={translate('Save the whole design, with its sketches and features, as a .json file. Open it again from Projects.')}
                 onClick={saveToFile}>
-                <Download /> Save to file
+                <Download />
+                {translate(' Save to file ')}
               </Button>
               <StudioExportButton design={currentDesign} rolledTo={() => editor.current?.rolledTo() ?? null} />
             </>
@@ -356,10 +364,10 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
               className="absolute left-4 right-4 top-12 z-50 flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-background p-3 shadow-md">
               <p className="flex-1 text-sm">{error ?? draftConflictMessage}</p>
               <Button size="sm" disabled={recovering} onClick={() => void recoverCopy()}>
-                Save sketch copy
+                {translate('Save sketch copy ')}
               </Button>
               <Button size="sm" variant="outline" disabled={recovering} onClick={() => void restoreSaved()}>
-                Use saved sketch
+                {translate('Use saved sketch ')}
               </Button>
             </div>
           )}
@@ -370,7 +378,10 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
               faceSketch={{
                 outline: faceBelow ? flipUnderside(facePart.outline) : facePart.outline,
                 floor: faceBelow && faceFloor ? flipUnderside(faceFloor) : faceFloor,
-                label: `${faceFloor ? 'Pocket floor' : faceBelow ? 'Underside' : 'Top face'}${faceBelow ? ', seen from below' : ''}`,
+                label: translate('{{value1}}{{value2}}', {
+                  value1: faceFloor ? translate('Pocket floor') : faceBelow ? translate('Underside') : translate('Top face'),
+                  value2: faceBelow ? translate(', seen from below') : '',
+                }),
                 below: faceBelow,
                 scene: faceEdit.scene,
               }}

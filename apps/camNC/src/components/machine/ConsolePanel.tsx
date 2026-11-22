@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { Button } from '@wbcnc/ui/components/button';
 import { Checkbox } from '@wbcnc/ui/components/checkbox';
@@ -62,14 +63,14 @@ export function ConsolePanel() {
               {line.kind === 'sent' ? '> ' : ''}
               {line.text}
             </span>
-            {line.detail && <span className="text-red-600"> — {line.detail}</span>}
+            {line.detail && <span className="text-red-600"> — {translate(line.detail)}</span>}
           </div>
         ))}
       </div>
       <form onSubmit={submit} className="flex flex-row gap-2">
         <Input
           className="font-mono"
-          placeholder={api.isConnected.value ? 'G-code or $ command' : 'Not connected'}
+          placeholder={api.isConnected.value ? translate('G-code or $ command') : translate('Not connected')}
           disabled={!api.isConnected.value}
           value={input}
           onChange={e => setInput(e.target.value)}
@@ -78,15 +79,16 @@ export function ConsolePanel() {
           autoComplete="off"
         />
         <Button type="submit" disabled={!api.isConnected.value}>
-          Send
+          {translate('Send ')}
         </Button>
       </form>
       <div className="flex flex-row gap-3 items-center">
         <Label className="text-xs flex flex-row gap-2 items-center">
-          <Checkbox checked={showOk} onCheckedChange={v => setShowOk(v === true)} /> Show ok
+          <Checkbox checked={showOk} onCheckedChange={v => setShowOk(v === true)} />
+          {translate(' Show ok ')}
         </Label>
         <Button size="sm" variant="ghost" onClick={() => api.clearConsole()}>
-          Clear
+          {translate('Clear ')}
         </Button>
       </div>
     </div>

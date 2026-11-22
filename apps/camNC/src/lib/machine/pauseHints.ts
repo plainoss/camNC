@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { parsePauseMarker, type PauseMarker, positionWindow } from '@wbcnc/cam/pauseMarker';
 import { gcodeWords, hasWord } from './gcodeWords';
 
@@ -110,17 +111,20 @@ function describeNext(lines: Line[], from: number, gcode: string): string | null
     if (!code) continue;
     seen++;
     if (/\bG38\.[2-5]\b/.test(code)) {
-      return 'Next it probes Z (G38). Attach the probe clip and put the plate under the bit, then Resume.';
+      return translate('Next it probes Z (G38). Attach the probe clip and put the plate under the bit, then Resume.');
     }
     const tool = code.match(/\bT(\d+)\b/);
     if (tool && /\bM0?6\b/.test(code)) {
       const description = toolDescription(gcode, Number(tool[1]));
-      return `Tool change to T${tool[1]}${description ? ` (${description})` : ''}: change the bit, then Resume. Re-zero Z if the program does not probe.`;
+      return translate('Tool change to T{{value1}}{{value2}}: change the bit, then Resume. Re-zero Z if the program does not probe.', {
+        value1: tool[1],
+        value2: description ? ` (${description})` : '',
+      });
     }
     if (/\bM0?[34]\b/.test(code)) {
-      return 'Next it starts the spindle. Make sure the spindle and dust collection are ready, then Resume.';
+      return translate('Next it starts the spindle. Make sure the spindle and dust collection are ready, then Resume.');
     }
-    if (/\b(G0?[0-3])\b|[XYZ]-?[\d.]/.test(code)) return 'Resume continues with the next move.';
+    if (/\b(G0?[0-3])\b|[XYZ]-?[\d.]/.test(code)) return translate('Resume continues with the next move.');
   }
   return null;
 }
@@ -129,7 +133,10 @@ function describeNext(lines: Line[], from: number, gcode: string): string | null
 export function explainPause(lines: Line[], index: number, gcode: string): PauseHint {
   const line = lines[index]!;
   const message = operatorMessage(line.comment) ?? (line.comment || null);
-  const reason = `The job stopped at a program pause (M0) on line ${index + 1}${message ? `: “${message}”` : ''}.`;
+  const reason = translate('The job stopped at a program pause (M0) on line {{value1}}{{value2}}.', {
+    value1: index + 1,
+    value2: message ? `: “${message}”` : '',
+  });
   const marker = index > 0 ? parsePauseMarker(lines[index - 1]!.comment) : null;
   return { reason, next: describeNext(lines, index + 1, gcode), line: index + 1, ...(marker && { marker }) };
 }

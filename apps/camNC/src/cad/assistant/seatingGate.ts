@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadDocument } from '@wbcnc/cad';
 import { addedUnplannedFurniturePieces } from '@wbcnc/cad-script';
 import type { AssistantRequirementCheck } from './requirements';
@@ -41,7 +42,8 @@ export function seatingConstructionCheck(
     passed: false,
     expected: 'every new piece joined by a measured construction pattern',
     actual: loose.slice(0, 12).map(piece => piece.name),
-    message:
-      'A chair or stool is built from frameStool or panelChair, so its retained joints and fastened seat are measured. These new pieces belong to no construction plan. Rebuild them from a pattern, or explain the constraint that stops it, instead of offering them as a finished design.',
+    message: translate(
+      'A chair or stool is built from frameStool or panelChair, so its retained joints and fastened seat are measured. These new pieces belong to no construction plan. Rebuild them from a pattern, or explain the constraint that stops it, instead of offering them as a finished design.'
+    ),
   };
 }

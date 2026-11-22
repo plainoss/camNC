@@ -1,3 +1,5 @@
+import { LanguageSelector } from './LanguageSelector';
+import { t as translate } from '@wbcnc/i18n';
 import { Link } from '@tanstack/react-router';
 import { Box, Bug, Cctv, ChevronsLeft, Gauge, HardDriveDownload, Layers, Info, Pin, Puzzle, Rocket, Scale3d, Wrench } from 'lucide-react';
 import * as React from 'react';
@@ -39,13 +41,13 @@ type NavRoute = {
 
 const routes: NavRoute[] = [
   {
-    title: 'Projects',
+    title: translate('Projects'),
     to: '/cam',
     icon: Box,
-    badge: 'Beta',
+    badge: translate('Beta'),
   },
   {
-    title: 'Get started',
+    title: translate('Get started'),
     to: '/start',
     icon: Rocket,
   },
@@ -54,50 +56,50 @@ const routes: NavRoute[] = [
 // Each camera's source and setup steps are on its own page, reached from here or the camera switcher.
 const machineRoutes: NavRoute[] = [
   {
-    title: 'Connection',
+    title: translate('Connection'),
     to: '/setup/fluidnc',
     icon: Puzzle,
   },
   {
-    title: 'Work area',
+    title: translate('Work area'),
     to: '/setup/machine-bounds',
     icon: Scale3d,
   },
   {
-    title: 'Cameras',
+    title: translate('Cameras'),
     to: '/setup/cameras',
     icon: Cctv,
   },
   {
-    title: 'Hide machine',
+    title: translate('Hide machine'),
     to: '/settings/hide-machine',
     icon: Layers,
-    badge: 'Beta',
+    badge: translate('Beta'),
   },
 ];
 
 const toolRoutes: NavRoute[] = [
   {
-    title: 'Bits',
+    title: translate('Bits'),
     to: '/settings/bits',
     icon: Wrench,
   },
   {
-    title: 'Cutting data',
+    title: translate('Cutting data'),
     to: '/settings/cutting-data',
     icon: Gauge,
   },
 ];
 
 const appRoutes: NavRoute[] = [
-  { title: 'About', to: '/about', icon: Info },
+  { title: translate('About'), to: '/about', icon: Info },
   {
-    title: 'Backup & restore',
+    title: translate('Backup & restore'),
     to: '/settings/backup',
     icon: HardDriveDownload,
   },
   {
-    title: 'Advanced settings',
+    title: translate('Advanced settings'),
     to: '/setup/edit-settings',
     icon: Bug,
   },
@@ -183,19 +185,20 @@ export function AppSidebar({ className, pinned = false, ...props }: AppSidebarPr
           </SidebarMenuItem>
         </SidebarMenu>
         <CamSourceSelector />
+        <LanguageSelector />
       </SidebarHeader>
       <SidebarContent>
         {!phone && <JobSteps />}
         <NavRoutes routes={routes} />
-        <NavRoutes routes={machineRoutes} label="Machine setup" />
-        <NavRoutes routes={toolRoutes} label="Tools" />
-        <NavRoutes routes={appRoutes} label="App" />
+        <NavRoutes routes={machineRoutes} label={translate('Machine setup')} />
+        <NavRoutes routes={toolRoutes} label={translate('Tools')} />
+        <NavRoutes routes={appRoutes} label={translate('App')} />
       </SidebarContent>
       {!phone && (pinned || roomForFull) && (
         <div className="px-2 pb-1">
           <SidebarMenuButton onClick={() => (setOpen(false), setRail(pinned ? 'icons' : 'full'))}>
             {pinned ? <ChevronsLeft className="size-4" /> : <Pin className="size-4" />}
-            <span>{pinned ? 'Collapse to icons' : 'Keep open'}</span>
+            <span>{pinned ? translate('Collapse to icons') : translate('Keep open')}</span>
           </SidebarMenuButton>
         </div>
       )}

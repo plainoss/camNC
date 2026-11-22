@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { placedRect, type PartInstance } from '../boards';
 import type { CamPartInfo } from '../camTypes';
@@ -17,16 +18,16 @@ export function DropStatus({
 }) {
   if (!dragging) return null;
   const text = !fits
-    ? 'Different thickness'
+    ? translate('Different thickness')
     : !target
       ? from
-        ? 'Moving from here'
-        : 'Drop here'
+        ? translate('Moving from here')
+        : translate('Drop here')
       : !target.drop?.at
-        ? 'Doesn’t fit on this board'
+        ? translate('Doesn’t fit on this board')
         : target.drop.exact
-          ? 'Lands where you drop it'
-          : 'Snaps into the nest';
+          ? translate('Lands where you drop it')
+          : translate('Snaps into the nest');
   return (
     <span
       className={cn(
@@ -101,7 +102,7 @@ export function Ghost({
           textAnchor="middle"
           fontSize={12 / pxPerMm}
           className="fill-amber-600 font-medium dark:fill-amber-400">
-          Off the board: won’t be cut
+          {translate('Off the board: won’t be cut ')}
         </text>
       )}
     </svg>

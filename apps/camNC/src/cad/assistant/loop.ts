@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CadDocument } from '@wbcnc/cad';
 import type { CadReport } from '@wbcnc/cad-script';
 import type { EvaluatedCadPart } from '@wbcnc/cad';
@@ -288,7 +289,13 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
         ? checkAssistantRequirements(requirements, base, checked.document, checked.trustedReport, checked.parts)
         : {
             ok: false,
-            checks: [{ requirement: 'trusted geometry', passed: false, message: 'The checker did not supply trusted evaluated geometry.' }],
+            checks: [
+              {
+                requirement: 'trusted geometry',
+                passed: false,
+                message: translate('The checker did not supply trusted evaluated geometry.'),
+              },
+            ],
           }
       : { ok: true, checks: [] };
   let latestReport = options.report;
@@ -298,7 +305,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
   const maxChecks = options.maxChecks ?? 5,
     maxTurns = options.maxTurns ?? 12;
   if (!Number.isInteger(maxChecks) || maxChecks < 1 || maxChecks > 20 || !Number.isInteger(maxTurns) || maxTurns < 1 || maxTurns > 30)
-    throw new Error('Assistant limits are out of range.');
+    throw new Error(translate('Assistant limits are out of range.'));
   let checks = 0,
     source = '',
     proposal: CadProposal | undefined;
@@ -322,7 +329,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
   for (let turn = 0; turn < maxTurns; turn++) {
     if (options.signal.aborted) return finish('stopped');
     if (runSignal.aborted) {
-      stopReason = 'Run deadline reached.';
+      stopReason = translate('Run deadline reached.');
       return finish('exhausted');
     }
     const finalizing = checks >= maxChecks || turn === maxTurns - 1;
@@ -350,7 +357,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     const fixedCharacters = stagedSystem.length + JSON.stringify(tools).length;
     const messageCharacters = (limits.maxInputCharacters ?? 120_000) - fixedCharacters;
     if (messageCharacters < 1) {
-      stopReason = 'Input character budget exceeded.';
+      stopReason = translate('Input character budget exceeded.');
       return finish('exhausted');
     }
     let modelMessages: AssistantMessage[];
@@ -367,11 +374,11 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
         ...(finalNote ? [{ role: 'user' as const, text: finalNote }] : []),
       ];
     } catch (error) {
-      stopReason = error instanceof Error ? error.message : 'Context budget exceeded.';
+      stopReason = error instanceof Error ? error.message : translate('Context budget exceeded.');
       return finish('exhausted');
     }
     if (fixedCharacters + assistantContextCharacters(modelMessages) > (limits.maxInputCharacters ?? 120_000)) {
-      stopReason = 'Input character budget exceeded.';
+      stopReason = translate('Input character budget exceeded.');
       return finish('exhausted');
     }
     const outgoingImages = modelMessages.flatMap(message => message.images ?? []);
@@ -380,7 +387,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
       outgoingImages.reduce((bytes, image) => bytes + Math.ceil((image.data.length * 3) / 4), 0) >
         (limits.maxImageBytes ?? 20 * 1024 * 1024)
     ) {
-      stopReason = 'Image count or byte budget exceeded. Start a new conversation or remove reference images.';
+      stopReason = translate('Image count or byte budget exceeded. Start a new conversation or remove reference images.');
       return finish('exhausted');
     }
     const budgetStop = assistantBudgetStop(usage, limits);
@@ -411,7 +418,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
       options.onUsage?.({ ...usage });
       if (options.signal.aborted) return finish('stopped');
       if (runSignal.aborted) {
-        stopReason = 'Run deadline reached.';
+        stopReason = translate('Run deadline reached.');
         return finish('exhausted');
       }
       throw error;
@@ -420,7 +427,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     options.onUsage?.({ ...usage });
     if (options.signal.aborted) return finish('stopped');
     if (runSignal.aborted) {
-      stopReason = 'Run deadline reached.';
+      stopReason = translate('Run deadline reached.');
       return finish('exhausted');
     }
     if (answer.completion === 'incomplete' || answer.completion === 'refused') {
@@ -436,14 +443,19 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     }
     emit(answer);
     if (answer.completion === 'incomplete' || answer.completion === 'refused') {
-      stopReason = answer.completion === 'incomplete' ? 'The provider did not finish its response.' : 'The provider refused this request.';
+      stopReason =
+        answer.completion === 'incomplete'
+          ? translate('The provider did not finish its response.')
+          : translate('The provider refused this request.');
       return finish('exhausted');
     }
     if (!answer.calls?.length) {
       if (/^\s*Proposal:\s*\S/i.test(answer.text) && proposal) return finish('proposal');
       if (/^\s*Question:\s*\S/i.test(answer.text)) return finish('question');
       stopReason = /^\s*Proposal:/i.test(answer.text)
-        ? 'The assistant offered a proposal, but no check of it passed, so there is nothing to review. Ask it to fix the failed check.'
+        ? translate(
+            'The assistant offered a proposal, but no check of it passed, so there is nothing to review. Ask it to fix the failed check.'
+          )
         : 'The assistant did not return a complete Proposal: or Question: response.';
       return finish('exhausted');
     }
@@ -519,15 +531,15 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
               : source || 'No script has been checked in this turn.';
         else if (call.name === 'finalize_design' && options.finalize) {
           proposal = undefined;
-          if (!latestCandidate?.ok) throw new Error('Check passing geometry before finalizing.');
-          if (Object.keys(call.arguments).length) throw new Error('finalize_design takes no arguments.');
+          if (!latestCandidate?.ok) throw new Error(translate('Check passing geometry before finalizing.'));
+          if (Object.keys(call.arguments).length) throw new Error(translate('finalize_design takes no arguments.'));
           let full = finalized.get(latestCandidate);
           if (!full) {
-            options.onActivity?.('Running the complete final check…');
+            options.onActivity?.(translate('Running the complete final check…'));
             const candidateSnapshot = JSON.stringify(latestCandidate.document);
             full = await options.finalize(structuredClone(latestCandidate), runSignal);
             if (JSON.stringify(full.document) !== candidateSnapshot)
-              throw new Error('Final verification changed the candidate. Check that geometry again.');
+              throw new Error(translate('Final verification changed the candidate. Check that geometry again.'));
             if (!runSignal.aborted) finalized.set(latestCandidate, full);
           }
           const acceptance = acceptanceOf(full);
@@ -551,7 +563,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
             latestCandidate = undefined;
             const { views: _views, bit, ...scriptInput } = call.arguments;
             if (bit !== undefined && (call.name !== 'check_design' || !(typeof bit === 'number' && bit >= 0.5 && bit <= 25)))
-              throw new Error('check_design bit is a flat bit diameter in mm, from 0.5 to 25.');
+              throw new Error(translate('check_design bit is a flat bit diameter in mm, from 0.5 to 25.'));
             const script = call.name === 'check_design' ? await scripts.resolve(scriptInput) : undefined;
             source = script?.source ?? '';
             const requestedViews = normalizeAssistantViews(call.arguments.views ?? (referenceImages ? true : false));
@@ -577,7 +589,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
             latestReport = checked.detailReport ?? checked.report;
             options.onUsage?.({ ...usage });
             if (options.signal.aborted) {
-              text = 'Stopped by the user. No proposal was offered.';
+              text = translate('Stopped by the user. No proposal was offered.');
             } else {
               const acceptance = acceptanceOf(checked);
               if (checked.ok && acceptance.ok) {
@@ -614,7 +626,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
           proposal = undefined;
           latestCandidate = undefined;
         }
-        text = error instanceof Error ? error.message : 'The check failed.';
+        text = error instanceof Error ? error.message : translate('The check failed.');
         isError = true;
       }
       emit({ role: 'tool', callId: call.id, text, ...(images?.length && { images }), ...(isError && { isError }) });

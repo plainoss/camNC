@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useDesignUnits } from './designUnits';
 import type { CadPart, CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -37,7 +38,7 @@ export function CadReliefField({
     if (!on) return onChange(undefined);
     const parsed = parseCadValue(value, { unit: 'mm', variables });
     if ('error' in parsed || parsed.value <= 0) {
-      if (!preview) setError('error' in parsed ? parsed.error : 'A bit needs to be wider than nothing.');
+      if (!preview) setError('error' in parsed ? parsed.error : translate('A bit needs to be wider than nothing.'));
       return;
     }
     setError(null);
@@ -49,11 +50,11 @@ export function CadReliefField({
     <div className="cad-relief-field">
       <label>
         <input type="checkbox" checked={!!relief} onChange={event => apply(event.target.checked)} />
-        Relieve inside corners
+        {translate('Relieve inside corners ')}
       </label>
       {relief && (
         <label htmlFor={id} className="cad-number-field">
-          for a bit of
+          {translate('for a bit of ')}
           <span>
             <CadValueInput
               bare
@@ -94,7 +95,7 @@ export function CadReliefField({
           {error}
         </p>
       )}
-      <p className="cad-thickness-hint">Bones let a square part go fully into a corner a round bit cuts.</p>
+      <p className="cad-thickness-hint">{translate('Bones let a square part go fully into a corner a round bit cuts.')}</p>
     </div>
   );
 }

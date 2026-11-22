@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { createCadFolder, renameCadFolder, type CadDocument, type CadFolder } from '@wbcnc/cad';
 import { useId, useState } from 'react';
 import { FeatureDialog } from './FeatureDialog';
@@ -39,14 +40,14 @@ export function FolderNameDialog({
     plane => !document.folders?.some(candidate => candidate.planeIds?.includes(plane.id))
   );
   return (
-    <FeatureDialog title={folder ? 'Rename folder' : 'New folder'} onOk={save} onCancel={onClose}>
+    <FeatureDialog title={folder ? translate('Rename folder') : translate('New folder')} onOk={save} onCancel={onClose}>
       <label className="cad-number-field" htmlFor={`${id}-name`}>
-        Name
+        {translate('Name ')}
         <input id={`${id}-name`} value={name} autoFocus onChange={event => setName(event.target.value)} />
       </label>
       {!folder && (
         <fieldset className="cad-folder-members">
-          <legend>Neighbouring parts</legend>
+          <legend>{translate('Neighbouring parts')}</legend>
           {available.map(part => (
             <label key={part.id}>
               <input
@@ -63,7 +64,7 @@ export function FolderNameDialog({
       )}
       {!folder && availablePlanes.length > 0 && (
         <fieldset className="cad-folder-members">
-          <legend>Neighbouring planes</legend>
+          <legend>{translate('Neighbouring planes')}</legend>
           {availablePlanes.map(plane => (
             <label key={plane.id}>
               <input

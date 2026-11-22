@@ -79,13 +79,12 @@ it('keeps what an Extrude dialog set when its sketch is opened from it', async (
   expect(latest().parts[0]!.thickness).toBe(30);
 });
 
-it('leaves the open dialog alone when the command chosen next is refused', async () => {
+it('swaps an open dialog for a new Hole, keeping one dialog open', async () => {
   await studio();
-  await start(/^Variable/, 'Variable');
+  await start(/^Variable/, /^#\? = /);
   await userEvent.click(await studioCommand(/^Hole/));
-  expect((await screen.findByRole('alert')).textContent).toMatch(/^Hole drills at the points of a sketch on Plate/);
+  await screen.findByRole('dialog', { name: '⌀ 6 mm THRU' });
   expect(screen.getAllByRole('dialog')).toHaveLength(1);
-  expect(screen.getByRole('dialog', { name: 'Variable' })).toBeDefined();
 });
 
 it('shows a depth being dragged in the Extrude dialog before the design has it', async () => {

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { DemoBanner } from '@/lib/demo/DemoBanner';
 import { getRehearsalId, isDemoMode } from '@/lib/demo/demo-mode';
 import { cn } from '@wbcnc/ui/lib/utils';
@@ -171,18 +172,24 @@ function VisualizeComponent() {
     if (snapEnabled) return onClickSnap();
     console.log('onDbClick', event.unprojectedPoint);
     if (!cncApi.canJog.value) {
-      toast.error(cncApi.isConnected.value ? `Machine is busy (${cncApi.state.value})` : 'Machine not connected');
+      toast.error(
+        cncApi.isConnected.value
+          ? translate('Machine is busy ({{value1}})', { value1: cncApi.state.value })
+          : translate('Machine not connected')
+      );
       return;
     }
     const point = event.unprojectedPoint;
     const bounds = getMachineBounds();
     if (!bounds) return;
     if (!bounds.containsPoint(new Vector2(point.x, point.y))) {
-      toast.info('Cannot jog outside machine bounds');
+      toast.info(translate('Cannot jog outside machine bounds'));
       return;
     }
-    cncApi.jogToMachineCoordinates(point.x, point.y).catch(err => toast.error(`Jog failed: ${err.message}`));
-    toast.success(`Jogging to ${point.x.toFixed(2)}, ${point.y.toFixed(2)}`);
+    cncApi
+      .jogToMachineCoordinates(point.x, point.y)
+      .catch(err => toast.error(translate('Jog failed: {{value1}}', { value1: err.message })));
+    toast.success(translate('Jogging to {{value1}}, {{value2}}', { value1: point.x.toFixed(2), value2: point.y.toFixed(2) }));
   }
 
   function onPointerMove(event: ThreeEvent<PointerEvent>) {
@@ -200,17 +207,21 @@ function VisualizeComponent() {
     const pos = snapPos;
     if (!pos) return;
     if (!cncApi.canJog.value) {
-      toast.error(cncApi.isConnected.value ? `Machine is busy (${cncApi.state.value})` : 'Machine not connected');
+      toast.error(
+        cncApi.isConnected.value
+          ? translate('Machine is busy ({{value1}})', { value1: cncApi.state.value })
+          : translate('Machine not connected')
+      );
       return;
     }
     const bounds = getMachineBounds();
     if (!bounds) return;
     if (!bounds.containsPoint(new Vector2(pos.x, pos.y))) {
-      toast.info('Cannot jog outside machine bounds');
+      toast.info(translate('Cannot jog outside machine bounds'));
       return;
     }
-    cncApi.jogToMachineCoordinates(pos.x, pos.y).catch(err => toast.error(`Jog failed: ${err.message}`));
-    toast.success(`Jogging to ${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}`);
+    cncApi.jogToMachineCoordinates(pos.x, pos.y).catch(err => toast.error(translate('Jog failed: {{value1}}', { value1: err.message })));
+    toast.success(translate('Jogging to {{value1}}, {{value2}}', { value1: pos.x.toFixed(2), value2: pos.y.toFixed(2) }));
   }
 
   return (
@@ -273,7 +284,8 @@ function VisualizeComponent() {
             <div className="dark pointer-events-none absolute inset-0 h-app text-foreground">
               {videoError ? (
                 <div className="flex h-full items-center justify-center p-4 text-center text-red-500">
-                  Error loading video: {videoError.message || 'unknown error'}
+                  {translate('Error loading video: ')}
+                  {videoError.message || translate('unknown error')}
                 </div>
               ) : (
                 <LoadingVideoOverlay />

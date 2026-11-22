@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { CamSettings, HoleChoice, LibraryTool, Tool } from '@wbcnc/cam';
 import { MATERIALS } from '@wbcnc/cam/settings';
 import { savedCuttingFor, resolveCutting, type CuttingData } from '@wbcnc/cam-settings';
@@ -42,7 +43,7 @@ export const kRoundBall: LibraryTool = {
   number: 21,
   diameter: 6,
   shape: 'ball',
-  name: '6 mm ball end',
+  name: translate('6 mm ball end'),
   flutes: 2,
   feed: 1200,
   plungeFeed: 300,
@@ -66,8 +67,8 @@ export function roundBallFor(p: Pick<PlanSettingsV1, 'roundBall'>, offered: Libr
 export const kBuiltInBits: LibraryTool[] = [
   kDefaultBit,
   { number: 2, diameter: 3.175, name: '1/8″ compression', flutes: 2, fluteLength: 25, feed: 2400, plungeFeed: 360, rpm: 15000 },
-  { number: 3, diameter: 6, name: '6 mm flat', flutes: 2, fluteLength: 32, feed: 1800, plungeFeed: 330, rpm: 30000 },
-  { number: 4, diameter: 8, name: '8 mm flat', flutes: 2, fluteLength: 32, feed: 3000, plungeFeed: 480, rpm: 30000 },
+  { number: 3, diameter: 6, name: translate('6 mm flat'), flutes: 2, fluteLength: 32, feed: 1800, plungeFeed: 330, rpm: 30000 },
+  { number: 4, diameter: 8, name: translate('8 mm flat'), flutes: 2, fluteLength: 32, feed: 3000, plungeFeed: 480, rpm: 30000 },
   kRoundBall,
 ];
 
@@ -128,7 +129,7 @@ export function toCamSettings(
     tools: bits.map((b, i) => ({
       number: i === 0 ? b.number : Math.max(b.number, p.bit.number + 1),
       diameter: b.diameter,
-      name: b.name.toLowerCase().includes('flat') ? b.name : `flat end mill: ${b.name}`,
+      name: b.name.toLowerCase().includes('flat') ? b.name : translate('flat end mill: {{value1}}', { value1: b.name }),
       guid: b.guid,
       presetId: b.presetId,
       presetName: b.presetName,

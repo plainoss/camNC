@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { addLine, addPoint, cornerKey, type CadSketch, type CadDocument, type cadSketchFrame, type CadPointEntity } from '@wbcnc/cad';
 import type { PartEdge } from './partEdges';
 import { partVertices } from './partVertices';
@@ -33,12 +34,14 @@ export function addUsedPartEdges(
       .filter(vertex => keys.includes(vertex.key))
       .map(vertex => ({ ...vertex, type: 'vertex' as const })),
   ];
-  if (!choices.length) return refuse('Use: pick an available model edge or vertex.');
+  if (!choices.length) return refuse(translate('Use: pick an available model edge or vertex.'));
   let next = sketch;
   const selected: string[] = [];
   for (const choice of choices) {
     if (choice.ambiguous)
-      return refuse('Use: this projection has more than one possible part or copy source. Hide an overlapping part, then pick again.');
+      return refuse(
+        translate('Use: this projection has more than one possible part or copy source. Hide an overlapping part, then pick again.')
+      );
     const points =
       choice.type === 'edge'
         ? [
@@ -47,7 +50,8 @@ export function addUsedPartEdges(
           ]
         : [[choice.x, choice.y]];
     const references = points.map(([x, y]) => corner(choice, x!, y!));
-    if (references.some(reference => !reference)) return refuse('Use: this geometry cannot be linked to its source corners yet.');
+    if (references.some(reference => !reference))
+      return refuse(translate('Use: this geometry cannot be linked to its source corners yet.'));
     // Imported references own their endpoints. Reusing a target point could steal another source's association,
     // or leave an origin-bound endpoint fixed while the chosen source moves.
     const empty = { ...sketch, entities: [], constraints: [] };

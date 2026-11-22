@@ -1,3 +1,4 @@
+import { t as translate, workerLanguageName } from '@wbcnc/i18n';
 import type { CadDimension, CadDimensionCreationResult, CadDocument, CadPart, CadSolveOptions, CadSolveResult } from '@wbcnc/cad';
 import * as Comlink from 'comlink';
 import type { CadWorkerAPI } from '../workers/cad.worker';
@@ -20,12 +21,17 @@ function failClient(target: SolverClient, error: Error) {
 
 function solverClient(): SolverClient {
   if (client) return client;
-  const worker = new Worker(new URL('../workers/cad.worker.ts', import.meta.url), { type: 'module', name: 'CAD sketch solver' });
+  const worker = new Worker(new URL('../workers/cad.worker.ts', import.meta.url), {
+    type: 'module',
+    name: workerLanguageName('CAD sketch solver'),
+  });
   const target: SolverClient = { worker, remote: Comlink.wrap<CadWorkerAPI>(worker), pending: new Set() };
   worker.addEventListener('error', event =>
-    failClient(target, new Error(event.message || 'The sketch solver worker stopped. Try the edit again.'))
+    failClient(target, new Error(event.message || translate('The sketch solver worker stopped. Try the edit again.')))
   );
-  worker.addEventListener('messageerror', () => failClient(target, new Error('The sketch solver returned an unreadable result.')));
+  worker.addEventListener('messageerror', () =>
+    failClient(target, new Error(translate('The sketch solver returned an unreadable result.')))
+  );
   client = target;
   return target;
 }
@@ -56,7 +62,7 @@ export function prepareDimensionCreation(part: CadPart, dimension: CadDimension)
 
 /** Releases native WASM state and rejects pending calls instead of leaving abandoned Comlink requests waiting. */
 export function disposeCadSolver() {
-  if (client) failClient(client, new Error('The sketch solver was closed.'));
+  if (client) failClient(client, new Error(translate('The sketch solver was closed.')));
 }
 
 if (import.meta.hot) import.meta.hot.dispose(disposeCadSolver);

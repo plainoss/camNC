@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import * as React from 'react';
 
 export type CamNcLogoIconProps = React.ComponentProps<'svg'>;
@@ -32,9 +33,10 @@ export function CamNcBrand({ className }: { className?: string }) {
       <CamNcLogoIcon className="size-8 flex-shrink-0" />
       <div className="grid flex-1 text-left text-sm leading-tight">
         <span className="truncate font-semibold tracking-tight">
-          Cam<span className="text-amber-500 font-bold">NC</span>
+          {translate('Cam')}
+          <span className="text-amber-500 font-bold">{translate('NC')}</span>
         </span>
-        <span className="truncate text-xs text-muted-foreground">Toolpath Vision</span>
+        <span className="truncate text-xs text-muted-foreground">{translate('Toolpath Vision')}</span>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import {
   CAD_CHORD_TOLERANCE,
   cadPartReferenceOwner,
@@ -27,7 +28,7 @@ export function splitPartWith(
   id: string
 ): { document: CadDocument; partId: string } | { error: string } {
   const owner = cadPartReferenceOwner(document, target);
-  if (!owner) return { error: 'That part is gone. Pick another.' };
+  if (!owner) return { error: translate('That part is gone. Pick another.') };
   let next = document,
     partId = owner.id,
     fromCopy = !!owner.split?.fromCopy;
@@ -45,7 +46,7 @@ export function splitPartWith(
       next = { ...next, parts: next.parts.map(part => (part.id === partId ? { ...part, regions } : part)) };
     }
   } else if (!owner.split && (owner.copies?.length || owner.pattern))
-    return { error: `Split one of ${owner.name}’s copies, or a part without copies.` };
+    return { error: translate('Split one of {{value1}}’s copies, or a part without copies.', { value1: owner.name }) };
   next = {
     ...next,
     revision: next.revision + 1,
@@ -62,7 +63,7 @@ export function splitPartWith(
   next = prepareStudioPreview(prepareStudioPreview(next));
   const split = next.parts.find(part => part.id === partId);
   if (!split?.split?.line)
-    return { error: 'Pick a plane that stands across the part, as the Front or Right plane does across a board on Top.' };
-  if (!splitHalves(split)) return { error: 'The plane doesn’t cut through the part.' };
+    return { error: translate('Pick a plane that stands across the part, as the Front or Right plane does across a board on Top.') };
+  if (!splitHalves(split)) return { error: translate('The plane doesn’t cut through the part.') };
   return { document: next, partId };
 }

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { CameraNameInput, DeleteCameraButton } from '@/components/camera/CameraControls';
 import { CameraStatusDot } from '@/components/CamSourceSelector';
 import { PageHeader } from '@/components/page-header';
@@ -27,13 +28,19 @@ type SetupRoute =
 function checkMessage(check: SetupCheck) {
   switch (check.state) {
     case 'good':
-      return `The setup fits the live picture. ${formatReprojectionError(check.error)}`;
+      return translate('The setup fits the live picture. {{value1}}', { value1: formatReprojectionError(check.error) });
     case 'off':
-      return `The setup doesn't quite fit the live picture (${formatReprojectionError(check.error)}). Point out the markers again, or recalibrate the lens if that doesn't help.`;
+      return translate(
+        "The setup doesn't quite fit the live picture ({{value1}}). Point out the markers again, or recalibrate the lens if that doesn't help.",
+        { value1: formatReprojectionError(check.error) }
+      );
     case 'missing':
-      return `Only ${check.found} of ${kExpectedMarkerCount} markers are visible, so the setup could not be checked.`;
+      return translate('Only {{value1}} of {{value2}} markers are visible, so the setup could not be checked.', {
+        value1: check.found,
+        value2: kExpectedMarkerCount,
+      });
     case 'failed':
-      return `The setup could not be checked: ${check.message}`;
+      return translate('The setup could not be checked: {{value1}}', { value1: check.message });
   }
 }
 
@@ -76,33 +83,33 @@ function SetupChecklist({ camId, camera, open }: { camId: string; camera: ICamSo
   return (
     <Card className="gap-2">
       <CardHeader>
-        <CardTitle className="text-base">Setup</CardTitle>
+        <CardTitle className="text-base">{translate('Setup')}</CardTitle>
       </CardHeader>
       <CardContent>
         <ul>
           <StepRow
             done={lens}
-            label="Lens calibration"
+            label={translate('Lens calibration')}
             action={lens ? 'Redo' : 'Start'}
             onClick={() => open('/setup/camera-calibration')}
           />
           <StepRow
             done={machineMarkers}
-            label="Markers on the machine"
+            label={translate('Markers on the machine')}
             action={machineMarkers ? 'Edit' : 'Start'}
             disabled={!lens}
             onClick={() => open('/setup/marker-positions')}
           />
           <StepRow
             done={pictureMarkers}
-            label="Markers in the picture"
+            label={translate('Markers in the picture')}
             action={pictureMarkers ? 'Redo' : 'Start'}
             disabled={!lens || !machineMarkers}
             onClick={() => open('/setup/point-selection')}
           />
           <StepRow
             done={check !== null && check !== 'checking' && check.state === 'good'}
-            label="Check against the live picture"
+            label={translate('Check against the live picture')}
             action={check === 'checking' ? 'Checking…' : 'Run'}
             disabled={!lens || !machineMarkers || check === 'checking'}
             onClick={() => {
@@ -114,7 +121,8 @@ function SetupChecklist({ camId, camera, open }: { camId: string; camera: ICamSo
         </ul>
         {check === 'checking' && (
           <p className="mt-2 flex flex-row items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" /> Looking for the markers…
+            <Loader2 className="size-4 animate-spin" />
+            {translate(' Looking for the markers… ')}
           </p>
         )}
         {check && check !== 'checking' && <p className="mt-2 text-sm text-muted-foreground">{checkMessage(check)}</p>}
@@ -147,7 +155,7 @@ function CameraPage() {
 
   return (
     <div className="w-full h-full">
-      <PageHeader title="Camera" />
+      <PageHeader title={translate('Camera')} />
       <div className="flex justify-center p-1 flex-row">
         <div className="max-w-2xl gap-4 flex flex-1 flex-col pb-8">
           <div className="flex flex-row flex-wrap items-center gap-2">
@@ -157,15 +165,17 @@ function CameraPage() {
             </div>
             {camId === activeCamId ? (
               <span className="flex flex-row items-center gap-1 px-2 text-sm text-muted-foreground">
-                <Check className="size-4" /> In use
+                <Check className="size-4" />
+                {translate(' In use ')}
               </span>
             ) : (
               <Button variant="outline" size="sm" onClick={() => setActiveCam(camId)}>
-                Use this camera
+                {translate('Use this camera ')}
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={duplicate}>
-              <Copy /> Duplicate
+              <Copy />
+              {translate(' Duplicate ')}
             </Button>
             <DeleteCameraButton id={camId} name={camera.name} onDeleted={() => navigate({ to: '/setup/cameras' })} />
           </div>
@@ -176,16 +186,17 @@ function CameraPage() {
               </div>
               {canCopySetup && (
                 <Button variant="outline" size="sm" onClick={() => open('/setup/import-setup')}>
-                  <Import /> Copy setup from another camera…
+                  <Import />
+                  {translate(' Copy setup from another camera… ')}
                 </Button>
               )}
             </div>
             <div className="flex flex-col gap-4">
               <Card className="gap-2">
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-base">Source</CardTitle>
+                  <CardTitle className="text-base">{translate('Source')}</CardTitle>
                   <Button variant="link" size="sm" className="h-auto p-0" onClick={() => open('/setup/url-entry')}>
-                    Change
+                    {translate('Change ')}
                   </Button>
                 </CardHeader>
                 <CardContent className="text-sm">

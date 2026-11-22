@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useMemo } from 'react';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { sanitizeCarvingSvg } from './sanitize';
@@ -9,7 +10,7 @@ import type { CarvingAssistantSession } from './useCarvingAssistant';
 export function VariantGrid({ session }: { session: CarvingAssistantSession }) {
   if (!session.variants.length) return null;
   return (
-    <div role="listbox" aria-label="Artwork variants" className="grid grid-cols-2 gap-2">
+    <div role="listbox" aria-label={translate('Artwork variants')} className="grid grid-cols-2 gap-2">
       {session.variants.map((variant, index) => (
         <VariantThumb key={variant.id} variant={variant} index={index} session={session} />
       ))}
@@ -36,7 +37,7 @@ function VariantThumb({ variant, index, session }: { variant: CarvingVariant; in
       type="button"
       role="option"
       aria-selected={selected}
-      aria-label={variant.status === 'generating' ? `Variant ${index + 1}, generating` : label}
+      aria-label={variant.status === 'generating' ? translate('Variant {{value1}}, generating', { value1: index + 1 }) : label}
       title={variant.error ?? variant.asset?.summary}
       disabled={variant.status !== 'ready'}
       className={cn(
@@ -50,7 +51,11 @@ function VariantThumb({ variant, index, session }: { variant: CarvingVariant; in
       onFocus={() => session.setHover(variant.id)}
       onBlur={() => session.setHover(null)}
       onClick={() => session.pick(variant.id)}>
-      {variant.status === 'failed' ? 'Failed' : src ? <img src={src} alt="" className="max-h-full max-w-full object-contain" /> : null}
+      {variant.status === 'failed' ? (
+        translate('Failed')
+      ) : src ? (
+        <img src={src} alt="" className="max-h-full max-w-full object-contain" />
+      ) : null}
     </button>
   );
 }

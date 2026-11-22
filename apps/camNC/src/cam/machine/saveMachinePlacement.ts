@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { physicalSheetIdOf } from '../boards';
 import { getJob, modelKey, updateJobForModel } from '../jobDb';
 import { useCamMachine } from './camMachine';
@@ -8,15 +9,16 @@ export async function saveMachinePlacement(x: number, y: number, stillCurrent: (
   const state = useCamMachine.getState();
   if (!state.jobId) return;
   const boardId = state.overlay?.boardId;
-  if (!boardId) throw new Error('Wait for the board setup before changing its placement.');
+  if (!boardId) throw new Error(translate('Wait for the board setup before changing its placement.'));
   const side = state.overlay?.side ?? 'a';
   const source = await getJob(state.jobId);
-  if (!source || !stillCurrent()) throw new Error('The machine setup changed before its placement could be saved.');
+  if (!source || !stillCurrent()) throw new Error(translate('The machine setup changed before its placement could be saved.'));
   const loaded = state.loadedSnapshot;
-  if (loaded && loaded.sourceKey !== modelKey(source)) throw new Error('The design changed. Review its setup before moving the zero.');
+  if (loaded && loaded.sourceKey !== modelKey(source))
+    throw new Error(translate('The design changed. Review its setup before moving the zero.'));
   const original = loaded?.queue.find(e => e.key === loaded.active)?.board.board;
   const baseline = original ?? source.boards?.find(b => b.id === boardId);
-  if (!baseline) throw new Error('The board has not been saved. Review it on Boards before running.');
+  if (!baseline) throw new Error(translate('The board has not been saved. Review it on Boards before running.'));
   const expectedSheet = physicalSheetIdOf(baseline);
   const saved = await updateJobForModel(source, current => {
     if (!stillCurrent()) return null;
@@ -26,6 +28,6 @@ export async function saveMachinePlacement(x: number, y: number, stillCurrent: (
     const next = { ...before, bed: { ...before.bed, [side]: { ...before.bed?.[side], x, y, deg: state.overlay?.rotationDeg ?? 0 } } };
     return { ...current, boards: board ? current.boards!.map(b => (b.id === boardId ? next : b)) : [...(current.boards ?? []), next] };
   });
-  if (!saved) throw new Error('The physical sheet or setup changed before its placement could be saved.');
+  if (!saved) throw new Error(translate('The physical sheet or setup changed before its placement could be saved.'));
   window.dispatchEvent(new CustomEvent(nativeRunHistoryChanged, { detail: saved.id }));
 }

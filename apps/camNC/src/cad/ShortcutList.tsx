@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@wbcnc/ui/components/dialog';
 import { useEffect, useState } from 'react';
 import type { ShortcutSection, ShortcutTab } from './shortcuts';
@@ -47,7 +48,9 @@ export function ShortcutList({
     ? tabs.flatMap(each =>
         each.sections.flatMap(({ title, items }) => {
           const matches = items.filter(item => item.label.toLowerCase().includes(search) || item.key.toLowerCase().includes(search));
-          return matches.length ? [{ title: `${each.title} · ${title}`, items: matches }] : [];
+          return matches.length
+            ? [{ title: translate('{{value1}} · {{title}}', { value1: each.title, title: title }), items: matches }]
+            : [];
         })
       )
     : [];
@@ -56,24 +59,31 @@ export function ShortcutList({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Keyboard shortcuts</DialogTitle>
-          <DialogDescription>Press ? again or Escape to close.</DialogDescription>
+          <DialogTitle>{translate('Keyboard shortcuts')}</DialogTitle>
+          <DialogDescription>{translate('Press ? again or Escape to close.')}</DialogDescription>
         </DialogHeader>
         <input
           type="search"
-          aria-label="Search shortcuts"
-          placeholder="Search shortcuts"
+          aria-label={translate('Search shortcuts')}
+          placeholder={translate('Search shortcuts')}
           className="rounded border px-2 py-1 text-sm"
           value={query}
           onChange={event => setQuery(event.target.value)}
         />
         {search ? (
-          <div role="region" aria-label="Search results" className="grid gap-3">
-            {found.length ? found.map(section) : <p className="text-sm">No shortcut matches “{query.trim()}”.</p>}
+          <div role="region" aria-label={translate('Search results')} className="grid gap-3">
+            {found.length ? (
+              found.map(section)
+            ) : (
+              <p className="text-sm">
+                {translate('No shortcut matches “')}
+                {query.trim()}”.
+              </p>
+            )}
           </div>
         ) : (
           <>
-            <div role="tablist" aria-label="Shortcut groups" className="flex flex-wrap gap-1 border-b pb-1 text-sm">
+            <div role="tablist" aria-label={translate('Shortcut groups')} className="flex flex-wrap gap-1 border-b pb-1 text-sm">
               {tabs.map(each => (
                 <button
                   key={each.title}
@@ -92,8 +102,8 @@ export function ShortcutList({
             </div>
           </>
         )}
-        <p className="text-xs text-muted-foreground" aria-label="Key legend">
-          Shift ⇧ · Ctrl or ⌘ Command · Alt or ⌥ Option · Esc Escape · ↑ ↓ the arrow keys
+        <p className="text-xs text-muted-foreground" aria-label={translate('Key legend')}>
+          {translate('Shift ⇧ · Ctrl or ⌘ Command · Alt or ⌥ Option · Esc Escape · ↑ ↓ the arrow keys ')}
         </p>
       </DialogContent>
     </Dialog>

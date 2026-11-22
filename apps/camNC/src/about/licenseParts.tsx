@@ -1,8 +1,10 @@
+import { t as translate } from '@wbcnc/i18n';
 export function FullText({ name, text }: { name: string; text: string }) {
   return (
     <details className="mt-3 rounded-md border">
       <summary className="cursor-pointer rounded-md px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2">
-        Read {name}
+        {translate('Read ')}
+        {name}
       </summary>
       <div
         role="region"
@@ -31,7 +33,9 @@ export function LicenseCard({
       <p className="mt-2 text-sm text-muted-foreground">{dependency.description}</p>
       <p className="mt-3">
         <a className={linkClass} href={dependency.url} download>
-          Download {dependency.name} license
+          {translate('Download ')}
+          {dependency.name}
+          {translate(' license ')}
         </a>
       </p>
       <FullText name={`${dependency.name} license`} text={dependency.text} />

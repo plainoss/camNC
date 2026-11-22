@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef, type ReactNode } from 'react';
 import './settingsDialog.css';
 
@@ -40,18 +41,18 @@ export function AssistantSettingsDialog({
     <dialog
       ref={dialog}
       className="assistant-settings"
-      aria-label="Assistant settings"
+      aria-label={translate('Assistant settings')}
       onClose={onClose}
       // Keys typed here are the dialog's own, never editor shortcuts.
       onKeyDown={event => event.stopPropagation()}>
       <header>
-        <h2>Assistant settings</h2>
-        <button type="button" aria-label="Close settings" onClick={() => dialog.current?.close()}>
+        <h2>{translate('Assistant settings')}</h2>
+        <button type="button" aria-label={translate('Close settings')} onClick={() => dialog.current?.close()}>
           ✕
         </button>
       </header>
       <div className="assistant-settings-body">
-        <nav aria-label="Settings sections">
+        <nav aria-label={translate('Settings sections')}>
           {sections.map(item => (
             <button key={item.id} type="button" aria-current={item.id === current.id || undefined} onClick={() => onSection(item.id)}>
               {item.label}

@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { editable } from './editorHelpers';
 import { FeatureDialog } from './FeatureDialog';
@@ -93,7 +94,7 @@ export function StudioSketchDialog({
       okLabel="✓ Finish sketch"
       okDisabled={disabled}
       okReason={reason}
-      okShortcut={{ keys: 'Control+Enter Meta+Enter', label: 'Ctrl/⌘+Enter' }}
+      okShortcut={{ keys: 'Control+Enter Meta+Enter', label: translate('Ctrl/⌘+Enter') }}
       onOk={() => {
         if (canConfirm()) onConfirm();
       }}
@@ -101,12 +102,12 @@ export function StudioSketchDialog({
       autoFocus={false}
       className="cad-sketch-dialog">
       <div className="cad-feature-selection">
-        <small>Sketch plane</small>
+        <small>{translate('Sketch plane')}</small>
         <span>{plane}</span>
       </div>
       <label>
         <input type="checkbox" checked={showConstraints} onChange={event => onShowConstraints(event.target.checked)} />
-        Show constraints
+        {translate('Show constraints ')}
       </label>
     </FeatureDialog>
   );
@@ -117,11 +118,11 @@ export function SketchPlaneDialog({ title, onCancel }: { title: string; onCancel
   return (
     <FeatureDialog title={title} okLabel="✓ Finish sketch" okDisabled onOk={() => {}} onCancel={onCancel} autoFocus={false}>
       <div className="cad-feature-selection" data-active="">
-        <small>Sketch plane</small>
+        <small>{translate('Sketch plane')}</small>
         <span />
       </div>
       <p className="cad-muted" role="status">
-        Select a sketch plane
+        {translate('Select a sketch plane ')}
       </p>
     </FeatureDialog>
   );

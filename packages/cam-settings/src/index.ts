@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import type { LibraryTool } from '@wbcnc/cam';
 import { MATERIALS } from '@wbcnc/cam/settings';
 
@@ -47,44 +48,48 @@ export const kCuttingFields: CuttingField[] = [
 ];
 
 export const kCuttingLabels: Record<CuttingField, { label: string; unit: string; step: number; min?: number }> = {
-  feed: { label: 'Feed', unit: 'mm/min', step: 50 },
-  plungeFeed: { label: 'Plunge feed', unit: 'mm/min', step: 10 },
-  rampFeed: { label: 'Ramp feed', unit: 'mm/min', step: 10 },
-  leadFeed: { label: 'Lead-in feed', unit: 'mm/min', step: 50 },
-  leadOutFeed: { label: 'Lead-out feed', unit: 'mm/min', step: 50 },
-  finishFeed: { label: 'Finishing feed', unit: 'mm/min', step: 50 },
-  reducedFeed: { label: 'Inner-corner feed', unit: 'mm/min', step: 50 },
-  transitionFeed: { label: 'Link feed', unit: 'mm/min', step: 50 },
-  stepdown: { label: 'Stepdown', unit: 'mm', step: 0.1 },
-  stepover: { label: 'Stepover', unit: 'mm', step: 0.1 },
-  rpm: { label: 'Spindle speed', unit: 'rpm', step: 500 },
-  finalFeedFactor: { label: 'Final pass feed', unit: '× feed', step: 0.1 },
-  wallFinish: { label: 'Pocket wall finish', unit: 'mm radial stock · 0 = off', step: 0.05, min: 0 },
-  outlineFinish: { label: 'Outline wall finish', unit: 'mm radial stock · 0 = off', step: 0.05, min: 0 },
+  feed: { label: translate('Feed'), unit: 'mm/min', step: 50 },
+  plungeFeed: { label: translate('Plunge feed'), unit: 'mm/min', step: 10 },
+  rampFeed: { label: translate('Ramp feed'), unit: 'mm/min', step: 10 },
+  leadFeed: { label: translate('Lead-in feed'), unit: 'mm/min', step: 50 },
+  leadOutFeed: { label: translate('Lead-out feed'), unit: 'mm/min', step: 50 },
+  finishFeed: { label: translate('Finishing feed'), unit: 'mm/min', step: 50 },
+  reducedFeed: { label: translate('Inner-corner feed'), unit: 'mm/min', step: 50 },
+  transitionFeed: { label: translate('Link feed'), unit: 'mm/min', step: 50 },
+  stepdown: { label: translate('Stepdown'), unit: 'mm', step: 0.1 },
+  stepover: { label: translate('Stepover'), unit: 'mm', step: 0.1 },
+  rpm: { label: translate('Spindle speed'), unit: 'rpm', step: 500 },
+  finalFeedFactor: { label: translate('Final pass feed'), unit: '× feed', step: 0.1 },
+  wallFinish: { label: translate('Pocket wall finish'), unit: translate('mm radial stock · 0 = off'), step: 0.05, min: 0 },
+  outlineFinish: { label: translate('Outline wall finish'), unit: translate('mm radial stock · 0 = off'), step: 0.05, min: 0 },
 };
 
 /** What each value does, for its tooltip: the consequence, not the mechanism. */
 export const kCuttingHints: Record<CuttingField, string> = {
-  feed: 'How fast the bit moves through the wood. Faster saves time but loads the bit; too slow can burn the wood.',
-  plungeFeed: 'How fast the bit goes down into the wood. Slower is gentler on the bit.',
-  rampFeed: 'Speed while entering along a sloped path. Follows the resolved plunge feed unless you set it separately.',
-  leadFeed: 'Speed while joining a wall on a tangent lead. Defaults to the resolved cutting feed.',
-  leadOutFeed: 'Speed while leaving a wall on a tangent lead. Defaults to the resolved cutting feed.',
-  finishFeed: 'Speed of finishing cuts. Defaults to cutting feed × final pass feed; a value set here takes precedence over that factor.',
-  reducedFeed: 'Feed cap for tight inner-wall turns. Defaults to half the cutting feed; straight cuts keep their cutting feed.',
-  transitionFeed: 'Speed of permitted links between cuts. Retracts and plunges still use their own movement limits.',
-  stepdown: 'How deep each pass cuts. Less is gentler on the bit and slower.',
-  stepover: 'How far each pocket pass moves sideways. Less leaves a smoother floor and is slower.',
-  rpm: 'How fast the spindle turns. The program starts the spindle at this speed; with a router, set its dial to match.',
-  finalFeedFactor: 'Default finishing speed as a share of cutting feed. A separate finishing-feed value takes precedence.',
-  wallFinish:
-    'Roughing stays this far off pocket walls, then finishing passes remove that radial stock in limited depth increments. 0 turns it off.',
-  outlineFinish:
-    'Roughing stays this far off outlines and through holes, then a final lap cuts them to size. Above 0.2 mm the walls are finished in stepdown increments, not in one lap. 0 turns it off.',
+  feed: translate('How fast the bit moves through the wood. Faster saves time but loads the bit; too slow can burn the wood.'),
+  plungeFeed: translate('How fast the bit goes down into the wood. Slower is gentler on the bit.'),
+  rampFeed: translate('Speed while entering along a sloped path. Follows the resolved plunge feed unless you set it separately.'),
+  leadFeed: translate('Speed while joining a wall on a tangent lead. Defaults to the resolved cutting feed.'),
+  leadOutFeed: translate('Speed while leaving a wall on a tangent lead. Defaults to the resolved cutting feed.'),
+  finishFeed: translate(
+    'Speed of finishing cuts. Defaults to cutting feed × final pass feed; a value set here takes precedence over that factor.'
+  ),
+  reducedFeed: translate('Feed cap for tight inner-wall turns. Defaults to half the cutting feed; straight cuts keep their cutting feed.'),
+  transitionFeed: translate('Speed of permitted links between cuts. Retracts and plunges still use their own movement limits.'),
+  stepdown: translate('How deep each pass cuts. Less is gentler on the bit and slower.'),
+  stepover: translate('How far each pocket pass moves sideways. Less leaves a smoother floor and is slower.'),
+  rpm: translate('How fast the spindle turns. The program starts the spindle at this speed; with a router, set its dial to match.'),
+  finalFeedFactor: translate('Default finishing speed as a share of cutting feed. A separate finishing-feed value takes precedence.'),
+  wallFinish: translate(
+    'Roughing stays this far off pocket walls, then finishing passes remove that radial stock in limited depth increments. 0 turns it off.'
+  ),
+  outlineFinish: translate(
+    'Roughing stays this far off outlines and through holes, then a final lap cuts them to size. Above 0.2 mm the walls are finished in stepdown increments, not in one lap. 0 turns it off.'
+  ),
 };
 
 export const kSourceLabels: Record<CuttingSource, string> = {
-  job: 'this job',
+  job: translate('this job'),
   saved: 'saved',
   library: 'library',
   default: 'default',

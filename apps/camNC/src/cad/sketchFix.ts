@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { originId, type CadSketch } from '@wbcnc/cad';
 import { entityPointIds } from './editorHelpers';
 
@@ -14,14 +15,17 @@ export function toggleFixed(sketch: CadSketch, targets: string[], tool: boolean)
   );
   ids.delete(originId(sketch));
   for (const e of sketch.entities) if (e.faceEdge) ids.delete(e.id);
-  if (!ids.size) return { message: 'Select geometry to fix. The origin and the edges of the face it’s drawn on always stay fixed.' };
+  if (!ids.size)
+    return { message: translate('Select geometry to fix. The origin and the edges of the face it’s drawn on always stay fixed.') };
   const fix = sketch.entities.some(e => e.type === 'point' && ids.has(e.id) && !e.fixed);
   return {
     sketch: { ...sketch, entities: sketch.entities.map(e => (e.type === 'point' && ids.has(e.id) ? { ...e, fixed: fix } : e)) },
     message: tool
-      ? `${fix ? 'Fixed' : 'Unfixed'}. Click more geometry, or press Escape to end Fix.`
+      ? translate('{{value1}}. Click more geometry, or press Escape to end Fix.', {
+          value1: fix ? translate('Fixed') : translate('Unfixed'),
+        })
       : fix
-        ? 'Selected geometry fixed. Shift+J unfixes it.'
-        : 'Selected geometry unfixed.',
+        ? translate('Selected geometry fixed. Shift+J unfixes it.')
+        : translate('Selected geometry unfixed.'),
   };
 }

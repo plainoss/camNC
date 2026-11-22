@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { ensureOpenCvIsLoaded } from '@wbcnc/load-opencv';
 import { ensureReadableStream, registerThreeJsTransferHandlers } from '@wbcnc/video-worker-utils';
 import * as Comlink from 'comlink';
@@ -59,7 +60,7 @@ class MarkerScannerWorker implements MarkerScannerWorkerAPI {
 
     const offscreen = new OffscreenCanvas(this.width, this.height);
     const ctx = offscreen.getContext('2d', { willReadFrequently: true });
-    if (!ctx) throw new Error('Could not get OffscreenCanvas 2D context');
+    if (!ctx) throw new Error(translate('Could not get OffscreenCanvas 2D context'));
     this.ctx = ctx;
 
     const [map1, map2] = calculateUndistortionMapsCached(calibrationData, this.width, this.height);
@@ -82,7 +83,7 @@ class MarkerScannerWorker implements MarkerScannerWorkerAPI {
 
   async scan(): Promise<IMarker[]> {
     if (!this.reader || !this.mapX || !this.mapY || !this.ctx) {
-      throw new Error('Worker not initialized');
+      throw new Error(translate('Worker not initialized'));
     }
 
     const { value: frame, done } = await this.reader.read();

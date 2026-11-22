@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useState } from 'react';
 import type { CadDocument, CadLengthUnit } from '@wbcnc/cad';
 import { Button } from '@wbcnc/ui/components/button';
@@ -23,7 +24,7 @@ export function StudioExportButton({
         size="sm"
         variant="ghost"
         className="text-muted-foreground"
-        title="Download the parts shown in the 3D view as a STEP file, for other CAD and CAM programs."
+        title={translate('Download the parts shown in the 3D view as a STEP file, for other CAD and CAM programs.')}
         onClick={() => {
           const document = design();
           // Hidden parts are what the 3D view hides, as it saved them.
@@ -31,7 +32,8 @@ export function StudioExportButton({
           const hidden = new Set(loadShownState(document.id).hiddenParts);
           setTarget(shownPartsTarget(document, rolledTo?.(), { name: document.name, hidden }));
         }}>
-        <Box /> Export…
+        <Box />
+        {translate(' Export… ')}
       </Button>
       <ExportDialog target={target} unit={unit} onClose={() => setTarget(null)} />
     </>

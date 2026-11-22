@@ -1,3 +1,4 @@
+import { t as translate } from '@wbcnc/i18n';
 import { useEffect, useRef, useState } from 'react';
 import type { CadDocument } from '@wbcnc/cad';
 import type { CadProposal } from '@wbcnc/cad-editor/proposal';
@@ -10,7 +11,7 @@ const names: Record<string, string> = {
   depth: 'Depth',
   board: 'Board',
   blank: 'Blank',
-  pocketDepth: 'Pocket depth',
+  pocketDepth: translate('Pocket depth'),
   wall: 'Wall',
   shelves: 'Shelves',
 };
@@ -65,13 +66,13 @@ export function ProposalTweaks({
       .then(next => {
         if (abort.signal.aborted) return;
         if (onReplace(next) === false) {
-          setMessage('A newer proposal arrived, so this change was not used.');
+          setMessage(translate('A newer proposal arrived, so this change was not used.'));
           setValues(Object.fromEntries(tweakable));
-        } else setMessage('✓ Checked again · no model request');
+        } else setMessage(translate('✓ Checked again · no model request'));
       })
       .catch(cause => {
         if (abort.signal.aborted) return;
-        setMessage(cause instanceof Error ? cause.message : 'The check failed.');
+        setMessage(cause instanceof Error ? cause.message : translate('The check failed.'));
         // The proposal is unchanged, so the sliders go back to what it was built with.
         setValues(Object.fromEntries(tweakable));
       })
@@ -83,14 +84,14 @@ export function ProposalTweaks({
   };
   if (!tweakable.length && !stale) return null;
   return (
-    <section className="cad-proposal-tweaks" aria-label="Adjust before applying">
-      <h3>Adjust before applying</h3>
+    <section className="cad-proposal-tweaks" aria-label={translate('Adjust before applying')}>
+      <h3>{translate('Adjust before applying')}</h3>
       {stale && (
         <button
           type="button"
           disabled={checking}
           onClick={() => run(structuredClone(currentDocument), tweakable.length ? values : undefined)}>
-          Re-check on current design
+          {translate('Re-check on current design ')}
         </button>
       )}
       {tweakable.map(([name]) => {
@@ -104,7 +105,7 @@ export function ProposalTweaks({
               {names[name] ?? name}
               <b>
                 {values[name]}
-                {count ? '' : ' mm'}
+                {count ? '' : translate(' mm')}
               </b>
             </span>
             <input
@@ -129,7 +130,7 @@ export function ProposalTweaks({
           </label>
         );
       })}
-      <p role="status">{checking ? 'Checking locally…' : message}</p>
+      <p role="status">{checking ? translate('Checking locally…') : message}</p>
     </section>
   );
 }
