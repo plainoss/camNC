@@ -171,6 +171,8 @@ import { dialogCommand, featureDialog, picksParts, previewOwner, sameDialogShown
 import { usePatternVariableCommit } from './studioPatternVariableSource';
 import { useStudioPreview } from './useStudioPreview';
 import { useEditorDocumentKeys } from './useEditorDocumentKeys';
+import { useEditorKeyboardFocus } from './useEditorKeyboardFocus';
+import { useSketchCanvasBox, useSketchWheelZoom } from './useSketchCanvasViewport';
 import { editedStep, useEditorVariableFields } from './useEditorVariableFields';
 import { useFeatureShown, withMadeSketchHidden } from './useFeatureShown';
 import { CadSketchOverlays } from './CadSketchOverlays';
@@ -352,8 +354,6 @@ export function CadEditor({
   useEffect(() => {
     if (selectedFace && !doc.parts.some(candidate => candidate.id === selectedFace.partId)) setSelectedFace(null);
   }, [doc.parts, selectedFace]);
-  // Where the drawing sits in its pane, for the parts shown behind a sketch to line up with it.
-  const [canvasBox, setCanvasBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   // How far the open sketch's view is turned off straight at its plane, by right-dragging; `n` turns it back.
   const [sketchTurn, setSketchTurn] = useState<SketchTurn>(faceOpening?.turn ?? straightOn);
   const { studioCamera, partCameraState } = useEditorCameras(suppliedStudioCamera, suppliedPartCamera);
@@ -387,31 +387,8 @@ export function CadEditor({
   }, [hiddenParts, showWorkspace]);
   // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
   const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
-  // When a step's dialog closes, the view has the keyboard again, so its shortcuts work straight away.
   const stepDialogOpen = !!dialog;
   const partPicking = picksParts(dialog);
-  const dialogWasOpen = useRef(false);
-  // A view still solving is inert: it takes the keyboard once it's done, unless something else has it by then.
-  const viewWantsKeyboard = useRef(false);
-  const focusViewIfIdle = useCallback(() => {
-    const active = root.current?.ownerDocument.activeElement;
-    if (!viewWantsKeyboard.current || (active && active !== root.current?.ownerDocument.body && active.isConnected)) {
-      viewWantsKeyboard.current = false;
-      return;
-    }
-    const view = root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]');
-    if (!view || view.closest('[inert]')) return;
-    view.focus();
-    viewWantsKeyboard.current = view.ownerDocument.activeElement !== view;
-  }, []);
-  useLayoutEffect(() => {
-    const closed = dialogWasOpen.current && !stepDialogOpen;
-    dialogWasOpen.current = stepDialogOpen;
-    if (!closed || !studioSession || !showWorkspace) return;
-    viewWantsKeyboard.current = true;
-    // The dialog has left the DOM. A background page may not receive another animation frame.
-    focusViewIfIdle();
-  }, [stepDialogOpen, studioSession, showWorkspace, focusViewIfIdle]);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   // A mark rather than a document: Cancel puts undo history back too, so the cancelled sketch isn't left for Undo.
@@ -426,35 +403,6 @@ export function CadEditor({
     // Accepting the design, or anything else that makes the editor busy, saves what's there: a restore can't race it.
     if (busy || !showWorkspace || choosingFace || dialog) setCancelledSketch(null);
   }, [busy, showWorkspace, choosingFace, dialog]);
-  useEffect(() => {
-    const element = svg.current;
-    if (!element) return;
-    const measure = () =>
-      setCanvasBox(previous => {
-        // A turned drawing's box isn't its size, but it turns about its middle.
-        const box = element.getBoundingClientRect(),
-          pane = (element.parentElement as HTMLElement).getBoundingClientRect(),
-          width = element.clientWidth,
-          height = element.clientHeight;
-        const next = {
-          left: box.left + box.width / 2 - width / 2 - pane.left,
-          top: box.top + box.height / 2 - height / 2 - pane.top,
-          width,
-          height,
-        };
-        return previous && JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
-      });
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [showWorkspace, show3D]);
-  // A sketch opened from the studio takes the keyboard once its drawing shows, so its shortcuts work straight away.
-  useEffect(() => {
-    if (studioSession && !showWorkspace && !show3D) focusSketchCanvas(svg.current);
-    // Only when the studio gives way to the drawing.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showWorkspace]);
   // Its region belongs to one part at one revision: applying it after either changed would write a stale cut.
   useEffect(() => setRegionField(null), [part?.id, doc.revision]);
   // Picking a drawing tool, by button or key, means going back to the drawing.
@@ -473,6 +421,8 @@ export function CadEditor({
   const drawingGroup = useRef<SVGGElement>(null);
   const markerScale = useSvgPixelScale(svg, view);
   const root = useRef<HTMLDivElement>(null);
+  // Where the drawing sits in its pane, for the parts shown behind a sketch to line up with it.
+  const canvasBox = useSketchCanvasBox(svg, showWorkspace, show3D);
   const dimensionInput = useRef<HTMLInputElement>(null);
   const filletInput = useRef<HTMLInputElement>(null);
   const offsetInput = useRef<HTMLInputElement>(null);
@@ -516,38 +466,15 @@ export function CadEditor({
   const preparingDimension = useRef(false);
   const mounted = useRef(true);
   callbacks.current = { onDraftChange, onFinish, onCancel, onFinishBlocked };
-  const deferredCanvasFocus = useRef<(() => void) | null>(null);
-  // The field of a step's dialog last typed in: solving makes the view inert, which drops the keyboard, and it goes back.
-  const dialogFocus = useRef<HTMLElement | null>(null);
-  useLayoutEffect(() => {
-    if (!busy) {
-      const restore = deferredCanvasFocus.current;
-      deferredCanvasFocus.current = null;
-      restore?.();
-      const field = dialogFocus.current;
-      const active = field?.ownerDocument.activeElement;
-      if (field?.isConnected && (!active || active === field.ownerDocument.body)) field.focus();
-      else focusViewIfIdle();
-    }
-  }, [busy, focusViewIfIdle]);
-  const restoreCanvasKeyboard = () => {
-    const restore = () => {
-      const canvas = svg.current,
-        active = canvas?.ownerDocument.activeElement;
-      // Solves finish before React removes workspace inertness. Focus only after
-      // that DOM commit, even when background animation frames are suspended.
-      if (canvas?.closest('[inert]')) {
-        deferredCanvasFocus.current = restore;
-        return;
-      }
-      deferredCanvasFocus.current = null;
-      if (canvas && (!active || active === canvas.ownerDocument.body || canvas.contains(active))) canvas.focus();
-    };
-    // Keyboard ownership must not wait for a frame in a background tab. Recheck
-    // after rendering as well, when a dismissed control may have lost focus.
-    restore();
-    requestAnimationFrame(restore);
-  };
+  const { viewWantsKeyboard, focusViewIfIdle, dialogFocus, restoreCanvasKeyboard } = useEditorKeyboardFocus({
+    root,
+    svg,
+    busy,
+    stepDialogOpen,
+    studioSession,
+    showWorkspace,
+    show3D,
+  });
   const requestSketchCheck = () => {
     const current = documentRef.current;
     if (lastCheckedRevision.current !== `${current.id}:${current.revision}`) setCheckEpoch(epoch => epoch + 1);
@@ -619,27 +546,7 @@ export function CadEditor({
     };
   }, []);
   useEditorDocumentKeys(root);
-  useEffect(() => {
-    const canvas = svg.current;
-    if (!canvas) return;
-    const zoom = (event: WheelEvent) => {
-      if (!event.deltaY) return;
-      event.preventDefault();
-      const matrix = (drawingGroup.current ?? canvas).getScreenCTM();
-      if (!matrix) return;
-      const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-      const factor = event.deltaY > 0 ? 1.12 : 1 / 1.12;
-      setView(v => ({
-        x: point.x + (v.x - point.x) * factor,
-        y: point.y + (v.y - point.y) * factor,
-        w: Math.max(10, Math.min(10000, v.w * factor)),
-        h: Math.max(10, Math.min(10000, v.h * factor)),
-      }));
-    };
-    // React's delegated wheel listener is passive; zoom must cancel page scrolling at this surface.
-    canvas.addEventListener('wheel', zoom, { passive: false });
-    return () => canvas.removeEventListener('wheel', zoom);
-  }, []);
+  useSketchWheelZoom(svg, drawingGroup, setView);
   useEffect(() => {
     const visible = sketch && visibleSketchPointIds(sketch, selected);
     const validSelected = selected.filter(id =>
