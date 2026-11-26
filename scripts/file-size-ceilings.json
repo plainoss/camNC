@@ -4,6 +4,6 @@
     "**/public/**"
   ],
   "ceilings": {
-    "apps/camNC/src/cad/CadEditor.tsx": 1818
+    "apps/camNC/src/cad/CadEditor.tsx": 1725
   }
 }
