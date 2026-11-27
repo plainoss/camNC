@@ -46,39 +46,23 @@ import { useSketchCommandPreviews } from './useSketchCommandPreviews';
 import { SketchCommandControls } from './SketchCommandControls';
 import { initialCircularPatternParameters } from './circularPatternParameters';
 import {
-  withCadLengthUnit,
   visibleSketchPointIds,
   type CadDimension,
   type CadDocument,
   type CadDrawnOn,
   type CadSketch,
-  type CadSketchSolveStatus,
   type CadPoint,
   cadVariableProblems,
   drawnOnOutline,
   resolveExtrudeSteps,
 } from '@wbcnc/cad';
-import {
-  useEffect,
-  useLayoutEffect,
-  useImperativeHandle,
-  useMemo,
-  useCallback,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type PointerEvent,
-} from 'react';
-import { solveCadDocument } from './solveCad';
+import { useEffect, useLayoutEffect, useMemo, useCallback, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { acquireCadKeyboard } from '@wbcnc/cad-editor/keyboardOwnership';
 import {
-  acceptCadSession,
   cadSession,
   commitCadSession,
-  endCadSession,
   markCadSession,
   redoCadSession,
-  restoreCadSession,
   undoCadSession,
   type CadCommandCheckpoint,
   type CadHistoryMark,
@@ -110,15 +94,14 @@ import { cadViewState, saveCadViewState } from '@wbcnc/cad-editor/viewState';
 import { loadShownState, saveShownState } from './shownState';
 import { type CadSelectionBox } from './boxSelection';
 import { type AnnotationGesture, type BoxGesture, type ChainAnchor, type DragGesture, type HandleDrag } from './editorGestures';
-import { constraintColorNotice, isEmptyDesign, isEmptySketch, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
-import { failedCheckProblems, noSketchProblems } from './sketchProblemLists';
+import { isEmptyDesign } from '@wbcnc/cad-editor/sketchFeedback';
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
 import { type CutRegion } from './cutRegions';
 import { sketchTools as tools } from './sketchTools';
 import { idleModificationWorkflow, type ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
-import { useSvgPixelScale, sketchStrokeColor } from './sketchAppearance';
+import { useSvgPixelScale } from './sketchAppearance';
 import { associatedEntityIds } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import {
@@ -173,6 +156,9 @@ import { useStudioPreview } from './useStudioPreview';
 import { useEditorDocumentKeys } from './useEditorDocumentKeys';
 import { useEditorKeyboardFocus } from './useEditorKeyboardFocus';
 import { useSketchCanvasBox, useSketchWheelZoom } from './useSketchCanvasViewport';
+import { useSketchCheck } from './useSketchCheck';
+import { sketchCheckDisplay } from './sketchCheckDisplay';
+import { useEditorAcceptance } from './useEditorAcceptance';
 import { editedStep, useEditorVariableFields } from './useEditorVariableFields';
 import { useFeatureShown, withMadeSketchHidden } from './useFeatureShown';
 import { CadSketchOverlays } from './CadSketchOverlays';
@@ -216,7 +202,6 @@ export function CadEditor({
   const [selectedConstraints, setSelectedConstraints] = useState<string[]>([]);
   const [showConstraints, setShowConstraints] = useState(true);
   const [hoveredConstraintEntities, setHoveredConstraintEntities] = useState<string[]>([]);
-  const [conflictedConstraints, setConflictedConstraints] = useState<string[]>([]);
   const [pending, setPending] = useState<Point[]>([]);
   const [polygonSides, setPolygonSides] = useState('6');
   const polygonInput = useRef<HTMLInputElement>(null);
@@ -263,12 +248,7 @@ export function CadEditor({
     setPalette(value => !value);
   };
   const [searchHighlight, setSearchHighlight] = useState<SearchCommand['id'] | null>(null);
-  const [status, setStatus] = useState('Checking sketch…');
-  const [{ problems, sketchProblems, featureProblems, unbuiltParts }, setProblems] = useState(noSketchProblems);
-  const [inProgress, setInProgress] = useState(false);
-  const [solving, setSolving] = useState(true);
   const [checkEpoch, setCheckEpoch] = useState(0);
-  const [sketchStatuses, setSketchStatuses] = useState<Record<string, CadSketchSolveStatus>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('Choose a drawing tool or select geometry.');
   const [finishError, setFinishError] = useState<string | null>(null);
@@ -435,7 +415,6 @@ export function CadEditor({
   const boxGesture = useRef<BoxGesture | null>(null);
   // A right or middle drag: it pans, or over the parts behind a studio sketch, a right drag turns the view.
   const pan = useRef<{ x: number; y: number; view: View; turn?: SketchTurn } | null>(null);
-  const solveSequence = useRef(0);
   const lastCheckedRevision = useRef('');
   const documentRef = useRef(doc);
   const { commit: variableCommit, normalized: normalizePatternVariableSource } = usePatternVariableCommit(dialog, documentRef, next =>
@@ -579,44 +558,22 @@ export function CadEditor({
 
   const solveDrag = (moving: DragGesture) => solveSketchDrag(sketchEditorInput(), moving);
 
-  useEffect(() => {
-    if (finishing.current || drag.current || annotationDrag.current || lastCheckedRevision.current === `${doc.id}:${doc.revision}`) return;
-    let cancelled = false;
-    const sequence = ++solveSequence.current;
-    setSolving(true);
-    void solveCadDocument(doc, { classifyEntities: true, sketchOnly })
-      .then(result => {
-        if (cancelled || sequence !== solveSequence.current || drag.current || annotationDrag.current) return;
-        lastCheckedRevision.current = `${doc.id}:${doc.revision}`;
-        setSolving(false);
-        const feedback = sketchFeedback(solveFeedback(result));
-        setProblems(feedback);
-        setConflictedConstraints(feedback.conflictedConstraintIds);
-        setInProgress(feedback.inProgress);
-        // A part's profile comes first and is what the editor shows, whatever its face sketches report.
-        setSketchStatuses(Object.fromEntries([...result.sketches].reverse().map(state => [state.partId, state])));
-        setStatus(feedback.status);
-        // Solver normalization belongs to the same user command, never another undo entry.
-        if (result.sketches.some(s => s.status === 'solved') && JSON.stringify(result.document) !== JSON.stringify(documentRef.current)) {
-          normalizePatternVariableSource(doc, result.document);
-          session.document = result.document;
-          documentRef.current = result.document;
-          setDocument(result.document);
-          callbacks.current.onDraftChange(result.document);
-        }
-      })
-      .catch(error => {
-        if (cancelled || sequence !== solveSequence.current) return;
-        lastCheckedRevision.current = `${doc.id}:${doc.revision}`;
-        setSolving(false);
-        setProblems(failedCheckProblems(error));
-        setInProgress(false);
-        setStatus('Sketch could not be checked');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [doc, session, checkEpoch, sketchOnly, normalizePatternVariableSource, solveFeedback]);
+  const { conflictedConstraints, status, problems, sketchProblems, featureProblems, unbuiltParts, inProgress, solving, sketchStatuses } =
+    useSketchCheck({
+      doc,
+      session,
+      checkEpoch,
+      sketchOnly,
+      lastCheckedRevision,
+      finishing,
+      drag,
+      annotationDrag,
+      documentRef,
+      setDocument,
+      callbacks,
+      normalizePatternVariableSource,
+      solveFeedback,
+    });
 
   useEffect(() => {
     if (!dimension) return;
@@ -924,73 +881,30 @@ export function CadEditor({
     applyConicRho() ||
     (tool === 'linearPattern' && selected.length ? acceptLinearPattern() : null) ||
     (creationValues?.editing ? applyCreationValue({ advance: false }) : null);
-  const prepareDocument = (): CadDocument | null => {
-    const blocked = (reason: string) => {
-      setFinishError(reason);
-      setMessage(reason);
-      callbacks.current.onFinishBlocked?.(reason);
-      return null;
-    };
-    if (busy || solving || finishing.current || preparingDimension.current) return blocked('Wait for the current sketch check to finish.');
-    const reason = !thicknessValid ? 'Enter a valid part thickness before finishing the sketch.' : pendingFinishReason;
-    if (reason) {
-      return blocked(reason);
-    }
-    try {
-      const error = applyPendingValues();
-      if (error) return blocked(error);
-    } catch (error) {
-      return blocked(error instanceof Error ? error.message : String(error));
-    }
-    if (lineContinuation) setPending([]);
-    return documentRef.current;
-  };
-  const finish = async (): Promise<boolean> => {
-    const prepared = prepareDocument();
-    if (!prepared) return false;
-    finishing.current = true;
-    setFinishError(null);
-    setBusy(true);
-    try {
-      await callbacks.current.onFinish(prepared);
-      acceptCadSession(session, prepared);
-      return true;
-    } catch (error) {
-      setFinishError(error instanceof Error ? error.message : String(error));
-      return false;
-    } finally {
-      finishing.current = false;
-      setBusy(false);
-      // Acceptance owns normalization while it runs. Resume ordinary draft checks
-      // if the editor stays mounted after a blocked acceptance or a host callback.
-      requestSketchCheck();
-      // Going inert dropped keyboard focus, and the editor can stay mounted, so shortcuts need it back.
-      restoreCanvasKeyboard();
-    }
-  };
-  useImperativeHandle(controller, () => ({
-    finish,
-    prepareDocument,
-    rolledTo: () => userRollback,
-    updateSettings: settings => {
-      const prepared = settings.lengthUnit === documentRef.current.lengthUnit ? documentRef.current : prepareDocument();
-      if (!prepared) return false;
-      commit({ ...withCadLengthUnit(prepared, settings.lengthUnit ?? 'mm'), name: settings.name });
-      return true;
-    },
-  }));
-  const cancel = async () => {
-    setBusy(true);
-    try {
-      publish(restoreCadSession(session, { document: session.entry, past: [], future: [] }));
-      await callbacks.current.onCancel();
-      endCadSession(doc.id);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const { prepareDocument, finish, cancel } = useEditorAcceptance({
+    controller,
+    session,
+    docId: doc.id,
+    documentRef,
+    callbacks,
+    busy,
+    setBusy,
+    solving,
+    finishing,
+    preparingDimension,
+    thicknessValid,
+    pendingFinishReason,
+    applyPendingValues,
+    lineContinuation,
+    setPending,
+    setFinishError,
+    setMessage,
+    requestSketchCheck,
+    restoreCanvasKeyboard,
+    publish,
+    commit,
+    userRollback,
+  });
   // Built on each call, so the navigation below reads this render's values, as it did when it was closures here.
   const studioNavigationInput = (): StudioNavigationInput => ({
     apartIds,
@@ -1079,29 +993,23 @@ export function CadEditor({
   const offsetDimension = offsetPreview?.ok
     ? (offsetPreview.sketch.constraints.find(c => c.id === offsetPreview.dimensionId && numeric(c)) as NumericConstraint | undefined)
     : undefined;
-  const activeSketchStatus = sketchStatuses[part?.id ?? ''];
   const variableProblems = cadVariableProblems(doc);
-  // A dimension that can't follow its variables shows like a conflicting one.
-  const shownConflicts = [...conflictedConstraints, ...variableProblems.flatMap(problem => problem.constraintIds ?? [])];
-  // A studio sketch closes whatever its edit did to the features built from it, which show as broken in the feature list.
-  const openSketchProblems = studioSession && !showWorkspace ? sketchProblems : problems;
-  const displayStatus =
-    activeSketchStatus?.status === 'solved' && (inProgress || !openSketchProblems.length)
-      ? sketchDofStatus(activeSketchStatus.dof, isEmptySketch(sketch))
-      : status;
-  const currentSolverResult = !solving && lastCheckedRevision.current === `${doc.id}:${doc.revision}`;
-  const colorNotice = currentSolverResult ? constraintColorNotice(activeSketchStatus) : undefined;
-  const entityStatus =
-    currentSolverResult &&
-    !drag.current &&
-    !cornerPreview?.ok &&
-    !transformPreview?.ok &&
-    !linearPreview?.ok &&
-    !slotPreview?.ok &&
-    activeSketchStatus?.status === 'solved'
-      ? activeSketchStatus.entityStatus
-      : undefined;
-  const stroke = sketchStrokeColor(activeSketchStatus, currentSolverResult);
+  const { activeSketchStatus, shownConflicts, openSketchProblems, displayStatus, colorNotice, entityStatus, stroke } = sketchCheckDisplay({
+    doc,
+    partId: part?.id,
+    sketch,
+    sketchStatuses,
+    conflictedConstraints,
+    variableConstraintIds: variableProblems.flatMap(problem => problem.constraintIds ?? []),
+    problems,
+    sketchProblems,
+    status,
+    inProgress,
+    solving,
+    lastCheckedRevision: lastCheckedRevision.current,
+    studioSketchOpen: studioSession && !showWorkspace,
+    previewing: !!drag.current || !!cornerPreview?.ok || !!transformPreview?.ok || !!linearPreview?.ok || !!slotPreview?.ok,
+  });
   const grid = Math.max(1, 10 ** Math.floor(Math.log10(view.w / 20)));
   const acceptanceNotice = notice ?? useNotice ?? finishError;
   // Read when a region is picked, after this render has worked out which features show.
