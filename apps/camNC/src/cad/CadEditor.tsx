@@ -44,14 +44,12 @@ import {
 import { DesignUnitContext, useDesignUnits } from './designUnits';
 import { useSketchCommandPreviews } from './useSketchCommandPreviews';
 import { SketchCommandControls } from './SketchCommandControls';
-import { initialCircularPatternParameters } from './circularPatternParameters';
 import {
   visibleSketchPointIds,
   type CadDimension,
   type CadDocument,
   type CadDrawnOn,
   type CadSketch,
-  type CadPoint,
   cadVariableProblems,
   drawnOnOutline,
   resolveExtrudeSteps,
@@ -75,8 +73,6 @@ import {
 } from '@wbcnc/cad-editor/dimensionWorkflow';
 import { idleDrawingGesture, type DrawingGesture } from '@wbcnc/cad-editor/drawingGesture';
 import { type CreationValues } from './creationValues';
-import { initialLinearPatternParameters, type LinearPatternParameters } from './linearPatternParameters';
-import { initialTransformParameters } from './transformParameters';
 import { SketchDrawing } from './SketchDrawing';
 import { sketchPlaneName } from './drawnOnName';
 import { SketchContextMenu } from './SketchContextMenu';
@@ -100,7 +96,6 @@ import { type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
 import { type CutRegion } from './cutRegions';
 import { sketchTools as tools } from './sketchTools';
-import { idleModificationWorkflow, type ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
 import { useSvgPixelScale } from './sketchAppearance';
 import { associatedEntityIds } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
@@ -157,6 +152,7 @@ import { useEditorDocumentKeys } from './useEditorDocumentKeys';
 import { useEditorKeyboardFocus } from './useEditorKeyboardFocus';
 import { useSketchCanvasBox, useSketchWheelZoom } from './useSketchCanvasViewport';
 import { useSketchCheck } from './useSketchCheck';
+import { useSketchCommandState } from './useSketchCommandState';
 import { sketchCheckDisplay } from './sketchCheckDisplay';
 import { useEditorAcceptance } from './useEditorAcceptance';
 import { editedStep, useEditorVariableFields } from './useEditorVariableFields';
@@ -203,9 +199,9 @@ export function CadEditor({
   const [showConstraints, setShowConstraints] = useState(true);
   const [hoveredConstraintEntities, setHoveredConstraintEntities] = useState<string[]>([]);
   const [pending, setPending] = useState<Point[]>([]);
-  const [polygonSides, setPolygonSides] = useState('6');
+  const commandState = useSketchCommandState(lengthText, lengthUnit);
+  const { filletEditing, conicEditing, setConicEditing, setRho, splitFirst, modification } = commandState;
   const polygonInput = useRef<HTMLInputElement>(null);
-  const polygonCountGesture = useRef<{ sides: number; radius: number } | null>(null);
   useLayoutEffect(() => {
     if (polygonTool && pending.length === 2) {
       polygonInput.current?.focus();
@@ -252,37 +248,11 @@ export function CadEditor({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('Choose a drawing tool or select geometry.');
   const [finishError, setFinishError] = useState<string | null>(null);
-  const [width, setWidth] = useState(lengthText(100));
-  const [height, setHeight] = useState(lengthText(60));
-  const [radius, setRadius] = useState(lengthText(10));
-  const [slotWidth, setSlotWidth] = useState(lengthText(10));
-  const [slotChain, setSlotChain] = useState(false);
-  const [sharedSlotWidth, setSharedSlotWidth] = useState<string | undefined>();
-  const slotWidthField = useRef<HTMLInputElement>(null);
   const handleDrag = useRef<HandleDrag | null>(null);
   const startHandleDrag = (event: { pointerId: number }, gesture: HandleDrag) => {
     handleDrag.current = gesture;
     svg.current?.setPointerCapture(event.pointerId);
   };
-  const [circularParameters, setCircularParameters] = useState(initialCircularPatternParameters);
-  const circularFields = useRef<Partial<Record<'count' | 'angle', HTMLInputElement>>>({});
-  const [linearParameters, setLinearParameters] = useState(() => initialLinearPatternParameters(lengthUnit));
-  const [patternEditId, setPatternEditId] = useState<string | null>(null);
-  const [patternNotice, setPatternNotice] = useState('');
-  const patternCommandId = useRef('');
-  const patternFields = useRef<Partial<Record<Exclude<keyof LinearPatternParameters, 'secondDirection'>, HTMLInputElement>>>({});
-  const [transformParameters, setTransformParameters] = useState(() => initialTransformParameters(undefined, lengthUnit));
-  const [transformNotice, setTransformNotice] = useState('');
-  const [splitNotice, setSplitNotice] = useState('');
-  const [splitFirst, setSplitFirst] = useState<{ entityId: string; parameter: number; point: CadPoint } | null>(null);
-  const [chamferDistances, setChamferDistances] = useState([lengthText(10), lengthText(10)]);
-  const [filletRadius, setFilletRadius] = useState(lengthText(10));
-  const [filletEditing, setFilletEditing] = useState(false);
-  const [modification, setModification] = useState<ModificationWorkflow>(idleModificationWorkflow);
-  const [hoveredModifyCurve, setHoveredModifyCurve] = useState<string | null>(null);
-  const [modifyTarget, setModifyTarget] = useState<Point | null>(null);
-  const [conicEditing, setConicEditing] = useState<string | null>(null);
-  const [rho, setRho] = useState('0.5');
   const [selectionBox, setSelectionBox] = useState<CadSelectionBox | null>(null);
   const [regionField, setRegionField] = useState<{ entry: CutRegion; anchor: Point } | null>(null);
   const [show3D, setShow3D] = useState(startIn3D === 'part');
@@ -405,7 +375,6 @@ export function CadEditor({
   const canvasBox = useSketchCanvasBox(svg, showWorkspace, show3D);
   const dimensionInput = useRef<HTMLInputElement>(null);
   const filletInput = useRef<HTMLInputElement>(null);
-  const offsetInput = useRef<HTMLInputElement>(null);
   const rhoInput = useRef<HTMLInputElement>(null);
   const creationInput = useRef<HTMLInputElement>(null);
   const newCurveCommand = useRef<{ id: string; checkpoint: CadCommandCheckpoint } | null>(null);
@@ -487,6 +456,7 @@ export function CadEditor({
     modificationPreview,
     curvePreview,
   } = useSketchCommandPreviews({
+    ...commandState,
     sketch,
     tool,
     selected,
@@ -495,22 +465,8 @@ export function CadEditor({
     variableScope,
     parseCadValue,
     markerScale,
-    filletRadius,
-    chamferDistances,
-    transformParameters,
-    circularParameters,
-    linearParameters,
-    patternEditId,
-    patternCommandId,
-    slotWidth,
-    slotChain,
-    sharedSlotWidth,
-    modification,
-    modifyTarget,
-    hoveredModifyCurve,
     pending,
     cursor,
-    rho,
   });
   useEffect(() => {
     focusSketchCanvas(svg.current);
@@ -696,6 +652,7 @@ export function CadEditor({
   const pointerMove = (event: PointerEvent<SVGSVGElement>) => sketchPointerMove(sketchEditorInput(), event);
   // Built on each call, so the handlers below read this render's values, as they did when they were closures here.
   const sketchEditorInput = (): SketchEditorInput => ({
+    ...commandState,
     acceptCircularPattern,
     acceptLinearPattern,
     acceptOffset,
@@ -710,13 +667,11 @@ export function CadEditor({
     cancelDimensionEdit,
     centerArcSweep,
     chain,
-    chamferDistances,
     chamferPreview,
     chamferSelection,
     changeSketch,
     chooseTool,
     commit,
-    conicEditing,
     constraintMode,
     construction,
     contextPress,
@@ -741,13 +696,11 @@ export function CadEditor({
     editPattern,
     faceSketch,
     filletPreview,
-    filletRadius,
     filletSelection,
     fit,
     fixGeometry,
     fixMode,
     handleDrag,
-    height,
     hoveredReferences,
     inference,
     lastDrawingHint,
@@ -756,11 +709,9 @@ export function CadEditor({
     lengthUnit,
     lineContinuation,
     markerScale,
-    modification,
     mounted,
     newCurveCommand,
     newDimensionCommand,
-    offsetInput,
     offsetPreview,
     openContext,
     pan,
@@ -769,26 +720,20 @@ export function CadEditor({
     parsedLinear,
     part,
     partEdges,
-    patternCommandId,
-    patternEditId,
     pending,
     pendingSnaps,
     pickedEdges,
     placeDimension,
     placingDimension,
     pointAt,
-    polygonCountGesture,
-    polygonSides,
     polygonTool,
     preparingDimension,
     projectPoint,
     publish,
-    radius,
     rejectValue,
     removeSelected,
     requestSketchCheck,
     restoreCanvasKeyboard,
-    rho,
     rhoInput,
     selectDimension,
     selected,
@@ -797,9 +742,6 @@ export function CadEditor({
     session,
     setBusy,
     setChain,
-    setChamferDistances,
-    setCircularParameters,
-    setConicEditing,
     setConstraintMode,
     setConstruction,
     setContextMenu,
@@ -810,37 +752,21 @@ export function CadEditor({
     setDimensionFlow,
     setDocument,
     setDrawingCue,
-    setFilletEditing,
     setFixMode,
     setHoveredConstraintEntities,
-    setHoveredModifyCurve,
     setHoveredPoint,
     setLineContinuation,
-    setLinearParameters,
     setMessage,
-    setModification,
-    setModifyTarget,
     setPalette,
-    setPatternEditId,
-    setPatternNotice,
     setPending,
     setPickedEdges,
-    setPolygonSides,
     setRegionField,
-    setRho,
     setSelected,
     setSelectedConstraints,
     setSelectionBox,
-    setSharedSlotWidth,
     setSketchTurn,
-    setSlotChain,
-    setSlotWidth,
     setSnapCue,
-    setSplitFirst,
-    setSplitNotice,
     setTool,
-    setTransformNotice,
-    setTransformParameters,
     setUseNotice,
     setUsingEdges,
     setView,
@@ -852,7 +778,6 @@ export function CadEditor({
     snap,
     solveDrag,
     solving,
-    splitFirst,
     svg,
     takeEdges,
     tangentAxis,
@@ -862,7 +787,6 @@ export function CadEditor({
     usingEdges,
     variableScope,
     view,
-    width,
   });
   const pointerEnd = (cancel = false, event?: PointerEvent<SVGSVGElement>) => sketchPointerEnd(sketchEditorInput(), cancel, event);
   const pendingFinishReason = sketchPendingFinishReason({
@@ -1388,15 +1312,13 @@ export function CadEditor({
               if (event.button !== 2) keyboardContext();
             }}>
             <SketchDrawing
+              {...commandState}
               activeSketchStatus={activeSketchStatus}
               annotationSketch={annotationSketch}
               centerArcSweep={centerArcSweep}
               acceptLinearPattern={acceptLinearPattern}
               chain={chain}
-              chamferDistances={chamferDistances}
               chamferPreview={chamferPreview}
-              circularFields={circularFields}
-              circularParameters={circularParameters}
               constraintMode={constraintMode}
               construction={construction}
               cornerPreview={cornerPreview}
@@ -1419,11 +1341,9 @@ export function CadEditor({
               hoveredPoint={hoveredPoint}
               inference={inference}
               lastCheckedRevision={lastCheckedRevision}
-              linearParameters={linearParameters}
               linearPreview={linearPreview}
               markerScale={markerScale}
               mirrorPreview={mirrorPreview}
-              modification={modification}
               modificationPreview={modificationPreview}
               offsetDimension={offsetDimension}
               offsetPreview={offsetPreview}
@@ -1433,20 +1353,16 @@ export function CadEditor({
               part={part}
               partEdges={partEdges}
               patternAnchor={patternAnchor}
-              patternFields={patternFields}
               pending={pending}
               pickedEdges={pickedEdges}
               placingDimension={placingDimension}
-              polygonSides={polygonSides}
               selectDimension={selectDimension}
               selected={selected}
               selectedConstraints={selectedConstraints}
               selectionBox={selectionBox}
-              setConicEditing={setConicEditing}
               setDimension={setDimension}
               setHoveredConstraintEntities={setHoveredConstraintEntities}
               setMessage={setMessage}
-              setRho={setRho}
               setSelected={setSelected}
               setSelectedConstraints={setSelectedConstraints}
               showConstraints={showConstraints}
@@ -1457,19 +1373,16 @@ export function CadEditor({
               sketchCameraShift={sketchCameraShift}
               sketchTurn={sketchTurn}
               slotPreview={slotPreview}
-              slotWidth={slotWidth}
               slotWidthCenter={slotWidthCenter}
               slotWidthCircle={slotWidthCircle}
               snapCue={snapCue}
               solving={solving}
-              splitFirst={splitFirst}
               startAnnotationDrag={startAnnotationDrag}
               startHandleDrag={startHandleDrag}
               stroke={stroke}
               svg={svg}
               tangentAxis={tangentAxis}
               tool={tool}
-              transformParameters={transformParameters}
               transformPreview={transformPreview}
               turned={turned}
               view={view}
@@ -1478,6 +1391,7 @@ export function CadEditor({
           <CadSketchOverlays
             commandControls={
               <SketchCommandControls
+                {...commandState}
                 tool={tool}
                 selected={selected}
                 lengthUnit={lengthUnit}
@@ -1491,37 +1405,17 @@ export function CadEditor({
                 chamferPreview={chamferPreview}
                 chamferSelection={chamferSelection}
                 filletPreview={filletPreview}
-                slotWidth={slotWidth}
-                setSlotWidth={setSlotWidth}
-                slotChain={slotChain}
-                setSlotChain={setSlotChain}
-                slotWidthField={slotWidthField}
                 acceptSlot={acceptSlot}
-                circularParameters={circularParameters}
-                setCircularParameters={setCircularParameters}
-                circularFields={circularFields}
                 acceptCircularPattern={acceptCircularPattern}
-                linearParameters={linearParameters}
-                setLinearParameters={setLinearParameters}
-                patternFields={patternFields}
                 acceptLinearPattern={acceptLinearPattern}
-                patternNotice={patternNotice}
-                transformParameters={transformParameters}
-                setTransformParameters={setTransformParameters}
                 acceptTransform={acceptTransform}
-                transformNotice={transformNotice}
-                splitNotice={splitNotice}
-                chamferDistances={chamferDistances}
-                setChamferDistances={setChamferDistances}
                 acceptChamfer={acceptChamfer}
                 filletInput={filletInput}
-                filletRadius={filletRadius}
-                setFilletRadius={setFilletRadius}
-                setFilletEditing={setFilletEditing}
                 acceptFillet={acceptFillet}
               />
             }
             {...{
+              ...commandState,
               acceptOffset,
               addShape,
               applyConicRho,
@@ -1531,7 +1425,6 @@ export function CadEditor({
               cancelDimensionEdit,
               chooseTool,
               commit,
-              conicEditing,
               constrain,
               creationInput,
               creationValues,
@@ -1545,41 +1438,28 @@ export function CadEditor({
               drawingGroup,
               fit,
               formatLength,
-              height,
               lengthText,
               lengthUnit,
               markerScale,
-              modification,
               offsetDimension,
-              offsetInput,
               offsetPreview,
               palette,
               part,
               pending,
-              polygonCountGesture,
               polygonInput,
-              polygonSides,
               polygonTool,
-              radius,
               regionField,
-              rho,
               rhoInput,
               root,
               searchMode,
               selectionHints,
               setCreationValues,
-              setHeight,
               setMessage,
-              setModification,
               setPalette,
-              setPolygonSides,
-              setRadius,
               setRegionField,
-              setRho,
               setSearchHighlight,
               setSelected,
               setShortcutsOpen,
-              setWidth,
               shortcutsOpen,
               showWorkspace,
               sketch,
@@ -1592,7 +1472,6 @@ export function CadEditor({
               toggleFix,
               tool,
               variableScope,
-              width,
             }}
           />
         </main>
